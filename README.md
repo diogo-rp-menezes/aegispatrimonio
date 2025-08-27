@@ -30,7 +30,7 @@ Seu objetivo é substituir controles manuais e planilhas por uma solução integ
 
 ## 📅 Plano de Implementação
 
-Projeto dividido em **4 fases ao longo de 20 meses**:contentReference[oaicite:6]{index=6}:
+Projeto dividido em **4 fases ao longo de 20 meses**
 
 1. ✅ **MVP** – gestão patrimonial básica.  
 2. ⚙️ **Core** – automação de processos e relatórios.  
@@ -44,7 +44,7 @@ Projeto dividido em **4 fases ao longo de 20 meses**:contentReference[oaicite:6]
 - 🔻 Redução de custos operacionais.  
 - ⏱️ Ganho de eficiência nas equipes de TI/Administração.  
 - ✅ Conformidade regulatória e auditoria facilitada.  
-- 📉 Payback estimado em **~9 meses**, ROI acima de **400%**:contentReference[oaicite:7]{index=7}.  
+- 📉 Payback estimado em **~9 meses**, ROI acima de **400%**
 
 ---
 
