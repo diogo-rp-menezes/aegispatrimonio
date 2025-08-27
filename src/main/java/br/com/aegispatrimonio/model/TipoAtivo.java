@@ -39,10 +39,10 @@ public class TipoAtivo {
     @Column(name = "atualizado_em")
     private LocalDateTime atualizadoEm;
     
-    // Construtor personalizado para inicializar as datas
-    public TipoAtivo() {
-        this.criadoEm = LocalDateTime.now();
-        this.atualizadoEm = LocalDateTime.now();
+    @PrePersist // Adicione este método
+    protected void onCreate() {
+        criadoEm = LocalDateTime.now();
+        atualizadoEm = LocalDateTime.now();
     }
     
     @PreUpdate

@@ -110,11 +110,3 @@ public class Ativo {
         return BigDecimal.ZERO;
     }
 }
-
-enum StatusAtivo {
-    ATIVO, EM_MANUTENCAO, INATIVO, BAIXADO
-}
-
-enum MetodoDepreciacao {
-    LINEAR, ACELERADA
-}

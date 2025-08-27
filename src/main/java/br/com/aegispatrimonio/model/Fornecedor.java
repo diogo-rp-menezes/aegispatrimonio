@@ -38,10 +38,10 @@ public class Fornecedor {
     @Column(name = "atualizado_em")
     private LocalDateTime atualizadoEm;
     
-    // Construtor personalizado para inicializar as datas
-    public Fornecedor() {
-        this.criadoEm = LocalDateTime.now();
-        this.atualizadoEm = LocalDateTime.now();
+    @PrePersist // Este método já cuida da inicialização
+    protected void onCreate() {
+        criadoEm = LocalDateTime.now();
+        atualizadoEm = LocalDateTime.now();
     }
     
     @PreUpdate

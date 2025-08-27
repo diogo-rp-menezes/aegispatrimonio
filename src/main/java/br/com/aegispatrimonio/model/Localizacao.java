@@ -2,11 +2,19 @@ package br.com.aegispatrimonio.model;
 
 import java.time.LocalDateTime;
 
-import jakarta.persistence.*;
-
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
 import lombok.Getter;
-import lombok.Setter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.ToString;
 
 @Entity
@@ -40,10 +48,10 @@ public class Localizacao {
     @Column(name = "atualizado_em")
     private LocalDateTime atualizadoEm;
     
-    // Construtor personalizado para inicializar as datas
-    public Localizacao() {
-        this.criadoEm = LocalDateTime.now();
-        this.atualizadoEm = LocalDateTime.now();
+    @PrePersist // Adicione este método
+    protected void onCreate() {
+        criadoEm = LocalDateTime.now();
+        atualizadoEm = LocalDateTime.now();
     }
     
     @PreUpdate
