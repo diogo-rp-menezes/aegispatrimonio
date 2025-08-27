@@ -24,7 +24,7 @@ Seu objetivo é substituir controles manuais e planilhas por uma solução integ
 - **Banco de Dados:** MySQL + Redis Cache  
 - **Infraestrutura:** Docker, CI/CD, Monitoramento (Prometheus + Grafana)  
 
-> 📌 Protótipo inicial foi construído em **Flask + JSON**, já migrado para arquitetura **enterprise**:contentReference[oaicite:5]{index=5}.
+> 📌 Protótipo inicial foi construído em **Flask + JSON**, já migrado para arquitetura **enterprise**
 
 ---
 
