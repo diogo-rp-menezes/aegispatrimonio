@@ -1,98 +1,119 @@
 package br.com.aegispatrimonio.service;
 
-import br.com.aegispatrimonio.exception.NotFoundException; // ✅ Seu próprio NotFoundException
-import br.com.aegispatrimonio.exception.DuplicateException;
-import br.com.aegispatrimonio.model.Ativo;
-import br.com.aegispatrimonio.model.StatusAtivo;
-import br.com.aegispatrimonio.repository.AtivoRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Optional;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.util.List;
-import java.util.Optional;
+import br.com.aegispatrimonio.dto.request.AtivoRequestDTO;
+import br.com.aegispatrimonio.dto.response.AtivoResponseDTO;
+import br.com.aegispatrimonio.model.Ativo;
+import br.com.aegispatrimonio.model.Fornecedor;
+import br.com.aegispatrimonio.model.Localizacao;
+import br.com.aegispatrimonio.model.Pessoa;
+import br.com.aegispatrimonio.model.StatusAtivo;
+import br.com.aegispatrimonio.model.TipoAtivo;
+import br.com.aegispatrimonio.repository.AtivoRepository;
+import br.com.aegispatrimonio.repository.FornecedorRepository;
+import br.com.aegispatrimonio.repository.LocalizacaoRepository;
+import br.com.aegispatrimonio.repository.PessoaRepository;
+import br.com.aegispatrimonio.repository.TipoAtivoRepository;
+import lombok.RequiredArgsConstructor;
 
-@Slf4j
 @Service
+@Transactional
 @RequiredArgsConstructor
 public class AtivoService {
 
     private final AtivoRepository ativoRepository;
+    private final TipoAtivoRepository tipoAtivoRepository;
+    private final LocalizacaoRepository localizacaoRepository;
+    private final FornecedorRepository fornecedorRepository;
+    private final PessoaRepository pessoaRepository;
 
     @Transactional
-    public Ativo criar(Ativo ativo) {
-        log.info("Criando novo ativo: {}", ativo.getNome());
-        validarNumeroPatrimonioUnico(ativo.getNumeroPatrimonio());
-        return ativoRepository.save(ativo);
+    public AtivoResponseDTO criar(AtivoRequestDTO request) {
+        validarNumeroPatrimonioUnico(request.getNumeroPatrimonio());
+        
+        Ativo ativo = convertToEntity(request);
+        Ativo savedAtivo = ativoRepository.save(ativo);
+        
+        return convertToResponseDTO(savedAtivo);
     }
 
     @Transactional(readOnly = true)
-    public Optional<Ativo> buscarPorId(Long id) {
-        log.debug("Buscando ativo por ID: {}", id);
-        return ativoRepository.findById(id);
+    public Optional<AtivoResponseDTO> buscarPorId(Long id) {
+        return ativoRepository.findById(id)
+                .map(this::convertToResponseDTO);
     }
 
     @Transactional(readOnly = true)
-    public Optional<Ativo> buscarPorNumeroPatrimonio(String numeroPatrimonio) {
-        log.debug("Buscando ativo por número de patrimônio: {}", numeroPatrimonio);
-        return ativoRepository.findByNumeroPatrimonio(numeroPatrimonio);
+    public Optional<AtivoResponseDTO> buscarPorNumeroPatrimonio(String numeroPatrimonio) {
+        return ativoRepository.findByNumeroPatrimonio(numeroPatrimonio)
+                .map(this::convertToResponseDTO);
     }
 
     @Transactional(readOnly = true)
-    public List<Ativo> listarPorTipo(Long tipoAtivoId) {
-        log.debug("Listando ativos por tipo: {}", tipoAtivoId);
-        return ativoRepository.findByTipoAtivoId(tipoAtivoId);
+    public List<AtivoResponseDTO> listarPorTipo(Long tipoAtivoId) {
+        return ativoRepository.findByTipoAtivoId(tipoAtivoId).stream()
+                .map(this::convertToResponseDTO)
+                .toList();
     }
 
     @Transactional(readOnly = true)
-    public List<Ativo> listarPorLocalizacao(Long localizacaoId) {
-        log.debug("Listando ativos por localização: {}", localizacaoId);
-        return ativoRepository.findByLocalizacaoId(localizacaoId);
+    public List<AtivoResponseDTO> listarPorLocalizacao(Long localizacaoId) {
+        return ativoRepository.findByLocalizacaoId(localizacaoId).stream()
+                .map(this::convertToResponseDTO)
+                .toList();
     }
 
     @Transactional(readOnly = true)
-    public List<Ativo> listarPorStatus(StatusAtivo status) {
-        log.debug("Listando ativos por status: {}", status);
-        return ativoRepository.findByStatus(status);
+    public List<AtivoResponseDTO> listarPorStatus(StatusAtivo status) {
+        return ativoRepository.findByStatus(status).stream()
+                .map(this::convertToResponseDTO)
+                .toList();
     }
 
     @Transactional(readOnly = true)
-    public Page<Ativo> listarTodos(Pageable pageable) {
-        log.debug("Listando todos ativos paginados");
-        return ativoRepository.findAll(pageable);
+    public Page<AtivoResponseDTO> listarTodos(Pageable pageable) {
+        return ativoRepository.findAll(pageable)
+                .map(this::convertToResponseDTO);
     }
 
     @Transactional
-    public Ativo atualizar(Long id, Ativo ativoAtualizado) {
-        log.info("Atualizando ativo ID: {}", id);
+    public AtivoResponseDTO atualizar(Long id, AtivoRequestDTO request) {
         Ativo ativoExistente = ativoRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Ativo não encontrado"));
+                .orElseThrow(() -> new RuntimeException("Ativo não encontrado com ID: " + id));
         
-        // Atualiza apenas campos permitidos
-        ativoExistente.setNome(ativoAtualizado.getNome());
-        ativoExistente.setValorAquisicao(ativoAtualizado.getValorAquisicao());
-        ativoExistente.setStatus(ativoAtualizado.getStatus());
-        // ... outros campos
+        if (!ativoExistente.getNumeroPatrimonio().equals(request.getNumeroPatrimonio())) {
+            validarNumeroPatrimonioUnico(request.getNumeroPatrimonio());
+        }
         
-        return ativoRepository.save(ativoExistente);
+        updateEntityFromRequest(ativoExistente, request);
+        Ativo updatedAtivo = ativoRepository.save(ativoExistente);
+        
+        return convertToResponseDTO(updatedAtivo);
     }
 
     @Transactional
     public void deletar(Long id) {
-        log.info("Deletando ativo ID: {}", id);
         Ativo ativo = ativoRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Ativo não encontrado"));
+                .orElseThrow(() -> new RuntimeException("Ativo não encontrado com ID: " + id));
         ativoRepository.delete(ativo);
     }
 
     @Transactional(readOnly = true)
-    public List<Ativo> buscarPorFaixaDeValor(BigDecimal valorMin, BigDecimal valorMax) {
-        log.debug("Buscando ativos por faixa de valor: {} - {}", valorMin, valorMax);
-        return ativoRepository.findByValorAquisicaoBetween(valorMin, valorMax);
+    public List<AtivoResponseDTO> buscarPorFaixaDeValor(BigDecimal valorMin, BigDecimal valorMax) {
+        return ativoRepository.findByValorAquisicaoBetween(
+                valorMin, 
+                valorMax
+            ).stream()
+            .map(this::convertToResponseDTO)
+            .toList();
     }
 
     @Transactional(readOnly = true)
@@ -100,9 +121,70 @@ public class AtivoService {
         return ativoRepository.existsByNumeroPatrimonio(numeroPatrimonio);
     }
 
+    // Métodos de conversão
+    private Ativo convertToEntity(AtivoRequestDTO request) {
+        Ativo ativo = new Ativo();
+        updateEntityFromRequest(ativo, request);
+        return ativo;
+    }
+
+    private void updateEntityFromRequest(Ativo ativo, AtivoRequestDTO request) {
+        ativo.setNome(request.getNome());
+        ativo.setNumeroPatrimonio(request.getNumeroPatrimonio());
+        ativo.setStatus(request.getStatus());
+        ativo.setDataAquisicao(request.getDataAquisicao());
+        ativo.setValorAquisicao(request.getValorAquisicao());
+        ativo.setValorResidual(request.getValorResidual());
+        ativo.setVidaUtilMeses(request.getVidaUtilMeses());
+        ativo.setMetodoDepreciacao(request.getMetodoDepreciacao());
+        ativo.setDataInicioDepreciacao(request.getDataInicioDepreciacao());
+        ativo.setInformacoesGarantia(request.getInformacoesGarantia());
+        ativo.setObservacoes(request.getObservacoes());
+        
+        // Configurar relações
+        if (request.getTipoAtivoId() != null) {
+            TipoAtivo tipoAtivo = tipoAtivoRepository.findById(request.getTipoAtivoId())
+                    .orElseThrow(() -> new RuntimeException("Tipo de ativo não encontrado"));
+            ativo.setTipoAtivo(tipoAtivo);
+        }
+        
+        if (request.getLocalizacaoId() != null) {
+            Localizacao localizacao = localizacaoRepository.findById(request.getLocalizacaoId())
+                    .orElseThrow(() -> new RuntimeException("Localização não encontrada"));
+            ativo.setLocalizacao(localizacao);
+        }
+        
+        if (request.getFornecedorId() != null) {
+            Fornecedor fornecedor = fornecedorRepository.findById(request.getFornecedorId())
+                    .orElseThrow(() -> new RuntimeException("Fornecedor não encontrado"));
+            ativo.setFornecedor(fornecedor);
+        }
+        
+        if (request.getPessoaResponsavelId() != null) {
+            Pessoa pessoa = pessoaRepository.findById(request.getPessoaResponsavelId())
+                    .orElseThrow(() -> new RuntimeException("Pessoa responsável não encontrada"));
+            ativo.setPessoaResponsavel(pessoa);
+        }
+        
+        // Configurar campos calculados
+        if (ativo.getVidaUtilMeses() != null && ativo.getVidaUtilMeses() > 0) {
+            BigDecimal depreciableAmount = ativo.getValorAquisicao().subtract(ativo.getValorResidual());
+            BigDecimal monthlyRate = depreciableAmount.divide(
+                BigDecimal.valueOf(ativo.getVidaUtilMeses()), 
+                10, 
+                java.math.RoundingMode.HALF_UP
+            );
+            ativo.setTaxaDepreciacaoMensal(monthlyRate);
+        }
+    }
+
+    private AtivoResponseDTO convertToResponseDTO(Ativo ativo) {
+        return AtivoResponseDTO.fromEntity(ativo);
+    }
+
     private void validarNumeroPatrimonioUnico(String numeroPatrimonio) {
         if (ativoRepository.existsByNumeroPatrimonio(numeroPatrimonio)) {
-            throw new DuplicateException("Número de patrimônio já existe: " + numeroPatrimonio);
+            throw new RuntimeException("Número de patrimônio já existe: " + numeroPatrimonio);
         }
     }
 }
