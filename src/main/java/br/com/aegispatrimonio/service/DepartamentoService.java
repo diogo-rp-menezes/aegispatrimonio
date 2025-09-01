@@ -21,7 +21,6 @@ public class DepartamentoService {
 
     @Transactional
     public DepartamentoResponseDTO criar(DepartamentoRequestDTO request) {
-        validarRequest(request);
         validarCentroCustoUnico(request.getCentroCusto(), null);
         
         Departamento departamento = convertToEntity(request);
@@ -39,10 +38,9 @@ public class DepartamentoService {
 
     @Transactional(readOnly = true)
     public DepartamentoResponseDTO buscarPorId(Long id) {
-        return convertToResponseDTO(
-            departamentoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Departamento não encontrado com ID: " + id))
-        );
+        return departamentoRepository.findById(id)
+                .map(this::convertToResponseDTO)
+                .orElseThrow(() -> new RuntimeException("Departamento não encontrado com ID: " + id));
     }
 
     @Transactional(readOnly = true)
@@ -53,30 +51,27 @@ public class DepartamentoService {
     }
 
     @Transactional(readOnly = true)
-    public Optional<DepartamentoResponseDTO> buscarPorCentroCusto(String centroCusto) {
+    public DepartamentoResponseDTO buscarPorCentroCusto(String centroCusto) {
         return departamentoRepository.findByCentroCusto(centroCusto)
-                .map(this::convertToResponseDTO);
+                .map(this::convertToResponseDTO)
+                .orElseThrow(() -> new RuntimeException("Departamento não encontrado com centro de custo: " + centroCusto));
     }
 
     @Transactional(readOnly = true)
     public List<DepartamentoResponseDTO> buscarPorNome(String nome) {
-        if (nome == null || nome.trim().isEmpty()) {
-            throw new RuntimeException("Nome não pode ser vazio para busca");
-        }
-        
-        return departamentoRepository.findByNomeContaining(nome.trim()).stream()
+        return departamentoRepository.findByNomeContaining(nome).stream()
                 .map(this::convertToResponseDTO)
                 .toList();
     }
 
     @Transactional
     public DepartamentoResponseDTO atualizar(Long id, DepartamentoRequestDTO request) {
-        validarRequest(request);
-        
         Departamento departamentoExistente = departamentoRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Departamento não encontrado com ID: " + id));
         
-        validarCentroCustoUnico(request.getCentroCusto(), id);
+        if (request.getCentroCusto() != null && !departamentoExistente.getCentroCusto().equals(request.getCentroCusto())) {
+            validarCentroCustoUnico(request.getCentroCusto(), id);
+        }
         
         updateEntityFromRequest(departamentoExistente, request);
         Departamento updatedDepartamento = departamentoRepository.save(departamentoExistente);
@@ -86,38 +81,12 @@ public class DepartamentoService {
 
     @Transactional
     public void deletar(Long id) {
-        if (!departamentoRepository.existsById(id)) {
-            throw new RuntimeException("Departamento não encontrado com ID: " + id);
-        }
-        departamentoRepository.deleteById(id);
+        Departamento departamento = departamentoRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Departamento não encontrado com ID: " + id));
+        departamentoRepository.delete(departamento);
     }
 
-    // Métodos auxiliares
-    private void validarRequest(DepartamentoRequestDTO request) {
-        if (request.getNome() == null || request.getNome().trim().isEmpty()) {
-            throw new RuntimeException("Nome do departamento é obrigatório");
-        }
-        
-        if (request.getCentroCusto() == null || request.getCentroCusto().trim().isEmpty()) {
-            throw new RuntimeException("Centro de custo é obrigatório");
-        }
-        
-        if (request.getFilialId() == null) {
-            throw new RuntimeException("ID da filial é obrigatório");
-        }
-    }
-
-    private void validarCentroCustoUnico(String centroCusto, Long idIgnorado) {
-        if (centroCusto != null) {
-            Optional<Departamento> departamentoExistente = departamentoRepository.findByCentroCusto(centroCusto);
-            
-            if (departamentoExistente.isPresent() && 
-                (idIgnorado == null || !departamentoExistente.get().getId().equals(idIgnorado))) {
-                throw new RuntimeException("Já existe um departamento com o centro de custo: " + centroCusto);
-            }
-        }
-    }
-
+    // Métodos de conversão
     private Departamento convertToEntity(DepartamentoRequestDTO request) {
         Departamento departamento = new Departamento();
         updateEntityFromRequest(departamento, request);
@@ -125,9 +94,9 @@ public class DepartamentoService {
     }
 
     private void updateEntityFromRequest(Departamento departamento, DepartamentoRequestDTO request) {
-        departamento.setNome(request.getNome().trim());
-        departamento.setCentroCusto(request.getCentroCusto().trim());
-        // Filial será setada via ID posteriormente no controller ou via mapper
+        departamento.setNome(request.getNome());
+        departamento.setCentroCusto(request.getCentroCusto());
+        // Filial será setada via ID posteriormente
     }
 
     private DepartamentoResponseDTO convertToResponseDTO(Departamento departamento) {
@@ -144,5 +113,16 @@ public class DepartamentoService {
         }
         
         return dto;
+    }
+
+    private void validarCentroCustoUnico(String centroCusto, Long idIgnorado) {
+        if (centroCusto != null) {
+            Optional<Departamento> departamentoExistente = departamentoRepository.findByCentroCusto(centroCusto);
+            
+            if (departamentoExistente.isPresent() && 
+                (idIgnorado == null || !departamentoExistente.get().getId().equals(idIgnorado))) {
+                throw new RuntimeException("Já existe um departamento com o centro de custo: " + centroCusto);
+            }
+        }
     }
 }

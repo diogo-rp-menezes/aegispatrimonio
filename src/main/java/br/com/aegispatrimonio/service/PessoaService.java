@@ -37,15 +37,17 @@ public class PessoaService {
     }
 
     @Transactional(readOnly = true)
-    public Optional<PessoaResponseDTO> buscarPorId(Long id) {
+    public PessoaResponseDTO buscarPorId(Long id) {
         return pessoaRepository.findById(id)
-                .map(this::convertToResponseDTO);
+                .map(this::convertToResponseDTO)
+                .orElseThrow(() -> new RuntimeException("Pessoa não encontrada com ID: " + id));
     }
 
     @Transactional(readOnly = true)
-    public Optional<PessoaResponseDTO> buscarPorEmail(String email) {
+    public PessoaResponseDTO buscarPorEmail(String email) {
         return pessoaRepository.findByEmail(email)
-                .map(this::convertToResponseDTO);
+                .map(this::convertToResponseDTO)
+                .orElseThrow(() -> new RuntimeException("Pessoa não encontrada com email: " + email));
     }
 
     @Transactional(readOnly = true)
@@ -94,7 +96,6 @@ public class PessoaService {
     private void updateEntityFromRequest(Pessoa pessoa, PessoaRequestDTO request) {
         pessoa.setNome(request.getNome());
         pessoa.setEmail(request.getEmail());
-        // Removido: pessoa.setTelefone(request.getTelefone());
         // Departamento será setado via ID posteriormente
     }
 
@@ -103,7 +104,6 @@ public class PessoaService {
         dto.setId(pessoa.getId());
         dto.setNome(pessoa.getNome());
         dto.setEmail(pessoa.getEmail());
-        // Removido: dto.setTelefone(pessoa.getTelefone());
         dto.setCriadoEm(pessoa.getCriadoEm());
         dto.setAtualizadoEm(pessoa.getAtualizadoEm());
         
