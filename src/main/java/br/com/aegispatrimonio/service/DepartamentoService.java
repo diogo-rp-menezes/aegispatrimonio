@@ -1,15 +1,16 @@
 package br.com.aegispatrimonio.service;
 
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import br.com.aegispatrimonio.dto.request.DepartamentoRequestDTO;
 import br.com.aegispatrimonio.dto.response.DepartamentoResponseDTO;
 import br.com.aegispatrimonio.model.Departamento;
 import br.com.aegispatrimonio.repository.DepartamentoRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import java.util.Optional;
 
 @Service
 @Transactional
