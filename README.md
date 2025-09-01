@@ -1,5 +1,5 @@
 
-# Aegis Patrim√¥nio Ìª°Ô∏è
+# Aegis Patrim√¥nio
 
 
 
@@ -15,7 +15,7 @@ Sistema completo de gest√£o patrimonial com controle de ativos, fornecedores e l
 
 
 
-## Ì≥ã Sobre o Projeto
+## ÔøΩÔøΩÔøΩ Sobre o Projeto
 
 
 
@@ -23,7 +23,7 @@ O Aegis Patrim√¥nio √© um sistema robusto desenvolvido em Spring Boot para gest√
 
 
 
-## ÌæØ Objetivos
+## Objetivos
 
 
 
@@ -47,7 +47,7 @@ O Aegis Patrim√¥nio √© um sistema robusto desenvolvido em Spring Boot para gest√
 
 
 
-## Ìª†Ô∏è Tecnologias Utilizadas
+## Tecnologias Utilizadas
 
 
 
@@ -101,7 +101,7 @@ Chart.js - Gr√°ficos e dashboards
 
 
 
-## Ì≥ã Funcionalidades
+## Funcionalidades
 
 
 
@@ -135,7 +135,7 @@ Migra√ß√µes com Flyway
 
 
 
-### Ì∫ß Em Desenvolvimento
+### Em Desenvolvimento
 
 Endpoints RESTful
 
@@ -161,7 +161,7 @@ Integra√ß√£o com leitor de QR Code
 
 
 
-## Ì≥Ñ Licen√ßa
+## Licen√ßa
 
 
 
@@ -169,7 +169,7 @@ Este projeto est√° sob a licen√ßa MIT. Veja o arquivo LICENSE para detalhes.
 
 
 
-## Ì±®‚ÄçÌ≤ª Desenvolvedor
+## Desenvolvedor
 
 
 
@@ -177,11 +177,11 @@ Diogo Menezes
 
 
 
-Ì≥ß Email: diogorpm@gmail.com
+Email: diogorpm@gmail.com
 
 
 
-Ì∞ô GitHub: @diogo-rp-menezes
+GitHub: @diogo-rp-menezes
 
 
 
@@ -191,7 +191,7 @@ Diogo Menezes
 
 
 
-"Prote√ß√£o digital para seu patrim√¥nio f√≠sico" Ìª°Ô∏è
+"Prote√ß√£o digital para seu patrim√¥nio f√≠sico"
 
 </div>
 
