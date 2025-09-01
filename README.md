@@ -15,7 +15,7 @@ Sistema completo de gestão patrimonial com controle de ativos, fornecedores e l
 
 
 
-## ��� Sobre o Projeto
+## Sobre o Projeto
 
 
 
