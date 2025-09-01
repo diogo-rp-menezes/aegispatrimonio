@@ -1,70 +1,65 @@
 package br.com.aegispatrimonio.controller;
 
-import br.com.aegispatrimonio.dto.request.DepartamentoRequestDTO;
-import br.com.aegispatrimonio.dto.response.DepartamentoResponseDTO;
-import br.com.aegispatrimonio.service.DepartamentoService;
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
+import java.util.Optional;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import br.com.aegispatrimonio.model.Departamento;
+import br.com.aegispatrimonio.service.DepartamentoService;
 
 @RestController
-@RequestMapping("/api/departamentos")
-@RequiredArgsConstructor
+@RequestMapping("/departamentos")
 public class DepartamentoController {
 
-    private final DepartamentoService departamentoService;
-
-    @PostMapping
-    public ResponseEntity<DepartamentoResponseDTO> criar(@Valid @RequestBody DepartamentoRequestDTO request) {
-        DepartamentoResponseDTO response = departamentoService.criar(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
-    }
+    @Autowired
+    private DepartamentoService departamentoService;
 
     @GetMapping
-    public ResponseEntity<List<DepartamentoResponseDTO>> listarTodos() {
-        List<DepartamentoResponseDTO> departamentos = departamentoService.listarTodos();
-        return ResponseEntity.ok(departamentos);
+    public List<Departamento> getAllDepartamentos() {
+        return departamentoService.findAll();
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<DepartamentoResponseDTO> buscarPorId(@PathVariable Long id) {
-        DepartamentoResponseDTO departamento = departamentoService.buscarPorId(id);
-        return ResponseEntity.ok(departamento);
+    public ResponseEntity<Departamento> getDepartamentoById(@PathVariable Long id) {
+        Optional<Departamento> departamento = departamentoService.findById(id);
+        return departamento.map(ResponseEntity::ok)
+                         .orElse(ResponseEntity.notFound().build());
     }
 
-    @GetMapping("/filial/{filialId}")
-    public ResponseEntity<List<DepartamentoResponseDTO>> listarPorFilial(@PathVariable Long filialId) {
-        List<DepartamentoResponseDTO> departamentos = departamentoService.listarPorFilial(filialId);
-        return ResponseEntity.ok(departamentos);
-    }
-
-    @GetMapping("/centro-custo/{centroCusto}")
-    public ResponseEntity<DepartamentoResponseDTO> buscarPorCentroCusto(@PathVariable String centroCusto) {
-        DepartamentoResponseDTO departamento = departamentoService.buscarPorCentroCusto(centroCusto);
-        return ResponseEntity.ok(departamento);
-    }
-
-    @GetMapping("/buscar")
-    public ResponseEntity<List<DepartamentoResponseDTO>> buscarPorNome(@RequestParam String nome) {
-        List<DepartamentoResponseDTO> departamentos = departamentoService.buscarPorNome(nome);
-        return ResponseEntity.ok(departamentos);
+    @PostMapping
+    public Departamento createDepartamento(@RequestBody Departamento departamento) {
+        return departamentoService.save(departamento);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<DepartamentoResponseDTO> atualizar(
-            @PathVariable Long id, 
-            @Valid @RequestBody DepartamentoRequestDTO request) {
-        DepartamentoResponseDTO response = departamentoService.atualizar(id, request);
-        return ResponseEntity.ok(response);
+    public ResponseEntity<Departamento> updateDepartamento(@PathVariable Long id, @RequestBody Departamento departamentoDetails) {
+        Optional<Departamento> departamento = departamentoService.findById(id);
+        if (departamento.isPresent()) {
+            Departamento existingDepartamento = departamento.get();
+            existingDepartamento.setNome(departamentoDetails.getNome());
+            existingDepartamento.setFilial(departamentoDetails.getFilial());
+            existingDepartamento.setCentroCusto(departamentoDetails.getCentroCusto());
+            return ResponseEntity.ok(departamentoService.save(existingDepartamento));
+        }
+        return ResponseEntity.notFound().build();
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deletar(@PathVariable Long id) {
-        departamentoService.deletar(id);
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<?> deleteDepartamento(@PathVariable Long id) {
+        if (departamentoService.existsById(id)) {
+            departamentoService.deleteById(id);
+            return ResponseEntity.ok().build();
+        }
+        return ResponseEntity.notFound().build();
     }
 }
