@@ -94,6 +94,7 @@ public class PessoaService {
     private void updateEntityFromRequest(Pessoa pessoa, PessoaRequestDTO request) {
         pessoa.setNome(request.getNome());
         pessoa.setEmail(request.getEmail());
+        // Removido: pessoa.setTelefone(request.getTelefone());
         // Departamento será setado via ID posteriormente
     }
 
@@ -102,6 +103,7 @@ public class PessoaService {
         dto.setId(pessoa.getId());
         dto.setNome(pessoa.getNome());
         dto.setEmail(pessoa.getEmail());
+        // Removido: dto.setTelefone(pessoa.getTelefone());
         dto.setCriadoEm(pessoa.getCriadoEm());
         dto.setAtualizadoEm(pessoa.getAtualizadoEm());
         
@@ -114,7 +116,7 @@ public class PessoaService {
     }
 
     private void validarEmailUnico(String email) {
-        if (email != null && pessoaRepository.existsByEmail(email)) {
+        if (email != null && pessoaRepository.findByEmail(email).isPresent()) {
             throw new RuntimeException("Já existe uma pessoa com o email: " + email);
         }
     }
