@@ -54,6 +54,14 @@ public class FornecedorService {
                 .toList();
     }
 
+    // NOVO MÉTODO ADICIONADO
+    @Transactional(readOnly = true)
+    public List<FornecedorResponseDTO> buscarPorNomeContendo(String nome) {
+        return fornecedorRepository.findByNomeContaining(nome).stream()
+                .map(this::convertToResponseDTO)
+                .toList();
+    }
+
     @Transactional
     public FornecedorResponseDTO atualizar(Long id, FornecedorRequestDTO request) {
         Fornecedor fornecedorExistente = fornecedorRepository.findById(id)
