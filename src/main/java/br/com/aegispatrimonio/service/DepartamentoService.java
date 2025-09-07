@@ -7,10 +7,11 @@ import br.com.aegispatrimonio.model.Filial;
 import br.com.aegispatrimonio.repository.DepartamentoRepository;
 import br.com.aegispatrimonio.repository.FilialRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -32,10 +33,21 @@ public class DepartamentoService {
     }
 
     @Transactional(readOnly = true)
-    public List<DepartamentoResponseDTO> listarTodos() {
-        return departamentoRepository.findAll().stream()
-                .map(this::convertToResponseDTO)
-                .toList();
+    public Page<DepartamentoResponseDTO> listarTodos(Pageable pageable) {
+        return departamentoRepository.findAll(pageable)
+                .map(this::convertToResponseDTO);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<DepartamentoResponseDTO> buscarPorNome(String nome, Pageable pageable) {
+        return departamentoRepository.findByNomeContainingIgnoreCase(nome, pageable)
+                .map(this::convertToResponseDTO);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<DepartamentoResponseDTO> listarPorFilial(Long filialId, Pageable pageable) {
+        return departamentoRepository.findByFilialId(filialId, pageable)
+                .map(this::convertToResponseDTO);
     }
 
     @Transactional(readOnly = true)

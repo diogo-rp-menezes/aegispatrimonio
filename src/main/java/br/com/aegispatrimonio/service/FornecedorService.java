@@ -5,10 +5,11 @@ import br.com.aegispatrimonio.dto.response.FornecedorResponseDTO;
 import br.com.aegispatrimonio.model.Fornecedor;
 import br.com.aegispatrimonio.repository.FornecedorRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -29,10 +30,9 @@ public class FornecedorService {
     }
 
     @Transactional(readOnly = true)
-    public List<FornecedorResponseDTO> listarTodos() {
-        return fornecedorRepository.findAll().stream()
-                .map(this::convertToResponseDTO)
-                .toList();
+    public Page<FornecedorResponseDTO> listarTodos(Pageable pageable) {
+        return fornecedorRepository.findAllOrderByNome(pageable)
+                .map(this::convertToResponseDTO);
     }
 
     @Transactional(readOnly = true)
@@ -48,18 +48,15 @@ public class FornecedorService {
     }
 
     @Transactional(readOnly = true)
-    public List<FornecedorResponseDTO> buscarPorEmail(String email) {
-        return fornecedorRepository.findByEmailContato(email).stream()
-                .map(this::convertToResponseDTO)
-                .toList();
+    public Page<FornecedorResponseDTO> buscarPorEmail(String email, Pageable pageable) {
+        return fornecedorRepository.findByEmailContato(email, pageable)
+                .map(this::convertToResponseDTO);
     }
 
-    // NOVO MÉTODO ADICIONADO
     @Transactional(readOnly = true)
-    public List<FornecedorResponseDTO> buscarPorNomeContendo(String nome) {
-        return fornecedorRepository.findByNomeContaining(nome).stream()
-                .map(this::convertToResponseDTO)
-                .toList();
+    public Page<FornecedorResponseDTO> buscarPorNomeContendo(String nome, Pageable pageable) {
+        return fornecedorRepository.findByNomeContaining(nome, pageable)
+                .map(this::convertToResponseDTO);
     }
 
     @Transactional

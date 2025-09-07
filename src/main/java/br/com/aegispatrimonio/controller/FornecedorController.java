@@ -12,11 +12,13 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Optional;
 
 @RestController
@@ -41,11 +43,24 @@ public class FornecedorController {
     }
 
     @GetMapping
-    @Operation(summary = "Listar todos os fornecedores", description = "Retorna uma lista de todos os fornecedores cadastrados")
-    @ApiResponse(responseCode = "200", description = "Lista de fornecedores recuperada com sucesso")
-    public ResponseEntity<List<FornecedorResponseDTO>> listarTodos() {
-        List<FornecedorResponseDTO> fornecedores = fornecedorService.listarTodos();
-        return ResponseEntity.ok(fornecedores);
+    @Operation(summary = "Listar todos os fornecedores", description = "Retorna uma lista paginada de todos os fornecedores, com filtros opcionais")
+    public ResponseEntity<Page<FornecedorResponseDTO>> listarTodos(
+            @Parameter(description = "Nome para filtro (opcional)", example = "tech") 
+            @RequestParam(required = false) String nome,
+            @Parameter(description = "Email para filtro (opcional)", example = "contato@empresa.com") 
+            @RequestParam(required = false) String email,
+            @Parameter(description = "Parâmetros de paginação") 
+            @PageableDefault(size = 10, sort = "nome") Pageable pageable) {
+        
+        if (nome != null && !nome.trim().isEmpty()) {
+            return ResponseEntity.ok(fornecedorService.buscarPorNomeContendo(nome, pageable));
+        }
+        
+        if (email != null && !email.trim().isEmpty()) {
+            return ResponseEntity.ok(fornecedorService.buscarPorEmail(email, pageable));
+        }
+        
+        return ResponseEntity.ok(fornecedorService.listarTodos(pageable));
     }
 
     @GetMapping("/{id}")
@@ -74,26 +89,6 @@ public class FornecedorController {
         Optional<FornecedorResponseDTO> fornecedor = fornecedorService.buscarPorNome(nome);
         return fornecedor.map(ResponseEntity::ok)
                        .orElse(ResponseEntity.notFound().build());
-    }
-
-    @GetMapping("/email/{email}")
-    @Operation(summary = "Buscar fornecedores por email", description = "Retorna fornecedores que possuem o email informado")
-    @ApiResponse(responseCode = "200", description = "Fornecedores encontrados com sucesso")
-    public ResponseEntity<List<FornecedorResponseDTO>> buscarPorEmail(
-            @Parameter(description = "Email para busca", example = "contato@empresa.com") 
-            @PathVariable String email) {
-        List<FornecedorResponseDTO> fornecedores = fornecedorService.buscarPorEmail(email);
-        return ResponseEntity.ok(fornecedores);
-    }
-
-    @GetMapping("/buscar")
-    @Operation(summary = "Buscar fornecedores por nome contendo", description = "Retorna fornecedores cujo nome contenha o texto informado")
-    @ApiResponse(responseCode = "200", description = "Fornecedores encontrados com sucesso")
-    public ResponseEntity<List<FornecedorResponseDTO>> buscarPorNomeContendo(
-            @Parameter(description = "Texto para busca no nome", example = "tech") 
-            @RequestParam String nome) {
-        List<FornecedorResponseDTO> fornecedores = fornecedorService.buscarPorNomeContendo(nome);
-        return ResponseEntity.ok(fornecedores);
     }
 
     @PutMapping("/{id}")

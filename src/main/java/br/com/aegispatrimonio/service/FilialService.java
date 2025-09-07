@@ -1,8 +1,9 @@
 package br.com.aegispatrimonio.service;
 
-import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,10 +32,9 @@ public class FilialService {
     }
 
     @Transactional(readOnly = true)
-    public List<FilialResponseDTO> listarTodos() {
-        return filialRepository.findAll().stream()
-                .map(this::convertToResponseDTO)
-                .toList();
+    public Page<FilialResponseDTO> listarTodos(Pageable pageable) {
+        return filialRepository.findAllOrderByNome(pageable)
+                .map(this::convertToResponseDTO);
     }
 
     @Transactional(readOnly = true)
@@ -56,10 +56,9 @@ public class FilialService {
     }
 
     @Transactional(readOnly = true)
-    public List<FilialResponseDTO> buscarPorNomeContendo(String nome) {
-        return filialRepository.findByNomeContaining(nome).stream()
-                .map(this::convertToResponseDTO)
-                .toList();
+    public Page<FilialResponseDTO> buscarPorNomeContendo(String nome, Pageable pageable) {
+        return filialRepository.findByNomeContaining(nome, pageable)
+                .map(this::convertToResponseDTO);
     }
 
     @Transactional

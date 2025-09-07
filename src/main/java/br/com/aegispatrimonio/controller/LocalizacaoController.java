@@ -12,11 +12,13 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Optional;
 
 @RestController
@@ -28,7 +30,7 @@ public class LocalizacaoController {
     private final LocalizacaoService localizacaoService;
 
     @PostMapping
-    @Operation(summary = "Criar nova localização", description = "Cadastra uma nova localização física no sistema")
+    @Operation(summary = "Criar nova localização", description = "Cadastra uma nueva localização física no sistema")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "201", description = "Localização criada com sucesso", 
                     content = @Content(schema = @Schema(implementation = LocalizacaoResponseDTO.class))),
@@ -42,11 +44,30 @@ public class LocalizacaoController {
     }
 
     @GetMapping
-    @Operation(summary = "Listar todas as localizações", description = "Retorna uma lista de todas as localizações cadastradas")
-    @ApiResponse(responseCode = "200", description = "Lista de localizações recuperada com sucesso")
-    public ResponseEntity<List<LocalizacaoResponseDTO>> listarTodos() {
-        List<LocalizacaoResponseDTO> localizacoes = localizacaoService.listarTodos();
-        return ResponseEntity.ok(localizacoes);
+    @Operation(summary = "Listar todas as localizações", description = "Retorna uma lista paginada de todas as localizações, com filtros opcionais")
+    public ResponseEntity<Page<LocalizacaoResponseDTO>> listarTodos(
+            @Parameter(description = "Nome para filtro (opcional)", example = "sala") 
+            @RequestParam(required = false) String nome,
+            @Parameter(description = "ID da filial para filtro (opcional)", example = "1") 
+            @RequestParam(required = false) Long filialId,
+            @Parameter(description = "ID da localização pai para filtro (opcional)", example = "1") 
+            @RequestParam(required = false) Long localizacaoPaiId,
+            @Parameter(description = "Parâmetros de paginação") 
+            @PageableDefault(size = 10, sort = "nome") Pageable pageable) {
+        
+        if (nome != null && !nome.trim().isEmpty()) {
+            return ResponseEntity.ok(localizacaoService.buscarPorNome(nome, pageable));
+        }
+        
+        if (filialId != null) {
+            return ResponseEntity.ok(localizacaoService.listarPorFilial(filialId, pageable));
+        }
+        
+        if (localizacaoPaiId != null) {
+            return ResponseEntity.ok(localizacaoService.listarPorLocalizacaoPai(localizacaoPaiId, pageable));
+        }
+        
+        return ResponseEntity.ok(localizacaoService.listarTodos(pageable));
     }
 
     @GetMapping("/{id}")
@@ -61,42 +82,6 @@ public class LocalizacaoController {
         Optional<LocalizacaoResponseDTO> localizacao = localizacaoService.buscarPorId(id);
         return localizacao.map(ResponseEntity::ok)
                         .orElse(ResponseEntity.notFound().build());
-    }
-
-    @GetMapping("/filial/{filialId}")
-    @Operation(summary = "Listar localizações por filial", description = "Retorna localizações pertencentes a uma filial específica")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Localizações encontradas"),
-        @ApiResponse(responseCode = "404", description = "Filial não encontrada")
-    })
-    public ResponseEntity<List<LocalizacaoResponseDTO>> listarPorFilial(
-            @Parameter(description = "ID da filial", example = "1") 
-            @PathVariable Long filialId) {
-        List<LocalizacaoResponseDTO> localizacoes = localizacaoService.listarPorFilial(filialId);
-        return ResponseEntity.ok(localizacoes);
-    }
-
-    @GetMapping("/pai/{localizacaoPaiId}")
-    @Operation(summary = "Listar localizações filhas", description = "Retorna localizações que são subordinadas a uma localização pai")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Localizações filhas encontradas"),
-        @ApiResponse(responseCode = "404", description = "Localização pai não encontrada")
-    })
-    public ResponseEntity<List<LocalizacaoResponseDTO>> listarPorLocalizacaoPai(
-            @Parameter(description = "ID da localização pai", example = "1") 
-            @PathVariable Long localizacaoPaiId) {
-        List<LocalizacaoResponseDTO> localizacoes = localizacaoService.listarPorLocalizacaoPai(localizacaoPaiId);
-        return ResponseEntity.ok(localizacoes);
-    }
-
-    @GetMapping("/buscar")
-    @Operation(summary = "Buscar localizações por nome", description = "Retorna localizações cujo nome contenha o texto informado")
-    @ApiResponse(responseCode = "200", description = "Localizações encontradas com sucesso")
-    public ResponseEntity<List<LocalizacaoResponseDTO>> buscarPorNome(
-            @Parameter(description = "Texto para busca no nome", example = "sala") 
-            @RequestParam String nome) {
-        List<LocalizacaoResponseDTO> localizacoes = localizacaoService.buscarPorNome(nome);
-        return ResponseEntity.ok(localizacoes);
     }
 
     @PutMapping("/{id}")

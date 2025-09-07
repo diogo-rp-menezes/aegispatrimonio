@@ -12,11 +12,13 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Optional;
 
 @RestController
@@ -41,10 +43,12 @@ public class TipoAtivoController {
     }
 
     @GetMapping
-    @Operation(summary = "Listar todos os tipos de ativo", description = "Retorna uma lista de todos os tipos de ativo cadastrados")
+    @Operation(summary = "Listar todos os tipos de ativo", description = "Retorna uma lista paginada de todos os tipos de ativo cadastrados")
     @ApiResponse(responseCode = "200", description = "Lista de tipos de ativo recuperada com sucesso")
-    public ResponseEntity<List<TipoAtivoResponseDTO>> listarTodos() {
-        List<TipoAtivoResponseDTO> tiposAtivo = tipoAtivoService.listarTodos();
+    public ResponseEntity<Page<TipoAtivoResponseDTO>> listarTodos(
+            @Parameter(description = "Parâmetros de paginação") 
+            @PageableDefault(size = 10, sort = "nome") Pageable pageable) {
+        Page<TipoAtivoResponseDTO> tiposAtivo = tipoAtivoService.listarTodos(pageable);
         return ResponseEntity.ok(tiposAtivo);
     }
 
@@ -74,6 +78,18 @@ public class TipoAtivoController {
         Optional<TipoAtivoResponseDTO> tipoAtivo = tipoAtivoService.buscarPorNome(nome);
         return tipoAtivo.map(ResponseEntity::ok)
                       .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/buscar")
+    @Operation(summary = "Buscar tipos de ativo por nome", description = "Busca tipos de ativo por nome com paginação")
+    @ApiResponse(responseCode = "200", description = "Busca realizada com sucesso")
+    public ResponseEntity<Page<TipoAtivoResponseDTO>> buscarPorNome(
+            @Parameter(description = "Nome para busca", example = "comp") 
+            @RequestParam String nome,
+            @Parameter(description = "Parâmetros de paginação") 
+            @PageableDefault(size = 10, sort = "nome") Pageable pageable) {
+        Page<TipoAtivoResponseDTO> tiposAtivo = tipoAtivoService.buscarPorNomePaginado(nome, pageable);
+        return ResponseEntity.ok(tiposAtivo);
     }
 
     @GetMapping("/verificar-nome/{nome}")

@@ -1,7 +1,6 @@
 package br.com.aegispatrimonio.service;
 
 import java.math.BigDecimal;
-import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.domain.Page;
@@ -58,33 +57,11 @@ public class AtivoService {
     }
 
     @Transactional(readOnly = true)
-    public List<AtivoResponseDTO> listarPorTipo(Long tipoAtivoId) {
-        return ativoRepository.findByTipoAtivoId(tipoAtivoId).stream()
-                .map(this::convertToResponseDTO)
-                .toList();
-    }
-
-    @Transactional(readOnly = true)
-    public List<AtivoResponseDTO> listarPorLocalizacao(Long localizacaoId) {
-        return ativoRepository.findByLocalizacaoId(localizacaoId).stream()
-                .map(this::convertToResponseDTO)
-                .toList();
-    }
-
-    @Transactional(readOnly = true)
-    public List<AtivoResponseDTO> listarPorStatus(StatusAtivo status) {
-        return ativoRepository.findByStatus(status).stream()
-                .map(this::convertToResponseDTO)
-                .toList();
-    }
-
-    @Transactional(readOnly = true)
     public Page<AtivoResponseDTO> listarTodos(Pageable pageable) {
         return ativoRepository.findAll(pageable)
                 .map(this::convertToResponseDTO);
     }
 
-    // NOVOS MÉTODOS PAGINADOS:
     @Transactional(readOnly = true)
     public Page<AtivoResponseDTO> listarPorTipo(Long tipoAtivoId, Pageable pageable) {
         return ativoRepository.findByTipoAtivoId(tipoAtivoId, pageable)
@@ -106,6 +83,12 @@ public class AtivoService {
     @Transactional(readOnly = true)
     public Page<AtivoResponseDTO> buscarPorNome(String nome, Pageable pageable) {
         return ativoRepository.findByNomeContainingIgnoreCase(nome, pageable)
+                .map(this::convertToResponseDTO);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AtivoResponseDTO> buscarPorFaixaDeValor(BigDecimal valorMin, BigDecimal valorMax, Pageable pageable) {
+        return ativoRepository.findByValorAquisicaoBetween(valorMin, valorMax, pageable)
                 .map(this::convertToResponseDTO);
     }
 
@@ -132,21 +115,11 @@ public class AtivoService {
     }
 
     @Transactional(readOnly = true)
-    public List<AtivoResponseDTO> buscarPorFaixaDeValor(BigDecimal valorMin, BigDecimal valorMax) {
-        return ativoRepository.findByValorAquisicaoBetween(
-                valorMin, 
-                valorMax
-            ).stream()
-            .map(this::convertToResponseDTO)
-            .toList();
-    }
-
-    @Transactional(readOnly = true)
     public boolean existePorNumeroPatrimonio(String numeroPatrimonio) {
         return ativoRepository.existsByNumeroPatrimonio(numeroPatrimonio);
     }
 
-    // Métodos de conversão
+    // Métodos de conversão (MANTIDOS)
     private Ativo convertToEntity(AtivoRequestDTO request) {
         Ativo ativo = new Ativo();
         updateEntityFromRequest(ativo, request);

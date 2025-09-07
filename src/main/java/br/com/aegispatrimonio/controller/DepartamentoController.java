@@ -12,11 +12,13 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Optional;
 
 @RestController
@@ -41,11 +43,24 @@ public class DepartamentoController {
     }
 
     @GetMapping
-    @Operation(summary = "Listar todos os departamentos", description = "Retorna uma lista de todos os departamentos cadastrados")
-    @ApiResponse(responseCode = "200", description = "Lista de departamentos recuperada com sucesso")
-    public ResponseEntity<List<DepartamentoResponseDTO>> listarTodos() {
-        List<DepartamentoResponseDTO> departamentos = departamentoService.listarTodos();
-        return ResponseEntity.ok(departamentos);
+    @Operation(summary = "Listar todos os departamentos", description = "Retorna uma lista paginada de todos os departamentos, com filtros opcionais")
+    public ResponseEntity<Page<DepartamentoResponseDTO>> listarTodos(
+            @Parameter(description = "Nome para filtro (opcional)", example = "ti") 
+            @RequestParam(required = false) String nome,
+            @Parameter(description = "ID da filial para filtro (opcional)", example = "1") 
+            @RequestParam(required = false) Long filialId,
+            @Parameter(description = "Parâmetros de paginação") 
+            @PageableDefault(size = 10, sort = "nome") Pageable pageable) {
+        
+        if (nome != null && !nome.trim().isEmpty()) {
+            return ResponseEntity.ok(departamentoService.buscarPorNome(nome, pageable));
+        }
+        
+        if (filialId != null) {
+            return ResponseEntity.ok(departamentoService.listarPorFilial(filialId, pageable));
+        }
+        
+        return ResponseEntity.ok(departamentoService.listarTodos(pageable));
     }
 
     @GetMapping("/{id}")

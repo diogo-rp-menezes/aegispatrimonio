@@ -8,10 +8,11 @@ import br.com.aegispatrimonio.repository.FilialRepository;
 import br.com.aegispatrimonio.repository.LocalizacaoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -34,11 +35,10 @@ public class LocalizacaoService {
     }
 
     @Transactional(readOnly = true)
-    public List<LocalizacaoResponseDTO> listarTodos() {
-        log.debug("Listando todas as localizações");
-        return localizacaoRepository.findAll().stream()
-                .map(this::convertToResponseDTO)
-                .toList();
+    public Page<LocalizacaoResponseDTO> listarTodos(Pageable pageable) {
+        log.debug("Listando localizações paginadas");
+        return localizacaoRepository.findAll(pageable)
+                .map(this::convertToResponseDTO);
     }
 
     @Transactional(readOnly = true)
@@ -49,27 +49,24 @@ public class LocalizacaoService {
     }
 
     @Transactional(readOnly = true)
-    public List<LocalizacaoResponseDTO> listarPorFilial(Long filialId) {
-        log.debug("Listando localizações por filial: {}", filialId);
-        return localizacaoRepository.findByFilialId(filialId).stream()
-                .map(this::convertToResponseDTO)
-                .toList();
+    public Page<LocalizacaoResponseDTO> listarPorFilial(Long filialId, Pageable pageable) {
+        log.debug("Listando localizações por filial paginadas");
+        return localizacaoRepository.findByFilialId(filialId, pageable)
+                .map(this::convertToResponseDTO);
     }
 
     @Transactional(readOnly = true)
-    public List<LocalizacaoResponseDTO> listarPorLocalizacaoPai(Long localizacaoPaiId) {
-        log.debug("Listando localizações por localização pai: {}", localizacaoPaiId);
-        return localizacaoRepository.findByLocalizacaoPaiId(localizacaoPaiId).stream()
-                .map(this::convertToResponseDTO)
-                .toList();
+    public Page<LocalizacaoResponseDTO> listarPorLocalizacaoPai(Long localizacaoPaiId, Pageable pageable) {
+        log.debug("Listando localizações por localização pai paginadas");
+        return localizacaoRepository.findByLocalizacaoPaiId(localizacaoPaiId, pageable)
+                .map(this::convertToResponseDTO);
     }
 
     @Transactional(readOnly = true)
-    public List<LocalizacaoResponseDTO> buscarPorNome(String nome) {
-        log.debug("Buscando localizações por nome: {}", nome);
-        return localizacaoRepository.findByNomeContaining(nome).stream()
-                .map(this::convertToResponseDTO)
-                .toList();
+    public Page<LocalizacaoResponseDTO> buscarPorNome(String nome, Pageable pageable) {
+        log.debug("Buscando localizações por nome paginadas");
+        return localizacaoRepository.findByNomeContaining(nome, pageable)
+                .map(this::convertToResponseDTO);
     }
 
     @Transactional
@@ -93,7 +90,7 @@ public class LocalizacaoService {
         localizacaoRepository.delete(localizacao);
     }
 
-    // Métodos de conversão
+    // Métodos de conversão (mantidos exatamente como estavam)
     private Localizacao convertToEntity(LocalizacaoRequestDTO request) {
         Localizacao localizacao = new Localizacao();
         updateEntityFromRequest(localizacao, request);

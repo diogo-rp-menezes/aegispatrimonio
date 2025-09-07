@@ -1,16 +1,18 @@
 package br.com.aegispatrimonio.service;
 
+import java.util.Optional;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import br.com.aegispatrimonio.dto.request.TipoAtivoRequestDTO;
 import br.com.aegispatrimonio.dto.response.TipoAtivoResponseDTO;
 import br.com.aegispatrimonio.model.TipoAtivo;
 import br.com.aegispatrimonio.repository.TipoAtivoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import java.util.Optional;
 
 @Slf4j
 @Service
@@ -32,11 +34,10 @@ public class TipoAtivoService {
     }
 
     @Transactional(readOnly = true)
-    public List<TipoAtivoResponseDTO> listarTodos() {
-        log.debug("Listando todos os tipos de ativo");
-        return tipoAtivoRepository.findAll().stream()
-                .map(this::convertToResponseDTO)
-                .toList();
+    public Page<TipoAtivoResponseDTO> listarTodos(Pageable pageable) {
+        log.debug("Listando todos os tipos de ativo com paginação");
+        return tipoAtivoRepository.findAll(pageable)
+                .map(this::convertToResponseDTO);
     }
 
     @Transactional(readOnly = true)
@@ -50,6 +51,13 @@ public class TipoAtivoService {
     public Optional<TipoAtivoResponseDTO> buscarPorNome(String nome) {
         log.debug("Buscando tipo de ativo por nome: {}", nome);
         return tipoAtivoRepository.findByNome(nome)
+                .map(this::convertToResponseDTO);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<TipoAtivoResponseDTO> buscarPorNomePaginado(String nome, Pageable pageable) {
+        log.debug("Buscando tipos de ativo por nome: {} com paginação", nome);
+        return tipoAtivoRepository.findByNomeContainingIgnoreCase(nome, pageable)
                 .map(this::convertToResponseDTO);
     }
 
@@ -82,7 +90,7 @@ public class TipoAtivoService {
         return tipoAtivoRepository.existsByNome(nome);
     }
 
-    // Métodos de conversão
+    // Métodos de conversão (MANTIDOS)
     private TipoAtivo convertToEntity(TipoAtivoRequestDTO request) {
         TipoAtivo tipoAtivo = new TipoAtivo();
         updateEntityFromRequest(tipoAtivo, request);
