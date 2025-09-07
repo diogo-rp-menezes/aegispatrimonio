@@ -124,6 +124,59 @@ public class AtivoController {
         return ResponseEntity.ok(existe);
     }
 
+    // NOVOS ENDPOINTS PAGINADOS:
+    @GetMapping("/paginado/tipo/{tipoAtivoId}")
+    @Operation(summary = "Listar ativos por tipo com paginação", 
+               description = "Retorna ativos filtrados por tipo com paginação")
+    public ResponseEntity<Page<AtivoResponseDTO>> listarPorTipoPaginado(
+            @Parameter(description = "ID do tipo de ativo", example = "1") 
+            @PathVariable Long tipoAtivoId,
+            @Parameter(description = "Parâmetros de paginação") 
+            @PageableDefault(size = 10, sort = "nome") 
+            Pageable pageable) {
+        Page<AtivoResponseDTO> ativos = ativoService.listarPorTipo(tipoAtivoId, pageable);
+        return ResponseEntity.ok(ativos);
+    }
+
+    @GetMapping("/paginado/localizacao/{localizacaoId}")
+    @Operation(summary = "Listar ativos por localização com paginação", 
+               description = "Retorna ativos filtrados por localização com paginação")
+    public ResponseEntity<Page<AtivoResponseDTO>> listarPorLocalizacaoPaginado(
+            @Parameter(description = "ID da localização", example = "1") 
+            @PathVariable Long localizacaoId,
+            @Parameter(description = "Parâmetros de paginação") 
+            @PageableDefault(size = 10, sort = "nome") 
+            Pageable pageable) {
+        Page<AtivoResponseDTO> ativos = ativoService.listarPorLocalizacao(localizacaoId, pageable);
+        return ResponseEntity.ok(ativos);
+    }
+
+    @GetMapping("/paginado/status/{status}")
+    @Operation(summary = "Listar ativos por status com paginação", 
+               description = "Retorna ativos filtrados por status com paginação")
+    public ResponseEntity<Page<AtivoResponseDTO>> listarPorStatusPaginado(
+            @Parameter(description = "Status do ativo", example = "ATIVO") 
+            @PathVariable StatusAtivo status,
+            @Parameter(description = "Parâmetros de paginação") 
+            @PageableDefault(size = 10, sort = "nome") 
+            Pageable pageable) {
+        Page<AtivoResponseDTO> ativos = ativoService.listarPorStatus(status, pageable);
+        return ResponseEntity.ok(ativos);
+    }
+
+    @GetMapping("/paginado/buscar")
+    @Operation(summary = "Buscar ativos por nome com paginação", 
+               description = "Busca ativos por nome com paginação")
+    public ResponseEntity<Page<AtivoResponseDTO>> buscarPorNomePaginado(
+            @Parameter(description = "Nome para busca") 
+            @RequestParam String nome,
+            @Parameter(description = "Parâmetros de paginação") 
+            @PageableDefault(size = 10, sort = "nome") 
+            Pageable pageable) {
+        Page<AtivoResponseDTO> ativos = ativoService.buscarPorNome(nome, pageable);
+        return ResponseEntity.ok(ativos);
+    }
+
     @PutMapping("/{id}")
     @Operation(summary = "Atualizar ativo", description = "Atualiza os dados de um ativo existente")
     @ApiResponses(value = {

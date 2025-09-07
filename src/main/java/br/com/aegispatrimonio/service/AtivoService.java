@@ -84,6 +84,31 @@ public class AtivoService {
                 .map(this::convertToResponseDTO);
     }
 
+    // NOVOS MÉTODOS PAGINADOS:
+    @Transactional(readOnly = true)
+    public Page<AtivoResponseDTO> listarPorTipo(Long tipoAtivoId, Pageable pageable) {
+        return ativoRepository.findByTipoAtivoId(tipoAtivoId, pageable)
+                .map(this::convertToResponseDTO);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AtivoResponseDTO> listarPorLocalizacao(Long localizacaoId, Pageable pageable) {
+        return ativoRepository.findByLocalizacaoId(localizacaoId, pageable)
+                .map(this::convertToResponseDTO);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AtivoResponseDTO> listarPorStatus(StatusAtivo status, Pageable pageable) {
+        return ativoRepository.findByStatus(status, pageable)
+                .map(this::convertToResponseDTO);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AtivoResponseDTO> buscarPorNome(String nome, Pageable pageable) {
+        return ativoRepository.findByNomeContainingIgnoreCase(nome, pageable)
+                .map(this::convertToResponseDTO);
+    }
+
     @Transactional
     public AtivoResponseDTO atualizar(Long id, AtivoRequestDTO request) {
         Ativo ativoExistente = ativoRepository.findById(id)
