@@ -1,0 +1,55 @@
+@import './styles/variables.css';
+@import 'bootstrap-icons/font/bootstrap-icons.css';
+
+* {
+  box-sizing: border-box;
+}
+
+.app-container {
+  min-height: 100vh;
+  display: flex;
+}
+
+.main-content {
+  margin-left: 280px;
+  flex: 1;
+  background: var(--aegis-light);
+  min-height: 100vh;
+}
+
+.content-area {
+  padding: 2rem;
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    margin-left: 0;
+  }
+}
+
+/* Estilos globais adicionais */
+.page-header {
+  margin-bottom: 2rem;
+}
+
+.page-title {
+  color: var(--aegis-primary);
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.page-subtitle {
+  color: #6c757d;
+  font-size: 1.1rem;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}

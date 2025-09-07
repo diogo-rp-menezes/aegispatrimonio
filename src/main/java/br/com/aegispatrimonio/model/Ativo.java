@@ -82,6 +82,15 @@ public class Ativo {
     @Column(name = "atualizado_em")
     private LocalDateTime atualizadoEm;
     
+    @Column(name = "depreciacao_acumulada", precision = 15, scale = 2)
+    private BigDecimal depreciacaoAcumulada;
+
+    @Column(name = "valor_contabil_atual", precision = 15, scale = 2)
+    private BigDecimal valorContabilAtual;
+
+    @Column(name = "data_ultima_depreciacao")
+    private LocalDate dataUltimaDepreciacao;
+    
     @PrePersist
     protected void onCreate() {
         criadoEm = LocalDateTime.now();
