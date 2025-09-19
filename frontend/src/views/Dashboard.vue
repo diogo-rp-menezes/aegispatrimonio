@@ -8,15 +8,32 @@ const ativos = ref([]);
 const loading = ref(false);
 const error = ref(null);
 
+const page = ref(0);
+const size = ref(10);
+const totalPages = ref(0);
+
+const nomeBusca = ref("");
+
 const router = useRouter();
 
 async function carregarAtivos() {
   loading.value = true;
   error.value = null;
   try {
-    const data = await listarAtivos({ page: 0, size: 20, sort: "id,asc" });
-    // Se sua API retorna objeto paginado (content, totalPages, etc.)
-    ativos.value = data.content ? data.content : data;
+    const data = await listarAtivos({
+      nome: nomeBusca.value,
+      page: page.value,
+      size: size.value,
+      sort: "id,asc",
+    });
+
+    if (data.content) {
+      ativos.value = data.content;
+      totalPages.value = data.totalPages;
+    } else {
+      ativos.value = data;
+      totalPages.value = 1;
+    }
   } catch (err) {
     console.error(err);
     error.value = "Erro ao carregar ativos.";
@@ -29,6 +46,18 @@ function abrirDetalhe(id) {
   router.push(`/detalhe/${id}`);
 }
 
+function mudarPagina(novaPagina) {
+  if (novaPagina >= 0 && novaPagina < totalPages.value) {
+    page.value = novaPagina;
+    carregarAtivos();
+  }
+}
+
+function buscar() {
+  page.value = 0; // sempre volta para a primeira página
+  carregarAtivos();
+}
+
 onMounted(() => {
   carregarAtivos();
 });
@@ -37,6 +66,20 @@ onMounted(() => {
 <template>
   <div>
     <h2 class="mb-4">Dashboard - Ativos</h2>
+
+    <!-- 🔍 Busca -->
+    <div class="input-group mb-3" style="max-width: 400px;">
+      <input
+        type="text"
+        class="form-control"
+        placeholder="Buscar por nome..."
+        v-model="nomeBusca"
+        @keyup.enter="buscar"
+      />
+      <button class="btn btn-primary" @click="buscar">
+        <i class="bi bi-search"></i> Buscar
+      </button>
+    </div>
 
     <div v-if="loading" class="alert alert-info">Carregando ativos...</div>
     <div v-if="error" class="alert alert-danger">{{ error }}</div>
@@ -70,5 +113,33 @@ onMounted(() => {
     <div v-if="!loading && ativos.length === 0" class="alert alert-warning">
       Nenhum ativo encontrado.
     </div>
+
+    <!-- Paginação -->
+    <nav v-if="totalPages > 1" aria-label="Navegação de página" class="mt-3">
+      <ul class="pagination">
+        <li class="page-item" :class="{ disabled: page === 0 }">
+          <button class="page-link" @click="mudarPagina(page - 1)">
+            Anterior
+          </button>
+        </li>
+
+        <li
+          v-for="n in totalPages"
+          :key="n"
+          class="page-item"
+          :class="{ active: n - 1 === page }"
+        >
+          <button class="page-link" @click="mudarPagina(n - 1)">
+            {{ n }}
+          </button>
+        </li>
+
+        <li class="page-item" :class="{ disabled: page === totalPages - 1 }">
+          <button class="page-link" @click="mudarPagina(page + 1)">
+            Próxima
+          </button>
+        </li>
+      </ul>
+    </nav>
   </div>
 </template>
