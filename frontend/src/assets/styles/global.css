@@ -2,14 +2,14 @@
    Variáveis principais
    ======================= */
 :root {
-  --primary-color: #0d6efd;
-  --secondary-color: #6c757d;
-  --success-color: #198754;
-  --warning-color: #ffc107;
-  --danger-color: #dc3545;
-  --info-color: #0dcaf0;
-  --light-bg: #f8f9fa;
-  --dark-bg: #212529;
+  --aegis-primary: #0d6efd;
+  --aegis-secondary: #6c757d;
+  --aegis-success: #198754;
+  --aegis-warning: #ffc107;
+  --aegis-danger: #dc3545;
+  --aegis-info: #0dcaf0;
+  --aegis-light: #f8f9fa;
+  --aegis-dark: #212529;
 
   --card-radius: 1rem;
   --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
@@ -19,89 +19,12 @@
    Reset / Base
    ======================= */
 body {
-  background-color: var(--light-bg);
+  background-color: var(--aegis-light);
   margin: 0;
   font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  color: #212529;
+  color: var(--aegis-dark);
 }
 
-/* Links */
 a {
   text-decoration: none;
-}
-
-/* =======================
-   Navbar / Sidebar
-   ======================= */
-.navbar {
-  border-bottom: 1px solid #e9ecef;
-}
-
-.bg-dark {
-  background-color: var(--dark-bg) !important;
-}
-
-.sidebar .nav-link {
-  padding: 0.6rem 1rem;
-  border-radius: 0.5rem;
-  margin-bottom: 0.25rem;
-  transition: all 0.2s ease;
-}
-
-.sidebar .nav-link.active,
-.sidebar .nav-link:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-/* =======================
-   Cards
-   ======================= */
-.card {
-  border-radius: var(--card-radius);
-  box-shadow: var(--card-shadow);
-  border: none;
-}
-
-.card .card-title {
-  font-weight: 600;
-}
-
-/* =======================
-   Botões
-   ======================= */
-.btn {
-  border-radius: 0.5rem;
-  font-weight: 500;
-  transition: all 0.2s ease-in-out;
-}
-
-.btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-}
-
-/* =======================
-   Tabelas
-   ======================= */
-.table {
-  border-radius: 0.75rem;
-  overflow: hidden;
-}
-
-.table thead {
-  background-color: var(--primary-color);
-  color: #fff;
-}
-
-.table-hover tbody tr:hover {
-  background-color: rgba(13, 110, 253, 0.05);
-}
-
-/* =======================
-   Badges
-   ======================= */
-.badge {
-  padding: 0.5em 0.75em;
-  border-radius: 0.5rem;
-  font-weight: 500;
 }

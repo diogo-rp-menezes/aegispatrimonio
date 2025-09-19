@@ -1,108 +1,87 @@
 <template>
-  <aside class="sidebar">
+  <aside :class="['sidebar', { collapsed }]">
     <div class="sidebar-header">
       <div class="sidebar-logo">
         <i class="bi bi-shield-check"></i>
-        Aegis
+        <transition name="fade-slide">
+          <span v-if="!collapsed">Aegis</span>
+        </transition>
       </div>
-      <div class="sidebar-subtitle">Patrimônio</div>
+      <transition name="fade-slide">
+        <div class="sidebar-subtitle" v-if="!collapsed">Patrimônio</div>
+      </transition>
+      <button class="btn btn-sm btn-light mt-2" @click="toggleCollapse">
+        <i :class="collapsed ? 'bi-chevron-right' : 'bi-chevron-left'"></i>
+      </button>
     </div>
 
     <div class="sidebar-nav">
       <div v-for="item in menuItems" :key="item.path" class="nav-item">
-        <router-link 
-          :to="item.path" 
-          class="nav-link" 
+        <router-link
+          :to="item.path"
+          class="nav-link"
           :class="{ active: isActive(item.path) }"
+          @click.prevent="toggleSubmenu(item)"
         >
           <i :class="['nav-icon', item.icon]"></i>
-          {{ item.title }}
+          <transition name="fade-slide">
+            <span v-if="!collapsed">{{ item.title }}</span>
+          </transition>
+          <i
+            v-if="item.children && !collapsed"
+            :class="[
+              'bi',
+              openSubmenus.includes(item.path) ? 'bi-chevron-down' : 'bi-chevron-right'
+            ]"
+            style="margin-left:auto"
+          ></i>
         </router-link>
+
+        <!-- Submenu -->
+        <transition name="fade-slide">
+          <div
+            v-if="item.children && openSubmenus.includes(item.path) && !collapsed"
+            class="submenu"
+          >
+            <router-link
+              v-for="child in item.children"
+              :key="child.path"
+              :to="child.path"
+              class="nav-link submenu-link"
+              :class="{ active: isActive(child.path) }"
+            >
+              <span>{{ child.title }}</span>
+            </router-link>
+          </div>
+        </transition>
       </div>
     </div>
   </aside>
 </template>
 
 <script setup>
-import { menuItems } from "../config/menu.js";
+import { ref } from "vue";
 import { useRoute } from "vue-router";
+import { menuItems } from "../config/menu.js";
+import '../assets/styles/sidebar.css'; // CSS atualizado
 
 const route = useRoute();
+const collapsed = ref(false);
+const openSubmenus = ref([]);
+
+const toggleCollapse = () => collapsed.value = !collapsed.value;
 
 const isActive = (path) => {
-  // Suporta rotas dinâmicas
   return route.path === path || route.path.startsWith(path + "/");
 };
+
+const toggleSubmenu = (item) => {
+  if (!item.children) return;
+  const index = openSubmenus.value.indexOf(item.path);
+  if (index > -1) {
+    openSubmenus.value.splice(index, 1);
+  } else {
+    openSubmenus.value.push(item.path);
+  }
+};
 </script>
-
-<style scoped>
-.sidebar {
-  width: 280px;
-  background: linear-gradient(135deg, var(--aegis-primary) 0%, var(--aegis-secondary) 100%);
-  color: white;
-  padding: 0;
-  position: fixed;
-  height: 100vh;
-  overflow-y: auto;
-  z-index: 1000;
-  box-shadow: 4px 0 20px rgba(0,0,0,0.1);
-}
-
-.sidebar-header {
-  padding: 2rem 1.5rem;
-  background: rgba(255,255,255,0.1);
-  backdrop-filter: blur(10px);
-}
-
-.sidebar-logo {
-  font-size: 1.5rem;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.sidebar-subtitle {
-  font-size: 0.875rem;
-  opacity: 0.8;
-  margin-top: 0.5rem;
-}
-
-.sidebar-nav {
-  padding: 1rem 0;
-}
-
-.nav-item {
-  margin: 0.25rem 1rem;
-}
-
-.nav-link {
-  color: rgba(255,255,255,0.8);
-  padding: 0.875rem 1rem;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  text-decoration: none;
-  transition: all 0.3s ease;
-  font-weight: 500;
-}
-
-.nav-link:hover {
-  background: rgba(255,255,255,0.1);
-  color: white;
-  transform: translateX(4px);
-}
-
-.nav-link.active {
-  background: linear-gradient(135deg, var(--aegis-accent), #ff9800);
-  color: white;
-  box-shadow: 0 4px 12px rgba(245, 124, 0, 0.3);
-}
-
-.nav-icon {
-  font-size: 1.25rem;
-  width: 24px;
-  text-align: center;
-}
-</style>
