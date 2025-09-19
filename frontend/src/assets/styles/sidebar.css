@@ -1,4 +1,6 @@
-/* Sidebar base */
+/* ===================
+   Sidebar base
+   =================== */
 .sidebar {
   width: 280px;
   background: #ffffff;
@@ -100,28 +102,21 @@
   text-align: center;
 }
 
-/* Submenu apenas no modo expandido */
-.submenu {
-  padding-left: 1rem;
+/* Badges */
+.badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 50px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: all 0.25s ease;
 }
 
-.submenu-link {
-  padding-left: 1.5rem;
-  display: block;
-  color: #495057;
+.sidebar.collapsed .badge {
+  opacity: 0;
+  transform: translateX(-10px);
 }
 
-.submenu-link:hover {
-  background: #f1f3f5;
-  border-radius: 12px;
-}
-
-.submenu-link.active {
-  background: #e9ecef;
-  border-radius: 12px;
-}
-
-/* Animação fade-slide */
+/* Fade-slide animation */
 .fade-slide-enter-active,
 .fade-slide-leave-active {
   transition: all 0.25s ease;
@@ -142,4 +137,26 @@
 /* Main content ajustável */
 .main-content {
   transition: margin-left 0.3s ease;
+}
+
+/* TopBar ajustes */
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 2rem;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  transition: padding 0.3s ease;
+}
+
+.top-bar .search-bar {
+  flex: 1;
+  max-width: 400px;
+  position: relative;
+  transition: max-width 0.3s ease;
+}
+
+.sidebar.collapsed ~ .main-content .top-bar .search-bar {
+  max-width: 200px;
 }

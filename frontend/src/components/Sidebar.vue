@@ -28,20 +28,10 @@
           <transition name="fade-slide">
             <span v-if="!collapsed">{{ item.title }}</span>
           </transition>
+          <transition name="fade-slide">
+            <span v-if="!collapsed && item.badge" class="badge">{{ item.badge }}</span>
+          </transition>
         </router-link>
-
-        <!-- Submenu apenas no modo expandido -->
-        <div v-if="item.children && !collapsed" class="submenu">
-          <router-link
-            v-for="child in item.children"
-            :key="child.path"
-            :to="child.path"
-            class="nav-link submenu-link"
-            :class="{ active: isActive(child.path) }"
-          >
-            <span>{{ child.title }}</span>
-          </router-link>
-        </div>
       </div>
     </div>
   </aside>

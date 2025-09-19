@@ -2,7 +2,9 @@
   <header class="top-bar">
     <div class="logo">
       <i class="bi bi-shield-check"></i>
-      <span v-if="!collapsed">Aegis Patrimônio</span>
+      <transition name="fade-slide">
+        <span v-if="!collapsed">Aegis Patrimônio</span>
+      </transition>
     </div>
     <div class="search-bar">
       <input type="text" placeholder="Pesquisar..." class="search-input" />
