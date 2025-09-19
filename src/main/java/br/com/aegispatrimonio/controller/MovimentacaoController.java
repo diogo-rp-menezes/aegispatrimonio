@@ -149,7 +149,7 @@ public class MovimentacaoController {
     }
 
     // ✅ CORRETO - Verbo primeiro: listar pendentes por ativo
-    @GetMapping("/ativo/{ativoId}/pendentes")
+    @GetMapping("/ativo/pendentes/{ativoId}")
     @Operation(summary = "Listar movimentações pendentes por ativo", description = "Retorna movimentações pendentes de um ativo específico com paginação")
     @ApiResponse(responseCode = "200", description = "Movimentações pendentes encontradas")
     public ResponseEntity<Page<MovimentacaoResponseDTO>> listarPendentesPorAtivo(
