@@ -1,7 +1,7 @@
 <!-- src/views/Dashboard.vue -->
 <script setup>
 import { ref, onMounted } from "vue";
-import { listarAtivos } from "../services/api";
+import { listarAtivos, deletarAtivo } from "../services/api";
 import { useRouter } from "vue-router";
 
 const ativos = ref([]);
@@ -46,6 +46,26 @@ function abrirDetalhe(id) {
   router.push(`/detalhe/${id}`);
 }
 
+function editarAtivo(id) {
+  router.push(`/ativos/${id}/editar`);
+}
+
+function novoAtivo() {
+  router.push("/ativos/novo");
+}
+
+async function excluirAtivo(id) {
+  if (confirm("Tem certeza que deseja excluir este ativo?")) {
+    try {
+      await deletarAtivo(id);
+      carregarAtivos(); // recarrega a tabela
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao excluir ativo.");
+    }
+  }
+}
+
 function mudarPagina(novaPagina) {
   if (novaPagina >= 0 && novaPagina < totalPages.value) {
     page.value = novaPagina;
@@ -54,7 +74,7 @@ function mudarPagina(novaPagina) {
 }
 
 function buscar() {
-  page.value = 0; // sempre volta para a primeira página
+  page.value = 0;
   carregarAtivos();
 }
 
@@ -65,7 +85,12 @@ onMounted(() => {
 
 <template>
   <div>
-    <h2 class="mb-4">Dashboard - Ativos</h2>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h2>Ativos</h2>
+      <button class="btn btn-success" @click="novoAtivo">
+        <i class="bi bi-plus-lg"></i> Novo Ativo
+      </button>
+    </div>
 
     <!-- 🔍 Busca -->
     <div class="input-group mb-3" style="max-width: 400px;">
@@ -99,11 +124,14 @@ onMounted(() => {
           <td>{{ ativo.nome }}</td>
           <td>{{ ativo.numeroPatrimonio }}</td>
           <td>
-            <button
-              class="btn btn-sm btn-primary"
-              @click="abrirDetalhe(ativo.id)"
-            >
-              <i class="bi bi-search"></i> Detalhes
+            <button class="btn btn-sm btn-primary me-2" @click="abrirDetalhe(ativo.id)">
+              <i class="bi bi-search"></i>
+            </button>
+            <button class="btn btn-sm btn-warning me-2" @click="editarAtivo(ativo.id)">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <button class="btn btn-sm btn-danger" @click="excluirAtivo(ativo.id)">
+              <i class="bi bi-trash"></i>
             </button>
           </td>
         </tr>
@@ -118,9 +146,7 @@ onMounted(() => {
     <nav v-if="totalPages > 1" aria-label="Navegação de página" class="mt-3">
       <ul class="pagination">
         <li class="page-item" :class="{ disabled: page === 0 }">
-          <button class="page-link" @click="mudarPagina(page - 1)">
-            Anterior
-          </button>
+          <button class="page-link" @click="mudarPagina(page - 1)">Anterior</button>
         </li>
 
         <li
@@ -135,9 +161,7 @@ onMounted(() => {
         </li>
 
         <li class="page-item" :class="{ disabled: page === totalPages - 1 }">
-          <button class="page-link" @click="mudarPagina(page + 1)">
-            Próxima
-          </button>
+          <button class="page-link" @click="mudarPagina(page + 1)">Próxima</button>
         </li>
       </ul>
     </nav>
