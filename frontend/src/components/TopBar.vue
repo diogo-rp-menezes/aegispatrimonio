@@ -11,7 +11,7 @@
       <i class="bi bi-search search-icon"></i>
     </div>
     <div class="actions">
-      <button class="btn btn-primary btn-modern">Ação</button>
+      <button class="btn btn-primary btn-modern" @click="$emit('toggleSidebar')">Ação</button>
     </div>
   </header>
 </template>
