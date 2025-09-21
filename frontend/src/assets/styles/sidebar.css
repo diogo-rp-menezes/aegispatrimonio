@@ -80,6 +80,19 @@
   box-shadow: 0 4px 12px rgba(245, 124, 0, 0.3);
 }
 
+/* Centralização no modo recolhido */
+.sidebar.collapsed .nav-link {
+  justify-content: center;
+  padding: 0.875rem 0.5rem;
+}
+
+.sidebar.collapsed .nav-icon {
+  margin: 0 auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 /* Highlight do item pai quando submenu ativo */
 .nav-link.submenu-open {
   background: rgba(255,255,255,0.15);
