@@ -1,25 +1,31 @@
 <template>
   <header class="top-bar">
-    <div class="logo">
-      <i class="bi bi-shield-check"></i>
-      <transition name="fade-slide">
-        <span v-if="!collapsed">Aegis Patrimônio</span>
-      </transition>
-    </div>
+    <!-- Botão menu mobile -->
+    <button class="mobile-menu-btn" @click="$emit('toggle-sidebar')" v-if="isMobile">
+      <i class="bi bi-list"></i>
+    </button>
+    
     <div class="search-bar">
-      <input type="text" placeholder="Pesquisar..." class="search-input" />
       <i class="bi bi-search search-icon"></i>
+      <input type="text" class="search-input" placeholder="Pesquisar patrimônio...">
     </div>
-    <div class="actions">
-      <button class="btn btn-primary btn-modern" @click="$emit('toggleSidebar')">Ação</button>
+    
+    <div class="user-profile">
+      <div class="user-avatar">JS</div>
+      <div class="user-info">
+        <h6>John Smith</h6>
+        <small>Administrador</small>
+      </div>
     </div>
   </header>
 </template>
 
 <script setup>
-import { defineProps } from "vue";
+import { defineProps, defineEmits } from "vue";
 
-const props = defineProps({
-  collapsed: Boolean
+defineProps({
+  isMobile: Boolean
 });
+
+defineEmits(['toggle-sidebar']);
 </script>
