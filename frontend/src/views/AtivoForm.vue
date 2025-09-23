@@ -108,15 +108,22 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { ref, reactive, onMounted, computed, defineProps, defineEmits } from 'vue';
 import axios from 'axios';
+
+// Defina props e emits
+const props = defineProps({
+  ativoId: {
+    type: String,
+    default: null
+  }
+});
+
+const emit = defineEmits(['saved', 'cancel']);
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080/api';
 
-const route = useRoute();
-const router = useRouter();
-const isEdit = computed(() => !!route.params.id);
+const isEdit = computed(() => !!props.ativoId);
 
 const form = reactive({
   nome: '',
@@ -128,13 +135,13 @@ const form = reactive({
   dataAquisicao: '',
 });
 
-const tipos = ref([]); // carregar da API se houver endpoint
+const tipos = ref([]);
 const localizacoes = ref([]);
 const saving = ref(false);
 
 onMounted(async () => {
   if (isEdit.value) {
-    const { data } = await axios.get(`${API_BASE}/ativos/${route.params.id}`);
+    const { data } = await axios.get(`${API_BASE}/ativos/${props.ativoId}`);
     Object.assign(form, data, {
       tipoAtivoId: data.tipoAtivoId || '',
       localizacaoId: data.localizacaoId || '',
@@ -143,7 +150,7 @@ onMounted(async () => {
     });
   }
 
-  // Exemplo: carregar listas auxiliares
+  // Carregar listas auxiliares
   try {
     const [tiposResp, locsResp] = await Promise.all([
       axios.get(`${API_BASE}/tipos-ativos`).catch(() => ({ data: [] })),
@@ -160,17 +167,17 @@ async function save() {
   saving.value = true;
   try {
     if (isEdit.value) {
-      await axios.put(`${API_BASE}/ativos/${route.params.id}`, form);
+      await axios.put(`${API_BASE}/ativos/${props.ativoId}`, form);
     } else {
       await axios.post(`${API_BASE}/ativos`, form);
     }
-    router.push('/ativos');
+    emit('saved');
   } finally {
     saving.value = false;
   }
 }
 
 function cancelar() {
-  router.push('/ativos');
+  emit('cancel');
 }
 </script>
