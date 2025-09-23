@@ -25,7 +25,7 @@ async function carregarAtivo() {
 }
 
 function voltar() {
-  router.push("/dashboard");
+  router.push("/ativos");
 }
 
 onMounted(() => {

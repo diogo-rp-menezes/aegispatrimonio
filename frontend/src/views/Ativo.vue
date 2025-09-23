@@ -43,7 +43,7 @@ async function carregarAtivos() {
 }
 
 function abrirDetalhe(id) {
-  router.push(`/detalhe/${id}`);
+  router.push(`/ativos/${id}`);
 }
 
 function editarAtivo(id) {
