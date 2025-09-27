@@ -49,19 +49,49 @@
           </h5>
 
           <div class="d-flex align-items-center gap-2">
-            <div class="input-group input-group-sm me-2" style="width: 220px;">
+            <!-- Busca com Debounce Automático -->
+            <div class="input-group input-group-sm me-2" style="width: 280px;">
+              <span class="input-group-text bg-light">
+                <i class="bi bi-search"></i>
+              </span>
               <input
                 v-model="q"
-                @keyup.enter="fetchPage(0)"
                 class="form-control form-control-sm"
                 type="search"
-                placeholder="Buscar por nome"
-                aria-label="Buscar por nome"
+                placeholder="Digite para buscar automaticamente..."
+                aria-label="Buscar ativos por nome"
+                @keyup.enter="fetchPage(0)"
               />
-              <button class="btn btn-outline-secondary btn-sm" @click="fetchPage(0)" :aria-label="'Buscar ' + q">
-                <i class="bi bi-search"></i>
+              <button 
+                v-if="q" 
+                class="btn btn-outline-danger btn-sm" 
+                @click="limparBusca"
+                title="Limpar busca"
+                aria-label="Limpar busca"
+              >
+                <i class="bi bi-x-lg"></i>
+              </button>
+              <button 
+                v-else
+                class="btn btn-outline-secondary btn-sm" 
+                @click="fetchPage(0)"
+                title="Buscar"
+                aria-label="Buscar"
+              >
+                <i class="bi bi-arrow-repeat"></i>
               </button>
             </div>
+          </div>
+        </div>
+
+        <!-- Indicador de Busca -->
+        <div v-if="q && !loading" class="card-body-modern border-bottom">
+          <div class="alert alert-light py-2 mb-0">
+            <small>
+              <i class="bi bi-search me-1"></i>
+              Buscando por: "<strong>{{ q }}</strong>"
+              <span v-if="items.length > 0">- {{ items.length }} resultado(s) encontrado(s)</span>
+            </small>
           </div>
         </div>
 
@@ -84,19 +114,51 @@
 
             <tbody>
               <tr v-if="loading">
-                <td colspan="7" class="text-center py-4">Carregando...</td>
+                <td colspan="7" class="text-center py-4">
+                  <div class="d-flex align-items-center justify-content-center">
+                    <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                    <span>Buscando ativos...</span>
+                  </div>
+                </td>
               </tr>
 
-              <tr v-if="!loading && items.length === 0">
-                <td colspan="7" class="text-center py-4">Nenhum ativo encontrado.</td>
+              <tr v-if="!loading && items.length === 0 && q">
+                <td colspan="7" class="text-center py-4">
+                  <i class="bi bi-search display-6 text-muted d-block mb-2"></i>
+                  <span class="text-muted">Nenhum ativo encontrado para "</span>
+                  <strong>"{{ q }}"</strong>
+                  <br>
+                  <small class="text-muted">Tente ajustar os termos da busca.</small>
+                </td>
+              </tr>
+
+              <tr v-if="!loading && items.length === 0 && !q">
+                <td colspan="7" class="text-center py-4">
+                  <i class="bi bi-inbox display-6 text-muted d-block mb-2"></i>
+                  <span class="text-muted">Nenhum ativo cadastrado.</span>
+                  <br>
+                  <small class="text-muted">Clique em "Adicionar Ativo" para começar.</small>
+                </td>
               </tr>
 
               <tr v-for="item in items" :key="item.id">
-                <td>{{ item.nome }}</td>
+                <td>
+                  <strong>{{ item.nome }}</strong>
+                  <br>
+                  <small class="text-muted">ID: {{ item.id }}</small>
+                </td>
                 <td>{{ item.tipoAtivoNome || '-' }}</td>
-                <td>{{ item.numeroPatrimonio || '-' }}</td>
+                <td>
+                  <span class="badge bg-light text-dark border">
+                    {{ item.numeroPatrimonio || 'N/A' }}
+                  </span>
+                </td>
                 <td>{{ item.localizacaoNome || '-' }}</td>
-                <td>{{ formatCurrency(item.valorAquisicao) }}</td>
+                <td>
+                  <strong :class="getValueClass(item.valorAquisicao)">
+                    {{ formatCurrency(item.valorAquisicao) }}
+                  </strong>
+                </td>
                 <td>
                   <span :class="`badge bg-${getStatusBadge(item.status)}`">
                     {{ getStatusText(item.status) }}
@@ -108,15 +170,17 @@
                       class="btn btn-outline-primary"
                       @click="editAtivo(item.id)"
                       :aria-label="`Editar ${item.nome}`"
+                      title="Editar"
                     >
-                      <i class="bi bi-pencil"></i> Editar
+                      <i class="bi bi-pencil"></i>
                     </button>
                     <button
-                      class="btn btn-outline-secondary"
+                      class="btn btn-outline-success"
                       @click="goToDetail(item.id)"
                       :aria-label="`Ver detalhes de ${item.nome}`"
+                      title="Detalhes"
                     >
-                      <i class="bi bi-eye"></i> Detalhes
+                      <i class="bi bi-eye"></i>
                     </button>
                   </div>
                 </td>
@@ -129,12 +193,15 @@
         <div class="card-footer-modern d-flex justify-content-between align-items-center mt-3">
           <div class="small text-muted">
             Mostrando {{ pageInfo.from }}–{{ pageInfo.to }} de {{ pageInfo.totalElements }} registros
+            <span v-if="q">- Filtrado por: "{{ q }}"</span>
           </div>
 
           <nav aria-label="Paginação de ativos">
             <ul class="pagination pagination-sm mb-0">
               <li :class="['page-item', { disabled: pageInfo.page === 0 }]">
-                <button class="page-link" @click="prevPage" :disabled="pageInfo.page === 0">&laquo;</button>
+                <button class="page-link" @click="prevPage" :disabled="pageInfo.page === 0">
+                  <i class="bi bi-chevron-left"></i>
+                </button>
               </li>
               <li
                 v-for="p in displayedPageNumbers"
@@ -144,7 +211,9 @@
                 <button class="page-link" @click="fetchPage(p)">{{ p + 1 }}</button>
               </li>
               <li :class="['page-item', { disabled: pageInfo.page >= pageInfo.totalPages - 1 }]">
-                <button class="page-link" @click="nextPage" :disabled="pageInfo.page >= pageInfo.totalPages - 1">&raquo;</button>
+                <button class="page-link" @click="nextPage" :disabled="pageInfo.page >= pageInfo.totalPages - 1">
+                  <i class="bi bi-chevron-right"></i>
+                </button>
               </li>
             </ul>
           </nav>
@@ -155,7 +224,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue';
+import { ref, reactive, computed, watch, onMounted } from 'vue';
+import { useDebounceFn } from '@vueuse/core';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import AtivoForm from './AtivoForm.vue';
@@ -178,6 +248,18 @@ const pageInfo = reactive({
   totalElements: 0,
   from: 0,
   to: 0,
+});
+
+// Debounce automático com VueUse (400ms de delay)
+const debouncedFetch = useDebounceFn(() => {
+  fetchPage(0);
+}, 400);
+
+// Watcher para busca automática
+watch(q, (newValue, oldValue) => {
+  if (newValue !== oldValue) {
+    debouncedFetch();
+  }
 });
 
 // Funções do formulário
@@ -221,6 +303,11 @@ function getStatusText(status) {
   return statusMap[status] || status;
 }
 
+function getValueClass(value) {
+  const numValue = typeof value === 'string' ? Number(value) : value;
+  return numValue > 10000 ? 'text-success' : 'text-dark';
+}
+
 // Funções de paginação e busca
 const currencyFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 function formatCurrency(v) {
@@ -233,22 +320,39 @@ async function fetchPage(page = 0) {
   loading.value = true;
   try {
     const params = { page, size: pageInfo.size };
-    if (q.value) params.nome = q.value;
+    if (q.value.trim()) params.nome = q.value.trim();
+    
     const { data } = await axios.get(`${API_BASE}/ativos`, { params });
     items.value = data.content || [];
-    pageInfo.page = data.number;
-    pageInfo.size = data.size;
-    pageInfo.totalPages = data.totalPages;
-    pageInfo.totalElements = data.totalElements;
+    pageInfo.page = data.number || 0;
+    pageInfo.size = data.size || PAGE_SIZE;
+    pageInfo.totalPages = data.totalPages || 0;
+    pageInfo.totalElements = data.totalElements || 0;
     pageInfo.from = pageInfo.totalElements === 0 ? 0 : pageInfo.page * pageInfo.size + 1;
     pageInfo.to = Math.min(pageInfo.totalElements, (pageInfo.page + 1) * pageInfo.size);
+  } catch (error) {
+    console.error('Erro ao carregar ativos:', error);
+    items.value = [];
+    pageInfo.totalElements = 0;
+    pageInfo.from = 0;
+    pageInfo.to = 0;
   } finally {
     loading.value = false;
   }
 }
 
-function prevPage() { if (pageInfo.page > 0) fetchPage(pageInfo.page - 1); }
-function nextPage() { if (pageInfo.page < pageInfo.totalPages - 1) fetchPage(pageInfo.page + 1); }
+function limparBusca() {
+  q.value = '';
+  fetchPage(0);
+}
+
+function prevPage() { 
+  if (pageInfo.page > 0) fetchPage(pageInfo.page - 1); 
+}
+
+function nextPage() { 
+  if (pageInfo.page < pageInfo.totalPages - 1) fetchPage(pageInfo.page + 1); 
+}
 
 const displayedPageNumbers = computed(() => {
   const total = pageInfo.totalPages || 1;
@@ -264,11 +368,35 @@ function goToDetail(id) {
   router.push(`/ativos/${id}`);
 }
 
-fetchPage(0);
+// Carregar inicialmente
+onMounted(() => {
+  fetchPage(0);
+});
 </script>
 
 <style scoped>
 .btn-group {
   white-space: nowrap;
+}
+
+.badge {
+  font-size: 0.75em;
+}
+
+.spinner-border-sm {
+  width: 1rem;
+  height: 1rem;
+}
+
+.display-6 {
+  font-size: 2.5rem;
+}
+
+.text-success {
+  color: #198754 !important;
+}
+
+.bg-light {
+  background-color: #f8f9fa !important;
 }
 </style>
