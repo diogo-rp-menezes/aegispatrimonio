@@ -1,28 +1,23 @@
 package br.com.aegispatrimonio.model;
 
-import java.time.LocalDateTime;
-
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.Where;
+
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "localizacoes")
 @Getter
 @Setter
 @NoArgsConstructor
-@ToString
+@ToString(exclude = {"localizacaoPai", "filial"})
+@SQLDelete(sql = "UPDATE localizacoes SET status = 'INATIVO' WHERE id = ?")
+@Where(clause = "status = 'ATIVO'")
 public class Localizacao {
     
     @Id
@@ -41,6 +36,10 @@ public class Localizacao {
     private Filial filial;
     
     private String descricao;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Status status;
     
     @Column(name = "criado_em")
     private LocalDateTime criadoEm;
@@ -48,10 +47,13 @@ public class Localizacao {
     @Column(name = "atualizado_em")
     private LocalDateTime atualizadoEm;
     
-    @PrePersist // Adicione este método
+    @PrePersist
     protected void onCreate() {
         criadoEm = LocalDateTime.now();
         atualizadoEm = LocalDateTime.now();
+        if (status == null) {
+            status = Status.ATIVO;
+        }
     }
     
     @PreUpdate

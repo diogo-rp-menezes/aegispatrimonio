@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -25,6 +26,12 @@ public class ManutencaoService {
     private final AtivoRepository ativoRepository;
     private final FornecedorRepository fornecedorRepository;
     private final PessoaRepository pessoaRepository;
+
+    private static final List<StatusManutencao> STATUS_PENDENTES = List.of(
+            StatusManutencao.SOLICITADA,
+            StatusManutencao.APROVADA,
+            StatusManutencao.EM_ANDAMENTO
+    );
 
     @Transactional
     public ManutencaoResponseDTO criar(ManutencaoRequestDTO request) {
@@ -54,18 +61,18 @@ public class ManutencaoService {
         log.info("Iniciando manutenção ID: {}", id);
         Manutencao manutencao = buscarEntidadePorId(id);
         validarStatus(manutencao, StatusManutencao.APROVADA, "iniciada");
-        
+
         Pessoa tecnico = pessoaRepository.findById(tecnicoId)
                 .orElseThrow(() -> new RuntimeException("Técnico não encontrado: " + tecnicoId));
-        
+
         Ativo ativo = manutencao.getAtivo();
         ativo.setStatus(StatusAtivo.EM_MANUTENCAO);
         ativoRepository.save(ativo);
-        
+
         manutencao.setStatus(StatusManutencao.EM_ANDAMENTO);
         manutencao.setTecnicoResponsavel(tecnico);
         manutencao.setDataInicio(LocalDate.now());
-        
+
         return convertToResponseDTO(manutencaoRepository.save(manutencao));
     }
 
@@ -74,17 +81,17 @@ public class ManutencaoService {
         log.info("Concluindo manutenção ID: {}", id);
         Manutencao manutencao = buscarEntidadePorId(id);
         validarStatus(manutencao, StatusManutencao.EM_ANDAMENTO, "concluída");
-        
+
         Ativo ativo = manutencao.getAtivo();
         ativo.setStatus(StatusAtivo.ATIVO);
         ativoRepository.save(ativo);
-        
+
         manutencao.setStatus(StatusManutencao.CONCLUIDA);
         manutencao.setDescricaoServico(descricaoServico);
         manutencao.setCustoReal(custoReal);
         manutencao.setTempoExecucaoMinutos(tempoExecucao);
         manutencao.setDataConclusao(LocalDate.now());
-        
+
         return convertToResponseDTO(manutencaoRepository.save(manutencao));
     }
 
@@ -92,21 +99,21 @@ public class ManutencaoService {
     public ManutencaoResponseDTO cancelar(Long id, String motivo) {
         log.info("Cancelando manutenção ID: {}", id);
         Manutencao manutencao = buscarEntidadePorId(id);
-        
-        if (manutencao.getStatus() == StatusManutencao.CONCLUIDA || 
+
+        if (manutencao.getStatus() == StatusManutencao.CONCLUIDA ||
             manutencao.getStatus() == StatusManutencao.CANCELADA) {
             throw new RuntimeException("Manutenção já concluída ou cancelada");
         }
-        
+
         if (manutencao.getStatus() == StatusManutencao.EM_ANDAMENTO) {
             Ativo ativo = manutencao.getAtivo();
             ativo.setStatus(StatusAtivo.ATIVO);
             ativoRepository.save(ativo);
         }
-        
+
         manutencao.setStatus(StatusManutencao.CANCELADA);
         manutencao.setObservacoes(motivo);
-        
+
         return convertToResponseDTO(manutencaoRepository.save(manutencao));
     }
 
@@ -128,7 +135,7 @@ public class ManutencaoService {
     @Transactional(readOnly = true)
     public Page<ManutencaoResponseDTO> listar(Pageable pageable) {
         log.debug("Listando manutenções paginadas");
-        return manutencaoRepository.findAllOrderByDataSolicitacaoDesc(pageable)
+        return manutencaoRepository.findAll(pageable)
                 .map(this::convertToResponseDTO);
     }
 
@@ -170,28 +177,28 @@ public class ManutencaoService {
     @Transactional(readOnly = true)
     public Page<ManutencaoResponseDTO> listarPorPeriodoSolicitacao(LocalDate inicio, LocalDate fim, Pageable pageable) {
         log.debug("Listando manutenções por período de solicitação: {} a {}", inicio, fim);
-        return manutencaoRepository.findByPeriodoSolicitacao(inicio, fim, pageable)
+        return manutencaoRepository.findByDataSolicitacaoBetween(inicio, fim, pageable)
                 .map(this::convertToResponseDTO);
     }
 
     @Transactional(readOnly = true)
     public Page<ManutencaoResponseDTO> listarPorPeriodoConclusao(LocalDate inicio, LocalDate fim, Pageable pageable) {
         log.debug("Listando manutenções por período de conclusão: {} a {}", inicio, fim);
-        return manutencaoRepository.findByPeriodoConclusao(inicio, fim, pageable)
+        return manutencaoRepository.findByDataConclusaoBetween(inicio, fim, pageable)
                 .map(this::convertToResponseDTO);
     }
 
     @Transactional(readOnly = true)
     public Page<ManutencaoResponseDTO> listarPendentes(Pageable pageable) {
         log.debug("Listando manutenções pendentes");
-        return manutencaoRepository.findManutencoesPendentes(pageable)
+        return manutencaoRepository.findByStatusIn(STATUS_PENDENTES, pageable)
                 .map(this::convertToResponseDTO);
     }
 
     @Transactional(readOnly = true)
     public Page<ManutencaoResponseDTO> listarPendentesPorAtivo(Long ativoId, Pageable pageable) {
         log.debug("Listando manutenções pendentes por ativo ID: {}", ativoId);
-        return manutencaoRepository.findManutencoesPendentesPorAtivo(ativoId, pageable)
+        return manutencaoRepository.findByAtivoIdAndStatusIn(ativoId, STATUS_PENDENTES, pageable)
                 .map(this::convertToResponseDTO);
     }
 
@@ -224,36 +231,36 @@ public class ManutencaoService {
 
     private Manutencao convertToEntity(ManutencaoRequestDTO request) {
         Manutencao manutencao = new Manutencao();
-        
+
         manutencao.setAtivo(ativoRepository.findById(request.getAtivoId())
                 .orElseThrow(() -> new RuntimeException("Ativo não encontrado")));
-        
+
         manutencao.setSolicitante(pessoaRepository.findById(request.getSolicitanteId())
                 .orElseThrow(() -> new RuntimeException("Solicitante não encontrado")));
-        
+
         if (request.getFornecedorId() != null) {
             manutencao.setFornecedor(fornecedorRepository.findById(request.getFornecedorId())
                     .orElseThrow(() -> new RuntimeException("Fornecedor não encontrado")));
         }
-        
+
         if (request.getTecnicoResponsavelId() != null) {
             manutencao.setTecnicoResponsavel(pessoaRepository.findById(request.getTecnicoResponsavelId())
                     .orElseThrow(() -> new RuntimeException("Técnico não encontrado")));
         }
-        
+
         manutencao.setTipo(request.getTipo());
         manutencao.setDescricaoProblema(request.getDescricaoProblema());
         manutencao.setDescricaoServico(request.getDescricaoServico());
         manutencao.setCustoEstimado(request.getCustoEstimado());
         manutencao.setDataPrevistaConclusao(request.getDataPrevistaConclusao());
         manutencao.setObservacoes(request.getObservacoes());
-        
+
         return manutencao;
     }
 
     private ManutencaoResponseDTO convertToResponseDTO(Manutencao manutencao) {
         ManutencaoResponseDTO dto = new ManutencaoResponseDTO();
-        
+
         dto.setId(manutencao.getId());
         dto.setAtivoId(manutencao.getAtivo().getId());
         dto.setAtivoNome(manutencao.getAtivo().getNome());
@@ -274,17 +281,17 @@ public class ManutencaoService {
         dto.setObservacoes(manutencao.getObservacoes());
         dto.setCriadoEm(manutencao.getCriadoEm());
         dto.setAtualizadoEm(manutencao.getAtualizadoEm());
-        
+
         if (manutencao.getFornecedor() != null) {
             dto.setFornecedorId(manutencao.getFornecedor().getId());
             dto.setFornecedorNome(manutencao.getFornecedor().getNome());
         }
-        
+
         if (manutencao.getTecnicoResponsavel() != null) {
             dto.setTecnicoResponsavelId(manutencao.getTecnicoResponsavel().getId());
             dto.setTecnicoResponsavelNome(manutencao.getTecnicoResponsavel().getNome());
         }
-        
+
         return dto;
     }
 }

@@ -2,17 +2,22 @@ package br.com.aegispatrimonio.model;
 
 import jakarta.persistence.*;
 import lombok.Getter;
-import lombok.Setter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.Where;
+
 import java.time.LocalDateTime;
 
 @Getter
 @Setter
 @NoArgsConstructor
-@ToString(exclude = {"departamento"}) // Exclui a relação para evitar loops
+@ToString(exclude = {"departamento"})
 @Entity
 @Table(name = "pessoas")
+@SQLDelete(sql = "UPDATE pessoas SET status = 'INATIVO' WHERE id = ?")
+@Where(clause = "status = 'ATIVO'")
 public class Pessoa {
     
     @Id
@@ -28,6 +33,10 @@ public class Pessoa {
     @ManyToOne
     @JoinColumn(name = "departamento_id", nullable = false)
     private Departamento departamento;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Status status;
     
     @Column(name = "criado_em")
     private LocalDateTime criadoEm;
@@ -39,6 +48,9 @@ public class Pessoa {
     protected void onCreate() {
         criadoEm = LocalDateTime.now();
         atualizadoEm = LocalDateTime.now();
+        if (status == null) {
+            status = Status.ATIVO;
+        }
     }
     
     @PreUpdate

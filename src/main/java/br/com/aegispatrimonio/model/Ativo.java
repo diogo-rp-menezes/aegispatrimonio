@@ -2,9 +2,12 @@ package br.com.aegispatrimonio.model;
 
 import jakarta.persistence.*;
 import lombok.Getter;
-import lombok.Setter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.Where;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -15,6 +18,8 @@ import java.time.LocalDateTime;
 @ToString(exclude = {"tipoAtivo", "localizacao", "fornecedor", "pessoaResponsavel"}) // Exclui todas as relações
 @Entity
 @Table(name = "ativos")
+@SQLDelete(sql = "UPDATE ativos SET status = 'BAIXADO' WHERE id = ?")
+@Where(clause = "status <> 'BAIXADO'") // Ignora ativos baixados em todas as consultas
 public class Ativo {
     
     @Id
@@ -95,6 +100,7 @@ public class Ativo {
     protected void onCreate() {
         criadoEm = LocalDateTime.now();
         atualizadoEm = LocalDateTime.now();
+        dataRegistro = LocalDate.now();
         
         // Inicializa valores padrão corretamente
         if (status == null) {

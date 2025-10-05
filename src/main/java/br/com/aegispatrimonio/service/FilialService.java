@@ -1,17 +1,16 @@
 package br.com.aegispatrimonio.service;
 
-import java.util.Optional;
-
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import br.com.aegispatrimonio.dto.request.FilialRequestDTO;
 import br.com.aegispatrimonio.dto.response.FilialResponseDTO;
 import br.com.aegispatrimonio.model.Filial;
 import br.com.aegispatrimonio.repository.FilialRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Optional;
 
 @Service
 @Transactional
@@ -24,16 +23,17 @@ public class FilialService {
     public FilialResponseDTO criar(FilialRequestDTO request) {
         validarCodigoUnico(request.getCodigo());
         validarNomeUnico(request.getNome());
-        
+
         Filial filial = convertToEntity(request);
         Filial savedFilial = filialRepository.save(filial);
-        
+
         return convertToResponseDTO(savedFilial);
     }
 
     @Transactional(readOnly = true)
     public Page<FilialResponseDTO> listarTodos(Pageable pageable) {
-        return filialRepository.findAllOrderByNome(pageable)
+        // Alterado: Usa o método padrão findAll. A ordenação é definida no Controller.
+        return filialRepository.findAll(pageable)
                 .map(this::convertToResponseDTO);
     }
 
@@ -57,7 +57,8 @@ public class FilialService {
 
     @Transactional(readOnly = true)
     public Page<FilialResponseDTO> buscarPorNomeContendo(String nome, Pageable pageable) {
-        return filialRepository.findByNomeContaining(nome, pageable)
+        // Alterado: Usa o método de busca case-insensitive do repositório.
+        return filialRepository.findByNomeContainingIgnoreCase(nome, pageable)
                 .map(this::convertToResponseDTO);
     }
 
@@ -65,18 +66,18 @@ public class FilialService {
     public FilialResponseDTO atualizar(Long id, FilialRequestDTO request) {
         Filial filialExistente = filialRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Filial não encontrada com ID: " + id));
-        
+
         if (!filialExistente.getCodigo().equals(request.getCodigo())) {
             validarCodigoUnico(request.getCodigo());
         }
-        
+
         if (!filialExistente.getNome().equals(request.getNome())) {
             validarNomeUnico(request.getNome());
         }
-        
+
         updateEntityFromRequest(filialExistente, request);
         Filial updatedFilial = filialRepository.save(filialExistente);
-        
+
         return convertToResponseDTO(updatedFilial);
     }
 
@@ -84,6 +85,7 @@ public class FilialService {
     public void deletar(Long id) {
         Filial filial = filialRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Filial não encontrada com ID: " + id));
+        // Adicionar validação para não deletar filial com dependências (departamentos, etc)
         filialRepository.delete(filial);
     }
 
@@ -121,7 +123,8 @@ public class FilialService {
     }
 
     private void validarNomeUnico(String nome) {
-        if (filialRepository.findByNome(nome).isPresent()) {
+        // Alterado: Usa o método existsByNome para maior eficiência.
+        if (filialRepository.existsByNome(nome)) {
             throw new RuntimeException("Já existe uma filial com o nome: " + nome);
         }
     }
