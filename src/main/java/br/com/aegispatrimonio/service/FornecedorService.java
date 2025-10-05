@@ -22,16 +22,17 @@ public class FornecedorService {
     @Transactional
     public FornecedorResponseDTO criar(FornecedorRequestDTO request) {
         validarNomeUnico(request.getNome());
-        
+
         Fornecedor fornecedor = convertToEntity(request);
         Fornecedor savedFornecedor = fornecedorRepository.save(fornecedor);
-        
+
         return convertToResponseDTO(savedFornecedor);
     }
 
     @Transactional(readOnly = true)
     public Page<FornecedorResponseDTO> listarTodos(Pageable pageable) {
-        return fornecedorRepository.findAllOrderByNome(pageable)
+        // Alterado: Usa o método padrão findAll. A ordenação é definida no Controller.
+        return fornecedorRepository.findAll(pageable)
                 .map(this::convertToResponseDTO);
     }
 
@@ -55,7 +56,8 @@ public class FornecedorService {
 
     @Transactional(readOnly = true)
     public Page<FornecedorResponseDTO> buscarPorNomeContendo(String nome, Pageable pageable) {
-        return fornecedorRepository.findByNomeContaining(nome, pageable)
+        // Alterado: Usa o método de busca case-insensitive do repositório.
+        return fornecedorRepository.findByNomeContainingIgnoreCase(nome, pageable)
                 .map(this::convertToResponseDTO);
     }
 
@@ -63,14 +65,14 @@ public class FornecedorService {
     public FornecedorResponseDTO atualizar(Long id, FornecedorRequestDTO request) {
         Fornecedor fornecedorExistente = fornecedorRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Fornecedor não encontrado com ID: " + id));
-        
+
         if (!fornecedorExistente.getNome().equals(request.getNome())) {
             validarNomeUnico(request.getNome());
         }
-        
+
         updateEntityFromRequest(fornecedorExistente, request);
         Fornecedor updatedFornecedor = fornecedorRepository.save(fornecedorExistente);
-        
+
         return convertToResponseDTO(updatedFornecedor);
     }
 

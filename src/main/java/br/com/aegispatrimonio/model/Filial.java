@@ -1,14 +1,11 @@
 package br.com.aegispatrimonio.model;
 
 import jakarta.persistence.*;
-import java.time.LocalDateTime;
+import lombok.*;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.Where;
 
-import lombok.Getter;
-import lombok.Setter;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
-import lombok.ToString;
-import lombok.EqualsAndHashCode;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "filiais")
@@ -18,6 +15,8 @@ import lombok.EqualsAndHashCode;
 @AllArgsConstructor
 @ToString
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@SQLDelete(sql = "UPDATE filiais SET status = 'INATIVO' WHERE id = ?")
+@Where(clause = "status = 'ATIVO'")
 public class Filial {
 
     @Id
@@ -31,23 +30,23 @@ public class Filial {
     @Column(name = "codigo", nullable = false, unique = true, length = 10)
     private String codigo;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Status status;
+
     @Column(name = "criado_em")
     private LocalDateTime criadoEm;
 
     @Column(name = "atualizado_em")
     private LocalDateTime atualizadoEm;
 
-    // Construtor personalizado
-    public Filial(String nome, String codigo) {
-        this.nome = nome;
-        this.codigo = codigo;
-    }
-
-    // Métodos utilitários
     @PrePersist
     protected void onCreate() {
         criadoEm = LocalDateTime.now();
         atualizadoEm = LocalDateTime.now();
+        if (status == null) {
+            status = Status.ATIVO;
+        }
     }
 
     @PreUpdate

@@ -25,13 +25,13 @@ public class PessoaService {
     @Transactional
     public PessoaResponseDTO criar(PessoaRequestDTO request) {
         validarEmailUnico(request.getEmail());
-        
+
         Pessoa pessoa = convertToEntity(request);
-        
+
         Departamento departamento = departamentoRepository.findById(request.getDepartamentoId())
                 .orElseThrow(() -> new RuntimeException("Departamento não encontrado: " + request.getDepartamentoId()));
         pessoa.setDepartamento(departamento);
-        
+
         return convertToResponseDTO(pessoaRepository.save(pessoa));
     }
 
@@ -49,17 +49,17 @@ public class PessoaService {
     public PessoaResponseDTO atualizar(Long id, PessoaRequestDTO request) {
         Pessoa pessoa = pessoaRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Pessoa não encontrada: " + id));
-        
+
         if (request.getEmail() != null && !pessoa.getEmail().equals(request.getEmail())) {
             validarEmailUnico(request.getEmail());
         }
-        
+
         updateEntityFromRequest(pessoa, request);
-        
+
         Departamento departamento = departamentoRepository.findById(request.getDepartamentoId())
                 .orElseThrow(() -> new RuntimeException("Departamento não encontrado: " + request.getDepartamentoId()));
         pessoa.setDepartamento(departamento);
-        
+
         return convertToResponseDTO(pessoaRepository.save(pessoa));
     }
 
@@ -70,10 +70,10 @@ public class PessoaService {
         pessoaRepository.delete(pessoa);
     }
 
-    // ✅ APENAS métodos paginados
     @Transactional(readOnly = true)
     public Page<PessoaResponseDTO> listar(Pageable pageable) {
-        return pessoaRepository.findAllOrderByNome(pageable)
+        // Alterado: Usa o método padrão findAll. A ordenação é definida no Controller.
+        return pessoaRepository.findAll(pageable)
                 .map(this::convertToResponseDTO);
     }
 
@@ -85,7 +85,8 @@ public class PessoaService {
 
     @Transactional(readOnly = true)
     public Page<PessoaResponseDTO> buscarPorNome(String nome, Pageable pageable) {
-        return pessoaRepository.findByNomeContaining(nome, pageable)
+        // Alterado: Usa o método de busca case-insensitive do repositório.
+        return pessoaRepository.findByNomeContainingIgnoreCase(nome, pageable)
                 .map(this::convertToResponseDTO);
     }
 
@@ -108,17 +109,18 @@ public class PessoaService {
         dto.setEmail(pessoa.getEmail());
         dto.setCriadoEm(pessoa.getCriadoEm());
         dto.setAtualizadoEm(pessoa.getAtualizadoEm());
-        
+
         if (pessoa.getDepartamento() != null) {
             dto.setDepartamentoId(pessoa.getDepartamento().getId());
             dto.setDepartamentoNome(pessoa.getDepartamento().getNome());
         }
-        
+
         return dto;
     }
 
     private void validarEmailUnico(String email) {
-        if (email != null && pessoaRepository.findByEmail(email).isPresent()) {
+        // Alterado: Usa o método existsByEmail para maior eficiência.
+        if (email != null && pessoaRepository.existsByEmail(email)) {
             throw new RuntimeException("Email já cadastrado: " + email);
         }
     }

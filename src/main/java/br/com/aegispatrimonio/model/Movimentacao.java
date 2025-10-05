@@ -1,14 +1,16 @@
 package br.com.aegispatrimonio.model;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.Where;
 
-import java.time.LocalDateTime;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "movimentacoes")
@@ -16,7 +18,9 @@ import java.time.LocalDate;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString
+@ToString(exclude = {"ativo", "localizacaoOrigem", "localizacaoDestino", "pessoaOrigem", "pessoaDestino"})
+@SQLDelete(sql = "UPDATE movimentacoes SET status = 'CANCELADA' WHERE id = ?")
+@Where(clause = "status <> 'CANCELADA'")
 public class Movimentacao {
 
     @Id
@@ -77,6 +81,6 @@ public class Movimentacao {
 
     @PreUpdate
     protected void onUpdate() {
-        atualizadoEm = LocalDateTime.now();
+        this.atualizadoEm = LocalDateTime.now();
     }
 }

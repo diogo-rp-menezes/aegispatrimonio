@@ -27,10 +27,10 @@ public class LocalizacaoService {
     @Transactional
     public LocalizacaoResponseDTO criar(LocalizacaoRequestDTO request) {
         log.info("Criando nova localização: {}", request.getNome());
-        
+
         Localizacao localizacao = convertToEntity(request);
         Localizacao savedLocalizacao = localizacaoRepository.save(localizacao);
-        
+
         return convertToResponseDTO(savedLocalizacao);
     }
 
@@ -65,20 +65,21 @@ public class LocalizacaoService {
     @Transactional(readOnly = true)
     public Page<LocalizacaoResponseDTO> buscarPorNome(String nome, Pageable pageable) {
         log.debug("Buscando localizações por nome paginadas");
-        return localizacaoRepository.findByNomeContaining(nome, pageable)
+        // Alterado: Usa o método de busca case-insensitive do repositório.
+        return localizacaoRepository.findByNomeContainingIgnoreCase(nome, pageable)
                 .map(this::convertToResponseDTO);
     }
 
     @Transactional
     public LocalizacaoResponseDTO atualizar(Long id, LocalizacaoRequestDTO request) {
         log.info("Atualizando localização ID: {}", id);
-        
+
         Localizacao localizacaoExistente = localizacaoRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Localização não encontrada com ID: " + id));
-        
+
         updateEntityFromRequest(localizacaoExistente, request);
         Localizacao updatedLocalizacao = localizacaoRepository.save(localizacaoExistente);
-        
+
         return convertToResponseDTO(updatedLocalizacao);
     }
 
@@ -100,12 +101,12 @@ public class LocalizacaoService {
     private void updateEntityFromRequest(Localizacao localizacao, LocalizacaoRequestDTO request) {
         localizacao.setNome(request.getNome());
         localizacao.setDescricao(request.getDescricao());
-        
+
         // Configurar filial
         Filial filial = filialRepository.findById(request.getFilialId())
                 .orElseThrow(() -> new RuntimeException("Filial não encontrada com ID: " + request.getFilialId()));
         localizacao.setFilial(filial);
-        
+
         // Configurar localização pai (se existir)
         if (request.getLocalizacaoPaiId() != null) {
             Localizacao localizacaoPai = localizacaoRepository.findById(request.getLocalizacaoPaiId())
@@ -123,19 +124,19 @@ public class LocalizacaoService {
         dto.setDescricao(localizacao.getDescricao());
         dto.setCriadoEm(localizacao.getCriadoEm());
         dto.setAtualizadoEm(localizacao.getAtualizadoEm());
-        
+
         // Configurar filial
         if (localizacao.getFilial() != null) {
             dto.setFilialId(localizacao.getFilial().getId());
             dto.setFilialNome(localizacao.getFilial().getNome());
         }
-        
+
         // Configurar localização pai
         if (localizacao.getLocalizacaoPai() != null) {
             dto.setLocalizacaoPaiId(localizacao.getLocalizacaoPai().getId());
             dto.setLocalizacaoPaiNome(localizacao.getLocalizacaoPai().getNome());
         }
-        
+
         return dto;
     }
 }
