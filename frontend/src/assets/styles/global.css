@@ -13,18 +13,64 @@
 
   --card-radius: 1rem;
   --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  
+  /* Novas variáveis para responsividade */
+  --mobile-breakpoint: 768px;
+  --sidebar-width: 280px;
+  --sidebar-width-collapsed: 70px;
 }
 
 /* =======================
    Reset / Base
    ======================= */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
 body {
   background-color: var(--aegis-light);
-  margin: 0;
   font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   color: var(--aegis-dark);
+  line-height: 1.6;
 }
 
 a {
   text-decoration: none;
+  color: inherit;
+}
+
+/* =======================
+   Utilidades Responsivas
+   ======================= */
+.container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 0 0.5rem;
+  }
+}
+
+.hidden-mobile {
+  display: block;
+}
+
+.visible-mobile {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .hidden-mobile {
+    display: none !important;
+  }
+  
+  .visible-mobile {
+    display: block !important;
+  }
 }
