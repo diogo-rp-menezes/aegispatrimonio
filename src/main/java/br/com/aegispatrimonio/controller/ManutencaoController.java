@@ -1,22 +1,8 @@
 package br.com.aegispatrimonio.controller;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.web.PageableDefault;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-
+import br.com.aegispatrimonio.dto.request.ManutencaoCancelDTO;
+import br.com.aegispatrimonio.dto.request.ManutencaoConclusaoDTO;
+import br.com.aegispatrimonio.dto.request.ManutencaoInicioDTO;
 import br.com.aegispatrimonio.dto.request.ManutencaoRequestDTO;
 import br.com.aegispatrimonio.dto.response.ManutencaoResponseDTO;
 import br.com.aegispatrimonio.model.StatusManutencao;
@@ -29,6 +15,15 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/manutencoes")
@@ -62,6 +57,26 @@ public class ManutencaoController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @GetMapping
+    @Operation(summary = "Listar e filtrar manutenções", description = "Retorna manutenções paginadas com filtros dinâmicos")
+    @ApiResponse(responseCode = "200", description = "Manutenções listadas com sucesso")
+    public ResponseEntity<Page<ManutencaoResponseDTO>> listar(
+            @Parameter(description = "ID do ativo") @RequestParam(required = false) Long ativoId,
+            @Parameter(description = "Status da manutenção") @RequestParam(required = false) StatusManutencao status,
+            @Parameter(description = "Tipo de manutenção") @RequestParam(required = false) TipoManutencao tipo,
+            @Parameter(description = "ID do solicitante") @RequestParam(required = false) Long solicitanteId,
+            @Parameter(description = "ID do fornecedor") @RequestParam(required = false) Long fornecedorId,
+            @Parameter(description = "Data inicial da solicitação") @RequestParam(required = false) LocalDate dataSolicitacaoInicio,
+            @Parameter(description = "Data final da solicitação") @RequestParam(required = false) LocalDate dataSolicitacaoFim,
+            @Parameter(description = "Data inicial da conclusão") @RequestParam(required = false) LocalDate dataConclusaoInicio,
+            @Parameter(description = "Data final da conclusão") @RequestParam(required = false) LocalDate dataConclusaoFim,
+            @Parameter(description = "Parâmetros de paginação") @PageableDefault(size = 10, sort = "dataSolicitacao,desc") Pageable pageable) {
+
+        Page<ManutencaoResponseDTO> manutenções = manutencaoService.listar(ativoId, status, tipo, solicitanteId, fornecedorId,
+                dataSolicitacaoInicio, dataSolicitacaoFim, dataConclusaoInicio, dataConclusaoFim, pageable);
+        return ResponseEntity.ok(manutenções);
+    }
+
     @PostMapping("/aprovar/{id}")
     @Operation(summary = "Aprovar manutenção", description = "Aprova uma manutenção solicitada")
     @ApiResponses(value = {
@@ -83,8 +98,8 @@ public class ManutencaoController {
     })
     public ResponseEntity<ManutencaoResponseDTO> iniciar(
             @Parameter(description = "ID da manutenção", example = "1") @PathVariable Long id,
-            @Parameter(description = "ID do técnico responsável", example = "1") @RequestParam Long tecnicoId) {
-        return ResponseEntity.ok(manutencaoService.iniciar(id, tecnicoId));
+            @Valid @RequestBody ManutencaoInicioDTO inicioDTO) {
+        return ResponseEntity.ok(manutencaoService.iniciar(id, inicioDTO));
     }
 
     @PostMapping("/concluir/{id}")
@@ -96,10 +111,8 @@ public class ManutencaoController {
     })
     public ResponseEntity<ManutencaoResponseDTO> concluir(
             @Parameter(description = "ID da manutenção", example = "1") @PathVariable Long id,
-            @Parameter(description = "Descrição do serviço", example = "Troca de peças") @RequestParam String descricaoServico,
-            @Parameter(description = "Custo real", example = "350.75") @RequestParam BigDecimal custoReal,
-            @Parameter(description = "Tempo de execução (minutos)", example = "120") @RequestParam Integer tempoExecucao) {
-        return ResponseEntity.ok(manutencaoService.concluir(id, descricaoServico, custoReal, tempoExecucao));
+            @Valid @RequestBody ManutencaoConclusaoDTO conclusaoDTO) {
+        return ResponseEntity.ok(manutencaoService.concluir(id, conclusaoDTO));
     }
 
     @PostMapping("/cancelar/{id}")
@@ -111,8 +124,8 @@ public class ManutencaoController {
     })
     public ResponseEntity<ManutencaoResponseDTO> cancelar(
             @Parameter(description = "ID da manutenção", example = "1") @PathVariable Long id,
-            @Parameter(description = "Motivo do cancelamento", example = "Peças indisponíveis") @RequestParam String motivo) {
-        return ResponseEntity.ok(manutencaoService.cancelar(id, motivo));
+            @Valid @RequestBody ManutencaoCancelDTO cancelDTO) {
+        return ResponseEntity.ok(manutencaoService.cancelar(id, cancelDTO));
     }
 
     @DeleteMapping("/{id}")
@@ -125,53 +138,6 @@ public class ManutencaoController {
             @Parameter(description = "ID da manutenção", example = "1") @PathVariable Long id) {
         manutencaoService.deletar(id);
         return ResponseEntity.noContent().build();
-    }
-
-    @GetMapping
-    @Operation(summary = "Listar manutenções com filtros", description = "Retorna manutenções paginadas com filtros")
-    @ApiResponse(responseCode = "200", description = "Manutenções listadas com sucesso")
-    public ResponseEntity<Page<ManutencaoResponseDTO>> listar(
-            @Parameter(description = "ID do ativo", example = "1") @RequestParam(required = false) Long ativoId,
-            @Parameter(description = "Status da manutenção", example = "SOLICITADA") @RequestParam(required = false) StatusManutencao status,
-            @Parameter(description = "Tipo de manutenção", example = "CORRETIVA") @RequestParam(required = false) TipoManutencao tipo,
-            @Parameter(description = "ID do solicitante", example = "1") @RequestParam(required = false) Long solicitanteId,
-            @Parameter(description = "ID do fornecedor", example = "1") @RequestParam(required = false) Long fornecedorId,
-            @Parameter(description = "Data inicial solicitação", example = "2024-01-01") @RequestParam(required = false) LocalDate dataSolicitacaoInicio,
-            @Parameter(description = "Data final solicitação", example = "2024-12-31") @RequestParam(required = false) LocalDate dataSolicitacaoFim,
-            @Parameter(description = "Data inicial conclusão", example = "2024-01-01") @RequestParam(required = false) LocalDate dataConclusaoInicio,
-            @Parameter(description = "Data final conclusão", example = "2024-12-31") @RequestParam(required = false) LocalDate dataConclusaoFim,
-            @Parameter(description = "Apenas pendentes", example = "true") @RequestParam(required = false) Boolean pendentes,
-            @Parameter(description = "Parâmetros de paginação") @PageableDefault(size = 10, sort = "dataSolicitacao,desc") Pageable pageable) {
-        
-        if (ativoId != null && Boolean.TRUE.equals(pendentes)) {
-            return ResponseEntity.ok(manutencaoService.listarPendentesPorAtivo(ativoId, pageable));
-        }
-        if (Boolean.TRUE.equals(pendentes)) {
-            return ResponseEntity.ok(manutencaoService.listarPendentes(pageable));
-        }
-        if (ativoId != null) {
-            return ResponseEntity.ok(manutencaoService.listarPorAtivo(ativoId, pageable));
-        }
-        if (status != null) {
-            return ResponseEntity.ok(manutencaoService.listarPorStatus(status, pageable));
-        }
-        if (tipo != null) {
-            return ResponseEntity.ok(manutencaoService.listarPorTipo(tipo, pageable));
-        }
-        if (solicitanteId != null) {
-            return ResponseEntity.ok(manutencaoService.listarPorSolicitante(solicitanteId, pageable));
-        }
-        if (fornecedorId != null) {
-            return ResponseEntity.ok(manutencaoService.listarPorFornecedor(fornecedorId, pageable));
-        }
-        if (dataSolicitacaoInicio != null && dataSolicitacaoFim != null) {
-            return ResponseEntity.ok(manutencaoService.listarPorPeriodoSolicitacao(dataSolicitacaoInicio, dataSolicitacaoFim, pageable));
-        }
-        if (dataConclusaoInicio != null && dataConclusaoFim != null) {
-            return ResponseEntity.ok(manutencaoService.listarPorPeriodoConclusao(dataConclusaoInicio, dataConclusaoFim, pageable));
-        }
-        
-        return ResponseEntity.ok(manutencaoService.listar(pageable));
     }
 
     @GetMapping("/custo-total")

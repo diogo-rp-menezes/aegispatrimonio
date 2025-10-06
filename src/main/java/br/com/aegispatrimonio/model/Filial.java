@@ -32,6 +32,16 @@ public class Filial {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
+    private TipoFilial tipo; // MATRIZ ou FILIAL
+
+    @Column(nullable = false, unique = true, length = 18)
+    private String cnpj;
+
+    @Column
+    private String endereco;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private Status status;
 
     @Column(name = "criado_em")
@@ -46,6 +56,9 @@ public class Filial {
         atualizadoEm = LocalDateTime.now();
         if (status == null) {
             status = Status.ATIVO;
+        }
+        if (tipo == null) {
+            tipo = TipoFilial.FILIAL; // Padrão para evitar nulos
         }
     }
 

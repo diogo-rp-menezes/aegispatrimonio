@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Gestão Patrimonial Galois - Demo Executiva</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+	<link rel="icon" href="favicon.ico" type="image/x-icon">
+    <style>
+        :root {
+            --galois-dark-blue: #1a3e72;
+            --galois-medium-blue: #2a5da6;
+            --galois-light-blue: #e6f0fa;
+            --galois-orange: #f57c00;
+            --galois-red: #AD2831;
+            --galois-green: #28a745;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--galois-light-blue), #ffffff);
+        }
+        
+        .presentation-header {
+            background: linear-gradient(135deg, var(--galois-dark-blue), var(--galois-medium-blue));
+            color: white;
+            padding: 3rem 0;
+            margin-bottom: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .presentation-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -10%;
+            width: 100%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            transform: rotate(45deg);
+        }
+        
+        .demo-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            border: none;
+            margin-bottom: 2rem;
+        }
+        
+        .demo-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+        }
+        
+        .demo-section {
+            padding: 2rem 0;
+        }
+        
+        .metric-card {
+            background: linear-gradient(135deg, var(--galois-green), #20c997);
+            color: white;
+            text-align: center;
+            padding: 2rem;
+            border-radius: 15px;
+            margin-bottom: 1rem;
+        }
+        
+        .metric-number {
+            font-size: 3rem;
+            font-weight: bold;
+            display: block;
+        }
+        
+        .current-vs-future {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+        
+        .current-state {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white;
+            padding: 2rem;
+            border-radius: 15px;
+        }
+        
+        .future-state {
+            background: linear-gradient(135deg, var(--galois-green), #20c997);
+            color: white;
+            padding: 2rem;
+            border-radius: 15px;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+        
+        .feature-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            text-align: center;
+            border-left: 5px solid var(--galois-orange);
+        }
+        
+        .feature-icon {
+            font-size: 3rem;
+            color: var(--galois-medium-blue);
+            margin-bottom: 1rem;
+        }
+        
+        .timeline {
+            position: relative;
+            padding: 2rem 0;
+        }
+        
+        .timeline-item {
+            display: flex;
+            margin-bottom: 2rem;
+            align-items: center;
+        }
+        
+        .timeline-marker {
+            width: 60px;
+            height: 60px;
+            background: var(--galois-orange);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            margin-right: 2rem;
+            flex-shrink: 0;
+        }
+        
+        .timeline-content {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+            flex: 1;
+        }
+        
+        .demo-system {
+            background: var(--galois-light-blue);
+            border: 2px dashed var(--galois-medium-blue);
+            border-radius: 15px;
+            padding: 2rem;
+            text-align: center;
+            margin: 2rem 0;
+        }
+        
+        .roi-calculator {
+            background: linear-gradient(135deg, var(--galois-dark-blue), var(--galois-medium-blue));
+            color: white;
+            padding: 3rem;
+            border-radius: 15px;
+            margin: 2rem 0;
+        }
+        
+        .roi-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .roi-item:last-child {
+            border-bottom: none;
+            font-weight: bold;
+            font-size: 1.2rem;
+            margin-top: 1rem;
+            padding-top: 2rem;
+            border-top: 2px solid rgba(255,255,255,0.3);
+        }
+        
+        .section-divider {
+            height: 3px;
+            background: linear-gradient(90deg, var(--galois-orange), var(--galois-medium-blue));
+            margin: 3rem 0;
+            border-radius: 2px;
+        }
+        
+        .demo-button {
+            background: linear-gradient(135deg, var(--galois-orange), #e65100);
+            border: none;
+            color: white;
+            padding: 1rem 3rem;
+            border-radius: 25px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .demo-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            color: white;
+        }
+        
+        @media (max-width: 768px) {
+            .current-vs-future {
+                grid-template-columns: 1fr;
+            }
+            
+            .timeline-item {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .timeline-marker {
+                margin-right: 0;
+                margin-bottom: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header da Apresentação -->
+    <div class="presentation-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-lg-8">
+                    <h1 class="display-4 mb-3">
+                        <i class="bi bi-shield-check me-3"></i>
+                        Sistema de Gestão Patrimonial
+                    </h1>
+                    <p class="lead mb-4">
+                        Solução Completa para Controle de Ativos e Suporte Técnico
+                    </p>
+                    <div class="d-flex flex-wrap gap-3">
+                        <span class="badge bg-light text-dark px-3 py-2">
+                            <i class="bi bi-building me-2"></i>Coligadas
+                        </span>
+                        <span class="badge bg-light text-dark px-3 py-2">
+                            <i class="bi bi-pc-display me-2"></i>Equipamentos
+                        </span>
+                        <span class="badge bg-light text-dark px-3 py-2">
+                            <i class="bi bi-buildings me-2"></i>Ativos
+                        </span>
+                    </div>
+                </div>
+                <div class="col-lg-4 text-center">
+                    <i class="bi bi-laptop" style="font-size: 8rem; opacity: 0.3;"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Seção 1: Problema Atual vs Solução -->
+        <div class="demo-section">
+            <h2 class="text-center mb-5">
+                <i class="bi bi-exclamation-triangle text-warning me-2"></i>
+                Cenário Atual vs Solução Proposta
+            </h2>
+            
+            <div class="current-vs-future">
+                <div class="current-state">
+                    <h3><i class="bi bi-x-circle me-2"></i>Situação Atual</h3>
+                    <ul class="list-unstyled mt-3">
+                        <li><i class="bi bi-file-earmark-text me-2"></i>Controle manual em planilhas</li>
+                        <li><i class="bi bi-clock me-2"></i>Tempo excessivo para localizar equipamentos</li>
+                        <li><i class="bi bi-graph-down me-2"></i>Perda de informações críticas</li>
+                        <li><i class="bi bi-people me-2"></i>Dependência de pessoas específicas</li>
+                        <li><i class="bi bi-exclamation-triangle me-2"></i>Impossibilidade de auditoria eficiente</li>
+                    </ul>
+                </div>
+                
+                <div class="future-state">
+                    <h3><i class="bi bi-check-circle me-2"></i>Com o Sistema</h3>
+                    <ul class="list-unstyled mt-3">
+                        <li><i class="bi bi-robot me-2"></i>Coleta automática de dados</li>
+                        <li><i class="bi bi-search me-2"></i>Localização instantânea de ativos</li>
+                        <li><i class="bi bi-shield-check me-2"></i>Dados seguros e centralizados</li>
+                        <li><i class="bi bi-graph-up me-2"></i>Relatórios gerenciais em tempo real</li>
+                        <li><i class="bi bi-bell me-2"></i>Alertas preventivos automáticos</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <!-- Seção 2: Demo do Sistema Atual -->
+        <div class="demo-section">
+            <h2 class="text-center mb-5">
+                <i class="bi bi-play-circle text-primary me-2"></i>
+                Demonstração do Protótipo Atual
+            </h2>
+            
+            <div class="demo-system">
+                <h4><i class="bi bi-laptop me-2"></i>Sistema em Funcionamento</h4>
+                <p class="mb-4">O sistema atual já coleta automaticamente as informações dos equipamentos</p>
+                
+                <div class="row text-center">
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <span class="metric-number">100%</span>
+                            <small>Automação da Coleta</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <span class="metric-number">15+</span>
+                            <small>Tipos de Dados</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <span class="metric-number">0</span>
+                            <small>Intervenção Manual</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <span class="metric-number">Real-time</span>
+                            <small>Atualizações</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- <a href="#" class="demo-button mt-4" onclick="openSystemDemo()">
+                    <i class="bi bi-play-fill me-2"></i>Abrir Demo do Sistema
+                </a> -->
+            </div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <!-- Seção 3: Funcionalidades Principais -->
+        <div class="demo-section">
+            <h2 class="text-center mb-5">
+                <i class="bi bi-gear text-primary me-2"></i>
+                Funcionalidades Principais
+            </h2>
+            
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <i class="bi bi-pc-display feature-icon"></i>
+                    <h4>Inventário Automático</h4>
+                    <p>Coleta automática de hardware, software e configurações de rede dos equipamentos</p>
+                </div>
+                
+                <div class="feature-card">
+                    <i class="bi bi-geo-alt feature-icon"></i>
+                    <h4>Controle de Localização</h4>
+                    <p>Rastreamento por Coligada → Departamento → Local com histórico de movimentações</p>
+                </div>
+                
+                <div class="feature-card">
+                    <i class="bi bi-tools feature-icon"></i>
+                    <h4>Suporte Técnico</h4>
+                    <p>Informações de acesso remoto, credenciais e dados técnicos para a equipe de TI</p>
+                </div>
+                
+                <div class="feature-card">
+                    <i class="bi bi-shield-lock feature-icon"></i>
+                    <h4>Segurança Avançada</h4>
+                    <p>Controle de acesso por níveis, autenticação AD e criptografia de dados sensíveis</p>
+                </div>
+                
+                <div class="feature-card">
+                    <i class="bi bi-graph-up feature-icon"></i>
+                    <h4>Relatórios Gerenciais</h4>
+                    <p>Dashboards executivos, relatórios de auditoria e indicadores de performance</p>
+                </div>
+                
+                <div class="feature-card">
+                    <i class="bi bi-arrow-left-right feature-icon"></i>
+                    <h4>Gestão de Comodatos</h4>
+                    <p>Controle de equipamentos em comodato com datas de recebimento e devolução</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <!-- Seção 4: Roadmap de Implementação -->
+        <div class="demo-section">
+            <h2 class="text-center mb-5">
+                <i class="bi bi-calendar-check text-success me-2"></i>
+                Roadmap de Implementação
+            </h2>
+            
+            <div class="timeline">
+                <div class="timeline-item">
+                    <div class="timeline-marker">
+                        <i class="bi bi-rocket-takeoff"></i>
+                    </div>
+                    <div class="timeline-content">
+                        <h4>Fase 1 - MVP (6 meses)</h4>
+                        <p><strong>Controle de Patrimônio Básico</strong></p>
+                        <ul>
+                            <li>Migração para Spring Boot + Vue.js</li>
+                            <li>Cadastro e inventário automático</li>
+                            <li>Controle de localização</li>
+                            <li>Relatórios básicos</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="timeline-item">
+                    <div class="timeline-marker">
+                        <i class="bi bi-tools"></i>
+                    </div>
+                    <div class="timeline-content">
+                        <h4>Fase 2 - Suporte Técnico (4 meses)</h4>
+                        <p><strong>Funcionalidades para Equipe de TI</strong></p>
+                        <ul>
+                            <li>Painel de suporte com credenciais</li>
+                            <li>Histórico de manutenções</li>
+                            <li>Gestão de comodatos</li>
+                            <li>Movimentação de equipamentos</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="timeline-item">
+                    <div class="timeline-marker">
+                        <i class="bi bi-phone"></i>
+                    </div>
+                    <div class="timeline-content">
+                        <h4>Fase 3 - Mobilidade (4 meses)</h4>
+                        <p><strong>Aplicativo Mobile</strong></p>
+                        <ul>
+                            <li>App Android/iOS</li>
+                            <li>Leitura de QR Codes</li>
+                            <li>Cadastro em campo</li>
+                            <li>Sincronização offline</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="timeline-item">
+                    <div class="timeline-marker">
+                        <i class="bi bi-cpu"></i>
+                    </div>
+                    <div class="timeline-content">
+                        <h4>Fase 4 - Monitoramento (6 meses)</h4>
+                        <p><strong>Alertas Preventivos</strong></p>
+                        <ul>
+                            <li>Monitoramento de saúde dos equipamentos</li>
+                            <li>Alertas automáticos</li>
+                            <li>Dashboards preditivos</li>
+                            <li>Integração com ferramentas de TI</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <!-- Seção 5: ROI e Benefícios -->
+        <!-- <div class="demo-section">
+            <h2 class="text-center mb-5">
+                <i class="bi bi-calculator text-warning me-2"></i>
+                Retorno sobre Investimento
+            </h2>
+            
+            <div class="roi-calculator">
+                <h3 class="text-center mb-4">Análise de ROI Anual</h3>
+                
+                <div class="roi-item">
+                    <span>Economia com Controle Manual (40h/mês × R$ 50/h)</span>
+                    <span><strong>R$ 24.000</strong></span>
+                </div>
+                
+                <div class="roi-item">
+                    <span>Redução de Perdas por Extravios (5% dos ativos)</span>
+                    <span><strong>R$ 75.000</strong></span>
+                </div>
+                
+                <div class="roi-item">
+                    <span>Otimização de Manutenções Preventivas</span>
+                    <span><strong>R$ 35.000</strong></span>
+                </div>
+                
+                <div class="roi-item">
+                    <span>Melhoria na Eficiência da Equipe de TI</span>
+                    <span><strong>R$ 45.000</strong></span>
+                </div>
+                
+                <div class="roi-item">
+                    <span>Conformidade Regulatória e Auditoria</span>
+                    <span><strong>R$ 25.000</strong></span>
+                </div>
+                
+                <div class="roi-item">
+                    <span><i class="bi bi-arrow-up-circle me-2"></i>ECONOMIA TOTAL ANUAL</span>
+                    <span><strong>R$ 204.000</strong></span>
+                </div>
+            </div>
+            
+            <div class="row mt-4">
+                <div class="col-md-4">
+                    <div class="demo-card text-center p-4">
+                        <i class="bi bi-speedometer2 text-primary" style="font-size: 3rem;"></i>
+                        <h4 class="mt-3">Redução de 80%</h4>
+                        <p>no tempo de localização de equipamentos</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="demo-card text-center p-4">
+                        <i class="bi bi-shield-check text-success" style="font-size: 3rem;"></i>
+                        <h4 class="mt-3">100% de Precisão</h4>
+                        <p>no inventário patrimonial</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="demo-card text-center p-4">
+                        <i class="bi bi-graph-up-arrow text-warning" style="font-size: 3rem;"></i>
+                        <h4 class="mt-3">ROI de 400%</h4>
+                        <p>no primeiro ano de operação</p>
+                    </div>
+                </div>
+            </div>
+        </div> -->
+
+        <!-- Call to Action -->
+        <!-- <div class="demo-section text-center">
+            <div class="demo-card p-5">
+                <h2 class="mb-4">
+                    <i class="bi bi-rocket-takeoff text-primary me-2"></i>
+                    Próximos Passos
+                </h2>
+                <p class="lead mb-4">
+                    Estamos prontos para iniciar a implementação e transformar a gestão patrimonial da instituição
+                </p>
+                <div class="d-flex justify-content-center gap-3 flex-wrap">
+                    <button class="demo-button" onclick="scheduleDemo()">
+                        <i class="bi bi-calendar-plus me-2"></i>Agendar Reunião Técnica
+                    </button>
+                    <button class="btn btn-outline-primary btn-lg" onclick="requestProposal()">
+                        <i class="bi bi-file-text me-2"></i>Solicitar Proposta Comercial
+                    </button>
+                </div>
+            </div>
+        </div> -->
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function openSystemDemo(url) {
+            // Simula abertura do sistema atual em nova aba
+<!--             alert('🚀 Aqui você abriria o dashboard atual funcionando!\n\nNo momento da apresentação real, você executará:\n1. O script PowerShell para coletar dados\n2. O servidor Flask\n3. Demonstrará o dashboard em funcionamento'); -->
+			window.open('localhost:5000', '_blank');
+        }
+        
+        function scheduleDemo() {
+            alert('📅 Funcionalidade para agendar reunião técnica\n\nSugestão de agenda:\n• Análise detalhada dos requisitos\n• Demonstração técnica completa\n• Discussão da arquitetura\n• Cronograma de implementação');
+        }
+        
+        function requestProposal() {
+            alert('📋 Funcionalidade para solicitar proposta comercial\n\nA proposta incluirá:\n• Especificação técnica detalhada\n• Cronograma de entrega\n• Investimento por fase\n• SLA e garantias');
+        }
+        
+        // Animações suaves ao rolar a página
+        window.addEventListener('scroll', function() {
+            const cards = document.querySelectorAll('.demo-card, .feature-card');
+            cards.forEach(card => {
+                const cardTop = card.getBoundingClientRect().top;
+                const cardVisible = 150;
+                
+                if (cardTop < window.innerHeight - cardVisible) {
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }
+            });
+        });
+        
+        // Inicializa animações
+        document.addEventListener('DOMContentLoaded', function() {
+            const cards = document.querySelectorAll('.demo-card, .feature-card');
+            cards.forEach(card => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(30px)';
+                card.style.transition = 'all 0.6s ease';
+            });
+        });
+    </script>
+</body>
+</html>

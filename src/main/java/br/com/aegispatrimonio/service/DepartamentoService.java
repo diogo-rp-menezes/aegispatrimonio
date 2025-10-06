@@ -1,124 +1,124 @@
 package br.com.aegispatrimonio.service;
 
-import br.com.aegispatrimonio.dto.request.DepartamentoRequestDTO;
-import br.com.aegispatrimonio.dto.response.DepartamentoResponseDTO;
+import br.com.aegispatrimonio.dto.DepartamentoCreateDTO;
+import br.com.aegispatrimonio.dto.DepartamentoDTO;
+import br.com.aegispatrimonio.dto.DepartamentoUpdateDTO;
+import br.com.aegispatrimonio.mapper.DepartamentoMapper;
 import br.com.aegispatrimonio.model.Departamento;
 import br.com.aegispatrimonio.model.Filial;
+import br.com.aegispatrimonio.model.Pessoa;
 import br.com.aegispatrimonio.repository.DepartamentoRepository;
 import br.com.aegispatrimonio.repository.FilialRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import br.com.aegispatrimonio.security.CustomUserDetails;
+import jakarta.persistence.EntityNotFoundException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Optional;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
-@Transactional
-@RequiredArgsConstructor
 public class DepartamentoService {
 
     private final DepartamentoRepository departamentoRepository;
+    private final DepartamentoMapper departamentoMapper;
     private final FilialRepository filialRepository;
 
-    @Transactional
-    public DepartamentoResponseDTO criar(DepartamentoRequestDTO request) {
-        validarFilial(request.getFilialId());
-        
-        Departamento departamento = convertToEntity(request);
-        Departamento savedDepartamento = departamentoRepository.save(departamento);
-        
-        return convertToResponseDTO(savedDepartamento);
+    public DepartamentoService(DepartamentoRepository departamentoRepository, DepartamentoMapper departamentoMapper, FilialRepository filialRepository) {
+        this.departamentoRepository = departamentoRepository;
+        this.departamentoMapper = departamentoMapper;
+        this.filialRepository = filialRepository;
+    }
+
+    private Pessoa getPessoaLogada() {
+        CustomUserDetails userDetails = (CustomUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return userDetails.getPessoa();
+    }
+
+    private boolean isAdmin(Pessoa pessoa) {
+        return "ROLE_ADMIN".equals(pessoa.getRole());
     }
 
     @Transactional(readOnly = true)
-    public Page<DepartamentoResponseDTO> listarTodos(Pageable pageable) {
-        return departamentoRepository.findAll(pageable)
-                .map(this::convertToResponseDTO);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<DepartamentoResponseDTO> buscarPorNome(String nome, Pageable pageable) {
-        return departamentoRepository.findByNomeContainingIgnoreCase(nome, pageable)
-                .map(this::convertToResponseDTO);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<DepartamentoResponseDTO> listarPorFilial(Long filialId, Pageable pageable) {
-        return departamentoRepository.findByFilialId(filialId, pageable)
-                .map(this::convertToResponseDTO);
-    }
-
-    @Transactional(readOnly = true)
-    public Optional<DepartamentoResponseDTO> buscarPorId(Long id) {
-        return departamentoRepository.findById(id)
-                .map(this::convertToResponseDTO);
-    }
-
-    @Transactional
-    public DepartamentoResponseDTO atualizar(Long id, DepartamentoRequestDTO request) {
-        Departamento departamentoExistente = departamentoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Departamento não encontrado com ID: " + id));
-        
-        if (!departamentoExistente.getFilial().getId().equals(request.getFilialId())) {
-            validarFilial(request.getFilialId());
+    public List<DepartamentoDTO> listarTodos() {
+        Pessoa pessoaLogada = getPessoaLogada();
+        if (isAdmin(pessoaLogada)) {
+            return departamentoRepository.findAll().stream().map(departamentoMapper::toDTO).collect(Collectors.toList());
         }
-        
-        updateEntityFromRequest(departamentoExistente, request);
-        Departamento updatedDepartamento = departamentoRepository.save(departamentoExistente);
-        
-        return convertToResponseDTO(updatedDepartamento);
+        Long filialId = pessoaLogada.getFilial().getId();
+        return departamentoRepository.findByFilialId(filialId).stream().map(departamentoMapper::toDTO).collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public DepartamentoDTO buscarPorId(Long id) {
+        Pessoa pessoaLogada = getPessoaLogada();
+        Departamento departamento = departamentoRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Departamento não encontrado com ID: " + id));
+
+        if (!isAdmin(pessoaLogada) && !departamento.getFilial().getId().equals(pessoaLogada.getFilial().getId())) {
+            throw new AccessDeniedException("Você não tem permissão para acessar departamentos de outra filial.");
+        }
+
+        return departamentoMapper.toDTO(departamento);
+    }
+
+    @Transactional
+    public DepartamentoDTO criar(DepartamentoCreateDTO departamentoCreateDTO) {
+        Pessoa pessoaLogada = getPessoaLogada();
+
+        if (!isAdmin(pessoaLogada) && !departamentoCreateDTO.filialId().equals(pessoaLogada.getFilial().getId())) {
+            throw new AccessDeniedException("Você só pode criar departamentos para a sua própria filial.");
+        }
+
+        Departamento departamento = departamentoMapper.toEntity(departamentoCreateDTO);
+
+        Filial filial = filialRepository.findById(departamentoCreateDTO.filialId())
+                .orElseThrow(() -> new EntityNotFoundException("Filial não encontrada com ID: " + departamentoCreateDTO.filialId()));
+        departamento.setFilial(filial);
+
+        Departamento departamentoSalvo = departamentoRepository.save(departamento);
+        return departamentoMapper.toDTO(departamentoSalvo);
+    }
+
+    @Transactional
+    public DepartamentoDTO atualizar(Long id, DepartamentoUpdateDTO departamentoUpdateDTO) {
+        Pessoa pessoaLogada = getPessoaLogada();
+        Departamento departamento = departamentoRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Departamento não encontrado com ID: " + id));
+
+        if (!isAdmin(pessoaLogada)) {
+            if (!departamento.getFilial().getId().equals(pessoaLogada.getFilial().getId())) {
+                throw new AccessDeniedException("Você não tem permissão para editar departamentos de outra filial.");
+            }
+            if (!departamento.getFilial().getId().equals(departamentoUpdateDTO.filialId())) {
+                throw new AccessDeniedException("Você não tem permissão para transferir departamentos entre filiais.");
+            }
+        }
+
+        departamento.setNome(departamentoUpdateDTO.nome());
+
+        if (departamentoUpdateDTO.filialId() != null) {
+            Filial filial = filialRepository.findById(departamentoUpdateDTO.filialId())
+                    .orElseThrow(() -> new EntityNotFoundException("Filial não encontrada com ID: " + departamentoUpdateDTO.filialId()));
+            departamento.setFilial(filial);
+        }
+
+        Departamento departamentoAtualizado = departamentoRepository.save(departamento);
+        return departamentoMapper.toDTO(departamentoAtualizado);
     }
 
     @Transactional
     public void deletar(Long id) {
+        Pessoa pessoaLogada = getPessoaLogada();
         Departamento departamento = departamentoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Departamento não encontrado com ID: " + id));
-        departamentoRepository.delete(departamento);
-    }
+                .orElseThrow(() -> new EntityNotFoundException("Departamento não encontrado com ID: " + id));
 
-    @Transactional(readOnly = true)
-    public boolean existePorId(Long id) {
-        return departamentoRepository.existsById(id);
-    }
-
-    // Métodos de conversão
-    private Departamento convertToEntity(DepartamentoRequestDTO request) {
-        Departamento departamento = new Departamento();
-        updateEntityFromRequest(departamento, request);
-        return departamento;
-    }
-
-    private void updateEntityFromRequest(Departamento departamento, DepartamentoRequestDTO request) {
-        departamento.setNome(request.getNome());
-        departamento.setCentroCusto(request.getCentroCusto());
-        
-        // Configurar filial
-        Filial filial = filialRepository.findById(request.getFilialId())
-                .orElseThrow(() -> new RuntimeException("Filial não encontrada com ID: " + request.getFilialId()));
-        departamento.setFilial(filial);
-    }
-
-    private DepartamentoResponseDTO convertToResponseDTO(Departamento departamento) {
-        DepartamentoResponseDTO dto = new DepartamentoResponseDTO();
-        dto.setId(departamento.getId());
-        dto.setNome(departamento.getNome());
-        dto.setCentroCusto(departamento.getCentroCusto());
-        dto.setCriadoEm(departamento.getCriadoEm());
-        dto.setAtualizadoEm(departamento.getAtualizadoEm());
-        
-        if (departamento.getFilial() != null) {
-            dto.setFilialId(departamento.getFilial().getId());
-            dto.setFilialNome(departamento.getFilial().getNome());
+        if (!isAdmin(pessoaLogada) && !departamento.getFilial().getId().equals(pessoaLogada.getFilial().getId())) {
+            throw new AccessDeniedException("Você não tem permissão para deletar departamentos de outra filial.");
         }
-        
-        return dto;
-    }
 
-    private void validarFilial(Long filialId) {
-        if (!filialRepository.existsById(filialId)) {
-            throw new RuntimeException("Filial não encontrada com ID: " + filialId);
-        }
+        departamentoRepository.deleteById(id);
     }
 }

@@ -7,7 +7,7 @@ CREATE TABLE movimentacoes (
     pessoa_destino_id BIGINT NOT NULL,
     data_movimentacao DATE NOT NULL,
     data_efetivacao DATE NULL,
-    status ENUM('PENDENTE', 'EFETIVADA', 'CANCELADA', 'REJEITADA') NOT NULL DEFAULT 'PENDENTE',
+    status ENUM('PENDENTE', 'EFETIVADA', 'CANCELADA') NOT NULL DEFAULT 'PENDENTE',
     motivo VARCHAR(255) NOT NULL,
     observacoes TEXT,
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

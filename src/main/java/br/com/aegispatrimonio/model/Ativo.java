@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @NoArgsConstructor
-@ToString(exclude = {"tipoAtivo", "localizacao", "fornecedor", "pessoaResponsavel"}) // Exclui todas as relações
+@ToString(exclude = {"tipoAtivo", "localizacao", "fornecedor", "pessoaResponsavel", "filial"}) // Exclui todas as relações
 @Entity
 @Table(name = "ativos")
 @SQLDelete(sql = "UPDATE ativos SET status = 'BAIXADO' WHERE id = ?")
@@ -25,6 +25,10 @@ public class Ativo {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "filial_id", nullable = false)
+    private Filial filial; // Vínculo com a Filial
     
     @Column(nullable = false)
     private String nome;
@@ -37,7 +41,7 @@ public class Ativo {
     private String numeroPatrimonio;
     
     @ManyToOne
-    @JoinColumn(name = "localizacao_id", nullable = false)
+    @JoinColumn(name = "localizacao_id") // Localização pode ser nula
     private Localizacao localizacao;
     
     @Enumerated(EnumType.STRING)
@@ -73,7 +77,7 @@ public class Ativo {
     private String informacoesGarantia;
     
     @ManyToOne
-    @JoinColumn(name = "pessoa_responsavel_id", nullable = false)
+    @JoinColumn(name = "pessoa_responsavel_id") // Responsável pode ser nulo
     private Pessoa pessoaResponsavel;
     
     private String observacoes;

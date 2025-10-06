@@ -1,115 +1,73 @@
 package br.com.aegispatrimonio.service;
 
-import br.com.aegispatrimonio.dto.request.FornecedorRequestDTO;
-import br.com.aegispatrimonio.dto.response.FornecedorResponseDTO;
+import br.com.aegispatrimonio.dto.FornecedorCreateDTO;
+import br.com.aegispatrimonio.dto.FornecedorDTO;
+import br.com.aegispatrimonio.dto.FornecedorUpdateDTO;
+import br.com.aegispatrimonio.mapper.FornecedorMapper;
 import br.com.aegispatrimonio.model.Fornecedor;
 import br.com.aegispatrimonio.repository.FornecedorRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Optional;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
-@Transactional
-@RequiredArgsConstructor
 public class FornecedorService {
 
     private final FornecedorRepository fornecedorRepository;
+    private final FornecedorMapper fornecedorMapper;
 
-    @Transactional
-    public FornecedorResponseDTO criar(FornecedorRequestDTO request) {
-        validarNomeUnico(request.getNome());
-
-        Fornecedor fornecedor = convertToEntity(request);
-        Fornecedor savedFornecedor = fornecedorRepository.save(fornecedor);
-
-        return convertToResponseDTO(savedFornecedor);
+    public FornecedorService(FornecedorRepository fornecedorRepository, FornecedorMapper fornecedorMapper) {
+        this.fornecedorRepository = fornecedorRepository;
+        this.fornecedorMapper = fornecedorMapper;
     }
 
     @Transactional(readOnly = true)
-    public Page<FornecedorResponseDTO> listarTodos(Pageable pageable) {
-        // Alterado: Usa o método padrão findAll. A ordenação é definida no Controller.
-        return fornecedorRepository.findAll(pageable)
-                .map(this::convertToResponseDTO);
+    public List<FornecedorDTO> listarTodos() {
+        return fornecedorRepository.findAll()
+                .stream()
+                .map(fornecedorMapper::toDTO)
+                .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
-    public Optional<FornecedorResponseDTO> buscarPorId(Long id) {
+    public FornecedorDTO buscarPorId(Long id) {
         return fornecedorRepository.findById(id)
-                .map(this::convertToResponseDTO);
-    }
-
-    @Transactional(readOnly = true)
-    public Optional<FornecedorResponseDTO> buscarPorNome(String nome) {
-        return fornecedorRepository.findByNome(nome)
-                .map(this::convertToResponseDTO);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<FornecedorResponseDTO> buscarPorEmail(String email, Pageable pageable) {
-        return fornecedorRepository.findByEmailContato(email, pageable)
-                .map(this::convertToResponseDTO);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<FornecedorResponseDTO> buscarPorNomeContendo(String nome, Pageable pageable) {
-        // Alterado: Usa o método de busca case-insensitive do repositório.
-        return fornecedorRepository.findByNomeContainingIgnoreCase(nome, pageable)
-                .map(this::convertToResponseDTO);
+                .map(fornecedorMapper::toDTO)
+                .orElseThrow(() -> new EntityNotFoundException("Fornecedor não encontrado com ID: " + id));
     }
 
     @Transactional
-    public FornecedorResponseDTO atualizar(Long id, FornecedorRequestDTO request) {
-        Fornecedor fornecedorExistente = fornecedorRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Fornecedor não encontrado com ID: " + id));
+    public FornecedorDTO criar(FornecedorCreateDTO fornecedorCreateDTO) {
+        Fornecedor fornecedor = fornecedorMapper.toEntity(fornecedorCreateDTO);
+        Fornecedor fornecedorSalvo = fornecedorRepository.save(fornecedor);
+        return fornecedorMapper.toDTO(fornecedorSalvo);
+    }
 
-        if (!fornecedorExistente.getNome().equals(request.getNome())) {
-            validarNomeUnico(request.getNome());
-        }
+    @Transactional
+    public FornecedorDTO atualizar(Long id, FornecedorUpdateDTO fornecedorUpdateDTO) {
+        Fornecedor fornecedor = fornecedorRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Fornecedor não encontrado com ID: " + id));
 
-        updateEntityFromRequest(fornecedorExistente, request);
-        Fornecedor updatedFornecedor = fornecedorRepository.save(fornecedorExistente);
+        fornecedor.setNome(fornecedorUpdateDTO.nome());
+        fornecedor.setCnpj(fornecedorUpdateDTO.cnpj());
+        fornecedor.setEndereco(fornecedorUpdateDTO.endereco());
+        fornecedor.setNomeContatoPrincipal(fornecedorUpdateDTO.nomeContatoPrincipal());
+        fornecedor.setEmailPrincipal(fornecedorUpdateDTO.emailPrincipal());
+        fornecedor.setTelefonePrincipal(fornecedorUpdateDTO.telefonePrincipal());
+        fornecedor.setObservacoes(fornecedorUpdateDTO.observacoes());
+        fornecedor.setStatus(fornecedorUpdateDTO.status());
 
-        return convertToResponseDTO(updatedFornecedor);
+        Fornecedor fornecedorAtualizado = fornecedorRepository.save(fornecedor);
+        return fornecedorMapper.toDTO(fornecedorAtualizado);
     }
 
     @Transactional
     public void deletar(Long id) {
-        Fornecedor fornecedor = fornecedorRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Fornecedor não encontrado com ID: " + id));
-        fornecedorRepository.delete(fornecedor);
-    }
-
-    // Métodos de conversão
-    private Fornecedor convertToEntity(FornecedorRequestDTO request) {
-        Fornecedor fornecedor = new Fornecedor();
-        updateEntityFromRequest(fornecedor, request);
-        return fornecedor;
-    }
-
-    private void updateEntityFromRequest(Fornecedor fornecedor, FornecedorRequestDTO request) {
-        fornecedor.setNome(request.getNome());
-        fornecedor.setEmailContato(request.getEmailContato());
-        fornecedor.setTelefoneContato(request.getTelefoneContato());
-    }
-
-    private FornecedorResponseDTO convertToResponseDTO(Fornecedor fornecedor) {
-        FornecedorResponseDTO dto = new FornecedorResponseDTO();
-        dto.setId(fornecedor.getId());
-        dto.setNome(fornecedor.getNome());
-        dto.setEmailContato(fornecedor.getEmailContato());
-        dto.setTelefoneContato(fornecedor.getTelefoneContato());
-        dto.setCriadoEm(fornecedor.getCriadoEm());
-        dto.setAtualizadoEm(fornecedor.getAtualizadoEm());
-        return dto;
-    }
-
-    private void validarNomeUnico(String nome) {
-        if (fornecedorRepository.existsByNome(nome)) {
-            throw new RuntimeException("Já existe um fornecedor com o nome: " + nome);
-        }
+        fornecedorRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Fornecedor não encontrado com ID: " + id));
+        fornecedorRepository.deleteById(id);
     }
 }

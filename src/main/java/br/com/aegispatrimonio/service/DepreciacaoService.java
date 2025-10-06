@@ -1,10 +1,12 @@
 package br.com.aegispatrimonio.service;
 
+import br.com.aegispatrimonio.exception.ResourceNotFoundException;
 import br.com.aegispatrimonio.model.Ativo;
 import br.com.aegispatrimonio.model.StatusAtivo;
 import br.com.aegispatrimonio.repository.AtivoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,10 +35,9 @@ public class DepreciacaoService {
     @Scheduled(cron = "0 0 0 1 * ?")
     @Transactional
     public void calcularDepreciacaoMensal() {
-        log.info("Iniciando cálculo de depreciação mensal...");
+        log.info("Iniciando cálculo de depreciação mensal agendado...");
         List<Ativo> ativosParaSalvar = new ArrayList<>();
 
-        // Otimização 1: Usar Stream para não carregar todos os ativos na memória.
         try (Stream<Ativo> ativosStream = ativoRepository.streamByStatus(StatusAtivo.ATIVO)) {
             ativosStream.forEach(ativo -> {
                 if (deveCalcularDepreciacao(ativo)) {
@@ -46,31 +47,30 @@ public class DepreciacaoService {
                         log.debug("Depreciação preparada para ativo {}.", ativo.getNumeroPatrimonio());
                     } catch (Exception e) {
                         log.error("Erro ao preparar depreciação para ativo {}: {}",
-                                ativo.getNumeroPatrimonio(), e.getMessage());
+                                ativo.getNumeroPatrimonio(), e.getMessage(), e);
                     }
                 }
             });
         }
 
-        // Otimização 2: Salvar todos os ativos modificados em uma única operação (batch update).
         if (!ativosParaSalvar.isEmpty()) {
             ativoRepository.saveAll(ativosParaSalvar);
-            log.info("Cálculo de depreciação concluído. {} ativos foram depreciados.", ativosParaSalvar.size());
+            log.info("Cálculo de depreciação agendado concluído. {} ativos foram depreciados.", ativosParaSalvar.size());
         } else {
-            log.info("Cálculo de depreciação concluído. Nenhum ativo precisou ser depreciado.");
+            log.info("Cálculo de depreciação agendado concluído. Nenhum ativo precisou ser depreciado.");
         }
     }
 
     /**
-     * Otimizado: Recalcula a depreciação para todos os ativos.
-     * Usa streaming para baixo consumo de memória e batch update para performance.
+     * Assíncrono e Otimizado: Recalcula a depreciação para todos os ativos.
+     * Executa em segundo plano para não bloquear a API.
      */
+    @Async
     @Transactional
     public void recalcularDepreciacaoTodosAtivos() {
-        log.info("Iniciando recálculo completo de depreciação...");
+        log.info("Iniciando recálculo completo de depreciação em segundo plano...");
         List<Ativo> ativosParaSalvar = new ArrayList<>();
 
-        // Otimização 1: Usar Stream para não carregar todos os ativos na memória.
         try (Stream<Ativo> ativosStream = ativoRepository.streamAll()) {
             ativosStream.forEach(ativo -> {
                 try {
@@ -78,23 +78,41 @@ public class DepreciacaoService {
                     ativosParaSalvar.add(ativo);
                 } catch (Exception e) {
                     log.error("Erro ao recalcular depreciação para ativo {}: {}",
-                            ativo.getNumeroPatrimonio(), e.getMessage());
+                            ativo.getNumeroPatrimonio(), e.getMessage(), e);
                 }
             });
         }
 
-        // Otimização 2: Salvar todos os ativos modificados em uma única operação (batch update).
         if (!ativosParaSalvar.isEmpty()) {
             ativoRepository.saveAll(ativosParaSalvar);
-            log.info("Recálculo de depreciação concluído. {} ativos foram processados.", ativosParaSalvar.size());
+            log.info("Recálculo de depreciação em segundo plano concluído. {} ativos foram processados.", ativosParaSalvar.size());
         } else {
-            log.info("Recálculo de depreciação concluído. Nenhum ativo foi processado.");
+            log.info("Recálculo de depreciação em segundo plano concluído. Nenhum ativo foi processado.");
         }
     }
 
     /**
-     * Prepara a depreciação para um ativo específico, mas não o salva.
+     * Assíncrono: Recalcula a depreciação para um ativo específico.
+     * Executa em segundo plano para não bloquear a API.
      */
+    @Async
+    @Transactional
+    public void recalcularDepreciacaoCompleta(Long ativoId) {
+        log.info("Iniciando recálculo de depreciação para o ativo ID {} em segundo plano...", ativoId);
+        Ativo ativo = ativoRepository.findById(ativoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ativo não encontrado com ID: " + ativoId));
+        prepararRecalculoCompleto(ativo);
+        ativoRepository.save(ativo);
+        log.info("Recálculo de depreciação para o ativo ID {} concluído.", ativoId);
+    }
+
+    @Transactional(readOnly = true)
+    public BigDecimal calcularDepreciacaoMensal(Long ativoId) {
+        Ativo ativo = ativoRepository.findById(ativoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ativo não encontrado com ID: " + ativoId));
+        return calcularValorDepreciacaoMensal(ativo);
+    }
+
     private void prepararDepreciacaoParaAtivo(Ativo ativo) {
         BigDecimal depreciacaoMensal = calcularValorDepreciacaoMensal(ativo);
         BigDecimal depreciacaoAcumulada = ativo.getDepreciacaoAcumulada() != null ?
@@ -112,21 +130,16 @@ public class DepreciacaoService {
         ativo.setDataUltimaDepreciacao(LocalDate.now());
     }
 
-    /**
-     * Prepara o recálculo da depreciação acumulada para um ativo, mas não o salva.
-     */
     private void prepararRecalculoCompleto(Ativo ativo) {
         if (ativo.getDataInicioDepreciacao() == null) {
-            return; 
+            log.warn("Recálculo ignorado para o ativo {}: data de início da depreciação não definida.", ativo.getNumeroPatrimonio());
+            return;
         }
 
         LocalDate dataInicio = ativo.getDataInicioDepreciacao();
         LocalDate dataAtual = LocalDate.now();
 
-        long mesesDecorridos = ChronoUnit.MONTHS.between(
-                dataInicio.withDayOfMonth(1),
-                dataAtual.withDayOfMonth(1)
-        );
+        long mesesDecorridos = ChronoUnit.MONTHS.between(dataInicio.withDayOfMonth(1), dataAtual.withDayOfMonth(1));
 
         if (mesesDecorridos < 0) {
              mesesDecorridos = 0;
@@ -142,12 +155,9 @@ public class DepreciacaoService {
 
         ativo.setDepreciacaoAcumulada(depreciacaoTotal);
         ativo.setValorContabilAtual(ativo.getValorAquisicao().subtract(depreciacaoTotal));
-        ativo.setDataUltimaDepreciacao(dataAtual);
     }
 
-    // MÉTODOS DE CÁLCULO E VALIDAÇÃO (LÓGICA PURA)
-
-    public BigDecimal calcularValorDepreciacaoMensal(Ativo ativo) {
+    private BigDecimal calcularValorDepreciacaoMensal(Ativo ativo) {
         if (!deveCalcularDepreciacao(ativo)) {
             return BigDecimal.ZERO;
         }
@@ -194,7 +204,7 @@ public class DepreciacaoService {
         return valorDepreciavel.multiply(taxa);
     }
 
-    public boolean deveCalcularDepreciacao(Ativo ativo) {
+    private boolean deveCalcularDepreciacao(Ativo ativo) {
         if (ativo.getStatus() != StatusAtivo.ATIVO || ativo.getDataInicioDepreciacao() == null ||
             ativo.getDataInicioDepreciacao().isAfter(LocalDate.now()) ||
             ativo.getVidaUtilMeses() == null || ativo.getVidaUtilMeses() <= 0) {
@@ -203,21 +213,5 @@ public class DepreciacaoService {
         BigDecimal depreciacaoAcumulada = ativo.getDepreciacaoAcumulada() != null ? ativo.getDepreciacaoAcumulada() : BigDecimal.ZERO;
         BigDecimal valorDepreciavelMaximo = ativo.getValorAquisicao().subtract(ativo.getValorResidual());
         return depreciacaoAcumulada.compareTo(valorDepreciavelMaximo) < 0;
-    }
-
-    // MÉTODOS DE PONTO DE ENTRADA (SOBRECARGAS PARA O CONTROLLER)
-
-    @Transactional
-    public void recalcularDepreciacaoCompleta(Long ativoId) {
-        Ativo ativo = ativoRepository.findById(ativoId)
-                .orElseThrow(() -> new RuntimeException("Ativo não encontrado com ID: " + ativoId));
-        prepararRecalculoCompleto(ativo);
-        ativoRepository.save(ativo);
-    }
-
-    public BigDecimal calcularDepreciacaoMensal(Long ativoId) {
-        Ativo ativo = ativoRepository.findById(ativoId)
-                .orElseThrow(() -> new RuntimeException("Ativo não encontrado com ID: " + ativoId));
-        return calcularValorDepreciacaoMensal(ativo);
     }
 }

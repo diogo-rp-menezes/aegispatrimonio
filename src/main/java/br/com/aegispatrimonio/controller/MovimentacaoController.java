@@ -178,17 +178,22 @@ public class MovimentacaoController {
 
     // ✅ CORRETO - Verbo primeiro: cancelar
     @PostMapping("/cancelar/{id}")
-    @Operation(summary = "Cancelar movimentação", description = "Cancela uma movimentação pendente")
+    @Operation(summary = "Cancelar movimentação", description = "Cancela uma movimentação pendente",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Motivo do cancelamento",
+                    required = true,
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(type = "string", example = "Mudança de planejamento"))
+            ))
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Movimentação cancelada com sucesso"),
         @ApiResponse(responseCode = "404", description = "Movimentação não encontrada"),
-        @ApiResponse(responseCode = "400", description = "Movimentação não está pendente")
+        @ApiResponse(responseCode = "400", description = "Movimentação não está pendente ou motivo inválido")
     })
     public ResponseEntity<MovimentacaoResponseDTO> cancelarMovimentacao(
-            @Parameter(description = "ID da movimentação", example = "1") 
+            @Parameter(description = "ID da movimentação", example = "1")
             @PathVariable Long id,
-            @Parameter(description = "Motivo do cancelamento", example = "Mudança de planejamento") 
-            @RequestParam String motivo) {
+            @RequestBody String motivo) {
         MovimentacaoResponseDTO response = movimentacaoService.cancelarMovimentacao(id, motivo);
         return ResponseEntity.ok(response);
     }

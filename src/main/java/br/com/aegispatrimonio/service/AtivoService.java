@@ -1,188 +1,179 @@
 package br.com.aegispatrimonio.service;
 
-import java.math.BigDecimal;
-import java.util.Optional;
-
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import br.com.aegispatrimonio.dto.AtivoCreateDTO;
+import br.com.aegispatrimonio.dto.AtivoDTO;
+import br.com.aegispatrimonio.dto.AtivoUpdateDTO;
+import br.com.aegispatrimonio.mapper.AtivoMapper;
+import br.com.aegispatrimonio.model.*;
+import br.com.aegispatrimonio.repository.*;
+import br.com.aegispatrimonio.security.CustomUserDetails;
+import jakarta.persistence.EntityNotFoundException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import br.com.aegispatrimonio.dto.request.AtivoRequestDTO;
-import br.com.aegispatrimonio.dto.response.AtivoResponseDTO;
-import br.com.aegispatrimonio.model.Ativo;
-import br.com.aegispatrimonio.model.Fornecedor;
-import br.com.aegispatrimonio.model.Localizacao;
-import br.com.aegispatrimonio.model.Pessoa;
-import br.com.aegispatrimonio.model.StatusAtivo;
-import br.com.aegispatrimonio.model.TipoAtivo;
-import br.com.aegispatrimonio.repository.AtivoRepository;
-import br.com.aegispatrimonio.repository.FornecedorRepository;
-import br.com.aegispatrimonio.repository.LocalizacaoRepository;
-import br.com.aegispatrimonio.repository.PessoaRepository;
-import br.com.aegispatrimonio.repository.TipoAtivoRepository;
-import lombok.RequiredArgsConstructor;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
-@Transactional
-@RequiredArgsConstructor
 public class AtivoService {
 
     private final AtivoRepository ativoRepository;
+    private final AtivoMapper ativoMapper;
     private final TipoAtivoRepository tipoAtivoRepository;
     private final LocalizacaoRepository localizacaoRepository;
     private final FornecedorRepository fornecedorRepository;
     private final PessoaRepository pessoaRepository;
+    private final FilialRepository filialRepository;
 
-    @Transactional
-    public AtivoResponseDTO criar(AtivoRequestDTO request) {
-        validarNumeroPatrimonioUnico(request.getNumeroPatrimonio());
-        
-        Ativo ativo = convertToEntity(request);
-        Ativo savedAtivo = ativoRepository.save(ativo);
-        
-        return convertToResponseDTO(savedAtivo);
+    public AtivoService(AtivoRepository ativoRepository, AtivoMapper ativoMapper, TipoAtivoRepository tipoAtivoRepository, LocalizacaoRepository localizacaoRepository, FornecedorRepository fornecedorRepository, PessoaRepository pessoaRepository, FilialRepository filialRepository) {
+        this.ativoRepository = ativoRepository;
+        this.ativoMapper = ativoMapper;
+        this.tipoAtivoRepository = tipoAtivoRepository;
+        this.localizacaoRepository = localizacaoRepository;
+        this.fornecedorRepository = fornecedorRepository;
+        this.pessoaRepository = pessoaRepository;
+        this.filialRepository = filialRepository;
+    }
+
+    private Pessoa getPessoaLogada() {
+        CustomUserDetails userDetails = (CustomUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return userDetails.getPessoa();
+    }
+
+    private boolean isAdmin(Pessoa pessoa) {
+        return "ROLE_ADMIN".equals(pessoa.getRole());
     }
 
     @Transactional(readOnly = true)
-    public Optional<AtivoResponseDTO> buscarPorId(Long id) {
-        return ativoRepository.findById(id)
-                .map(this::convertToResponseDTO);
-    }
+    public List<AtivoDTO> listarTodos() {
+        Pessoa pessoaLogada = getPessoaLogada();
 
-    @Transactional(readOnly = true)
-    public Optional<AtivoResponseDTO> buscarPorNumeroPatrimonio(String numeroPatrimonio) {
-        return ativoRepository.findByNumeroPatrimonio(numeroPatrimonio)
-                .map(this::convertToResponseDTO);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<AtivoResponseDTO> listarTodos(Pageable pageable) {
-        return ativoRepository.findAll(pageable)
-                .map(this::convertToResponseDTO);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<AtivoResponseDTO> listarPorTipo(Long tipoAtivoId, Pageable pageable) {
-        return ativoRepository.findByTipoAtivoId(tipoAtivoId, pageable)
-                .map(this::convertToResponseDTO);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<AtivoResponseDTO> listarPorLocalizacao(Long localizacaoId, Pageable pageable) {
-        return ativoRepository.findByLocalizacaoId(localizacaoId, pageable)
-                .map(this::convertToResponseDTO);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<AtivoResponseDTO> listarPorStatus(StatusAtivo status, Pageable pageable) {
-        return ativoRepository.findByStatus(status, pageable)
-                .map(this::convertToResponseDTO);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<AtivoResponseDTO> buscarPorNome(String nome, Pageable pageable) {
-        return ativoRepository.findByNomeContainingIgnoreCase(nome, pageable)
-                .map(this::convertToResponseDTO);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<AtivoResponseDTO> buscarPorFaixaDeValor(BigDecimal valorMin, BigDecimal valorMax, Pageable pageable) {
-        return ativoRepository.findByValorAquisicaoBetween(valorMin, valorMax, pageable)
-                .map(this::convertToResponseDTO);
-    }
-
-    @Transactional
-    public AtivoResponseDTO atualizar(Long id, AtivoRequestDTO request) {
-        Ativo ativoExistente = ativoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Ativo não encontrado com ID: " + id));
-        
-        if (!ativoExistente.getNumeroPatrimonio().equals(request.getNumeroPatrimonio())) {
-            validarNumeroPatrimonioUnico(request.getNumeroPatrimonio());
+        if (isAdmin(pessoaLogada)) {
+            return ativoRepository.findAll().stream().map(ativoMapper::toDTO).collect(Collectors.toList());
         }
-        
-        updateEntityFromRequest(ativoExistente, request);
-        Ativo updatedAtivo = ativoRepository.save(ativoExistente);
-        
-        return convertToResponseDTO(updatedAtivo);
+
+        Long filialId = pessoaLogada.getFilial().getId();
+        return ativoRepository.findByFilialId(filialId).stream().map(ativoMapper::toDTO).collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public AtivoDTO buscarPorId(Long id) {
+        Pessoa pessoaLogada = getPessoaLogada();
+        Ativo ativo = ativoRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Ativo não encontrado com ID: " + id));
+
+        if (!isAdmin(pessoaLogada) && !ativo.getFilial().getId().equals(pessoaLogada.getFilial().getId())) {
+            throw new AccessDeniedException("Você não tem permissão para acessar ativos de outra filial.");
+        }
+
+        return ativoMapper.toDTO(ativo);
+    }
+
+    @Transactional
+    public AtivoDTO criar(AtivoCreateDTO ativoCreateDTO) {
+        Pessoa pessoaLogada = getPessoaLogada();
+
+        if (!isAdmin(pessoaLogada) && !ativoCreateDTO.filialId().equals(pessoaLogada.getFilial().getId())) {
+            throw new AccessDeniedException("Você só pode criar ativos para a sua própria filial.");
+        }
+
+        Ativo ativo = ativoMapper.toEntity(ativoCreateDTO);
+
+        Filial filial = filialRepository.findById(ativoCreateDTO.filialId())
+                .orElseThrow(() -> new EntityNotFoundException("Filial não encontrada com ID: " + ativoCreateDTO.filialId()));
+        ativo.setFilial(filial);
+
+        TipoAtivo tipoAtivo = tipoAtivoRepository.findById(ativoCreateDTO.tipoAtivoId())
+                .orElseThrow(() -> new EntityNotFoundException("Tipo de Ativo não encontrado com ID: " + ativoCreateDTO.tipoAtivoId()));
+        ativo.setTipoAtivo(tipoAtivo);
+
+        if (ativoCreateDTO.localizacaoId() != null) {
+            Localizacao localizacao = localizacaoRepository.findById(ativoCreateDTO.localizacaoId())
+                    .orElseThrow(() -> new EntityNotFoundException("Localização não encontrada com ID: " + ativoCreateDTO.localizacaoId()));
+            ativo.setLocalizacao(localizacao);
+        }
+
+        Fornecedor fornecedor = fornecedorRepository.findById(ativoCreateDTO.fornecedorId())
+                .orElseThrow(() -> new EntityNotFoundException("Fornecedor não encontrado com ID: " + ativoCreateDTO.fornecedorId()));
+        ativo.setFornecedor(fornecedor);
+
+        if (ativoCreateDTO.pessoaResponsavelId() != null) {
+            Pessoa pessoa = pessoaRepository.findById(ativoCreateDTO.pessoaResponsavelId())
+                    .orElseThrow(() -> new EntityNotFoundException("Pessoa responsável não encontrada com ID: " + ativoCreateDTO.pessoaResponsavelId()));
+            ativo.setPessoaResponsavel(pessoa);
+        }
+
+        Ativo ativoSalvo = ativoRepository.save(ativo);
+        return ativoMapper.toDTO(ativoSalvo);
+    }
+
+    @Transactional
+    public AtivoDTO atualizar(Long id, AtivoUpdateDTO ativoUpdateDTO) {
+        Pessoa pessoaLogada = getPessoaLogada();
+        Ativo ativo = ativoRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Ativo não encontrado com ID: " + id));
+
+        if (!isAdmin(pessoaLogada)) {
+            if (!ativo.getFilial().getId().equals(pessoaLogada.getFilial().getId())) {
+                throw new AccessDeniedException("Você não tem permissão para editar ativos de outra filial.");
+            }
+            if (!ativo.getFilial().getId().equals(ativoUpdateDTO.filialId())) {
+                throw new AccessDeniedException("Você não tem permissão para transferir ativos entre filiais.");
+            }
+        }
+
+        ativo.setNome(ativoUpdateDTO.nome());
+        ativo.setStatus(ativoUpdateDTO.status());
+        ativo.setDataAquisicao(ativoUpdateDTO.dataAquisicao());
+        ativo.setValorAquisicao(ativoUpdateDTO.valorAquisicao());
+        ativo.setObservacoes(ativoUpdateDTO.observacoes());
+        ativo.setInformacoesGarantia(ativoUpdateDTO.informacoesGarantia());
+
+        Filial filial = filialRepository.findById(ativoUpdateDTO.filialId())
+                .orElseThrow(() -> new EntityNotFoundException("Filial não encontrada com ID: " + ativoUpdateDTO.filialId()));
+        ativo.setFilial(filial);
+
+        TipoAtivo tipoAtivo = tipoAtivoRepository.findById(ativoUpdateDTO.tipoAtivoId())
+                .orElseThrow(() -> new EntityNotFoundException("Tipo de Ativo não encontrado com ID: " + ativoUpdateDTO.tipoAtivoId()));
+        ativo.setTipoAtivo(tipoAtivo);
+
+        if (ativoUpdateDTO.localizacaoId() != null) {
+            Localizacao localizacao = localizacaoRepository.findById(ativoUpdateDTO.localizacaoId())
+                    .orElseThrow(() -> new EntityNotFoundException("Localização não encontrada com ID: " + ativoUpdateDTO.localizacaoId()));
+            ativo.setLocalizacao(localizacao);
+        } else {
+            ativo.setLocalizacao(null);
+        }
+
+        Fornecedor fornecedor = fornecedorRepository.findById(ativoUpdateDTO.fornecedorId())
+                .orElseThrow(() -> new EntityNotFoundException("Fornecedor não encontrado com ID: " + ativoUpdateDTO.fornecedorId()));
+        ativo.setFornecedor(fornecedor);
+
+        if (ativoUpdateDTO.pessoaResponsavelId() != null) {
+            Pessoa pessoa = pessoaRepository.findById(ativoUpdateDTO.pessoaResponsavelId())
+                    .orElseThrow(() -> new EntityNotFoundException("Pessoa responsável não encontrada com ID: " + ativoUpdateDTO.pessoaResponsavelId()));
+            ativo.setPessoaResponsavel(pessoa);
+        } else {
+            ativo.setPessoaResponsavel(null);
+        }
+
+        Ativo ativoAtualizado = ativoRepository.save(ativo);
+        return ativoMapper.toDTO(ativoAtualizado);
     }
 
     @Transactional
     public void deletar(Long id) {
+        Pessoa pessoaLogada = getPessoaLogada();
         Ativo ativo = ativoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Ativo não encontrado com ID: " + id));
-        ativoRepository.delete(ativo);
-    }
+                .orElseThrow(() -> new EntityNotFoundException("Ativo não encontrado com ID: " + id));
 
-    @Transactional(readOnly = true)
-    public boolean existePorNumeroPatrimonio(String numeroPatrimonio) {
-        return ativoRepository.existsByNumeroPatrimonio(numeroPatrimonio);
-    }
+        if (!isAdmin(pessoaLogada) && !ativo.getFilial().getId().equals(pessoaLogada.getFilial().getId())) {
+            throw new AccessDeniedException("Você não tem permissão para deletar ativos de outra filial.");
+        }
 
-    // Métodos de conversão (MANTIDOS)
-    private Ativo convertToEntity(AtivoRequestDTO request) {
-        Ativo ativo = new Ativo();
-        updateEntityFromRequest(ativo, request);
-        return ativo;
-    }
-
-    private void updateEntityFromRequest(Ativo ativo, AtivoRequestDTO request) {
-        ativo.setNome(request.getNome());
-        ativo.setNumeroPatrimonio(request.getNumeroPatrimonio());
-        ativo.setStatus(request.getStatus());
-        ativo.setDataAquisicao(request.getDataAquisicao());
-        ativo.setValorAquisicao(request.getValorAquisicao());
-        ativo.setValorResidual(request.getValorResidual());
-        ativo.setVidaUtilMeses(request.getVidaUtilMeses());
-        ativo.setMetodoDepreciacao(request.getMetodoDepreciacao());
-        ativo.setDataInicioDepreciacao(request.getDataInicioDepreciacao());
-        ativo.setInformacoesGarantia(request.getInformacoesGarantia());
-        ativo.setObservacoes(request.getObservacoes());
-        
-        // Configurar relações
-        if (request.getTipoAtivoId() != null) {
-            TipoAtivo tipoAtivo = tipoAtivoRepository.findById(request.getTipoAtivoId())
-                    .orElseThrow(() -> new RuntimeException("Tipo de ativo não encontrado"));
-            ativo.setTipoAtivo(tipoAtivo);
-        }
-        
-        if (request.getLocalizacaoId() != null) {
-            Localizacao localizacao = localizacaoRepository.findById(request.getLocalizacaoId())
-                    .orElseThrow(() -> new RuntimeException("Localização não encontrada"));
-            ativo.setLocalizacao(localizacao);
-        }
-        
-        if (request.getFornecedorId() != null) {
-            Fornecedor fornecedor = fornecedorRepository.findById(request.getFornecedorId())
-                    .orElseThrow(() -> new RuntimeException("Fornecedor não encontrado"));
-            ativo.setFornecedor(fornecedor);
-        }
-        
-        if (request.getPessoaResponsavelId() != null) {
-            Pessoa pessoa = pessoaRepository.findById(request.getPessoaResponsavelId())
-                    .orElseThrow(() -> new RuntimeException("Pessoa responsável não encontrada"));
-            ativo.setPessoaResponsavel(pessoa);
-        }
-        
-        // Configurar campos calculados
-        if (ativo.getVidaUtilMeses() != null && ativo.getVidaUtilMeses() > 0) {
-            BigDecimal depreciableAmount = ativo.getValorAquisicao().subtract(ativo.getValorResidual());
-            BigDecimal monthlyRate = depreciableAmount.divide(
-                BigDecimal.valueOf(ativo.getVidaUtilMeses()), 
-                10, 
-                java.math.RoundingMode.HALF_UP
-            );
-            ativo.setTaxaDepreciacaoMensal(monthlyRate);
-        }
-    }
-
-    private AtivoResponseDTO convertToResponseDTO(Ativo ativo) {
-        return AtivoResponseDTO.fromEntity(ativo);
-    }
-
-    private void validarNumeroPatrimonioUnico(String numeroPatrimonio) {
-        if (ativoRepository.existsByNumeroPatrimonio(numeroPatrimonio)) {
-            throw new RuntimeException("Número de patrimônio já existe: " + numeroPatrimonio);
-        }
+        ativoRepository.deleteById(id);
     }
 }

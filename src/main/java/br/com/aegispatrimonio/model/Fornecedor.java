@@ -28,12 +28,24 @@ public class Fornecedor {
     
     @Column(nullable = false)
     private String nome;
+
+    @Column(nullable = false, unique = true, length = 18) // Formato: XX.XXX.XXX/XXXX-XX
+    private String cnpj;
+
+    @Column
+    private String endereco;
+
+    @Column(name = "nome_contato_principal")
+    private String nomeContatoPrincipal;
     
-    @Column(name = "email_contato")
-    private String emailContato;
+    @Column(name = "email_principal")
+    private String emailPrincipal;
     
-    @Column(name = "telefone_contato")
-    private String telefoneContato;
+    @Column(name = "telefone_principal")
+    private String telefonePrincipal;
+
+    @Column(columnDefinition = "TEXT")
+    private String observacoes;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

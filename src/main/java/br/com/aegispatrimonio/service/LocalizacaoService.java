@@ -1,142 +1,140 @@
 package br.com.aegispatrimonio.service;
 
-import br.com.aegispatrimonio.dto.request.LocalizacaoRequestDTO;
-import br.com.aegispatrimonio.dto.response.LocalizacaoResponseDTO;
+import br.com.aegispatrimonio.dto.LocalizacaoCreateDTO;
+import br.com.aegispatrimonio.dto.LocalizacaoDTO;
+import br.com.aegispatrimonio.dto.LocalizacaoUpdateDTO;
+import br.com.aegispatrimonio.mapper.LocalizacaoMapper;
 import br.com.aegispatrimonio.model.Filial;
 import br.com.aegispatrimonio.model.Localizacao;
+import br.com.aegispatrimonio.model.Pessoa;
 import br.com.aegispatrimonio.repository.FilialRepository;
 import br.com.aegispatrimonio.repository.LocalizacaoRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import br.com.aegispatrimonio.security.CustomUserDetails;
+import jakarta.persistence.EntityNotFoundException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Optional;
+import java.util.List;
+import java.util.stream.Collectors;
 
-@Slf4j
 @Service
-@Transactional
-@RequiredArgsConstructor
 public class LocalizacaoService {
 
     private final LocalizacaoRepository localizacaoRepository;
+    private final LocalizacaoMapper localizacaoMapper;
     private final FilialRepository filialRepository;
 
-    @Transactional
-    public LocalizacaoResponseDTO criar(LocalizacaoRequestDTO request) {
-        log.info("Criando nova localização: {}", request.getNome());
+    public LocalizacaoService(LocalizacaoRepository localizacaoRepository, LocalizacaoMapper localizacaoMapper, FilialRepository filialRepository) {
+        this.localizacaoRepository = localizacaoRepository;
+        this.localizacaoMapper = localizacaoMapper;
+        this.filialRepository = filialRepository;
+    }
 
-        Localizacao localizacao = convertToEntity(request);
-        Localizacao savedLocalizacao = localizacaoRepository.save(localizacao);
+    private Pessoa getPessoaLogada() {
+        CustomUserDetails userDetails = (CustomUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return userDetails.getPessoa();
+    }
 
-        return convertToResponseDTO(savedLocalizacao);
+    private boolean isAdmin(Pessoa pessoa) {
+        return "ROLE_ADMIN".equals(pessoa.getRole());
     }
 
     @Transactional(readOnly = true)
-    public Page<LocalizacaoResponseDTO> listarTodos(Pageable pageable) {
-        log.debug("Listando localizações paginadas");
-        return localizacaoRepository.findAll(pageable)
-                .map(this::convertToResponseDTO);
+    public List<LocalizacaoDTO> listarTodos() {
+        Pessoa pessoaLogada = getPessoaLogada();
+        if (isAdmin(pessoaLogada)) {
+            return localizacaoRepository.findAll().stream().map(localizacaoMapper::toDTO).collect(Collectors.toList());
+        }
+        Long filialId = pessoaLogada.getFilial().getId();
+        return localizacaoRepository.findByFilialId(filialId).stream().map(localizacaoMapper::toDTO).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
-    public Optional<LocalizacaoResponseDTO> buscarPorId(Long id) {
-        log.debug("Buscando localização por ID: {}", id);
-        return localizacaoRepository.findById(id)
-                .map(this::convertToResponseDTO);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<LocalizacaoResponseDTO> listarPorFilial(Long filialId, Pageable pageable) {
-        log.debug("Listando localizações por filial paginadas");
-        return localizacaoRepository.findByFilialId(filialId, pageable)
-                .map(this::convertToResponseDTO);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<LocalizacaoResponseDTO> listarPorLocalizacaoPai(Long localizacaoPaiId, Pageable pageable) {
-        log.debug("Listando localizações por localização pai paginadas");
-        return localizacaoRepository.findByLocalizacaoPaiId(localizacaoPaiId, pageable)
-                .map(this::convertToResponseDTO);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<LocalizacaoResponseDTO> buscarPorNome(String nome, Pageable pageable) {
-        log.debug("Buscando localizações por nome paginadas");
-        // Alterado: Usa o método de busca case-insensitive do repositório.
-        return localizacaoRepository.findByNomeContainingIgnoreCase(nome, pageable)
-                .map(this::convertToResponseDTO);
-    }
-
-    @Transactional
-    public LocalizacaoResponseDTO atualizar(Long id, LocalizacaoRequestDTO request) {
-        log.info("Atualizando localização ID: {}", id);
-
-        Localizacao localizacaoExistente = localizacaoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Localização não encontrada com ID: " + id));
-
-        updateEntityFromRequest(localizacaoExistente, request);
-        Localizacao updatedLocalizacao = localizacaoRepository.save(localizacaoExistente);
-
-        return convertToResponseDTO(updatedLocalizacao);
-    }
-
-    @Transactional
-    public void deletar(Long id) {
-        log.info("Deletando localização ID: {}", id);
+    public LocalizacaoDTO buscarPorId(Long id) {
+        Pessoa pessoaLogada = getPessoaLogada();
         Localizacao localizacao = localizacaoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Localização não encontrada com ID: " + id));
-        localizacaoRepository.delete(localizacao);
+                .orElseThrow(() -> new EntityNotFoundException("Localização não encontrada com ID: " + id));
+
+        if (!isAdmin(pessoaLogada) && !localizacao.getFilial().getId().equals(pessoaLogada.getFilial().getId())) {
+            throw new AccessDeniedException("Você não tem permissão para acessar localizações de outra filial.");
+        }
+
+        return localizacaoMapper.toDTO(localizacao);
     }
 
-    // Métodos de conversão (mantidos exatamente como estavam)
-    private Localizacao convertToEntity(LocalizacaoRequestDTO request) {
-        Localizacao localizacao = new Localizacao();
-        updateEntityFromRequest(localizacao, request);
-        return localizacao;
-    }
+    @Transactional
+    public LocalizacaoDTO criar(LocalizacaoCreateDTO localizacaoCreateDTO) {
+        Pessoa pessoaLogada = getPessoaLogada();
 
-    private void updateEntityFromRequest(Localizacao localizacao, LocalizacaoRequestDTO request) {
-        localizacao.setNome(request.getNome());
-        localizacao.setDescricao(request.getDescricao());
+        if (!isAdmin(pessoaLogada) && !localizacaoCreateDTO.filialId().equals(pessoaLogada.getFilial().getId())) {
+            throw new AccessDeniedException("Você só pode criar localizações para a sua própria filial.");
+        }
 
-        // Configurar filial
-        Filial filial = filialRepository.findById(request.getFilialId())
-                .orElseThrow(() -> new RuntimeException("Filial não encontrada com ID: " + request.getFilialId()));
+        Localizacao localizacao = localizacaoMapper.toEntity(localizacaoCreateDTO);
+
+        Filial filial = filialRepository.findById(localizacaoCreateDTO.filialId())
+                .orElseThrow(() -> new EntityNotFoundException("Filial não encontrada com ID: " + localizacaoCreateDTO.filialId()));
         localizacao.setFilial(filial);
 
-        // Configurar localização pai (se existir)
-        if (request.getLocalizacaoPaiId() != null) {
-            Localizacao localizacaoPai = localizacaoRepository.findById(request.getLocalizacaoPaiId())
-                    .orElseThrow(() -> new RuntimeException("Localização pai não encontrada com ID: " + request.getLocalizacaoPaiId()));
+        if (localizacaoCreateDTO.localizacaoPaiId() != null) {
+            Localizacao localizacaoPai = localizacaoRepository.findById(localizacaoCreateDTO.localizacaoPaiId())
+                    .orElseThrow(() -> new EntityNotFoundException("Localização Pai não encontrada com ID: " + localizacaoCreateDTO.localizacaoPaiId()));
+            localizacao.setLocalizacaoPai(localizacaoPai);
+        }
+
+        Localizacao localizacaoSalva = localizacaoRepository.save(localizacao);
+        return localizacaoMapper.toDTO(localizacaoSalva);
+    }
+
+    @Transactional
+    public LocalizacaoDTO atualizar(Long id, LocalizacaoUpdateDTO localizacaoUpdateDTO) {
+        Pessoa pessoaLogada = getPessoaLogada();
+        Localizacao localizacao = localizacaoRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Localização não encontrada com ID: " + id));
+
+        if (!isAdmin(pessoaLogada)) {
+            if (!localizacao.getFilial().getId().equals(pessoaLogada.getFilial().getId())) {
+                throw new AccessDeniedException("Você não tem permissão para editar localizações de outra filial.");
+            }
+            if (!localizacao.getFilial().getId().equals(localizacaoUpdateDTO.filialId())) {
+                throw new AccessDeniedException("Você não tem permissão para transferir localizações entre filiais.");
+            }
+        }
+
+        localizacao.setNome(localizacaoUpdateDTO.nome());
+        localizacao.setDescricao(localizacaoUpdateDTO.descricao());
+        localizacao.setStatus(localizacaoUpdateDTO.status());
+
+        if (localizacaoUpdateDTO.filialId() != null) {
+            Filial filial = filialRepository.findById(localizacaoUpdateDTO.filialId())
+                    .orElseThrow(() -> new EntityNotFoundException("Filial não encontrada com ID: " + localizacaoUpdateDTO.filialId()));
+            localizacao.setFilial(filial);
+        }
+
+        if (localizacaoUpdateDTO.localizacaoPaiId() != null) {
+            Localizacao localizacaoPai = localizacaoRepository.findById(localizacaoUpdateDTO.localizacaoPaiId())
+                    .orElseThrow(() -> new EntityNotFoundException("Localização Pai não encontrada com ID: " + localizacaoUpdateDTO.localizacaoPaiId()));
             localizacao.setLocalizacaoPai(localizacaoPai);
         } else {
             localizacao.setLocalizacaoPai(null);
         }
+
+        Localizacao localizacaoAtualizada = localizacaoRepository.save(localizacao);
+        return localizacaoMapper.toDTO(localizacaoAtualizada);
     }
 
-    private LocalizacaoResponseDTO convertToResponseDTO(Localizacao localizacao) {
-        LocalizacaoResponseDTO dto = new LocalizacaoResponseDTO();
-        dto.setId(localizacao.getId());
-        dto.setNome(localizacao.getNome());
-        dto.setDescricao(localizacao.getDescricao());
-        dto.setCriadoEm(localizacao.getCriadoEm());
-        dto.setAtualizadoEm(localizacao.getAtualizadoEm());
+    @Transactional
+    public void deletar(Long id) {
+        Pessoa pessoaLogada = getPessoaLogada();
+        Localizacao localizacao = localizacaoRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Localização não encontrada com ID: " + id));
 
-        // Configurar filial
-        if (localizacao.getFilial() != null) {
-            dto.setFilialId(localizacao.getFilial().getId());
-            dto.setFilialNome(localizacao.getFilial().getNome());
+        if (!isAdmin(pessoaLogada) && !localizacao.getFilial().getId().equals(pessoaLogada.getFilial().getId())) {
+            throw new AccessDeniedException("Você não tem permissão para deletar localizações de outra filial.");
         }
 
-        // Configurar localização pai
-        if (localizacao.getLocalizacaoPai() != null) {
-            dto.setLocalizacaoPaiId(localizacao.getLocalizacaoPai().getId());
-            dto.setLocalizacaoPaiNome(localizacao.getLocalizacaoPai().getNome());
-        }
-
-        return dto;
+        localizacaoRepository.deleteById(id);
     }
 }

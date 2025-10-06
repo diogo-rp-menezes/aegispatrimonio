@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Galois - Gestão Patrimonial</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+	<link rel="icon" href="favicon.ico" type="image/x-icon">
+    <style>
+        :root {
+            --galois-primary: #1a3e72;
+            --galois-secondary: #2a5da6;
+            --galois-accent: #f57c00;
+            --galois-success: #28a745;
+            --galois-danger: #AD2831;
+            --galois-light: #f8f9fa;
+            --galois-dark: #343a40;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            line-height: 1.6;
+        }
+        
+        .app-container {
+            min-height: 100vh;
+            display: flex;
+        }
+        
+        .sidebar {
+            width: 280px;
+            background: linear-gradient(135deg, var(--galois-primary) 0%, var(--galois-secondary) 100%);
+            color: white;
+            padding: 0;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 4px 0 20px rgba(0,0,0,0.1);
+        }
+        
+        .sidebar-header {
+            padding: 2rem 1.5rem;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+        }
+        
+        .sidebar-logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .sidebar-subtitle {
+            font-size: 0.875rem;
+            opacity: 0.8;
+            margin-top: 0.5rem;
+        }
+        
+        .sidebar-nav {
+            padding: 1rem 0;
+        }
+        
+        .nav-item {
+            margin: 0.25rem 1rem;
+        }
+        
+        .nav-link {
+            color: rgba(255,255,255,0.8);
+            padding: 0.875rem 1rem;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+        
+        .nav-link:hover {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            transform: translateX(4px);
+        }
+        
+        .nav-link.active {
+            background: linear-gradient(135deg, var(--galois-accent), #ff9800);
+            color: white;
+            box-shadow: 0 4px 12px rgba(245, 124, 0, 0.3);
+        }
+        
+        .nav-icon {
+            font-size: 1.25rem;
+            width: 24px;
+            text-align: center;
+        }
+        
+        .main-content {
+            margin-left: 280px;
+            flex: 1;
+            padding: 0;
+            background: var(--galois-light);
+        }
+        
+        .top-bar {
+            background: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 999;
+        }
+        
+        .search-bar {
+            position: relative;
+            flex: 1;
+            max-width: 400px;
+            margin: 0 2rem;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 0.75rem 1rem 0.75rem 3rem;
+            border: 2px solid #e9ecef;
+            border-radius: 50px;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+            background: var(--galois-light);
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: var(--galois-accent);
+            box-shadow: 0 0 0 3px rgba(245, 124, 0, 0.1);
+            background: white;
+        }
+        
+        .search-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #6c757d;
+        }
+        
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+        }
+        
+        .user-profile:hover {
+            background: var(--galois-light);
+        }
+        
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--galois-accent), #ff9800);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+        }
+        
+        .content-area {
+            padding: 2rem;
+        }
+        
+        .page-header {
+            margin-bottom: 2rem;
+        }
+        
+        .page-title {
+            color: var(--galois-primary);
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .page-subtitle {
+            color: #6c757d;
+            font-size: 1.1rem;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            border: 1px solid rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--galois-accent), var(--galois-secondary));
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+        }
+        
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+        
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: white;
+        }
+        
+        .stat-icon.equipments {
+            background: linear-gradient(135deg, var(--galois-secondary), #4dabf7);
+        }
+        
+        .stat-icon.locations {
+            background: linear-gradient(135deg, var(--galois-success), #51cf66);
+        }
+        
+        .stat-icon.maintenance {
+            background: linear-gradient(135deg, var(--galois-accent), #ffa726);
+        }
+        
+        .stat-icon.alerts {
+            background: linear-gradient(135deg, var(--galois-danger), #ff6b6b);
+        }
+        
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--galois-primary);
+            line-height: 1;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            color: #6c757d;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-change {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        
+        .stat-change.positive {
+            color: var(--galois-success);
+        }
+        
+        .stat-change.negative {
+            color: var(--galois-danger);
+        }
+        
+        .card-modern {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            border: 1px solid rgba(0,0,0,0.05);
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .card-modern:hover {
+            box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+        }
+        
+        .card-header-modern {
+            padding: 1.5rem;
+            border-bottom: 1px solid #f1f3f4;
+            background: #fafbfc;
+        }
+        
+        .card-title-modern {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--galois-primary);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .table-modern {
+            margin: 0;
+        }
+        
+        .table-modern thead th {
+            background: #fafbfc;
+            border: none;
+            padding: 1rem 1.5rem;
+            font-weight: 600;
+            color: var(--galois-primary);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .table-modern tbody td {
+            padding: 1rem 1.5rem;
+            border: none;
+            border-bottom: 1px solid #f1f3f4;
+            vertical-align: middle;
+        }
+        
+        .table-modern tbody tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .badge-modern {
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .badge-online {
+            background: rgba(40, 167, 69, 0.1);
+            color: var(--galois-success);
+        }
+        
+        .badge-maintenance {
+            background: rgba(245, 124, 0, 0.1);
+            color: var(--galois-accent);
+        }
+        
+        .badge-offline {
+            background: rgba(173, 40, 49, 0.1);
+            color: var(--galois-danger);
+        }
+        
+        .btn-modern {
+            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            font-weight: 600;
+            border: none;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .btn-primary-modern {
+            background: linear-gradient(135deg, var(--galois-secondary), #4dabf7);
+            color: white;
+        }
+        
+        .btn-primary-modern:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(42, 93, 166, 0.3);
+        }
+        
+        .btn-accent-modern {
+            background: linear-gradient(135deg, var(--galois-accent), #ffa726);
+            color: white;
+        }
+        
+        .btn-accent-modern:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(245, 124, 0, 0.3);
+        }
+        
+        .floating-fab {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--galois-accent), #ffa726);
+            color: white;
+            border: none;
+            box-shadow: 0 4px 20px rgba(245, 124, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+        
+        .floating-fab:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 25px rgba(245, 124, 0, 0.4);
+        }
+        
+        .quick-actions {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .quick-action-card {
+            flex: 1;
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+        
+        .quick-action-card:hover {
+            border-color: var(--galois-accent);
+            transform: translateY(-2px);
+        }
+        
+        .quick-action-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            color: var(--galois-secondary);
+        }
+        
+        .modal-modern .modal-content {
+            border: none;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+        }
+        
+        .modal-modern .modal-header {
+            background: linear-gradient(135deg, var(--galois-primary), var(--galois-secondary));
+            color: white;
+            border-radius: 16px 16px 0 0;
+            padding: 1.5rem;
+        }
+        
+        .tabs-modern {
+            border-bottom: 2px solid #f1f3f4;
+            margin-bottom: 2rem;
+        }
+        
+        .tab-modern {
+            padding: 1rem 1.5rem;
+            border: none;
+            background: none;
+            color: #6c757d;
+            font-weight: 600;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+        
+        .tab-modern.active {
+            color: var(--galois-primary);
+            border-bottom-color: var(--galois-accent);
+        }
+        
+        .notification-badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: var(--galois-danger);
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.25rem 0.5rem;
+            border-radius: 50px;
+            min-width: 20px;
+            text-align: center;
+        }
+        
+        /* Estilos específicos para patrimônio geral */
+        .patrimony-category {
+            border-left: 4px solid var(--galois-primary);
+            padding-left: 1rem;
+            margin: 3rem 0 2rem;
+        }
+        
+        .category-icon {
+            font-size: 1.8rem;
+            margin-right: 1rem;
+            color: var(--galois-primary);
+        }
+        
+        .category-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+        
+        .detail-view {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            margin-top: 2rem;
+        }
+        
+        .detail-header {
+            background: linear-gradient(135deg, var(--galois-primary), var(--galois-secondary));
+            color: white;
+            padding: 1.5rem;
+            border-radius: 16px 16px 0 0;
+            margin-bottom: 2rem;
+        }
+        
+        .detail-section {
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid #f1f3f4;
+        }
+        
+        .detail-section:last-child {
+            border-bottom: none;
+        }
+        
+        .tech-specs {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+        
+        .spec-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .spec-item:last-child {
+            border-bottom: none;
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+            
+            .sidebar.show {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .quick-actions {
+                flex-direction: column;
+            }
+            
+            .category-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">
+                    <i class="bi bi-shield-check"></i>
+                    Galois
+                </div>
+                <div class="sidebar-subtitle">Gestão Patrimonial</div>
+            </div>
+            
+            <div class="sidebar-nav">
+                <div class="nav-item">
+                    <a href="#" class="nav-link active">
+                        <i class="nav-icon bi bi-speedometer2"></i>
+                        Dashboard
+                    </a>
+                </div>
+                
+                <div class="nav-item">
+                    <a href="#" class="nav-link">
+                        <i class="nav-icon bi bi-pc-display"></i>
+                        Equipamentos TI
+                    </a>
+                </div>
+                
+                <div class="nav-item">
+                    <a href="#" class="nav-link">
+                        <i class="nav-icon bi bi-bricks"></i>
+                        Mobiliário
+                    </a>
+                </div>
+                
+                <div class="nav-item">
+                    <a href="#" class="nav-link">
+                        <i class="nav-icon bi bi-tools"></i>
+                        Equipamentos Especiais
+                    </a>
+                </div>
+                
+                <div class="nav-item">
+                    <a href="#" class="nav-link">
+                        <i class="nav-icon bi bi-arrow-left-right"></i>
+                        Comodatos
+                    </a>
+                </div>
+                
+                <div class="nav-item">
+                    <a href="#" class="nav-link">
+                        <i class="nav-icon bi bi-file-earmark-text"></i>
+                        Relatórios
+                    </a>
+                </div>
+                
+                <div class="nav-item">
+                    <a href="#" class="nav-link">
+                        <i class="nav-icon bi bi-gear"></i>
+                        Configurações
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="main-content">
+            <!-- Top Bar -->
+            <div class="top-bar">
+                <button class="btn btn-outline-secondary d-lg-none" id="sidebarToggle">
+                    <i class="bi bi-list"></i>
+                </button>
+                
+                <div class="search-bar">
+                    <i class="bi bi-search search-icon"></i>
+                    <input type="text" class="search-input" placeholder="Pesquisar patrimônio...">
+                </div>
+                
+                <div class="user-profile">
+                    <div class="user-avatar">JS</div>
+                    <div class="user-info">
+                        <h6>John Smith</h6>
+                        <small>Administrador</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Content Area - Vue.js App -->
+            <div class="content-area" id="app">
+                <!-- Dashboard View -->
+                <div v-if="currentView === 'dashboard'">
+                    <div class="page-header">
+                        <h1 class="page-title">
+                            <i class="bi bi-building me-2"></i>
+                            Gestão Patrimonial Completa
+                        </h1>
+                        <p class="page-subtitle">Controle centralizado de todos os ativos da instituição</p>
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div class="quick-actions">
+                        <div class="quick-action-card" @click="showQuickAction('scan')">
+                            <i class="bi bi-qr-code-scan quick-action-icon"></i>
+                            <h5>Escanear</h5>
+                            <p>Registrar via QR Code</p>
+                        </div>
+                        
+                        <div class="quick-action-card" @click="showQuickAction('add')">
+                            <i class="bi bi-plus-circle quick-action-icon"></i>
+                            <h5>Adicionar</h5>
+                            <p>Novo item manualmente</p>
+                        </div>
+                        
+                        <div class="quick-action-card" @click="showQuickAction('report')">
+                            <i class="bi bi-file-earmark-text quick-action-icon"></i>
+                            <h5>Relatório</h5>
+                            <p>Gerar documento</p>
+                        </div>
+                    </div>
+
+                    <!-- Stats Overview -->
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <div>
+                                    <div class="stat-label">Total de Itens</div>
+                                    <div class="stat-value">428</div>
+                                </div>
+                                <div class="stat-icon equipments">
+                                    <i class="bi bi-box-seam"></i>
+                                </div>
+                            </div>
+                            <div class="stat-change positive">
+                                <i class="bi bi-arrow-up"></i> 12% desde o último mês
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <div>
+                                    <div class="stat-label">Localizações</div>
+                                    <div class="stat-value">18</div>
+                                </div>
+                                <div class="stat-icon locations">
+                                    <i class="bi bi-pin-map"></i>
+                                </div>
+                            </div>
+                            <div class="stat-change positive">
+                                <i class="bi bi-arrow-up"></i> 2 novas unidades
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <div>
+                                    <div class="stat-label">Em Manutenção</div>
+                                    <div class="stat-value">14</div>
+                                </div>
+                                <div class="stat-icon maintenance">
+                                    <i class="bi bi-tools"></i>
+                                </div>
+                            </div>
+                            <div class="stat-change negative">
+                                <i class="bi bi-arrow-down"></i> 3% acima da média
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <div>
+                                    <div class="stat-label">Alertas</div>
+                                    <div class="stat-value">5</div>
+                                </div>
+                                <div class="stat-icon alerts">
+                                    <i class="bi bi-exclamation-triangle"></i>
+                                </div>
+                            </div>
+                            <div class="stat-change positive">
+                                <i class="bi bi-arrow-down"></i> 60% resolvidos
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Patrimony Categories -->
+                    <!-- Equipamentos de TI -->
+                    <div class="patrimony-category">
+                        <div class="category-header">
+                            <i class="bi bi-pc-display category-icon"></i>
+                            <div>
+                                <h3>Equipamentos de TI</h3>
+                                <p class="text-muted">Computadores, notebooks, impressoras e periféricos</p>
+                            </div>
+                        </div>
+                        
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-header">
+                                    <div>
+                                        <div class="stat-label">Computadores</div>
+                                        <div class="stat-value">142</div>
+                                    </div>
+                                </div>
+                                <div class="stat-change positive">
+                                    <i class="bi bi-arrow-up"></i> 5% desde o último mês
+                                </div>
+                            </div>
+                            
+                            <div class="stat-card">
+                                <div class="stat-header">
+                                    <div>
+                                        <div class="stat-label">Notebooks</div>
+                                        <div class="stat-value">38</div>
+                                    </div>
+                                </div>
+                                <div class="stat-change positive">
+                                    <i class="bi bi-arrow-up"></i> 3 novos
+                                </div>
+                            </div>
+                            
+                            <div class="stat-card">
+                                <div class="stat-header">
+                                    <div>
+                                        <div class="stat-label">Impressoras</div>
+                                        <div class="stat-value">24</div>
+                                    </div>
+                                </div>
+                                <div class="stat-change negative">
+                                    <i class="bi bi-arrow-down"></i> 1 em manutenção
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card-modern">
+                            <div class="card-header-modern">
+                                <h5 class="card-title-modern">
+                                    <i class="bi bi-clock-history me-2"></i>
+                                    Equipamentos Recentemente Atualizados
+                                </h5>
+                                <button class="btn btn-sm btn-primary-modern">
+                                    <i class="bi bi-arrow-right"></i> Ver todos
+                                </button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-modern">
+                                    <thead>
+                                        <tr>
+                                            <th>Nome</th>
+                                            <th>Tipo</th>
+                                            <th>Patrimônio</th>
+                                            <th>Localização</th>
+                                            <th>Última Atualização</th>
+                                            <th>Status</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="item in tiItems" :key="item.id">
+                                            <td>{{ item.name }}</td>
+                                            <td>{{ item.type }}</td>
+                                            <td>{{ item.patrimonyNumber }}</td>
+                                            <td>{{ item.location }}</td>
+                                            <td>{{ item.lastUpdate }}</td>
+                                            <td>
+                                                <span class="badge-modern" :class="statusClass(item.status)">
+                                                    {{ statusText(item.status) }}
+                                                </span>
+                                            </td>
+                                            <td class="text-end">
+                                                <button class="btn btn-sm btn-outline-primary" @click="showDetail(item)">
+                                                    <i class="bi bi-eye"></i> Detalhes
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mobiliário -->
+                    <div class="patrimony-category">
+                        <div class="category-header">
+                            <i class="bi bi-bricks category-icon"></i>
+                            <div>
+                                <h3>Mobiliário</h3>
+                                <p class="text-muted">Mesas, cadeiras, armários e outros móveis</p>
+                            </div>
+                        </div>
+                        
+                        <div class="card-modern">
+                            <div class="card-header-modern">
+                                <h5 class="card-title-modern">
+                                    <i class="bi bi-list-check me-2"></i>
+                                    Inventário de Mobiliário
+                                </h5>
+                                <button class="btn btn-sm btn-primary-modern">
+                                    <i class="bi bi-plus"></i> Adicionar
+                                </button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-modern">
+                                    <thead>
+                                        <tr>
+                                            <th>Item</th>
+                                            <th>Tipo</th>
+                                            <th>Patrimônio</th>
+                                            <th>Localização</th>
+                                            <th>Valor</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="item in furnitureItems" :key="item.id">
+                                            <td>{{ item.name }}</td>
+                                            <td>{{ item.type }}</td>
+                                            <td>{{ item.patrimonyNumber }}</td>
+                                            <td>{{ item.location }}</td>
+                                            <td>{{ item.value }}</td>
+                                            <td class="text-end">
+                                                <button class="btn btn-sm btn-outline-primary" @click="showDetail(item)">
+                                                    <i class="bi bi-eye"></i> Detalhes
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Equipamentos Especiais -->
+                    <div class="patrimony-category">
+                        <div class="category-header">
+                            <i class="bi bi-tools category-icon"></i>
+                            <div>
+                                <h3>Equipamentos Especiais</h3>
+                                <p class="text-muted">Projetores, equipamentos médicos, laboratoriais, etc.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="card-modern">
+                            <div class="card-header-modern">
+                                <h5 class="card-title-modern">
+                                    <i class="bi bi-clipboard-data me-2"></i>
+                                    Equipamentos por Categoria
+                                </h5>
+                            </div>
+                            <div class="row p-4">
+                                <div class="col-md-4">
+                                    <div class="card">
+                                        <div class="card-body text-center">
+                                            <i class="bi bi-projector" style="font-size: 2rem; color: var(--galois-primary);"></i>
+                                            <h5 class="mt-3">Projetores</h5>
+                                            <div class="stat-value">12</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card">
+                                        <div class="card-body text-center">
+                                            <i class="bi bi-camera-video" style="font-size: 2rem; color: var(--galois-primary);"></i>
+                                            <h5 class="mt-3">Câmeras</h5>
+                                            <div class="stat-value">8</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card">
+                                        <div class="card-body text-center">
+                                            <i class="bi bi-cpu" style="font-size: 2rem; color: var(--galois-primary);"></i>
+                                            <h5 class="mt-3">Servidores</h5>
+                                            <div class="stat-value">5</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detail View -->
+                <div v-if="currentView === 'detail'" class="detail-view">
+                    <button class="btn btn-outline-secondary mb-3" @click="currentView = 'dashboard'">
+                        <i class="bi bi-arrow-left"></i> Voltar
+                    </button>
+                    
+                    <div class="detail-header">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <h2><i :class="selectedItem.icon"></i> {{ selectedItem.name }}</h2>
+                                <h4>{{ selectedItem.type }}</h4>
+                                <div class="d-flex gap-2 mt-2">
+                                    <span class="badge bg-light text-black">{{ selectedItem.patrimonyNumber }}</span>
+                                    <span class="badge bg-light text-black">{{ selectedItem.location }}</span>
+                                    <span class="badge" :class="statusBadgeClass(selectedItem.status)">
+                                        {{ statusText(selectedItem.status) }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <button class="btn btn-accent-modern me-2">
+                                    <i class="bi bi-pencil"></i> Editar
+                                </button>
+                                <button class="btn btn-primary-modern">
+                                    <i class="bi bi-printer"></i> Imprimir
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="detail-section">
+                                <h5><i class="bi bi-info-circle"></i> Informações Básicas</h5>
+                                <div class="spec-list mt-3">
+                                    <div class="spec-item">
+                                        <span class="text-muted">Data de Aquisição:</span>
+                                        <span>{{ selectedItem.acquisitionDate || 'N/A' }}</span>
+                                    </div>
+                                    <div class="spec-item">
+                                        <span class="text-muted">Fornecedor:</span>
+                                        <span>{{ selectedItem.supplier || 'N/A' }}</span>
+                                    </div>
+                                    <div class="spec-item">
+                                        <span class="text-muted">Valor:</span>
+                                        <span>{{ selectedItem.value || 'N/A' }}</span>
+                                    </div>
+                                    <div class="spec-item">
+                                        <span class="text-muted">Garantia:</span>
+                                        <span>{{ selectedItem.warranty || 'N/A' }}</span>
+                                    </div>
+                                    <div class="spec-item">
+                                        <span class="text-muted">Responsável:</span>
+                                        <span>{{ selectedItem.responsible || 'N/A' }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="detail-section">
+                                <h5><i class="bi bi-geo-alt"></i> Localização</h5>
+                                <div class="mt-3">
+                                    <p><strong>Coligada:</strong> {{ selectedItem.branch || 'N/A' }}</p>
+                                    <p><strong>Departamento:</strong> {{ selectedItem.department || 'N/A' }}</p>
+                                    <p><strong>Sala/Área:</strong> {{ selectedItem.room || 'N/A' }}</p>
+                                    <p><strong>Observações:</strong> {{ selectedItem.locationNotes || 'Nenhuma' }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <!-- Detalhes específicos para TI -->
+                            <div v-if="selectedItem.category === 'ti'" class="tech-specs">
+                                <h5><i class="bi bi-motherboard"></i> Especificações Técnicas</h5>
+                                <div class="spec-list mt-3">
+                                    <div class="spec-item">
+                                        <span class="text-muted">Modelo:</span>
+                                        <span>{{ selectedItem.specs.model || 'N/A' }}</span>
+                                    </div>
+                                    <div class="spec-item">
+                                        <span class="text-muted">Fabricante:</span>
+                                        <span>{{ selectedItem.specs.manufacturer || 'N/A' }}</span>
+                                    </div>
+                                    <div class="spec-item">
+                                        <span class="text-muted">Número de Série:</span>
+                                        <span class="font-monospace">{{ selectedItem.specs.serial || 'N/A' }}</span>
+                                    </div>
+                                    <div class="spec-item">
+                                        <span class="text-muted">Processador:</span>
+                                        <span>{{ selectedItem.specs.cpu || 'N/A' }}</span>
+                                    </div>
+                                    <div class="spec-item">
+                                        <span class="text-muted">Memória RAM:</span>
+                                        <span>{{ selectedItem.specs.ram || 'N/A' }}</span>
+                                    </div>
+                                    <div class="spec-item">
+                                        <span class="text-muted">Armazenamento:</span>
+                                        <span>{{ selectedItem.specs.storage || 'N/A' }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Histórico e Manutenções -->
+                            <div class="detail-section">
+                                <h5><i class="bi bi-clock-history"></i> Histórico</h5>
+                                <div class="mt-3">
+                                    <div class="alert alert-info">
+                                        <i class="bi bi-info-circle"></i> Última atualização em {{ selectedItem.lastUpdate }}
+                                    </div>
+                                    <ul class="list-group">
+                                        <li class="list-group-item">
+                                            <i class="bi bi-check-circle text-success me-2"></i>
+                                            <strong>Cadastrado em:</strong> {{ selectedItem.registerDate }}
+                                        </li>
+                                        <li class="list-group-item">
+                                            <i class="bi bi-arrow-left-right text-primary me-2"></i>
+                                            <strong>Última movimentação:</strong> {{ selectedItem.lastMovement || 'Nenhuma' }}
+                                        </li>
+                                        <li class="list-group-item">
+                                            <i class="bi bi-tools text-warning me-2"></i>
+                                            <strong>Última manutenção:</strong> {{ selectedItem.lastMaintenance || 'Nenhuma' }}
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Seção de Ações -->
+                    <div class="detail-section">
+                        <h5><i class="bi bi-lightning"></i> Ações Rápidas</h5>
+                        <div class="d-flex gap-2 mt-3">
+                            <button class="btn btn-outline-primary">
+                                <i class="bi bi-arrow-left-right"></i> Transferir
+                            </button>
+                            <button class="btn btn-outline-warning">
+                                <i class="bi bi-tools"></i> Registrar Manutenção
+                            </button>
+                            <button class="btn btn-outline-secondary">
+                                <i class="bi bi-file-earmark-text"></i> Gerar Relatório
+                            </button>
+                            <button class="btn btn-outline-danger">
+                                <i class="bi bi-trash"></i> Baixar Item
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Floating Action Button -->
+        <button class="floating-fab" @click="showQuickAction('scan')">
+            <i class="bi bi-qr-code-scan"></i>
+        </button>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.2.47/dist/vue.global.min.js"></script>
+    <script>
+        const { createApp } = Vue;
+        
+        createApp({
+            data() {
+                return {
+                    currentView: 'dashboard',
+                    selectedItem: null,
+                    tiItems: [
+                        {
+                            id: 1,
+                            name: 'WS-ACCT-001',
+                            type: 'Desktop',
+                            category: 'ti',
+                            icon: 'bi bi-pc-display',
+                            patrimonyNumber: 'PAT-2023-001',
+                            location: 'Financeiro/Sala 12',
+                            status: 'active',
+                            lastUpdate: '2 horas atrás',
+                            acquisitionDate: '15/03/2023',
+                            supplier: 'Dell Computadores Ltda',
+                            value: 'R$ 4.299,00',
+                            warranty: '12 meses',
+                            responsible: 'Maria Silva',
+                            branch: 'Matriz',
+                            department: 'Financeiro',
+                            room: 'Sala 12',
+                            locationNotes: 'Ao lado da impressora',
+                            registerDate: '20/03/2023',
+                            lastMovement: '05/06/2023 - Transferido para Financeiro',
+                            lastMaintenance: 'Nenhuma',
+                            specs: {
+                                model: 'OptiPlex 7090',
+                                manufacturer: 'Dell',
+                                serial: 'ABC123456789',
+                                cpu: 'Intel Core i7-10700',
+                                ram: '16GB DDR4',
+                                storage: '512GB SSD + 1TB HDD'
+                            }
+                        },
+                        {
+                            id: 2,
+                            name: 'NB-MKT-005',
+                            type: 'Notebook',
+                            category: 'ti',
+                            icon: 'bi bi-laptop',
+                            patrimonyNumber: 'PAT-2023-042',
+                            location: 'Marketing/Sala 03',
+                            status: 'maintenance',
+                            lastUpdate: '1 dia atrás',
+                            acquisitionDate: '10/05/2023',
+                            supplier: 'Dell Computadores Ltda',
+                            value: 'R$ 5.799,00',
+                            warranty: '12 meses',
+                            responsible: 'João Oliveira',
+                            branch: 'Matriz',
+                            department: 'Marketing',
+                            room: 'Sala 03',
+                            registerDate: '12/05/2023',
+                            lastMovement: 'Nenhuma',
+                            lastMaintenance: '15/06/2023 - Problema com teclado',
+                            specs: {
+                                model: 'XPS 15',
+                                manufacturer: 'Dell',
+                                serial: 'XYZ987654321',
+                                cpu: 'Intel Core i9-12900H',
+                                ram: '32GB DDR5',
+                                storage: '1TB SSD'
+                            }
+                        },
+                        {
+                            id: 3,
+                            name: 'PRT-ADM-002',
+                            type: 'Impressora',
+                            category: 'ti',
+                            icon: 'bi bi-printer',
+                            patrimonyNumber: 'PAT-2022-087',
+                            location: 'Administrativo/Corredor',
+                            status: 'inactive',
+                            lastUpdate: '3 dias atrás',
+                            acquisitionDate: '22/11/2022',
+                            supplier: 'HP Brasil',
+                            value: 'R$ 2.899,00',
+                            warranty: '6 meses',
+                            responsible: 'Departamento Administrativo',
+                            branch: 'Matriz',
+                            department: 'Administrativo',
+                            room: 'Corredor',
+                            registerDate: '25/11/2022',
+                            lastMovement: '10/01/2023 - Transferido para Administrativo',
+                            lastMaintenance: '20/05/2023 - Troca de toner',
+                            specs: {
+                                model: 'LaserJet Pro M404dn',
+                                manufacturer: 'HP',
+                                serial: 'HP1234567890',
+                                cpu: 'N/A',
+                                ram: 'N/A',
+                                storage: 'N/A'
+                            }
+                        }
+                    ],
+                    furnitureItems: [
+                        {
+                            id: 101,
+                            name: 'Mesa Executiva',
+                            type: 'Mobiliário',
+                            category: 'furniture',
+                            icon: 'bi bi-table',
+                            patrimonyNumber: 'PAT-2022-045',
+                            location: 'Diretoria/Sala 01',
+                            status: 'active',
+                            lastUpdate: '1 semana atrás',
+                            acquisitionDate: '15/03/2022',
+                            supplier: 'Moveis Planejados Ltda',
+                            value: 'R$ 2.450,00',
+                            warranty: '24 meses',
+                            responsible: 'Carlos Eduardo',
+                            branch: 'Matriz',
+                            department: 'Diretoria',
+                            room: 'Sala 01',
+                            locationNotes: 'Sala do diretor presidente',
+                            registerDate: '18/03/2022',
+                            lastMovement: 'Nenhuma',
+                            lastMaintenance: 'Nenhuma'
+                        },
+                        {
+                            id: 102,
+                            name: 'Cadeira Ergonômica',
+                            type: 'Mobiliário',
+                            category: 'furniture',
+                            icon: 'bi bi-chair',
+                            patrimonyNumber: 'PAT-2023-023',
+                            location: 'TI/Sala 05',
+                            status: 'active',
+                            lastUpdate: '2 dias atrás',
+                            acquisitionDate: '05/04/2023',
+                            supplier: 'ErgoDesign',
+                            value: 'R$ 1.299,00',
+                            warranty: '12 meses',
+                            responsible: 'Equipe de TI',
+                            branch: 'Matriz',
+                            department: 'TI',
+                            room: 'Sala 05',
+                            registerDate: '07/04/2023',
+                            lastMovement: '10/04/2023 - Transferido para TI',
+                            lastMaintenance: 'Nenhuma'
+                        }
+                    ]
+                }
+            },
+            methods: {
+                showDetail(item) {
+                    this.selectedItem = item;
+                    this.currentView = 'detail';
+                },
+                showQuickAction(action) {
+                    alert(`Ação rápida: ${action}`);
+                },
+                statusClass(status) {
+                    return {
+                        'active': 'badge-online',
+                        'maintenance': 'badge-maintenance',
+                        'inactive': 'badge-offline'
+                    }[status] || 'badge-secondary';
+                },
+                statusBadgeClass(status) {
+                    return {
+                        'active': 'bg-success',
+                        'maintenance': 'bg-warning',
+                        'inactive': 'bg-danger'
+                    }[status] || 'bg-secondary';
+                },
+                statusText(status) {
+                    return {
+                        'active': 'Ativo',
+                        'maintenance': 'Manutenção',
+                        'inactive': 'Inativo'
+                    }[status] || status;
+                }
+            },
+            mounted() {
+                // Sidebar toggle for mobile
+                document.getElementById('sidebarToggle').addEventListener('click', function() {
+                    document.querySelector('.sidebar').classList.toggle('show');
+                });
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

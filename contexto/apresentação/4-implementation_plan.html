@@ -1,0 +1,1291 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plano de Implementação - Sistema Galois</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+	<link rel="icon" href="favicon.ico" type="image/x-icon">
+    <style>
+        :root {
+            --galois-primary: #1a3e72;
+            --galois-secondary: #2a5da6;
+            --galois-accent: #f57c00;
+            --galois-success: #28a745;
+            --galois-danger: #AD2831;
+            --galois-warning: #ffc107;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            line-height: 1.6;
+        }
+        
+        .plan-header {
+            background: linear-gradient(135deg, var(--galois-primary), var(--galois-secondary));
+            color: white;
+            padding: 4rem 0;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .plan-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 120%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            transform: rotate(15deg);
+        }
+        
+        .plan-section {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            padding: 3rem;
+            margin-bottom: 3rem;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .plan-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: linear-gradient(90deg, var(--galois-accent), var(--galois-secondary));
+        }
+        
+        .section-title {
+            color: var(--galois-primary);
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .section-subtitle {
+            color: #6c757d;
+            font-size: 1.2rem;
+            margin-bottom: 3rem;
+        }
+        
+        .phase-card {
+            background: linear-gradient(135deg, #ffffff, #f8f9fa);
+            border: 2px solid #e9ecef;
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .phase-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+            border-color: var(--galois-accent);
+        }
+        
+        .phase-card.phase-1 {
+            border-left: 6px solid var(--galois-success);
+        }
+        
+        .phase-card.phase-2 {
+            border-left: 6px solid var(--galois-primary);
+        }
+        
+        .phase-card.phase-3 {
+            border-left: 6px solid var(--galois-accent);
+        }
+        
+        .phase-card.phase-4 {
+            border-left: 6px solid var(--galois-danger);
+        }
+        
+        .phase-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 2rem;
+        }
+        
+        .phase-number {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: white;
+            margin-right: 1rem;
+        }
+        
+        .phase-1 .phase-number {
+            background: linear-gradient(135deg, var(--galois-success), #20c997);
+        }
+        
+        .phase-2 .phase-number {
+            background: linear-gradient(135deg, var(--galois-primary), var(--galois-secondary));
+        }
+        
+        .phase-3 .phase-number {
+            background: linear-gradient(135deg, var(--galois-accent), #ff9800);
+        }
+        
+        .phase-4 .phase-number {
+            background: linear-gradient(135deg, var(--galois-danger), #e57373);
+        }
+        
+        .phase-info {
+            flex: 1;
+        }
+        
+        .phase-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--galois-primary);
+            margin-bottom: 0.5rem;
+        }
+        
+        .phase-duration {
+            color: #6c757d;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .phase-stats {
+            display: flex;
+            gap: 2rem;
+            margin-bottom: 1rem;
+        }
+        
+        .stat-item {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: var(--galois-primary);
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+        
+        .deliverables {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+        }
+        
+        .deliverables h6 {
+            color: var(--galois-primary);
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+        
+        .deliverable-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+            padding: 0.5rem;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        .deliverable-item:hover {
+            background: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .deliverable-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.8rem;
+            flex-shrink: 0;
+        }
+        
+        .deliverable-icon.high {
+            background: var(--galois-danger);
+        }
+        
+        .deliverable-icon.medium {
+            background: var(--galois-warning);
+        }
+        
+        .deliverable-icon.low {
+            background: var(--galois-success);
+        }
+        
+        .timeline-visual {
+            background: linear-gradient(90deg, #f8f9fa, white);
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+            position: relative;
+        }
+        
+        .timeline-bar {
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            position: relative;
+            margin: 2rem 0;
+        }
+        
+        .timeline-progress {
+            height: 100%;
+            background: linear-gradient(90deg, var(--galois-success), var(--galois-accent));
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .timeline-progress::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            animation: shimmer 2s infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        
+        .milestone {
+            position: absolute;
+            top: -10px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--galois-accent);
+            border: 3px solid white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        
+        .milestone-label {
+            position: absolute;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--galois-primary);
+            white-space: nowrap;
+        }
+        
+        .resource-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+        
+        .resource-card {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        
+        .resource-card:hover {
+            border-color: var(--galois-accent);
+            transform: translateY(-4px);
+        }
+        
+        .resource-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        
+        .resource-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--galois-primary);
+            margin-bottom: 0.5rem;
+        }
+        
+        .resource-description {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        
+        .risk-matrix {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+        
+        .risk-item {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            border-left: 4px solid;
+            transition: all 0.3s ease;
+        }
+        
+        .risk-item:hover {
+            transform: translateX(8px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .risk-high {
+            border-left-color: var(--galois-danger);
+            background: linear-gradient(135deg, #ffffff, #ffebee);
+        }
+        
+        .risk-medium {
+            border-left-color: var(--galois-warning);
+            background: linear-gradient(135deg, #ffffff, #fff8e1);
+        }
+        
+        .risk-low {
+            border-left-color: var(--galois-success);
+            background: linear-gradient(135deg, #ffffff, #e8f5e8);
+        }
+        
+        .cost-breakdown {
+            background: linear-gradient(135deg, var(--galois-primary), var(--galois-secondary));
+            color: white;
+            border-radius: 16px;
+            padding: 3rem;
+            margin: 2rem 0;
+        }
+        
+        .cost-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .cost-item:last-child {
+            border-bottom: none;
+            font-weight: bold;
+            font-size: 1.3rem;
+            margin-top: 1rem;
+            padding-top: 2rem;
+            border-top: 2px solid rgba(255,255,255,0.3);
+        }
+        
+        .success-metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+        
+        .metric-card {
+            background: linear-gradient(135deg, #ffffff, #f8f9fa);
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        
+        .metric-card:hover {
+            border-color: var(--galois-accent);
+            transform: translateY(-4px);
+        }
+        
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: var(--galois-primary);
+            margin-bottom: 0.5rem;
+        }
+        
+        .metric-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        
+        .next-steps {
+            background: linear-gradient(135deg, var(--galois-accent), #ff9800);
+            color: white;
+            border-radius: 16px;
+            padding: 3rem;
+            text-align: center;
+            margin: 3rem 0;
+        }
+        
+        .cta-button {
+            background: white;
+            color: var(--galois-primary);
+            border: none;
+            padding: 1rem 3rem;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin: 0.5rem;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+            color: var(--galois-primary);
+        }
+        
+        @media (max-width: 768px) {
+            .phase-stats {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .phase-header {
+                flex-direction: column;
+            }
+            
+            .resource-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .risk-matrix {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="plan-header">
+        <div class="container">
+            <h1 class="display-3 mb-3">
+                <i class="bi bi-rocket-takeoff"></i>
+                Plano de Implementação
+            </h1>
+            <p class="lead">Roadmap completo para transformação digital do patrimônio</p>
+            <div class="mt-4">
+                <span class="badge bg-light text-dark px-4 py-2 me-2">
+                    <i class="bi bi-calendar-event me-2"></i>20 meses
+                </span>
+                <span class="badge bg-light text-dark px-4 py-2 me-2">
+                    <i class="bi bi-people me-2"></i>4 fases
+                </span>
+                <!-- <span class="badge bg-light text-dark px-4 py-2">
+                    <i class="bi bi-check-circle me-2"></i>ROI 400%
+                </span> -->
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Visão Geral -->
+        <div class="plan-section">
+            <h2 class="section-title">
+                <i class="bi bi-eye"></i>
+                Visão Geral do Projeto
+            </h2>
+            <p class="section-subtitle">
+                Transformação completa do controle patrimonial com fases bem definidas
+            </p>
+            
+            <div class="timeline-visual">
+                <h5 class="text-center mb-4">Timeline de 20 meses</h5>
+                <div class="timeline-bar">
+                    <div class="timeline-progress" style="width: 30%;"></div>
+                    <div class="milestone" style="left: 25%;">
+                        <div class="milestone-label">MVP</div>
+                    </div>
+                    <div class="milestone" style="left: 50%;">
+                        <div class="milestone-label">Core</div>
+                    </div>
+                    <div class="milestone" style="left: 70%;">
+                        <div class="milestone-label">Mobile</div>
+                    </div>
+                    <div class="milestone" style="left: 100%;">
+                        <div class="milestone-label">AI</div>
+                    </div>
+                </div>
+                <div class="row text-center mt-4">
+                    <div class="col-3">
+                        <div class="text-success">
+                            <i class="bi bi-play-circle" style="font-size: 2rem;"></i>
+                            <div><strong>Fase 1</strong></div>
+                            <small>6 meses</small>
+                        </div>
+                    </div>
+                    <div class="col-3">
+                        <div class="text-primary">
+                            <i class="bi bi-gear-wide-connected" style="font-size: 2rem;"></i>
+                            <div><strong>Fase 2</strong></div>
+                            <small>4 meses</small>
+                        </div>
+                    </div>
+                    <div class="col-3">
+                        <div class="text-warning">
+                            <i class="bi bi-phone" style="font-size: 2rem;"></i>
+                            <div><strong>Fase 3</strong></div>
+                            <small>4 meses</small>
+                        </div>
+                    </div>
+                    <div class="col-3">
+                        <div class="text-danger">
+                            <i class="bi bi-robot" style="font-size: 2rem;"></i>
+                            <div><strong>Fase 4</strong></div>
+                            <small>6 meses</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fases Detalhadas -->
+        <div class="plan-section">
+            <h2 class="section-title">
+                <i class="bi bi-list-ol"></i>
+                Fases de Implementação
+            </h2>
+            <p class="section-subtitle">
+                Cada fase entrega valor imediato e prepara a base para a próxima
+            </p>
+            
+            <!-- Fase 1 -->
+            <div class="phase-card phase-1">
+                <div class="phase-header">
+                    <div class="d-flex align-items-center">
+                        <div class="phase-number">1</div>
+                        <div class="phase-info">
+                            <div class="phase-title">MVP - Sistema Core</div>
+                            <div class="phase-duration">
+                                <i class="bi bi-calendar me-2"></i>6 meses | 
+                                <i class="bi bi-people me-2"></i>1 desenvolvedor
+                            </div>
+                        </div>
+                    </div>
+                    <div class="phase-stats">
+                        <div class="stat-item">
+                            <div class="stat-value">85%</div>
+                            <div class="stat-label">Funcionalidades Básicas</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">15</div>
+                            <div class="stat-label">APIs REST</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="deliverables">
+                    <h6><i class="bi bi-check-circle me-2"></i>Entregas Principais</h6>
+                    <div class="deliverable-item">
+                        <div class="deliverable-icon high"><i class="bi bi-1-circle"></i></div>
+                        <div>
+                            <strong>Backend Spring Boot</strong><br>
+                            <small>APIs RESTful, autenticação JWT, integração MySQL</small>
+                        </div>
+                    </div>
+                    <div class="deliverable-item">
+                        <div class="deliverable-icon high"><i class="bi bi-2-circle"></i></div>
+                        <div>
+                            <strong>Frontend Vue.js</strong><br>
+                            <small>Interface moderna, responsiva, dashboards básicos</small>
+                        </div>
+                    </div>
+                    <div class="deliverable-item">
+                        <div class="deliverable-icon medium"><i class="bi bi-3-circle"></i></div>
+                        <div>
+                            <strong>Migração de Dados</strong><br>
+                            <small>Importação dos JSONs existentes para banco relacional</small>
+                        </div>
+                    </div>
+                    <div class="deliverable-item">
+                        <div class="deliverable-icon medium"><i class="bi bi-4-circle"></i></div>
+                        <div>
+                            <strong>Integração PowerShell</strong><br>
+                            <small>Adaptação do script atual para enviar via API</small>
+                        </div>
+                    </div>
+                    <div class="deliverable-item">
+                        <div class="deliverable-icon low"><i class="bi bi-5-circle"></i></div>
+                        <div>
+                            <strong>Containerização</strong><br>
+                            <small>Docker containers, docker-compose, ambiente de dev</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fase 2 -->
+            <div class="phase-card phase-2">
+                <div class="phase-header">
+                    <div class="d-flex align-items-center">
+                        <div class="phase-number">2</div>
+                        <div class="phase-info">
+                            <div class="phase-title">Funcionalidades Avançadas</div>
+                            <div class="phase-duration">
+                                <i class="bi bi-calendar me-2"></i>4 meses | 
+                                <i class="bi bi-people me-2"></i>1 desenvolvedor
+                            </div>
+                        </div>
+                    </div>
+                    <div class="phase-stats">
+                        <div class="stat-item">
+                            <div class="stat-value">95%</div>
+                            <div class="stat-label">Recursos Completos</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">8</div>
+                            <div class="stat-label">Módulos</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="deliverables">
+                    <h6><i class="bi bi-gear me-2"></i>Entregas Principais</h6>
+                    <div class="deliverable-item">
+                        <div class="deliverable-icon high"><i class="bi bi-shield-check"></i></div>
+                        <div>
+                            <strong>Sistema de Permissões RBAC</strong><br>
+                            <small>Controle granular de acesso por perfil e função</small>
+                        </div>
+                    </div>
+                    <div class="deliverable-item">
+                        <div class="deliverable-icon high"><i class="bi bi-tools"></i></div>
+                        <div>
+                            <strong>Módulo de Suporte</strong><br>
+                            <small>Credenciais, acesso remoto, informações técnicas</small>
+                        </div>
+                    </div>
+                    <div class="deliverable-item">
+                        <div class="deliverable-icon medium"><i class="bi bi-arrow-left-right"></i></div>
+                        <div>
+                            <strong>Gestão de Comodatos</strong><br>
+                            <small>Controle de empréstimos, prazos, notificações</small>
+                        </div>
+                    </div>
+                    <div class="deliverable-item">
+                        <div class="deliverable-icon medium"><i class="bi bi-file-text"></i></div>
+                        <div>
+                            <strong>Relatórios Avançados</strong><br>
+                            <small>Exportação PDF/Excel, templates customizáveis</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fase 3 -->
+            <div class="phase-card phase-3">
+                <div class="phase-header">
+                    <div class="d-flex align-items-center">
+                        <div class="phase-number">3</div>
+                        <div class="phase-info">
+                            <div class="phase-title">Aplicativo Mobile</div>
+                            <div class="phase-duration">
+                                <i class="bi bi-calendar me-2"></i>4 meses | 
+                                <i class="bi bi-people me-2"></i>1 desenvolvedor mobile
+                            </div>
+                        </div>
+                    </div>
+                    <div class="phase-stats">
+                        <div class="stat-item">
+                            <div class="stat-value">100%</div>
+                            <div class="stat-label">Mobilidade</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">2</div>
+                            <div class="stat-label">Plataformas</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="deliverables">
+                    <h6><i class="bi bi-phone me-2"></i>Entregas Principais</h6>
+                    <div class="deliverable-item">
+                        <div class="deliverable-icon high"><i class="bi bi-phone"></i></div>
+                        <div>
+                            <strong>App React Native</strong><br>
+                            <small>iOS e Android nativos com interface otimizada</small>
+                        </div>
+                    </div>
+                    <div class="deliverable-item">
+                        <div class="deliverable-icon high"><i class="bi bi-qr-code-scan"></i></div>
+                        <div>
+                            <strong>Scanner QR Code</strong><br>
+                            <small>Leitura rápida, busca instantânea, ações contextuais</small>
+                        </div>
+                    </div>
+                    <div class="deliverable-item">
+                        <div class="deliverable-icon medium"><i class="bi bi-cloud-arrow-down"></i></div>
+                        <div>
+                            <strong>Sincronização Offline</strong><br>
+                            <small>Funcionamento sem internet, sync automática</small>
+                        </div>
+                    </div>
+                    <div class="deliverable-item">
+                        <div class="deliverable-icon low"><i class="bi bi-bell"></i></div>
+                        <div>
+                            <strong>Push Notifications</strong><br>
+                            <small>Alertas em tempo real, lembretes automáticos</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fase 4 -->
+            <div class="phase-card phase-4">
+                <div class="phase-header">
+                    <div class="d-flex align-items-center">
+                        <div class="phase-number">4</div>
+                        <div class="phase-info">
+                            <div class="phase-title">Inteligência e Monitoramento</div>
+                            <div class="phase-duration">
+                                <i class="bi bi-calendar me-2"></i>6 meses | 
+                                <i class="bi bi-people me-2"></i>1 desenvolvedor DevOps
+                            </div>
+                        </div>
+                    </div>
+                    <div class="phase-stats">
+                        <div class="stat-item">
+                            <div class="stat-value">AI</div>
+                            <div class="stat-label">Powered</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">24/7</div>
+                            <div class="stat-label">Monitoramento</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="deliverables">
+                    <h6><i class="bi bi-cpu me-2"></i>Entregas Principais</h6>
+                    <div class="deliverable-item">
+                        <div class="deliverable-icon high"><i class="bi bi-graph-up"></i></div>
+                        <div>
+                            <strong>Monitoramento Automático</strong><br>
+                            <small>Coleta contínua de métricas, alertas preventivos</small>
+                        </div>
+                    </div>
+                    <div class="deliverable-item">
+                        <div class="deliverable-icon high"><i class="bi bi-robot"></i></div>
+                        <div>
+                            <strong>Algoritmos Preditivos</strong><br>
+                            <small>ML para prever falhas, otimizar manutenções</small>
+                        </div>
+                    </div>
+                    <div class="deliverable-item">
+                        <div class="deliverable-icon medium"><i class="bi bi-speedometer2"></i></div>
+                        <div>
+                            <strong>Dashboards Executivos</strong><br>
+                            <small>KPIs em tempo real, análises estratégicas</small>
+                        </div>
+                    </div>
+                    <div class="deliverable-item">
+                        <div class="deliverable-icon low"><i class="bi bi-plug"></i></div>
+                        <div>
+                            <strong>Integrações Externas</strong><br>
+                            <small>ITSM, Slack, Teams, sistemas legados</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recursos Necessários -->
+        <!-- <div class="plan-section">
+            <h2 class="section-title">
+                <i class="bi bi-people-fill"></i>
+                Recursos e Equipe
+            </h2>
+            <p class="section-subtitle">
+                Time especializado para garantir o sucesso do projeto
+            </p>
+            
+            <div class="resource-grid">
+                <div class="resource-card">
+                    <i class="bi bi-person-badge resource-icon text-primary"></i>
+                    <div class="resource-title">Tech Lead</div>
+                    <div class="resource-description">
+                        Arquitetura, decisões técnicas, code review
+                    </div>
+                </div>
+                
+                <div class="resource-card">
+                    <i class="bi bi-code-slash resource-icon text-success"></i>
+                    <div class="resource-title">Dev Backend</div>
+                    <div class="resource-description">
+                        Spring Boot, APIs REST, banco de dados
+                    </div>
+                </div>
+                
+                <div class="resource-card">
+                    <i class="bi bi-palette resource-icon text-info"></i>
+                    <div class="resource-title">Dev Frontend</div>
+                    <div class="resource-description">
+                        Vue.js, interfaces, experiência do usuário
+                    </div>
+                </div>
+                
+                <div class="resource-card">
+                    <i class="bi bi-phone resource-icon text-warning"></i>
+                    <div class="resource-title">Dev Mobile</div>
+                    <div class="resource-description">
+                        React Native, iOS/Android, integração
+                    </div>
+                </div>
+                
+                <div class="resource-card">
+                    <i class="bi bi-shield-check resource-icon text-danger"></i>
+                    <div class="resource-title">DevOps/Security</div>
+                    <div class="resource-description">
+                        Docker, CI/CD, segurança, infraestrutura
+                    </div>
+                </div>
+                
+                <div class="resource-card">
+                    <i class="bi bi-clipboard-check resource-icon text-secondary"></i>
+                    <div class="resource-title">QA/Tester</div>
+                    <div class="resource-description">
+                        Testes automatizados, validação, qualidade
+                    </div>
+                </div>
+            </div>
+        </div>
+ -->
+        <!-- Análise de Riscos -->
+        <div class="plan-section">
+            <h2 class="section-title">
+                <i class="bi bi-exclamation-triangle"></i>
+                Matriz de Riscos
+            </h2>
+            <p class="section-subtitle">
+                Identificação proativa de riscos com planos de mitigação
+            </p>
+            
+            <div class="risk-matrix">
+                <div class="risk-item risk-high">
+                    <h6 class="text-danger"><i class="bi bi-exclamation-triangle me-2"></i>Alto Risco</h6>
+                    <p><strong>Resistência à mudança</strong></p>
+                    <small><strong>Mitigação:</strong> Treinamentos intensivos, champions por departamento, migração gradual</small>
+                </div>
+                
+                <div class="risk-item risk-medium">
+                    <h6 class="text-warning"><i class="bi bi-exclamation-circle me-2"></i>Risco Médio</h6>
+                    <p><strong>Integração com AD</strong></p>
+                    <small><strong>Mitigação:</strong> Testes antecipados, ambiente de homologação, fallback local</small>
+                </div>
+                
+                <div class="risk-item risk-low">
+                    <h6 class="text-success"><i class="bi bi-info-circle me-2"></i>Baixo Risco</h6>
+                    <p><strong>Performance do sistema</strong></p>
+                    <small><strong>Mitigação:</strong> Testes de carga, otimização contínua, cache Redis</small>
+                </div>
+                
+                <div class="risk-item risk-high">
+                    <h6 class="text-danger"><i class="bi bi-exclamation-triangle me-2"></i>Alto Risco</h6>
+                    <p><strong>Qualidade dos dados legados</strong></p>
+                    <small><strong>Mitigação:</strong> Limpeza prévia, validação automática, correção manual</small>
+                </div>
+                
+                <div class="risk-item risk-medium">
+                    <h6 class="text-warning"><i class="bi bi-exclamation-circle me-2"></i>Risco Médio</h6>
+                    <p><strong>Disponibilidade da equipe</strong></p>
+                    <small><strong>Mitigação:</strong> Documentação detalhada, conhecimento compartilhado, backup team</small>
+                </div>
+                
+                <div class="risk-item risk-low">
+                    <h6 class="text-success"><i class="bi bi-info-circle me-2"></i>Baixo Risco</h6>
+                    <p><strong>Tecnologia escolhida</strong></p>
+                    <small><strong>Mitigação:</strong> Stack comprovado, comunidade ativa, suporte empresarial</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Investimento -->
+        <!-- <div class="cost-breakdown">
+            <h2 class="text-center mb-4">
+                <i class="bi bi-calculator me-3"></i>
+                Investimento Total
+            </h2>
+            
+            <div class="cost-item">
+                <span>Fase 1 - MVP Sistema Core</span>
+                <span><strong>R$ 45.000</strong></span>
+            </div>
+            
+            <div class="cost-item">
+                <span>Fase 2 - Funcionalidades Avançadas</span>
+                <span><strong>R$ 32.000</strong></span>
+            </div>
+            
+            <div class="cost-item">
+                <span>Fase 3 - Aplicativo Mobile</span>
+                <span><strong>R$ 28.000</strong></span>
+            </div>
+            
+            <div class="cost-item">
+                <span>Fase 4 - IA e Monitoramento</span>
+                <span><strong>R$ 35.000</strong></span>
+            </div>
+            
+            <div class="cost-item">
+                <span>Infraestrutura e Ferramentas</span>
+                <span><strong>R$ 8.000</strong></span>
+            </div>
+            
+            <div class="cost-item">
+                <span>Treinamento e Documentação</span>
+                <span><strong>R$ 12.000</strong></span>
+            </div>
+            
+            <div class="cost-item">
+                <span><i class="bi bi-arrow-up-circle me-2"></i>INVESTIMENTO TOTAL</span>
+                <span><strong>R$ 160.000</strong></span>
+            </div>
+            
+            <div class="text-center mt-4">
+                <p class="mb-0">💰 <strong>ROI projetado:</strong> R$ 204.000/ano de economia</p>
+                <p><strong>Payback:</strong> 9,4 meses</p>
+            </div>
+        </div> -->
+
+        <!-- Métricas de Sucesso -->
+        <div class="plan-section">
+            <h2 class="section-title">
+                <i class="bi bi-target"></i>
+                Métricas de Sucesso
+            </h2>
+            <p class="section-subtitle">
+                KPIs para medir o impacto e valor entregue pelo sistema
+            </p>
+            
+            <div class="success-metrics">
+                <div class="metric-card">
+                    <div class="metric-value">80%</div>
+                    <div class="metric-label">Redução no tempo de localização</div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-value">100%</div>
+                    <div class="metric-label">Precisão do inventário</div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-value">90%</div>
+                    <div class="metric-label">Satisfação dos usuários</div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-value">60%</div>
+                    <div class="metric-label">Redução de perdas</div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-value">40h</div>
+                    <div class="metric-label">Economia mensal em horas</div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-value">99.5%</div>
+                    <div class="metric-label">Disponibilidade do sistema</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Próximos Passos -->
+        <!-- <div class="next-steps">
+            <h2 class="mb-4">
+                <i class="bi bi-rocket-takeoff me-3"></i>
+                Próximos Passos
+            </h2>
+            <p class="lead mb-4">
+                Estamos prontos para iniciar a transformação digital do seu patrimônio
+            </p>
+            <div class="d-flex justify-content-center flex-wrap">
+                <a href="#" class="cta-button" onclick="scheduleKickoff()">
+                    <i class="bi bi-calendar-plus me-2"></i>
+                    Agendar Kick-off
+                </a>
+                <a href="#" class="cta-button" onclick="requestContract()">
+                    <i class="bi bi-file-text me-2"></i>
+                    Solicitar Contrato
+                </a>
+                <a href="#" class="cta-button" onclick="setupInfrastructure()">
+                    <i class="bi bi-gear me-2"></i>
+                    Preparar Ambiente
+                </a>
+            </div> -->
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Funções de interação
+        function scheduleKickoff() {
+            alert('📅 Agendamento do Kick-off\n\nVamos agendar uma reunião para:\n• Definir equipe do projeto\n• Alinhar expectativas\n• Estabelecer cronograma detalhado\n• Configurar ambientes de desenvolvimento\n• Definir metodologia de trabalho');
+        }
+        
+        function requestContract() {
+            alert('📋 Solicitação de Contrato\n\nO contrato incluirá:\n• Escopo detalhado de cada fase\n• Cronograma com marcos\n• Valores e forma de pagamento\n• SLAs e garantias\n• Critérios de aceitação\n• Propriedade intelectual');
+        }
+        
+        function setupInfrastructure() {
+            alert('⚙️ Preparação do Ambiente\n\nPreparativos necessários:\n• Definir servidores/cloud\n• Configurar repositórios Git\n• Estabelecer pipelines CI/CD\n• Configurar ambientes (dev/test/prod)\n• Definir políticas de backup\n• Configurar monitoramento');
+        }
+        
+        // Animações e interatividade
+        document.addEventListener('DOMContentLoaded', function() {
+            // Animação do progresso da timeline
+            const progressBar = document.querySelector('.timeline-progress');
+            let progress = 0;
+            const targetProgress = 30;
+            
+            const animateProgress = () => {
+                if (progress < targetProgress) {
+                    progress += 1;
+                    progressBar.style.width = progress + '%';
+                    setTimeout(animateProgress, 50);
+                }
+            };
+            
+            // Inicia animação quando a timeline fica visível
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        animateProgress();
+                        observer.unobserve(entry.target);
+                    }
+                });
+            });
+            
+            const timeline = document.querySelector('.timeline-visual');
+            if (timeline) {
+                observer.observe(timeline);
+            }
+            
+            // Efeito hover nos cards de fase
+            document.querySelectorAll('.phase-card').forEach(card => {
+                card.addEventListener('mouseenter', function() {
+                    this.style.transform = 'translateY(-8px) scale(1.02)';
+                });
+                
+                card.addEventListener('mouseleave', function() {
+                    this.style.transform = 'translateY(0) scale(1)';
+                });
+            });
+            
+            // Contador animado para métricas
+            const animateCounters = () => {
+                document.querySelectorAll('.metric-value, .stat-value').forEach(counter => {
+                    const target = counter.textContent;
+                    const numericTarget = parseInt(target.replace(/[^\d]/g, ''));
+                    
+                    if (!isNaN(numericTarget) && numericTarget > 0) {
+                        let current = 0;
+                        const increment = numericTarget / 50;
+                        
+                        const updateCounter = () => {
+                            if (current < numericTarget) {
+                                current += increment;
+                                const displayValue = Math.floor(current);
+                                counter.textContent = target.replace(/\d+/, displayValue);
+                                setTimeout(updateCounter, 40);
+                            } else {
+                                counter.textContent = target;
+                            }
+                        };
+                        
+                        // Inicia animação quando visível
+                        const counterObserver = new IntersectionObserver((entries) => {
+                            entries.forEach(entry => {
+                                if (entry.isIntersecting) {
+                                    updateCounter();
+                                    counterObserver.unobserve(entry.target);
+                                }
+                            });
+                        });
+                        
+                        counterObserver.observe(counter);
+                    }
+                });
+            };
+            
+            animateCounters();
+            
+            // Efeito de revelação para seções
+            const revealObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.style.opacity = '1';
+                        entry.target.style.transform = 'translateY(0)';
+                    }
+                });
+            }, { threshold: 0.1 });
+            
+            document.querySelectorAll('.plan-section').forEach(section => {
+                section.style.opacity = '0';
+                section.style.transform = 'translateY(50px)';
+                section.style.transition = 'all 0.8s ease';
+                revealObserver.observe(section);
+            });
+            
+            // Tooltip para elementos informativos
+            const addTooltips = () => {
+                document.querySelectorAll('[data-tooltip]').forEach(element => {
+                    element.addEventListener('mouseenter', function(e) {
+                        const tooltip = document.createElement('div');
+                        tooltip.className = 'custom-tooltip';
+                        tooltip.textContent = this.getAttribute('data-tooltip');
+                        tooltip.style.cssText = `
+                            position: absolute;
+                            background: #333;
+                            color: white;
+                            padding: 8px 12px;
+                            border-radius: 4px;
+                            font-size: 12px;
+                            z-index: 1000;
+                            pointer-events: none;
+                            white-space: nowrap;
+                        `;
+                        document.body.appendChild(tooltip);
+                        
+                        const updatePosition = (e) => {
+                            tooltip.style.left = e.pageX + 10 + 'px';
+                            tooltip.style.top = e.pageY - 30 + 'px';
+                        };
+                        
+                        updatePosition(e);
+                        this.addEventListener('mousemove', updatePosition);
+                        
+                        this.addEventListener('mouseleave', () => {
+                            tooltip.remove();
+                        }, { once: true });
+                    });
+                });
+            };
+            
+            addTooltips();
+        });
+        
+        // Função para mostrar detalhes de uma fase
+        function showPhaseDetails(phaseNumber) {
+            const phases = {
+                1: {
+                    title: "Fase 1 - MVP Sistema Core",
+                    details: `
+                        <h5>Objetivos:</h5>
+                        <ul>
+                            <li>Estabelecer a base arquitetural do sistema</li>
+                            <li>Migrar dados existentes para estrutura relacional</li>
+                            <li>Implementar funcionalidades básicas de CRUD</li>
+                            <li>Garantir integração com script PowerShell atual</li>
+                        </ul>
+                        
+                        <h5>Tecnologias:</h5>
+                        <ul>
+                            <li>Backend: Spring Boot 3.2, Spring Security, JPA/Hibernate</li>
+                            <li>Frontend: Vue.js 3, Composition API, Vuetify</li>
+                            <li>Database: MySQL 8.0, Flyway migrations</li>
+                            <li>Infraestrutura: Docker, Docker Compose</li>
+                        </ul>
+                        
+                        <h5>Critérios de Aceite:</h5>
+                        <ul>
+                            <li>✅ Sistema funcionando com dados migrados</li>
+                            <li>✅ Interface responsiva e intuitiva</li>
+                            <li>✅ Script PowerShell integrado via API</li>
+                            <li>✅ Autenticação básica funcionando</li>
+                        </ul>
+                    `
+                },
+                2: {
+                    title: "Fase 2 - Funcionalidades Avançadas",
+                    details: `
+                        <h5>Objetivos:</h5>
+                        <ul>
+                            <li>Implementar sistema completo de permissões</li>
+                            <li>Desenvolver módulo de suporte técnico</li>
+                            <li>Criar sistema de comodatos</li>
+                            <li>Implementar relatórios avançados</li>
+                        </ul>
+                        
+                        <h5>Funcionalidades:</h5>
+                        <ul>
+                            <li>RBAC com perfis granulares</li>
+                            <li>Módulo de credenciais e acesso remoto</li>
+                            <li>Controle de empréstimos e devoluções</li>
+                            <li>Geração de relatórios PDF/Excel</li>
+                        </ul>
+                        
+                        <h5>Critérios de Aceite:</h5>
+                        <ul>
+                            <li>✅ Sistema de permissões operacional</li>
+                            <li>✅ Módulo de suporte completo</li>
+                            <li>✅ Comodatos com alertas automáticos</li>
+                            <li>✅ Relatórios customizáveis</li>
+                        </ul>
+                    `
+                }
+            };
+            
+            const phase = phases[phaseNumber];
+            if (phase) {
+                alert(`${phase.title}\n\n${phase.details.replace(/<[^>]*>/g, '').replace(/&[^;]*;/g, '')}`);
+            }
+        }
+        
+        // Adicionar event listeners para cards de fase
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.phase-card').forEach((card, index) => {
+                card.addEventListener('click', () => showPhaseDetails(index + 1));
+                card.style.cursor = 'pointer';
+                
+                // Adicionar indicador visual de que é clicável
+                const clickHint = document.createElement('div');
+                clickHint.innerHTML = '<i class="bi bi-info-circle"></i> Clique para mais detalhes';
+                clickHint.style.cssText = `
+                    position: absolute;
+                    top: 10px;
+                    right: 15px;
+                    font-size: 12px;
+                    color: #6c757d;
+                    opacity: 0;
+                    transition: opacity 0.3s ease;
+                `;
+                card.appendChild(clickHint);
+                
+                card.addEventListener('mouseenter', () => {
+                    clickHint.style.opacity = '1';
+                });
+                
+                card.addEventListener('mouseleave', () => {
+                    clickHint.style.opacity = '0';
+                });
+            });
+        });
+    </script>
+</body>
+</html>

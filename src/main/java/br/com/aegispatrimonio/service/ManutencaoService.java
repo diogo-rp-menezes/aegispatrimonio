@@ -1,19 +1,24 @@
 package br.com.aegispatrimonio.service;
 
+import br.com.aegispatrimonio.dto.request.ManutencaoCancelDTO;
+import br.com.aegispatrimonio.dto.request.ManutencaoConclusaoDTO;
+import br.com.aegispatrimonio.dto.request.ManutencaoInicioDTO;
 import br.com.aegispatrimonio.dto.request.ManutencaoRequestDTO;
 import br.com.aegispatrimonio.dto.response.ManutencaoResponseDTO;
+import br.com.aegispatrimonio.exception.ResourceConflictException;
+import br.com.aegispatrimonio.exception.ResourceNotFoundException;
 import br.com.aegispatrimonio.model.*;
 import br.com.aegispatrimonio.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -27,24 +32,28 @@ public class ManutencaoService {
     private final FornecedorRepository fornecedorRepository;
     private final PessoaRepository pessoaRepository;
 
-    private static final List<StatusManutencao> STATUS_PENDENTES = List.of(
-            StatusManutencao.SOLICITADA,
-            StatusManutencao.APROVADA,
-            StatusManutencao.EM_ANDAMENTO
-    );
-
     @Transactional
     public ManutencaoResponseDTO criar(ManutencaoRequestDTO request) {
         log.info("Criando nova manutenção para ativo ID: {}", request.getAtivoId());
-        validarManutencao(request);
         Manutencao manutencao = convertToEntity(request);
-        return convertToResponseDTO(manutencaoRepository.save(manutencao));
+        Manutencao savedManutencao = manutencaoRepository.save(manutencao);
+        return convertToResponseDTO(savedManutencao);
     }
 
     @Transactional(readOnly = true)
     public Optional<ManutencaoResponseDTO> buscarPorId(Long id) {
         log.debug("Buscando manutenção ID: {}", id);
         return manutencaoRepository.findById(id).map(this::convertToResponseDTO);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ManutencaoResponseDTO> listar(Long ativoId, StatusManutencao status, TipoManutencao tipo, Long solicitanteId, Long fornecedorId,
+                                              LocalDate dataSolicitacaoInicio, LocalDate dataSolicitacaoFim, LocalDate dataConclusaoInicio,
+                                              LocalDate dataConclusaoFim, Pageable pageable) {
+        log.debug("Listando manutenções com filtros");
+        Specification<Manutencao> spec = ManutencaoSpecification.build(ativoId, status, tipo, solicitanteId, fornecedorId,
+                dataSolicitacaoInicio, dataSolicitacaoFim, dataConclusaoInicio, dataConclusaoFim);
+        return manutencaoRepository.findAll(spec, pageable).map(this::convertToResponseDTO);
     }
 
     @Transactional
@@ -57,13 +66,13 @@ public class ManutencaoService {
     }
 
     @Transactional
-    public ManutencaoResponseDTO iniciar(Long id, Long tecnicoId) {
+    public ManutencaoResponseDTO iniciar(Long id, ManutencaoInicioDTO inicioDTO) {
         log.info("Iniciando manutenção ID: {}", id);
         Manutencao manutencao = buscarEntidadePorId(id);
         validarStatus(manutencao, StatusManutencao.APROVADA, "iniciada");
 
-        Pessoa tecnico = pessoaRepository.findById(tecnicoId)
-                .orElseThrow(() -> new RuntimeException("Técnico não encontrado: " + tecnicoId));
+        Pessoa tecnico = pessoaRepository.findById(inicioDTO.getTecnicoId())
+                .orElseThrow(() -> new ResourceNotFoundException("Técnico não encontrado com ID: " + inicioDTO.getTecnicoId()));
 
         Ativo ativo = manutencao.getAtivo();
         ativo.setStatus(StatusAtivo.EM_MANUTENCAO);
@@ -77,7 +86,7 @@ public class ManutencaoService {
     }
 
     @Transactional
-    public ManutencaoResponseDTO concluir(Long id, String descricaoServico, BigDecimal custoReal, Integer tempoExecucao) {
+    public ManutencaoResponseDTO concluir(Long id, ManutencaoConclusaoDTO conclusaoDTO) {
         log.info("Concluindo manutenção ID: {}", id);
         Manutencao manutencao = buscarEntidadePorId(id);
         validarStatus(manutencao, StatusManutencao.EM_ANDAMENTO, "concluída");
@@ -87,22 +96,21 @@ public class ManutencaoService {
         ativoRepository.save(ativo);
 
         manutencao.setStatus(StatusManutencao.CONCLUIDA);
-        manutencao.setDescricaoServico(descricaoServico);
-        manutencao.setCustoReal(custoReal);
-        manutencao.setTempoExecucaoMinutos(tempoExecucao);
+        manutencao.setDescricaoServico(conclusaoDTO.getDescricaoServico());
+        manutencao.setCustoReal(conclusaoDTO.getCustoReal());
+        manutencao.setTempoExecucaoMinutos(conclusaoDTO.getTempoExecucao());
         manutencao.setDataConclusao(LocalDate.now());
 
         return convertToResponseDTO(manutencaoRepository.save(manutencao));
     }
 
     @Transactional
-    public ManutencaoResponseDTO cancelar(Long id, String motivo) {
+    public ManutencaoResponseDTO cancelar(Long id, ManutencaoCancelDTO cancelDTO) {
         log.info("Cancelando manutenção ID: {}", id);
         Manutencao manutencao = buscarEntidadePorId(id);
 
-        if (manutencao.getStatus() == StatusManutencao.CONCLUIDA ||
-            manutencao.getStatus() == StatusManutencao.CANCELADA) {
-            throw new RuntimeException("Manutenção já concluída ou cancelada");
+        if (manutencao.getStatus() == StatusManutencao.CONCLUIDA || manutencao.getStatus() == StatusManutencao.CANCELADA) {
+            throw new ResourceConflictException("Manutenção já foi concluída ou cancelada e não pode ser alterada.");
         }
 
         if (manutencao.getStatus() == StatusManutencao.EM_ANDAMENTO) {
@@ -112,7 +120,7 @@ public class ManutencaoService {
         }
 
         manutencao.setStatus(StatusManutencao.CANCELADA);
-        manutencao.setObservacoes(motivo);
+        manutencao.setObservacoes(cancelDTO.getMotivo());
 
         return convertToResponseDTO(manutencaoRepository.save(manutencao));
     }
@@ -120,137 +128,52 @@ public class ManutencaoService {
     @Transactional
     public void deletar(Long id) {
         log.info("Deletando manutenção ID: {}", id);
-        Manutencao manutencao = buscarEntidadePorId(id);
-        manutencaoRepository.delete(manutencao);
+        if (!manutencaoRepository.existsById(id)) {
+            throw new ResourceNotFoundException("Manutenção não encontrada com ID: " + id);
+        }
+        manutencaoRepository.deleteById(id);
     }
 
     @Transactional(readOnly = true)
     public BigDecimal custoTotalPorAtivo(Long ativoId) {
         log.debug("Calculando custo total para ativo ID: {}", ativoId);
+        if (!ativoRepository.existsById(ativoId)) {
+            throw new ResourceNotFoundException("Ativo não encontrado com ID: " + ativoId);
+        }
         BigDecimal custoTotal = manutencaoRepository.findCustoTotalManutencaoPorAtivo(ativoId);
         return custoTotal != null ? custoTotal : BigDecimal.ZERO;
     }
 
-    // Métodos paginados
-    @Transactional(readOnly = true)
-    public Page<ManutencaoResponseDTO> listar(Pageable pageable) {
-        log.debug("Listando manutenções paginadas");
-        return manutencaoRepository.findAll(pageable)
-                .map(this::convertToResponseDTO);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<ManutencaoResponseDTO> listarPorAtivo(Long ativoId, Pageable pageable) {
-        log.debug("Listando manutenções por ativo ID: {}", ativoId);
-        return manutencaoRepository.findByAtivoId(ativoId, pageable)
-                .map(this::convertToResponseDTO);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<ManutencaoResponseDTO> listarPorStatus(StatusManutencao status, Pageable pageable) {
-        log.debug("Listando manutenções por status: {}", status);
-        return manutencaoRepository.findByStatus(status, pageable)
-                .map(this::convertToResponseDTO);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<ManutencaoResponseDTO> listarPorTipo(TipoManutencao tipo, Pageable pageable) {
-        log.debug("Listando manutenções por tipo: {}", tipo);
-        return manutencaoRepository.findByTipo(tipo, pageable)
-                .map(this::convertToResponseDTO);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<ManutencaoResponseDTO> listarPorSolicitante(Long solicitanteId, Pageable pageable) {
-        log.debug("Listando manutenções por solicitante ID: {}", solicitanteId);
-        return manutencaoRepository.findBySolicitanteId(solicitanteId, pageable)
-                .map(this::convertToResponseDTO);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<ManutencaoResponseDTO> listarPorFornecedor(Long fornecedorId, Pageable pageable) {
-        log.debug("Listando manutenções por fornecedor ID: {}", fornecedorId);
-        return manutencaoRepository.findByFornecedorId(fornecedorId, pageable)
-                .map(this::convertToResponseDTO);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<ManutencaoResponseDTO> listarPorPeriodoSolicitacao(LocalDate inicio, LocalDate fim, Pageable pageable) {
-        log.debug("Listando manutenções por período de solicitação: {} a {}", inicio, fim);
-        return manutencaoRepository.findByDataSolicitacaoBetween(inicio, fim, pageable)
-                .map(this::convertToResponseDTO);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<ManutencaoResponseDTO> listarPorPeriodoConclusao(LocalDate inicio, LocalDate fim, Pageable pageable) {
-        log.debug("Listando manutenções por período de conclusão: {} a {}", inicio, fim);
-        return manutencaoRepository.findByDataConclusaoBetween(inicio, fim, pageable)
-                .map(this::convertToResponseDTO);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<ManutencaoResponseDTO> listarPendentes(Pageable pageable) {
-        log.debug("Listando manutenções pendentes");
-        return manutencaoRepository.findByStatusIn(STATUS_PENDENTES, pageable)
-                .map(this::convertToResponseDTO);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<ManutencaoResponseDTO> listarPendentesPorAtivo(Long ativoId, Pageable pageable) {
-        log.debug("Listando manutenções pendentes por ativo ID: {}", ativoId);
-        return manutencaoRepository.findByAtivoIdAndStatusIn(ativoId, STATUS_PENDENTES, pageable)
-                .map(this::convertToResponseDTO);
-    }
-
-    // Métodos auxiliares
     private Manutencao buscarEntidadePorId(Long id) {
         return manutencaoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Manutenção não encontrada: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Manutenção não encontrada com ID: " + id));
     }
 
     private void validarStatus(Manutencao manutencao, StatusManutencao statusEsperado, String acao) {
         if (manutencao.getStatus() != statusEsperado) {
-            throw new RuntimeException("Manutenção não pode ser " + acao + ". Status atual: " + manutencao.getStatus());
-        }
-    }
-
-    private void validarManutencao(ManutencaoRequestDTO request) {
-        if (!ativoRepository.existsById(request.getAtivoId())) {
-            throw new RuntimeException("Ativo não encontrado: " + request.getAtivoId());
-        }
-        if (!pessoaRepository.existsById(request.getSolicitanteId())) {
-            throw new RuntimeException("Solicitante não encontrado: " + request.getSolicitanteId());
-        }
-        if (request.getFornecedorId() != null && !fornecedorRepository.existsById(request.getFornecedorId())) {
-            throw new RuntimeException("Fornecedor não encontrado: " + request.getFornecedorId());
-        }
-        if (request.getTecnicoResponsavelId() != null && !pessoaRepository.existsById(request.getTecnicoResponsavelId())) {
-            throw new RuntimeException("Técnico não encontrado: " + request.getTecnicoResponsavelId());
+            throw new ResourceConflictException("A manutenção não pode ser " + acao + " pois seu status atual é '" + manutencao.getStatus() + "' e o esperado era '" + statusEsperado + "'.");
         }
     }
 
     private Manutencao convertToEntity(ManutencaoRequestDTO request) {
-        Manutencao manutencao = new Manutencao();
+        Ativo ativo = ativoRepository.findById(request.getAtivoId())
+                .orElseThrow(() -> new ResourceNotFoundException("Ativo não encontrado com ID: " + request.getAtivoId()));
 
-        manutencao.setAtivo(ativoRepository.findById(request.getAtivoId())
-                .orElseThrow(() -> new RuntimeException("Ativo não encontrado")));
+        Pessoa solicitante = pessoaRepository.findById(request.getSolicitanteId())
+                .orElseThrow(() -> new ResourceNotFoundException("Solicitante não encontrado com ID: " + request.getSolicitanteId()));
 
-        manutencao.setSolicitante(pessoaRepository.findById(request.getSolicitanteId())
-                .orElseThrow(() -> new RuntimeException("Solicitante não encontrado")));
-
+        Fornecedor fornecedor = null;
         if (request.getFornecedorId() != null) {
-            manutencao.setFornecedor(fornecedorRepository.findById(request.getFornecedorId())
-                    .orElseThrow(() -> new RuntimeException("Fornecedor não encontrado")));
+            fornecedor = fornecedorRepository.findById(request.getFornecedorId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Fornecedor não encontrado com ID: " + request.getFornecedorId()));
         }
 
-        if (request.getTecnicoResponsavelId() != null) {
-            manutencao.setTecnicoResponsavel(pessoaRepository.findById(request.getTecnicoResponsavelId())
-                    .orElseThrow(() -> new RuntimeException("Técnico não encontrado")));
-        }
-
+        Manutencao manutencao = new Manutencao();
+        manutencao.setAtivo(ativo);
+        manutencao.setSolicitante(solicitante);
+        manutencao.setFornecedor(fornecedor);
         manutencao.setTipo(request.getTipo());
         manutencao.setDescricaoProblema(request.getDescricaoProblema());
-        manutencao.setDescricaoServico(request.getDescricaoServico());
         manutencao.setCustoEstimado(request.getCustoEstimado());
         manutencao.setDataPrevistaConclusao(request.getDataPrevistaConclusao());
         manutencao.setObservacoes(request.getObservacoes());
@@ -260,7 +183,6 @@ public class ManutencaoService {
 
     private ManutencaoResponseDTO convertToResponseDTO(Manutencao manutencao) {
         ManutencaoResponseDTO dto = new ManutencaoResponseDTO();
-
         dto.setId(manutencao.getId());
         dto.setAtivoId(manutencao.getAtivo().getId());
         dto.setAtivoNome(manutencao.getAtivo().getNome());

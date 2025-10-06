@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arquitetura Técnica - Sistema Galois</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+	<link rel="icon" href="favicon.ico" type="image/x-icon">
+    <style>
+        :root {
+            --galois-primary: #1a3e72;
+            --galois-secondary: #2a5da6;
+            --galois-accent: #f57c00;
+            --galois-success: #28a745;
+            --galois-danger: #AD2831;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            line-height: 1.6;
+        }
+        
+        .architecture-header {
+            background: linear-gradient(135deg, var(--galois-primary), var(--galois-secondary));
+            color: white;
+            padding: 3rem 0;
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+        
+        .architecture-section {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            padding: 3rem;
+            margin-bottom: 3rem;
+        }
+        
+        .section-title {
+            color: var(--galois-primary);
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .section-subtitle {
+            color: #6c757d;
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .architecture-diagram {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .current-architecture {
+            border-left: 5px solid var(--galois-danger);
+        }
+        
+        .future-architecture {
+            border-left: 5px solid var(--galois-success);
+        }
+        
+        .arch-component {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+        
+        .arch-component:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        }
+        
+        .arch-component.frontend {
+            border-color: #007bff;
+            background: linear-gradient(135deg, #ffffff, #e3f2fd);
+        }
+        
+        .arch-component.backend {
+            border-color: var(--galois-success);
+            background: linear-gradient(135deg, #ffffff, #e8f5e8);
+        }
+        
+        .arch-component.database {
+            border-color: var(--galois-accent);
+            background: linear-gradient(135deg, #ffffff, #fff3e0);
+        }
+        
+        .arch-component.infrastructure {
+            border-color: var(--galois-secondary);
+            background: linear-gradient(135deg, #ffffff, #e3f2fd);
+        }
+        
+        .component-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .component-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        
+        .component-description {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+        
+        .tech-stack {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+        
+        .tech-item {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .tech-item:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        
+        .tech-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        
+        .tech-name {
+            font-weight: 600;
+            color: var(--galois-primary);
+            margin-bottom: 0.5rem;
+        }
+        
+        .tech-version {
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+        
+        .flow-diagram {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+        
+        .flow-step {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+            min-width: 150px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            position: relative;
+        }
+        
+        .flow-step::after {
+            content: '→';
+            position: absolute;
+            right: -2rem;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 2rem;
+            color: var(--galois-accent);
+            font-weight: bold;
+        }
+        
+        .flow-step:last-child::after {
+            display: none;
+        }
+        
+        .comparison-table {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .comparison-table th {
+            background: var(--galois-primary);
+            color: white;
+            padding: 1.5rem;
+            text-align: center;
+            font-weight: 600;
+        }
+        
+        .comparison-table td {
+            padding: 1.5rem;
+            text-align: center;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .comparison-table tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .feature-positive {
+            color: var(--galois-success);
+            font-weight: 600;
+        }
+        
+        .feature-negative {
+            color: var(--galois-danger);
+            font-weight: 600;
+        }
+        
+        .feature-neutral {
+            color: #6c757d;
+        }
+        
+        .deployment-timeline {
+            position: relative;
+            padding: 2rem 0;
+        }
+        
+        .timeline-line {
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: linear-gradient(to bottom, var(--galois-accent), var(--galois-secondary));
+            transform: translateX(-50%);
+        }
+        
+        .timeline-step {
+            display: flex;
+            align-items: center;
+            margin-bottom: 3rem;
+            position: relative;
+        }
+        
+        .timeline-step:nth-child(even) {
+            flex-direction: row-reverse;
+        }
+        
+        .timeline-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 45%;
+            margin: 0 2rem;
+        }
+        
+        .timeline-marker {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: var(--galois-accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+            font-weight: bold;
+            z-index: 10;
+            position: relative;
+        }
+        
+        .security-features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+        
+        .security-item {
+            background: linear-gradient(135deg, #ffffff, #f8f9fa);
+            padding: 2rem;
+            border-radius: 12px;
+            text-align: center;
+            border: 2px solid #e9ecef;
+            transition: all 0.3s ease;
+        }
+        
+        .security-item:hover {
+            border-color: var(--galois-accent);
+            transform: translateY(-4px);
+        }
+        
+        .security-icon {
+            font-size: 2.5rem;
+            color: var(--galois-danger);
+            margin-bottom: 1rem;
+        }
+        
+        @media (max-width: 768px) {
+            .flow-diagram {
+                flex-direction: column;
+            }
+            
+            .flow-step::after {
+                content: '↓';
+                right: 50%;
+                top: 100%;
+                transform: translateX(50%);
+            }
+            
+            .timeline-step {
+                flex-direction: column !important;
+            }
+            
+            .timeline-content {
+                width: 90%;
+                margin: 1rem 0;
+            }
+            
+            .timeline-line {
+                left: 30px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="architecture-header">
+        <div class="container">
+            <h1 class="display-4 mb-3">
+                <i class="bi bi-diagram-3"></i>
+                Arquitetura Técnica
+            </h1>
+            <p class="lead">Evolução do Sistema de Gestão Patrimonial</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Comparação Arquitetural -->
+        <div class="architecture-section">
+            <h2 class="section-title">
+                <i class="bi bi-arrow-left-right"></i>
+                Evolução Arquitetural
+            </h2>
+            <p class="section-subtitle">
+                Migração da arquitetura atual para uma solução enterprise moderna
+            </p>
+            
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="architecture-diagram current-architecture">
+                        <h4 class="text-danger mb-3">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            Arquitetura Atual (Protótipo)
+                        </h4>
+                        
+                        <div class="arch-component frontend">
+                            <i class="bi bi-window component-icon text-primary"></i>
+                            <div class="component-title">Frontend</div>
+                            <div class="component-description">HTML + Bootstrap + JavaScript</div>
+                        </div>
+                        
+                        <div class="arch-component backend">
+                            <i class="bi bi-server component-icon text-success"></i>
+                            <div class="component-title">Backend</div>
+                            <div class="component-description">Flask (Python) + Scripts PowerShell</div>
+                        </div>
+                        
+                        <div class="arch-component database">
+                            <i class="bi bi-file-earmark-text component-icon text-warning"></i>
+                            <div class="component-title">Dados</div>
+                            <div class="component-description">Arquivos JSON locais</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-6">
+                    <div class="architecture-diagram future-architecture">
+                        <h4 class="text-success mb-3">
+                            <i class="bi bi-check-circle"></i>
+                            Arquitetura Futura (Enterprise)
+                        </h4>
+                        
+                        <div class="arch-component frontend">
+                            <i class="bi bi-phone component-icon text-primary"></i>
+                            <div class="component-title">Frontend</div>
+                            <div class="component-description">Vue.js + Mobile App (React Native)</div>
+                        </div>
+                        
+                        <div class="arch-component backend">
+                            <i class="bi bi-gear-wide-connected component-icon text-success"></i>
+                            <div class="component-title">Backend</div>
+                            <div class="component-description">Spring Boot + Microservices</div>
+                        </div>
+                        
+                        <div class="arch-component database">
+                            <i class="bi bi-database component-icon text-warning"></i>
+                            <div class="component-title">Banco de Dados</div>
+                            <div class="component-description">MySQL + Redis Cache</div>
+                        </div>
+                        
+                        <div class="arch-component infrastructure">
+                            <i class="bi bi-cloud component-icon text-info"></i>
+                            <div class="component-title">Infraestrutura</div>
+                            <div class="component-description">Docker + CI/CD + Monitoramento</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stack Tecnológico -->
+        <div class="architecture-section">
+            <h2 class="section-title">
+                <i class="bi bi-stack"></i>
+                Stack Tecnológico Completo
+            </h2>
+            <p class="section-subtitle">
+                Tecnologias modernas para uma solução robusta e escalável
+            </p>
+            
+            <div class="tech-stack">
+                <div class="tech-item">
+                    <i class="bi bi-cup-hot tech-icon text-warning"></i>
+                    <div class="tech-name">Java</div>
+                    <div class="tech-version">OpenJDK 17+ LTS</div>
+                </div>
+                
+                <div class="tech-item">
+                    <i class="bi bi-leaf tech-icon text-success"></i>
+                    <div class="tech-name">Spring Boot</div>
+                    <div class="tech-version">v3.2+ com Security</div>
+                </div>
+                
+                <div class="tech-item">
+                    <i class="bi bi-palette tech-icon text-info"></i>
+                    <div class="tech-name">Vue.js</div>
+                    <div class="tech-version">v3 + Composition API</div>
+                </div>
+                
+                <div class="tech-item">
+                    <i class="bi bi-database tech-icon text-primary"></i>
+                    <div class="tech-name">MySQL</div>
+                    <div class="tech-version">v8.0+ com InnoDB</div>
+                </div>
+                
+                <div class="tech-item">
+                    <i class="bi bi-lightning tech-icon text-danger"></i>
+                    <div class="tech-name">Redis</div>
+                    <div class="tech-version">Cache + Sessions</div>
+                </div>
+                
+                <div class="tech-item">
+                    <i class="bi bi-box tech-icon text-secondary"></i>
+                    <div class="tech-name">Docker</div>
+                    <div class="tech-version">Containerização</div>
+                </div>
+                
+                <div class="tech-item">
+                    <i class="bi bi-shield-check tech-icon text-success"></i>
+                    <div class="tech-name">JWT + OAuth2</div>
+                    <div class="tech-version">Autenticação Segura</div>
+                </div>
+                
+                <div class="tech-item">
+                    <i class="bi bi-file-earmark-code tech-icon text-info"></i>
+                    <div class="tech-name">Swagger/OpenAPI</div>
+                    <div class="tech-version">Documentação API</div>
+                </div>
+                
+                <div class="tech-item">
+                    <i class="bi bi-phone tech-icon text-warning"></i>
+                    <div class="tech-name">React Native</div>
+                    <div class="tech-version">App Mobile</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fluxo de Dados -->
+        <div class="architecture-section">
+            <h2 class="section-title">
+                <i class="bi bi-arrow-right-circle"></i>
+                Fluxo de Dados e Integração
+            </h2>
+            <p class="section-subtitle">
+                Como os dados fluem através do sistema, desde a coleta até a apresentação
+            </p>
+            
+            <div class="flow-diagram">
+                <div class="flow-step">
+                    <i class="bi bi-laptop" style="font-size: 2rem; color: var(--galois-secondary);"></i>
+                    <h6>PowerShell Script</h6>
+                    <small>Coleta automática</small>
+                </div>
+                
+                <div class="flow-step">
+                    <i class="bi bi-cloud-upload" style="font-size: 2rem; color: var(--galois-accent);"></i>
+                    <h6>REST API</h6>
+                    <small>Spring Boot</small>
+                </div>
+                
+                <div class="flow-step">
+                    <i class="bi bi-database" style="font-size: 2rem; color: var(--galois-success);"></i>
+                    <h6>Persistência</h6>
+                    <small>MySQL + Redis</small>
+                </div>
+                
+                <div class="flow-step">
+                    <i class="bi bi-gear" style="font-size: 2rem; color: var(--galois-primary);"></i>
+                    <h6>Processamento</h6>
+                    <small>Business Logic</small>
+                </div>
+                
+                <div class="flow-step">
+                    <i class="bi bi-display" style="font-size: 2rem; color: var(--galois-danger);"></i>
+                    <h6>Visualização</h6>
+                    <small>Vue.js + Mobile</small>
+                </div>
+            </div>
+            
+            <div class="alert alert-info mt-4">
+                <i class="bi bi-info-circle me-2"></i>
+                <strong>Compatibilidade:</strong> O script PowerShell atual continuará funcionando, 
+                apenas enviando dados via API REST em vez de arquivos JSON.
+            </div>
+        </div>
+
+        <!-- Comparação de Recursos -->
+        <div class="architecture-section">
+            <h2 class="section-title">
+                <i class="bi bi-clipboard-check"></i>
+                Comparação: Atual vs Futuro
+            </h2>
+            
+            <div class="table-responsive">
+                <table class="comparison-table table">
+                    <thead>
+                        <tr>
+                            <th>Aspecto</th>
+                            <th>Sistema Atual</th>
+                            <th>Sistema Futuro</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Escalabilidade</strong></td>
+                            <td class="feature-negative">Limitada (single server)</td>
+                            <td class="feature-positive">Alta (microservices)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Segurança</strong></td>
+                            <td class="feature-neutral">Básica (AD simples)</td>
+                            <td class="feature-positive">Enterprise (JWT + OAuth2)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Performance</strong></td>
+                            <td class="feature-neutral">Média (arquivos JSON)</td>
+                            <td class="feature-positive">Alta (cache Redis)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Manutenibilidade</strong></td>
+                            <td class="feature-negative">Baixa (código monolítico)</td>
+                            <td class="feature-positive">Alta (padrões enterprise)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Mobilidade</strong></td>
+                            <td class="feature-negative">Apenas web desktop</td>
+                            <td class="feature-positive">Web + Mobile nativo</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Integração</strong></td>
+                            <td class="feature-negative">Limitada</td>
+                            <td class="feature-positive">APIs RESTful completas</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Monitoramento</strong></td>
+                            <td class="feature-negative">Manual</td>
+                            <td class="feature-positive">Automático + Alertas</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Backup/Recovery</strong></td>
+                            <td class="feature-negative">Manual (arquivos)</td>
+                            <td class="feature-positive">Automático (BD + Docker)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Segurança -->
+        <div class="architecture-section">
+            <h2 class="section-title">
+                <i class="bi bi-shield-lock"></i>
+                Segurança e Controle de Acesso
+            </h2>
+            <p class="section-subtitle">
+                Implementação de segurança enterprise com múltiplas camadas de proteção
+            </p>
+            
+            <div class="security-features">
+                <div class="security-item">
+                    <i class="bi bi-person-badge security-icon"></i>
+                    <h5>Autenticação</h5>
+                    <p>JWT Tokens + Integração Active Directory + Multi-factor Authentication</p>
+                </div>
+                
+                <div class="security-item">
+                    <i class="bi bi-key security-icon"></i>
+                    <h5>Autorização</h5>
+                    <p>RBAC (Role-Based Access Control) com níveis granulares de permissão</p>
+                </div>
+                
+                <div class="security-item">
+                    <i class="bi bi-file-earmark-lock security-icon"></i>
+                    <h5>Criptografia</h5>
+                    <p>TLS 1.3 para transmissão + AES-256 para dados sensíveis em repouso</p>
+                </div>
+                
+                <div class="security-item">
+                    <i class="bi bi-journal-text security-icon"></i>
+                    <h5>Auditoria</h5>
+                    <p>Log completo de todas as ações com timestamps e rastreabilidade</p>
+                </div>
+                
+                <div class="security-item">
+                    <i class="bi bi-shield-check security-icon"></i>
+                    <h5>Validação</h5>
+                    <p>Sanitização de inputs + proteção contra SQL Injection e XSS</p>
+                </div>
+                
+                <div class="security-item">
+                    <i class="bi bi-clock-history security-icon"></i>
+                    <h5>Sessões</h5>
+                    <p>Timeout automático + controle de sessões concorrentes</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Timeline de Implementação -->
+        <div class="architecture-section">
+            <h2 class="section-title">
+                <i class="bi bi-calendar-check"></i>
+                Timeline de Implementação
+            </h2>
+            <p class="section-subtitle">
+                Cronograma detalhado da migração com marcos e entregas
+            </p>
+            
+            <div class="deployment-timeline">
+                <div class="timeline-line"></div>
+                
+                <div class="timeline-step">
+                    <div class="timeline-content">
+                        <h4>Fase 1 - Fundação</h4>
+                        <p><strong>Duração:</strong> 6 meses</p>
+                        <ul>
+                            <li>Setup da infraestrutura Spring Boot</li>
+                            <li>Migração do banco de dados</li>
+                            <li>APIs básicas de CRUD</li>
+                            <li>Interface Vue.js MVP</li>
+                            <li>Integração com script PowerShell</li>
+                        </ul>
+                        <div class="badge bg-success">Core System</div>
+                    </div>
+                    <div class="timeline-marker">1</div>
+                </div>
+                
+                <div class="timeline-step">
+                    <div class="timeline-content">
+                        <h4>Fase 2 - Funcionalidades</h4>
+                        <p><strong>Duração:</strong> 4 meses</p>
+                        <ul>
+                            <li>Sistema de autenticação JWT</li>
+                            <li>Controle de permissões RBAC</li>
+                            <li>Módulo de suporte técnico</li>
+                            <li>Gestão de comodatos</li>
+                            <li>Relatórios avançados</li>
+                        </ul>
+                        <div class="badge bg-primary">Business Logic</div>
+                    </div>
+                    <div class="timeline-marker">2</div>
+                </div>
+                
+                <div class="timeline-step">
+                    <div class="timeline-content">
+                        <h4>Fase 3 - Mobile</h4>
+                        <p><strong>Duração:</strong> 4 meses</p>
+                        <ul>
+                            <li>Desenvolvimento app React Native</li>
+                            <li>Scanner QR Code integrado</li>
+                            <li>Sincronização offline</li>
+                            <li>Push notifications</li>
+                            <li>Testes em dispositivos</li>
+                        </ul>
+                        <div class="badge bg-info">Mobile Experience</div>
+                    </div>
+                    <div class="timeline-marker">3</div>
+                </div>
+                
+                <div class="timeline-step">
+                    <div class="timeline-content">
+                        <h4>Fase 4 - Inteligência</h4>
+                        <p><strong>Duração:</strong> 6 meses</p>
+                        <ul>
+                            <li>Monitoramento automático</li>
+                            <li>Alertas preditivos</li>
+                            <li>Dashboards executivos</li>
+                            <li>Integração com ferramentas de TI</li>
+                            <li>Machine Learning básico</li>
+                        </ul>
+                        <div class="badge bg-warning">AI & Analytics</div>
+                    </div>
+                    <div class="timeline-marker">4</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Infraestrutura e Deploy -->
+        <div class="architecture-section">
+            <h2 class="section-title">
+                <i class="bi bi-cloud-arrow-up"></i>
+                Infraestrutura e Deploy
+            </h2>
+            <p class="section-subtitle">
+                Estratégia de containerização e deployment para máxima confiabilidade
+            </p>
+            
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="card border-0 shadow">
+                        <div class="card-header bg-primary text-white">
+                            <h5><i class="bi bi-box me-2"></i>Containerização</h5>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-unstyled">
+                                <li class="mb-2">
+                                    <i class="bi bi-check-circle text-success me-2"></i>
+                                    <strong>Backend:</strong> Spring Boot em Alpine Linux
+                                </li>
+                                <li class="mb-2">
+                                    <i class="bi bi-check-circle text-success me-2"></i>
+                                    <strong>Frontend:</strong> Vue.js otimizado com Nginx
+                                </li>
+                                <li class="mb-2">
+                                    <i class="bi bi-check-circle text-success me-2"></i>
+                                    <strong>Database:</strong> MySQL 8.0 com volumes persistentes
+                                </li>
+                                <li class="mb-2">
+                                    <i class="bi bi-check-circle text-success me-2"></i>
+                                    <strong>Cache:</strong> Redis para sessions e cache
+                                </li>
+                                <li class="mb-2">
+                                    <i class="bi bi-check-circle text-success me-2"></i>
+                                    <strong>Proxy:</strong> Nginx como reverse proxy
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-6">
+                    <div class="card border-0 shadow">
+                        <div class="card-header bg-success text-white">
+                            <h5><i class="bi bi-arrow-clockwise me-2"></i>CI/CD Pipeline</h5>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-unstyled">
+                                <li class="mb-2">
+                                    <i class="bi bi-check-circle text-success me-2"></i>
+                                    <strong>Git:</strong> Versionamento com GitFlow
+                                </li>
+                                <li class="mb-2">
+                                    <i class="bi bi-check-circle text-success me-2"></i>
+                                    <strong>Build:</strong> Maven para Java + npm para Vue
+                                </li>
+                                <li class="mb-2">
+                                    <i class="bi bi-check-circle text-success me-2"></i>
+                                    <strong>Tests:</strong> JUnit + Mockito + Jest
+                                </li>
+                                <li class="mb-2">
+                                    <i class="bi bi-check-circle text-success me-2"></i>
+                                    <strong>Deploy:</strong> Docker Compose + Scripts
+                                </li>
+                                <li class="mb-2">
+                                    <i class="bi bi-check-circle text-success me-2"></i>
+                                    <strong>Monitor:</strong> Health checks automáticos
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="alert alert-info mt-4">
+                <i class="bi bi-lightbulb me-2"></i>
+                <strong>Ambiente de Desenvolvimento:</strong> Todo o stack pode ser executado localmente 
+                com um simples <code>docker-compose up</code>, facilitando o desenvolvimento e testes.
+            </div>
+        </div>
+
+        <!-- Métricas e Monitoramento -->
+        <div class="architecture-section">
+            <h2 class="section-title">
+                <i class="bi bi-graph-up"></i>
+                Monitoramento e Métricas
+            </h2>
+            <p class="section-subtitle">
+                Observabilidade completa do sistema com alertas proativos
+            </p>
+            
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="text-center p-4 bg-light rounded">
+                        <i class="bi bi-speedometer2" style="font-size: 3rem; color: var(--galois-primary);"></i>
+                        <h5 class="mt-3">Performance</h5>
+                        <p>Tempo de resposta, throughput, uso de recursos</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-center p-4 bg-light rounded">
+                        <i class="bi bi-heart-pulse" style="font-size: 3rem; color: var(--galois-success);"></i>
+                        <h5 class="mt-3">Health Checks</h5>
+                        <p>Status dos serviços, conectividade, disponibilidade</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-center p-4 bg-light rounded">
+                        <i class="bi bi-bell" style="font-size: 3rem; color: var(--galois-accent);"></i>
+                        <h5 class="mt-3">Alertas</h5>
+                        <p>Notificações automáticas por email/SMS/Slack</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Animate elements on scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Animate tech items
+            document.querySelectorAll('.tech-item, .arch-component, .security-item').forEach(el => {
+                el.style.opacity = '0';
+                el.style.transform = 'translateY(30px)';
+                el.style.transition = 'all 0.6s ease';
+                observer.observe(el);
+            });
+
+            // Animate timeline steps
+            document.querySelectorAll('.timeline-step').forEach((el, index) => {
+                el.style.opacity = '0';
+                el.style.transform = 'translateX(' + (index % 2 === 0 ? '-50px' : '50px') + ')';
+                el.style.transition = 'all 0.8s ease';
+                observer.observe(el);
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análise ROI - Sistema Galois</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+	<link rel="icon" href="favicon.ico" type="image/x-icon">
+    <style>
+        :root {
+            --galois-primary: #1a3e72;
+            --galois-secondary: #2a5da6;
+            --galois-accent: #f57c00;
+            --galois-success: #28a745;
+            --galois-danger: #AD2831;
+            --galois-warning: #ffc107;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            line-height: 1.6;
+        }
+        
+        .roi-header {
+            background: linear-gradient(135deg, var(--galois-success), #20c997);
+            color: white;
+            padding: 4rem 0;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .roi-header::before {
+            content: '💰';
+            position: absolute;
+            font-size: 15rem;
+            opacity: 0.1;
+            right: -5rem;
+            top: -2rem;
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        
+        .roi-section {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            padding: 3rem;
+            margin-bottom: 3rem;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .roi-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: linear-gradient(90deg, var(--galois-success), var(--galois-accent));
+        }
+        
+        .section-title {
+            color: var(--galois-primary);
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .section-subtitle {
+            color: #6c757d;
+            font-size: 1.2rem;
+            margin-bottom: 3rem;
+        }
+        
+        .benefit-card {
+            background: linear-gradient(135deg, #ffffff, #f8f9fa);
+            border: 2px solid #e9ecef;
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            transition: all 0.3s ease;
+            height: 100%;
+        }
+        
+        .benefit-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+            border-color: var(--galois-success);
+        }
+        
+        .benefit-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            color: white;
+            margin-bottom: 1.5rem;
+        }
+        
+        .benefit-icon.cost-reduction {
+            background: linear-gradient(135deg, var(--galois-success), #20c997);
+        }
+        
+        .benefit-icon.efficiency {
+            background: linear-gradient(135deg, var(--galois-primary), var(--galois-secondary));
+        }
+        
+        .benefit-icon.accuracy {
+            background: linear-gradient(135deg, var(--galois-accent), #ff9800);
+        }
+        
+        .benefit-icon.compliance {
+            background: linear-gradient(135deg, var(--galois-danger), #e57373);
+        }
+        
+        .benefit-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--galois-primary);
+            margin-bottom: 1rem;
+        }
+        
+        .benefit-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: var(--galois-success);
+            margin-bottom: 0.5rem;
+        }
+        
+        .benefit-description {
+            color: #6c757d;
+            margin-bottom: 1.5rem;
+        }
+        
+        .benefit-details {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1rem;
+        }
+        
+        .roi-calculator {
+            background: linear-gradient(135deg, var(--galois-primary), var(--galois-secondary));
+            color: white;
+            border-radius: 20px;
+            padding: 3rem;
+            margin: 3rem 0;
+        }
+        
+        .calculator-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .calculator-row:last-child {
+            border-bottom: none;
+            font-weight: bold;
+            font-size: 1.3rem;
+            margin-top: 1rem;
+            padding-top: 2rem;
+            border-top: 2px solid rgba(255,255,255,0.3);
+        }
+        
+        .calculator-label {
+            flex: 1;
+        }
+        
+        .calculator-value {
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+        
+        .payback-timeline {
+            background: linear-gradient(135deg, #ffffff, #f8f9fa);
+            border-radius: 16px;
+            padding: 2rem;
+            margin: 2rem 0;
+            position: relative;
+        }
+        
+        .timeline-chart {
+            height: 300px;
+            background: linear-gradient(to right, 
+                rgba(173, 40, 49, 0.1) 0%, 
+                rgba(173, 40, 49, 0.1) 47%, 
+                rgba(40, 167, 69, 0.1) 47%, 
+                rgba(40, 167, 69, 0.1) 100%
+            );
+            border-radius: 12px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 2rem 0;
+        }
+        
+        .timeline-marker {
+            position: absolute;
+            left: 47%;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: var(--galois-accent);
+        }
+        
+        .timeline-label {
+            position: absolute;
+            top: -30px;
+            left: 47%;
+            transform: translateX(-50%);
+            background: var(--galois-accent);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+        
+        .cost-phase {
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--galois-danger);
+            font-weight: bold;
+            padding-left: 2rem;
+        }
+        
+        .benefit-phase {
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--galois-success);
+            font-weight: bold;
+            padding-right: 2rem;
+        }
+        
+        .comparison-table {
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin: 2rem 0;
+        }
+        
+        .comparison-table th {
+            background: var(--galois-primary);
+            color: white;
+            padding: 1.5rem;
+            text-align: center;
+            font-weight: 600;
+        }
+        
+        .comparison-table td {
+            padding: 1.5rem;
+            text-align: center;
+            border-bottom: 1px solid #e9ecef;
+            vertical-align: middle;
+        }
+        
+        .comparison-table tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .current-cost {
+            color: var(--galois-danger);
+            font-weight: 600;
+        }
+        
+        .future-cost {
+            color: var(--galois-success);
+            font-weight: 600;
+        }
+        
+        .savings {
+            background: rgba(40, 167, 69, 0.1);
+            color: var(--galois-success);
+            font-weight: bold;
+        }
+        
+        .impact-metric {
+            text-align: center;
+            padding: 2rem;
+            background: linear-gradient(135deg, #ffffff, #f8f9fa);
+            border-radius: 16px;
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .impact-metric:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+        
+        .impact-number {
+            font-size: 3rem;
+            font-weight: bold;
+            color: var(--galois-primary);
+            margin-bottom: 0.5rem;
+        }
+        
+        .impact-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .impact-description {
+            color: var(--galois-primary);
+            font-weight: 600;
+            margin-top: 0.5rem;
+        }
+        
+        .intangible-benefits {
+            background: linear-gradient(135deg, var(--galois-accent), #ff9800);
+            color: white;
+            border-radius: 16px;
+            padding: 3rem;
+            margin: 3rem 0;
+        }
+        
+        .intangible-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+        }
+        
+        .intangible-icon {
+            font-size: 2rem;
+            width: 60px;
+            text-align: center;
+        }
+        
+        .conclusion-cta {
+            background: linear-gradient(135deg, var(--galois-primary), var(--galois-secondary));
+            color: white;
+            border-radius: 20px;
+            padding: 4rem 3rem;
+            text-align: center;
+            margin: 3rem 0;
+        }
+        
+        .cta-button {
+            background: white;
+            color: var(--galois-primary);
+            border: none;
+            padding: 1rem 3rem;
+            border-radius: 50px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin: 0.5rem;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            color: var(--galois-primary);
+        }
+        
+        @media (max-width: 768px) {
+            .calculator-row {
+                flex-direction: column;
+                gap: 0.5rem;
+                text-align: center;
+            }
+            
+            .timeline-chart {
+                height: 200px;
+            }
+            
+            .cost-phase, .benefit-phase {
+                position: static;
+                transform: none;
+                padding: 1rem;
+                text-align: center;
+                display: block;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="roi-header">
+        <div class="container">
+            <h1 class="display-3 mb-3">
+                <i class="bi bi-graph-up-arrow"></i>
+                Retorno sobre Investimento
+            </h1>
+            <p class="lead">Análise completa dos benefícios financeiros e estratégicos</p>
+            <!-- <div class="mt-4">
+                <span class="badge bg-light text-dark px-4 py-2 me-2">
+                    <i class="bi bi-currency-dollar me-2"></i>ROI 400%
+                </span>
+                <span class="badge bg-light text-dark px-4 py-2 me-2">
+                    <i class="bi bi-clock me-2"></i>Payback 9.4 meses
+                </span>
+                <span class="badge bg-light text-dark px-4 py-2">
+                    <i class="bi bi-trending-up me-2"></i>R$ 204k/ano economia
+                </span>
+            </div> -->
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Benefícios Principais -->
+        <div class="roi-section">
+            <h2 class="section-title">
+                <i class="bi bi-award"></i>
+                Benefícios Quantificáveis
+            </h2>
+            <p class="section-subtitle">
+                Impacto financeiro direto com base em métricas reais da operação
+            </p>
+            
+            <div class="row">
+                <div class="col-lg-6 col-md-6 mb-4">
+                    <div class="benefit-card">
+                        <div class="benefit-icon cost-reduction">
+                            <i class="bi bi-piggy-bank"></i>
+                        </div>
+                        <div class="benefit-title">Redução de Custos Operacionais</div>
+<!--                         <div class="benefit-value">R$ 99.000</div> -->
+                        <div class="benefit-description">Economia <!-- anual --> em processos manuais e retrabalho</div>
+                        <!-- <div class="benefit-details">
+                            <strong>Breakdown:</strong><br>
+                            • Controle manual: R$ 24.000<br>
+                            • Perdas/extravios: R$ 75.000
+                        </div> -->
+                    </div>
+                </div>
+                
+                <div class="col-lg-6 col-md-6 mb-4">
+                    <div class="benefit-card">
+                        <div class="benefit-icon efficiency">
+                            <i class="bi bi-speedometer2"></i>
+                        </div>
+                        <div class="benefit-title">Ganho de Eficiência</div>
+                        <!-- div class="benefit-value">R$ 80.000</div> -->
+                        <div class="benefit-description">Otimização de tempo da equipe de TI e administração</div>
+                        <!-- <div class="benefit-details">
+                            <strong>Breakdown:</strong><br>
+                            • Eficiência TI: R$ 45.000<br>
+                            • Manutenções preventivas: R$ 35.000
+                        </div> -->
+                    </div>
+                </div>
+                
+                <div class="col-lg-6 col-md-6 mb-4">
+                    <div class="benefit-card">
+                        <div class="benefit-icon accuracy">
+                            <i class="bi bi-bullseye"></i>
+                        </div>
+                        <div class="benefit-title">Precisão e Controle</div>
+<!--                         <div class="benefit-value">R$ 25.000</div> -->
+                        <div class="benefit-description">Conformidade regulatória e auditoria eficiente</div>
+                        <!-- <div class="benefit-details">
+                            <strong>Breakdown:</strong><br>
+                            • Auditoria: R$ 15.000<br>
+                            • Compliance: R$ 10.000
+                        </div> -->
+                    </div>
+                </div>
+                
+                <div class="col-lg-6 col-md-6 mb-4">
+                    <div class="benefit-card">
+                        <div class="benefit-icon compliance">
+                            <i class="bi bi-shield-check"></i>
+                        </div>
+                        <div class="benefit-title">Redução de Riscos</div>
+<!--                         <div class="benefit-value">Invalorável</div> -->
+                        <div class="benefit-description">Mitigação de riscos operacionais e de compliance</div>
+                        <!-- <div class="benefit-details">
+                            <strong>Impactos:</strong><br>
+                            • Eliminação de multas<br>
+                            • Proteção de dados sensíveis
+                        </div> -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Calculadora ROI -->
+        <!-- <div class="roi-calculator">
+            <h2 class="text-center mb-4">
+                <i class="bi bi-calculator me-3"></i>
+                Calculadora de ROI - Análise 3 Anos
+            </h2>
+            
+            <div class="calculator-row">
+                <div class="calculator-label">
+                    <i class="bi bi-arrow-down-circle me-2"></i>
+                    Investimento Inicial (Sistema Completo)
+                </div>
+                <div class="calculator-value">R$ 160.000</div>
+            </div>
+            
+            <div class="calculator-row">
+                <div class="calculator-label">
+                    <i class="bi bi-arrow-up-circle me-2"></i>
+                    Economia Anual Projetada
+                </div>
+                <div class="calculator-value">R$ 204.000</div>
+            </div>
+            
+            <div class="calculator-row">
+                <div class="calculator-label">
+                    <i class="bi bi-clock me-2"></i>
+                    Tempo de Payback
+                </div>
+                <div class="calculator-value">9,4 meses</div>
+            </div>
+            
+            <div class="calculator-row">
+                <div class="calculator-label">
+                    <i class="bi bi-graph-up me-2"></i>
+                    ROI Ano 1
+                </div>
+                <div class="calculator-value">127%</div>
+            </div>
+            
+            <div class="calculator-row">
+                <div class="calculator-label">
+                    <i class="bi bi-graph-up-arrow me-2"></i>
+                    ROI Acumulado 3 Anos
+                </div>
+                <div class="calculator-value">400%</div>
+            </div>
+            
+            <div class="calculator-row">
+                <div class="calculator-label">
+                    <i class="bi bi-currency-dollar me-2"></i>
+                    <strong>BENEFÍCIO LÍQUIDO 3 ANOS</strong>
+                </div>
+                <div class="calculator-value">R$ 452.000</div>
+            </div>
+        </div> -->
+
+        <!-- Timeline de Payback -->
+        <!-- <div class="roi-section">
+            <h2 class="section-title">
+                <i class="bi bi-clock-history"></i>
+                Timeline de Payback
+            </h2>
+            <p class="section-subtitle">
+                Visualização do ponto de equilíbrio e retorno do investimento
+            </p>
+            
+            <div class="payback-timeline">
+                <div class="timeline-chart">
+                    <div class="timeline-marker"></div>
+                    <div class="timeline-label">Breakeven<br>9,4 meses</div>
+                    <div class="cost-phase">
+                        <i class="bi bi-arrow-down-circle me-2"></i>
+                        INVESTIMENTO<br>
+                        <strong>R$ 160.000</strong>
+                    </div>
+                    <div class="benefit-phase">
+                        <i class="bi bi-arrow-up-circle me-2"></i>
+                        RETORNO<br>
+                        <strong>R$ 204.000/ano</strong>
+                    </div>
+                </div>
+                
+                <div class="row text-center mt-4">
+                    <div class="col-md-3">
+                        <div class="impact-metric">
+                            <div class="impact-number">3</div>
+                            <div class="impact-label">Meses</div>
+                            <div class="impact-description">Implementação MVP</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="impact-metric">
+                            <div class="impact-number">6</div>
+                            <div class="impact-label">Meses</div>
+                            <div class="impact-description">Primeiros Benefícios</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="impact-metric">
+                            <div class="impact-number">9.4</div>
+                            <div class="impact-label">Meses</div>
+                            <div class="impact-description">Ponto de Equilíbrio</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="impact-metric">
+                            <div class="impact-number">12</div>
+                            <div class="impact-label">Meses</div>
+                            <div class="impact-description">ROI Positivo</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div> -->
+
+        <!-- Comparação Atual vs Futuro -->
+        <!-- <div class="roi-section">
+            <h2 class="section-title">
+                <i class="bi bi-arrow-left-right"></i>
+                Comparação de Custos: Atual vs Futuro
+            </h2>
+            <p class="section-subtitle">
+                Análise detalhada dos custos operacionais antes e depois da implementação
+            </p>
+            
+            <div class="table-responsive">
+                <table class="comparison-table table">
+                    <thead>
+                        <tr>
+                            <th>Categoria</th>
+                            <th>Custo Atual (Anual)</th>
+                            <th>Custo Futuro (Anual)</th>
+                            <th>Economia</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Controle Manual de Inventário</strong></td>
+                            <td class="current-cost">R$ 24.000</td>
+                            <td class="future-cost">R$ 0</td>
+                            <td class="savings">R$ 24.000</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Perdas por Extravios</strong></td>
+                            <td class="current-cost">R$ 75.000</td>
+                            <td class="future-cost">R$ 0</td>
+                            <td class="savings">R$ 75.000</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Manutenções Corretivas</strong></td>
+                            <td class="current-cost">R$ 50.000</td>
+                            <td class="future-cost">R$ 15.000</td>
+                            <td class="savings">R$ 35.000</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Horas da Equipe TI</strong></td>
+                            <td class="current-cost">R$ 60.000</td>
+                            <td class="future-cost">R$ 15.000</td>
+                            <td class="savings">R$ 45.000</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Auditorias e Compliance</strong></td>
+                            <td class="current-cost">R$ 35.000</td>
+                            <td class="future-cost">R$ 10.000</td>
+                            <td class="savings">R$ 25.000</td>
+                        </tr>
+                        <tr style="background: rgba(40, 167, 69, 0.1);">
+                            <td><strong>TOTAL ANUAL</strong></td>
+                            <td class="current-cost"><strong>R$ 244.000</strong></td>
+                            <td class="future-cost"><strong>R$ 40.000</strong></td>
+                            <td class="savings"><strong>R$ 204.000</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div> -->
+
+        <!-- Impactos Mensuráveis -->
+        <div class="roi-section">
+            <h2 class="section-title">
+                <i class="bi bi-graph-up"></i>
+                Impactos Mensuráveis
+            </h2>
+            <p class="section-subtitle">
+                Métricas operacionais que demonstram o valor entregue pelo sistema
+            </p>
+            
+            <div class="row">
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="impact-metric">
+                        <div class="impact-number">80%</div>
+                        <div class="impact-label">Redução</div>
+                        <div class="impact-description">Tempo de Localização</div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="impact-metric">
+                        <div class="impact-number">100%</div>
+                        <div class="impact-label">Precisão</div>
+                        <div class="impact-description">Inventário Patrimonial</div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="impact-metric">
+                        <div class="impact-number">90%</div>
+                        <div class="impact-label">Redução</div>
+                        <div class="impact-description">Perda de Equipamentos</div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="impact-metric">
+                        <div class="impact-number">60%</div>
+                        <div class="impact-label">Economia</div>
+                        <div class="impact-description">Tempo Administrativo</div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="impact-metric">
+                        <div class="impact-number">75%</div>
+                        <div class="impact-label">Redução</div>
+                        <div class="impact-description">Manutenções Corretivas</div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="impact-metric">
+                        <div class="impact-number">40h</div>
+                        <div class="impact-label">Economia</div>
+                        <div class="impact-description">Horas/Mês da Equipe</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Benefícios Intangíveis -->
+        <div class="intangible-benefits">
+            <h2 class="text-center mb-4">
+                <i class="bi bi-lightbulb me-3"></i>
+                Benefícios Intangíveis
+            </h2>
+            <p class="text-center mb-4 lead">
+                Valor estratégico que vai além dos números financeiros
+            </p>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="intangible-item">
+                        <i class="bi bi-people intangible-icon"></i>
+                        <div>
+                            <h5>Satisfação da Equipe</h5>
+                            <p>Redução de tarefas manuais repetitivas, foco em atividades estratégicas</p>
+                        </div>
+                    </div>
+                    
+                    <div class="intangible-item">
+                        <i class="bi bi-shield-check intangible-icon"></i>
+                        <div>
+                            <h5>Conformidade Regulatória</h5>
+                            <p>Atendimento automático a requisitos de auditoria e compliance</p>
+                        </div>
+                    </div>
+                    
+                    <div class="intangible-item">
+                        <i class="bi bi-graph-up intangible-icon"></i>
+                        <div>
+                            <h5>Tomada de Decisão</h5>
+                            <p>Dados precisos em tempo real para decisões estratégicas</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="intangible-item">
+                        <i class="bi bi-award intangible-icon"></i>
+                        <div>
+                            <h5>Imagem Institucional</h5>
+                            <p>Modernização e profissionalização da gestão patrimonial</p>
+                        </div>
+                    </div>
+                    
+                    <div class="intangible-item">
+                        <i class="bi bi-lightning intangible-icon"></i>
+                        <div>
+                            <h5>Agilidade Operacional</h5>
+                            <p>Processos otimizados e resposta rápida a demandas</p>
+                        </div>
+                    </div>
+                    
+                    <div class="intangible-item">
+                        <i class="bi bi-lock intangible-icon"></i>
+                        <div>
+                            <h5>Segurança da Informação</h5>
+                            <p>Proteção de dados sensíveis com criptografia enterprise</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cenários de ROI -->
+        <!-- <div class="roi-section">
+            <h2 class="section-title">
+                <i class="bi bi-graph-up-arrow"></i>
+                Cenários de Retorno
+            </h2>
+            <p class="section-subtitle">
+                Análise conservadora, realista e otimista do retorno sobre investimento
+            </p>
+            
+            <div class="row">
+                <div class="col-lg-4">
+                    <div class="benefit-card" style="border-left: 6px solid #ffc107;">
+                        <div class="text-center">
+                            <i class="bi bi-speedometer" style="font-size: 3rem; color: #ffc107; margin-bottom: 1rem;"></i>
+                            <h4 style="color: #ffc107;">Cenário Conservador</h4>
+                            <div class="benefit-value" style="color: #ffc107;">250%</div>
+                            <p>ROI em 3 anos</p>
+                        </div>
+                        <ul class="list-unstyled">
+                            <li><i class="bi bi-check me-2"></i>50% dos benefícios projetados</li>
+                            <li><i class="bi bi-check me-2"></i>Implementação mais lenta</li>
+                            <li><i class="bi bi-check me-2"></i>Resistência à mudança</li>
+                            <li><i class="bi bi-check me-2"></i><strong>Ainda assim positivo</strong></li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="col-lg-4">
+                    <div class="benefit-card" style="border-left: 6px solid var(--galois-success);">
+                        <div class="text-center">
+                            <i class="bi bi-speedometer2" style="font-size: 3rem; color: var(--galois-success); margin-bottom: 1rem;"></i>
+                            <h4 style="color: var(--galois-success);">Cenário Realista</h4>
+                            <div class="benefit-value">400%</div>
+                            <p>ROI em 3 anos</p>
+                        </div>
+                        <ul class="list-unstyled">
+                            <li><i class="bi bi-check me-2"></i>80% dos benefícios projetados</li>
+                            <li><i class="bi bi-check me-2"></i>Implementação conforme planejado</li>
+                            <li><i class="bi bi-check me-2"></i>Adoção gradual bem-sucedida</li>
+                            <li><i class="bi bi-check me-2"></i><strong>Cenário mais provável</strong></li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="col-lg-4">
+                    <div class="benefit-card" style="border-left: 6px solid var(--galois-primary);">
+                        <div class="text-center">
+                            <i class="bi bi-rocket-takeoff" style="font-size: 3rem; color: var(--galois-primary); margin-bottom: 1rem;"></i>
+                            <h4 style="color: var(--galois-primary);">Cenário Otimista</h4>
+                            <div class="benefit-value" style="color: var(--galois-primary);">600%</div>
+                            <p>ROI em 3 anos</p>
+                        </div>
+                        <ul class="list-unstyled">
+                            <li><i class="bi bi-check me-2"></i>100%+ dos benefícios</li>
+                            <li><i class="bi bi-check me-2"></i>Adoção rápida e entusiástica</li>
+                            <li><i class="bi bi-check me-2"></i>Benefícios não previstos</li>
+                            <li><i class="bi bi-check me-2"></i><strong>Potencial de expansão</strong></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div> -->
+
+        <!-- Conclusão e CTA -->
+        <!-- <div class="conclusion-cta">
+            <h2 class="mb-4">
+                <i class="bi bi-trophy me-3"></i>
+                Investimento Estratégico com Retorno Garantido
+            </h2>
+            <div class="row align-items-center">
+                <div class="col-lg-8">
+                    <p class="lead mb-4">
+                        O Sistema de Gestão Patrimonial representa mais que uma ferramenta tecnológica: 
+                        é uma transformação digital que entrega valor imediato e sustentável.
+                    </p>
+                    
+                    <div class="row text-center mb-4">
+                        <div class="col-md-3">
+                            <div class="impact-number" style="color: white;">9.4</div>
+                            <div class="impact-label" style="color: rgba(255,255,255,0.8);">meses payback</div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="impact-number" style="color: white;">400%</div>
+                            <div class="impact-label" style="color: rgba(255,255,255,0.8);">ROI 3 anos</div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="impact-number" style="color: white;">R$ 204k</div>
+                            <div class="impact-label" style="color: rgba(255,255,255,0.8);">economia/ano</div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="impact-number" style="color: white;">R$ 452k</div>
+                            <div class="impact-label" style="color: rgba(255,255,255,0.8);">benefício 3 anos</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4 text-center">
+                    <i class="bi bi-graph-up-arrow" style="font-size: 8rem; opacity: 0.3;"></i>
+                </div>
+            </div>
+            
+            <div class="text-center">
+                <h4 class="mb-4">Pronto para transformar sua gestão patrimonial?</h4>
+                <div class="d-flex justify-content-center flex-wrap">
+                    <a href="#" class="cta-button" onclick="requestProposal()">
+                        <i class="bi bi-file-text me-2"></i>
+                        Solicitar Proposta Detalhada
+                    </a>
+                    <a href="#" class="cta-button" onclick="schedulePresentation()">
+                        <i class="bi bi-calendar-event me-2"></i>
+                        Agendar Apresentação
+                    </a>
+                    <a href="#" class="cta-button" onclick="startPilot()">
+                        <i class="bi bi-play-circle me-2"></i>
+                        Iniciar Projeto Piloto
+                    </a>
+                </div>
+            </div>
+        </div> -->
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Funções de interação
+        function requestProposal() {
+            alert('📋 Proposta Comercial Detalhada\n\n' +
+                  'Nossa proposta incluirá:\n' +
+                  '• Análise personalizada do seu ambiente\n' +
+                  '• Cronograma detalhado de implementação\n' +
+                  '• Investimento por fase com ROI específico\n' +
+                  '• Garantias e SLAs\n' +
+                  '• Plano de treinamento da equipe\n' +
+                  '• Suporte pós-implementação');
+        }
+        
+        function schedulePresentation() {
+            alert('📊 Apresentação Executiva\n\n' +
+                  'Agende uma apresentação personalizada:\n' +
+                  '• Demo ao vivo do sistema atual\n' +
+                  '• Análise específica do seu cenário\n' +
+                  '• ROI customizado para sua realidade\n' +
+                  '• Sessão de perguntas e respostas\n' +
+                  '• Próximos passos do projeto');
+        }
+        
+        function startPilot() {
+            alert('🚀 Projeto Piloto\n\n' +
+                  'Inicie com um piloto de baixo risco:\n' +
+                  '• Implementação em 1 coligada/departamento\n' +
+                  '• 30 dias para validação\n' +
+                  '• Investimento reduzido\n' +
+                  '• Medição de resultados reais\n' +
+                  '• Base para expansão completa');
+        }
+        
+        // Animações e interatividade
+        document.addEventListener('DOMContentLoaded', function() {
+            // Contador animado para valores ROI
+            const animateCounters = () => {
+                document.querySelectorAll('.benefit-value, .calculator-value, .impact-number').forEach(counter => {
+                    const target = counter.textContent;
+                    const numericTarget = parseFloat(target.replace(/[^\d.]/g, ''));
+                    
+                    if (!isNaN(numericTarget) && numericTarget > 0) {
+                        let current = 0;
+                        const increment = numericTarget / 60;
+                        const isPercentage = target.includes('%');
+                        const isCurrency = target.includes('R);
+                        
+                        const updateCounter = () => {
+                            if (current < numericTarget) {
+                                current += increment;
+                                let displayValue = Math.floor(current);
+                                
+                                if (isCurrency) {
+                                    counter.textContent = `R$ ${displayValue.toLocaleString('pt-BR')}`;
+                                } else if (isPercentage) {
+                                    counter.textContent = `${displayValue}%`;
+                                } else {
+                                    counter.textContent = displayValue;
+                                }
+                                
+                                setTimeout(updateCounter, 50);
+                            } else {
+                                counter.textContent = target;
+                            }
+                        };
+                        
+                        // Inicia animação quando visível
+                        const counterObserver = new IntersectionObserver((entries) => {
+                            entries.forEach(entry => {
+                                if (entry.isIntersecting) {
+                                    updateCounter();
+                                    counterObserver.unobserve(entry.target);
+                                }
+                            });
+                        });
+                        
+                        counterObserver.observe(counter);
+                    }
+                });
+            };
+            
+            animateCounters();
+            
+            // Animação para cards de benefícios
+            document.querySelectorAll('.benefit-card').forEach(card => {
+                card.addEventListener('mouseenter', function() {
+                    this.style.transform = 'translateY(-12px) scale(1.02)';
+                });
+                
+                card.addEventListener('mouseleave', function() {
+                    this.style.transform = 'translateY(0) scale(1)';
+                });
+            });
+            
+            // Efeito de revelação progressiva
+            const revealObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.style.opacity = '1';
+                        entry.target.style.transform = 'translateY(0)';
+                    }
+                });
+            }, { threshold: 0.1 });
+            
+            document.querySelectorAll('.roi-section, .benefit-card, .impact-metric').forEach(element => {
+                element.style.opacity = '0';
+                element.style.transform = 'translateY(30px)';
+                element.style.transition = 'all 0.8s ease';
+                revealObserver.observe(element);
+            });
+            
+            // Efeito especial para timeline de payback
+            const timelineObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const marker = entry.target.querySelector('.timeline-marker');
+                        const label = entry.target.querySelector('.timeline-label');
+                        
+                        setTimeout(() => {
+                            marker.style.animation = 'pulse 2s infinite';
+                            label.style.animation = 'bounce 1s ease-in-out 3';
+                        }, 500);
+                    }
+                });
+            });
+            
+            const timeline = document.querySelector('.timeline-chart');
+            if (timeline) {
+                timelineObserver.observe(timeline);
+            }
+        });
+        
+        // Adicionar estilos de animação dinamicamente
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes pulse {
+                0%, 100% { box-shadow: 0 0 0 0 rgba(245, 124, 0, 0.7); }
+                50% { box-shadow: 0 0 0 20px rgba(245, 124, 0, 0); }
+            }
+            
+            @keyframes bounce {
+                0%, 20%, 50%, 80%, 100% { transform: translateX(-50%) translateY(0); }
+                40% { transform: translateX(-50%) translateY(-10px); }
+                60% { transform: translateX(-50%) translateY(-5px); }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>

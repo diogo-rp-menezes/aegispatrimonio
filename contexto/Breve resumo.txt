@@ -1,0 +1,6 @@
+A ideia surgiu quando percebi que a empresa onde trabalho não tem nenhum controle sobre o patrimônio.
+Na POC eu fiz um script para podermos registrar os ativos de informática. Escrevi o script para que fizesse o levantamento do hardware dos computadores. O que me levou a ter a ideia de também fazer um sistema de health check para auxiliar no suporte e evitarmos ações corretivas para preventivas.
+A principio seria só dos equipamentos de TI. Porém a ideia foi crescendo e decidi englobar todos os ativos. 
+Rastreando a localização deles, movimentações, manutenções, depreciação, entre outras funcionalidades.
+Conversando com um cliente em potencial ele sugeriu que o ativo tivesse atributos específicos de acordo com o seu tipo, computadores, equipamentos musicais, veículos, etc. Para que a manutenção fosse especializada por tipo, podemos avaliar isso, se necessário. Acho que seria uma melhoria para o futuro.
+Com base nisso podemos fazer uma analise inicial do projeto.

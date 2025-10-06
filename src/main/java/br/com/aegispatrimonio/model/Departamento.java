@@ -1,13 +1,7 @@
 package br.com.aegispatrimonio.model;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-import lombok.ToString;
-import org.hibernate.annotations.SQLDelete;
-import org.hibernate.annotations.Where;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
@@ -17,46 +11,36 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString(exclude = {"filial"})
-@SQLDelete(sql = "UPDATE departamentos SET status = 'INATIVO' WHERE id = ?")
-@Where(clause = "status = 'ATIVO'")
+@ToString(exclude = "filial")
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Departamento {
-    
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
-    
-    @Column(nullable = false)
-    private String nome;
-    
-    @ManyToOne
-    @JoinColumn(name = "filial_id", nullable = false)
-    private Filial filial;
-    
-    @Column(name = "centro_custo")
-    private String centroCusto;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private Status status;
-    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "filial_id", nullable = false)
+    private Filial filial; // Vínculo com a Filial
+
+    @Column(nullable = false, length = 100)
+    private String nome;
+
     @Column(name = "criado_em")
     private LocalDateTime criadoEm;
-    
+
     @Column(name = "atualizado_em")
     private LocalDateTime atualizadoEm;
-    
+
     @PrePersist
     protected void onCreate() {
         criadoEm = LocalDateTime.now();
         atualizadoEm = LocalDateTime.now();
-        if (status == null) {
-            status = Status.ATIVO;
-        }
     }
-    
+
     @PreUpdate
-    public void preUpdate() {
-        this.atualizadoEm = LocalDateTime.now();
+    protected void onUpdate() {
+        atualizadoEm = LocalDateTime.now();
     }
 }

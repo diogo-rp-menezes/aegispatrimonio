@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @NoArgsConstructor
-@ToString(exclude = {"departamento"})
+@ToString(exclude = {"departamento", "filial"})
 @Entity
 @Table(name = "pessoas")
 @SQLDelete(sql = "UPDATE pessoas SET status = 'INATIVO' WHERE id = ?")
@@ -23,12 +23,28 @@ public class Pessoa {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "filial_id", nullable = false)
+    private Filial filial; // Vínculo com a Filial
     
     @Column(nullable = false)
     private String nome;
-    
+
     @Column(unique = true)
+    private String matricula; // Identificador único do funcionário
+
+    @Column(nullable = false)
+    private String cargo; // Cargo ou função da pessoa
+    
+    @Column(unique = true, nullable = false)
     private String email;
+
+    @Column(nullable = false)
+    private String password;
+
+    @Column(nullable = false)
+    private String role; // Ex: "ROLE_ADMIN", "ROLE_USER"
     
     @ManyToOne
     @JoinColumn(name = "departamento_id", nullable = false)
