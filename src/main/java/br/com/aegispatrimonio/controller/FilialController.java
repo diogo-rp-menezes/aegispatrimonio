@@ -4,13 +4,14 @@ import br.com.aegispatrimonio.dto.FilialCreateDTO;
 import br.com.aegispatrimonio.dto.FilialDTO;
 import br.com.aegispatrimonio.dto.FilialUpdateDTO;
 import br.com.aegispatrimonio.service.FilialService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/filiais")
+@RequestMapping("/filiais") // REMOVIDO o /api
 public class FilialController {
 
     private final FilialService filialService;
@@ -31,12 +32,12 @@ public class FilialController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public FilialDTO criar(@RequestBody FilialCreateDTO filialCreateDTO) {
+    public FilialDTO criar(@RequestBody @Valid FilialCreateDTO filialCreateDTO) {
         return filialService.criar(filialCreateDTO);
     }
 
     @PutMapping("/{id}")
-    public FilialDTO atualizar(@PathVariable Long id, @RequestBody FilialUpdateDTO filialUpdateDTO) {
+    public FilialDTO atualizar(@PathVariable Long id, @RequestBody @Valid FilialUpdateDTO filialUpdateDTO) {
         return filialService.atualizar(id, filialUpdateDTO);
     }
 

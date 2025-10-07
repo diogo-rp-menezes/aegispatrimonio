@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/localizacoes")
+@RequestMapping("/localizacoes") // REMOVIDO o /api
 public class LocalizacaoController {
 
     private final LocalizacaoService localizacaoService;
@@ -32,12 +32,12 @@ public class LocalizacaoController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public LocalizacaoDTO criar(@RequestBody @Valid LocalizacaoCreateDTO localizacaoCreateDTO) { // Anotação @Valid adicionada
+    public LocalizacaoDTO criar(@RequestBody @Valid LocalizacaoCreateDTO localizacaoCreateDTO) {
         return localizacaoService.criar(localizacaoCreateDTO);
     }
 
     @PutMapping("/{id}")
-    public LocalizacaoDTO atualizar(@PathVariable Long id, @RequestBody @Valid LocalizacaoUpdateDTO localizacaoUpdateDTO) { // Anotação @Valid adicionada
+    public LocalizacaoDTO atualizar(@PathVariable Long id, @RequestBody @Valid LocalizacaoUpdateDTO localizacaoUpdateDTO) {
         return localizacaoService.atualizar(id, localizacaoUpdateDTO);
     }
 

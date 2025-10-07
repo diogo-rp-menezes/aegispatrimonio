@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/tipos-ativo")
+@RequestMapping("/tipos-ativo") // REMOVIDO o /api
 public class TipoAtivoController {
 
     private final TipoAtivoService tipoAtivoService;

@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/pessoas")
+@RequestMapping("/pessoas") // REMOVIDO o /api
 public class PessoaController {
 
     private final PessoaService pessoaService;
@@ -37,7 +37,7 @@ public class PessoaController {
     }
 
     @PutMapping("/{id}")
-    public PessoaDTO atualizar(@PathVariable Long id, @RequestBody @Valid PessoaUpdateDTO pessoaUpdateDTO) { // Anotação @Valid adicionada
+    public PessoaDTO atualizar(@PathVariable Long id, @RequestBody @Valid PessoaUpdateDTO pessoaUpdateDTO) {
         return pessoaService.atualizar(id, pessoaUpdateDTO);
     }
 

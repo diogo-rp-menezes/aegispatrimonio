@@ -13,11 +13,11 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/ativos")
+@RequestMapping("/ativos") // REMOVIDO o /api
 public class AtivoController {
 
     private final AtivoService ativoService;
-    private final HealthCheckService healthCheckService; // Serviço injetado
+    private final HealthCheckService healthCheckService;
 
     public AtivoController(AtivoService ativoService, HealthCheckService healthCheckService) {
         this.ativoService = ativoService;
@@ -51,7 +51,6 @@ public class AtivoController {
         ativoService.deletar(id);
     }
 
-    // --- Endpoint de Health Check ---
     @PatchMapping("/{id}/health-check")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateHealthCheck(@PathVariable Long id, @RequestBody @Valid HealthCheckDTO healthCheckDTO) {

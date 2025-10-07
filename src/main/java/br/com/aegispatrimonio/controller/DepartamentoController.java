@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/departamentos")
+@RequestMapping("/departamentos") // REMOVIDO o /api
 public class DepartamentoController {
 
     private final DepartamentoService departamentoService;
@@ -32,12 +32,12 @@ public class DepartamentoController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public DepartamentoDTO criar(@RequestBody @Valid DepartamentoCreateDTO departamentoCreateDTO) { // Anotação @Valid adicionada
+    public DepartamentoDTO criar(@RequestBody @Valid DepartamentoCreateDTO departamentoCreateDTO) {
         return departamentoService.criar(departamentoCreateDTO);
     }
 
     @PutMapping("/{id}")
-    public DepartamentoDTO atualizar(@PathVariable Long id, @RequestBody @Valid DepartamentoUpdateDTO departamentoUpdateDTO) { // Anotação @Valid adicionada
+    public DepartamentoDTO atualizar(@PathVariable Long id, @RequestBody @Valid DepartamentoUpdateDTO departamentoUpdateDTO) {
         return departamentoService.atualizar(id, departamentoUpdateDTO);
     }
 

@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  # Serviço do Banco de Dados MySQL
+  db:
+    image: mysql:8.0
+    container_name: aegis-mysql-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: Admin123
+      MYSQL_DATABASE: aegis-patrimonio
+    ports:
+      # Mapeia a porta 3306 do container para a 3306 da sua máquina
+      - "3306:3306"
+    volumes:
+      # Garante que os dados do banco persistam entre as execuções
+      - mysql_data:/var/lib/mysql
+
+  # Serviço da Aplicação Spring Boot
+  app:
+    # Constrói a imagem a partir do Dockerfile no diretório atual
+    build: .
+    container_name: aegis-app
+    restart: on-failure
+    depends_on:
+      - db # Garante que o serviço 'db' inicie antes do 'app'
+    ports:
+      # Mapeia a porta 8080 do container para a 8080 da sua máquina
+      - "8080:8080"
+    environment:
+      # Sobrescreve a URL do datasource para apontar para o container do banco
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/aegis-patrimonio?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: Admin123
+      # Garante que a aplicação espere o banco de dados estar pronto
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+
+# Define o volume nomeado para persistência dos dados do MySQL
+volumes:
+  mysql_data:

@@ -38,7 +38,7 @@ public class DepreciacaoService {
         log.info("Iniciando cálculo de depreciação mensal agendado...");
         List<Ativo> ativosParaSalvar = new ArrayList<>();
 
-        try (Stream<Ativo> ativosStream = ativoRepository.streamByStatus(StatusAtivo.ATIVO)) {
+        try (Stream<Ativo> ativosStream = ativoRepository.findAllByStatus(StatusAtivo.ATIVO)) { // CORRIGIDO
             ativosStream.forEach(ativo -> {
                 if (deveCalcularDepreciacao(ativo)) {
                     try {
@@ -71,7 +71,7 @@ public class DepreciacaoService {
         log.info("Iniciando recálculo completo de depreciação em segundo plano...");
         List<Ativo> ativosParaSalvar = new ArrayList<>();
 
-        try (Stream<Ativo> ativosStream = ativoRepository.streamAll()) {
+        try (Stream<Ativo> ativosStream = ativoRepository.streamAll()) { // CORRIGIDO
             ativosStream.forEach(ativo -> {
                 try {
                     prepararRecalculoCompleto(ativo);

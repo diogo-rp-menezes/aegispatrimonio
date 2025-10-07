@@ -11,6 +11,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 public class AegispatrimonioApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(AegispatrimonioApplication.class, args);
+        SpringApplication.run(AegispatrimonioApplication.class, args)
+
+        ;
     }
+
+
 }
