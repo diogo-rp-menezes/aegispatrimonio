@@ -13,8 +13,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -27,8 +30,11 @@ public class AtivoService {
     private final FornecedorRepository fornecedorRepository;
     private final PessoaRepository pessoaRepository;
     private final FilialRepository filialRepository;
+    private final ManutencaoRepository manutencaoRepository;
+    private final MovimentacaoRepository movimentacaoRepository;
+    private final DepreciacaoService depreciacaoService; // Injetado para recálculo automático
 
-    public AtivoService(AtivoRepository ativoRepository, AtivoMapper ativoMapper, TipoAtivoRepository tipoAtivoRepository, LocalizacaoRepository localizacaoRepository, FornecedorRepository fornecedorRepository, PessoaRepository pessoaRepository, FilialRepository filialRepository) {
+    public AtivoService(AtivoRepository ativoRepository, AtivoMapper ativoMapper, TipoAtivoRepository tipoAtivoRepository, LocalizacaoRepository localizacaoRepository, FornecedorRepository fornecedorRepository, PessoaRepository pessoaRepository, FilialRepository filialRepository, ManutencaoRepository manutencaoRepository, MovimentacaoRepository movimentacaoRepository, DepreciacaoService depreciacaoService) {
         this.ativoRepository = ativoRepository;
         this.ativoMapper = ativoMapper;
         this.tipoAtivoRepository = tipoAtivoRepository;
@@ -36,6 +42,9 @@ public class AtivoService {
         this.fornecedorRepository = fornecedorRepository;
         this.pessoaRepository = pessoaRepository;
         this.filialRepository = filialRepository;
+        this.manutencaoRepository = manutencaoRepository;
+        this.movimentacaoRepository = movimentacaoRepository;
+        this.depreciacaoService = depreciacaoService;
     }
 
     private Pessoa getPessoaLogada() {
@@ -80,6 +89,8 @@ public class AtivoService {
             throw new AccessDeniedException("Você só pode criar ativos para a sua própria filial.");
         }
 
+        validarNumeroPatrimonio(ativoCreateDTO.numeroPatrimonio(), null);
+
         Ativo ativo = ativoMapper.toEntity(ativoCreateDTO);
 
         Filial filial = filialRepository.findById(ativoCreateDTO.filialId())
@@ -93,6 +104,7 @@ public class AtivoService {
         if (ativoCreateDTO.localizacaoId() != null) {
             Localizacao localizacao = localizacaoRepository.findById(ativoCreateDTO.localizacaoId())
                     .orElseThrow(() -> new EntityNotFoundException("Localização não encontrada com ID: " + ativoCreateDTO.localizacaoId()));
+            validarConsistenciaLocalizacao(localizacao, filial);
             ativo.setLocalizacao(localizacao);
         }
 
@@ -103,6 +115,7 @@ public class AtivoService {
         if (ativoCreateDTO.pessoaResponsavelId() != null) {
             Pessoa pessoa = pessoaRepository.findById(ativoCreateDTO.pessoaResponsavelId())
                     .orElseThrow(() -> new EntityNotFoundException("Pessoa responsável não encontrada com ID: " + ativoCreateDTO.pessoaResponsavelId()));
+            validarConsistenciaResponsavel(pessoa, filial);
             ativo.setPessoaResponsavel(pessoa);
         }
 
@@ -120,12 +133,21 @@ public class AtivoService {
             if (!ativo.getFilial().getId().equals(pessoaLogada.getFilial().getId())) {
                 throw new AccessDeniedException("Você não tem permissão para editar ativos de outra filial.");
             }
-            if (!ativo.getFilial().getId().equals(ativoUpdateDTO.filialId())) {
+            if (ativoUpdateDTO.filialId() != null && !ativo.getFilial().getId().equals(ativoUpdateDTO.filialId())) {
                 throw new AccessDeniedException("Você não tem permissão para transferir ativos entre filiais.");
             }
         }
 
+        validarNumeroPatrimonio(ativoUpdateDTO.numeroPatrimonio(), id);
+
+        // Armazena valores financeiros originais para verificar se precisam de recálculo
+        BigDecimal valorAquisicaoOriginal = ativo.getValorAquisicao();
+        LocalDate dataAquisicaoOriginal = ativo.getDataAquisicao();
+        // NOTA: Outros campos como valorResidual, vidaUtilMeses, metodoDepreciacao e dataInicioDepreciacao
+        // também deveriam estar no DTO e acionar o recálculo.
+
         ativo.setNome(ativoUpdateDTO.nome());
+        ativo.setNumeroPatrimonio(ativoUpdateDTO.numeroPatrimonio());
         ativo.setStatus(ativoUpdateDTO.status());
         ativo.setDataAquisicao(ativoUpdateDTO.dataAquisicao());
         ativo.setValorAquisicao(ativoUpdateDTO.valorAquisicao());
@@ -143,6 +165,7 @@ public class AtivoService {
         if (ativoUpdateDTO.localizacaoId() != null) {
             Localizacao localizacao = localizacaoRepository.findById(ativoUpdateDTO.localizacaoId())
                     .orElseThrow(() -> new EntityNotFoundException("Localização não encontrada com ID: " + ativoUpdateDTO.localizacaoId()));
+            validarConsistenciaLocalizacao(localizacao, filial);
             ativo.setLocalizacao(localizacao);
         } else {
             ativo.setLocalizacao(null);
@@ -155,12 +178,22 @@ public class AtivoService {
         if (ativoUpdateDTO.pessoaResponsavelId() != null) {
             Pessoa pessoa = pessoaRepository.findById(ativoUpdateDTO.pessoaResponsavelId())
                     .orElseThrow(() -> new EntityNotFoundException("Pessoa responsável não encontrada com ID: " + ativoUpdateDTO.pessoaResponsavelId()));
+            validarConsistenciaResponsavel(pessoa, filial);
             ativo.setPessoaResponsavel(pessoa);
         } else {
             ativo.setPessoaResponsavel(null);
         }
 
         Ativo ativoAtualizado = ativoRepository.save(ativo);
+
+        // Verifica se uma alteração financeira requer o recálculo da depreciação
+        boolean precisaRecalcular = !Objects.equals(valorAquisicaoOriginal, ativoUpdateDTO.valorAquisicao()) ||
+                                  !Objects.equals(dataAquisicaoOriginal, ativoUpdateDTO.dataAquisicao());
+
+        if (precisaRecalcular) {
+            depreciacaoService.recalcularDepreciacaoCompleta(ativoAtualizado.getId());
+        }
+
         return ativoMapper.toDTO(ativoAtualizado);
     }
 
@@ -174,6 +207,33 @@ public class AtivoService {
             throw new AccessDeniedException("Você não tem permissão para deletar ativos de outra filial.");
         }
 
-        ativoRepository.deleteById(id);
+        if (manutencaoRepository.existsByAtivoId(id)) {
+            throw new IllegalStateException("Não é possível deletar o ativo, pois existem manutenções associadas a ele.");
+        }
+
+        if (movimentacaoRepository.existsByAtivoId(id)) {
+            throw new IllegalStateException("Não é possível deletar o ativo, pois existem movimentações associadas a ele.");
+        }
+
+        ativoRepository.delete(ativo);
+    }
+
+    private void validarNumeroPatrimonio(String numeroPatrimonio, Long ativoId) {
+        Optional<Ativo> ativoExistente = ativoRepository.findByNumeroPatrimonio(numeroPatrimonio);
+        if (ativoExistente.isPresent() && !ativoExistente.get().getId().equals(ativoId)) {
+            throw new IllegalArgumentException("Já existe um ativo cadastrado com o número de patrimônio informado.");
+        }
+    }
+
+    private void validarConsistenciaLocalizacao(Localizacao localizacao, Filial filial) {
+        if (!localizacao.getFilial().getId().equals(filial.getId())) {
+            throw new IllegalArgumentException("A localização selecionada não pertence à filial do ativo.");
+        }
+    }
+
+    private void validarConsistenciaResponsavel(Pessoa responsavel, Filial filial) {
+        if (!responsavel.getFilial().getId().equals(filial.getId())) {
+            throw new IllegalArgumentException("O responsável selecionado não pertence à filial do ativo.");
+        }
     }
 }

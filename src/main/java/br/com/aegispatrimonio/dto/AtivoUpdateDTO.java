@@ -15,6 +15,8 @@ public record AtivoUpdateDTO(
 
     @NotBlank @Size(max = 255) String nome,
 
+    @NotBlank @Size(max = 50) String numeroPatrimonio, // Adicionado
+
     @NotNull @Positive Long tipoAtivoId,
 
     @Positive Long localizacaoId,

@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Objects;
 import java.util.Optional;
 
 @Slf4j
@@ -75,6 +76,8 @@ public class ManutencaoService {
                 .orElseThrow(() -> new ResourceNotFoundException("Técnico não encontrado com ID: " + inicioDTO.getTecnicoId()));
 
         Ativo ativo = manutencao.getAtivo();
+        validarConsistenciaFilial(tecnico, ativo, "Técnico responsável");
+
         ativo.setStatus(StatusAtivo.EM_MANUTENCAO);
         ativoRepository.save(ativo);
 
@@ -127,11 +130,15 @@ public class ManutencaoService {
 
     @Transactional
     public void deletar(Long id) {
-        log.info("Deletando manutenção ID: {}", id);
-        if (!manutencaoRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Manutenção não encontrada com ID: " + id);
+        log.warn("Tentativa de deletar manutenção ID: {}", id);
+        Manutencao manutencao = buscarEntidadePorId(id);
+
+        if (manutencao.getStatus() != StatusManutencao.SOLICITADA) {
+            throw new ResourceConflictException("Manutenções com status '" + manutencao.getStatus() + "' não podem ser deletadas. Considere cancelar a manutenção para preservar o histórico.");
         }
-        manutencaoRepository.deleteById(id);
+
+        manutencaoRepository.delete(manutencao);
+        log.info("Manutenção ID: {} deletada com sucesso.", id);
     }
 
     @Transactional(readOnly = true)
@@ -159,8 +166,14 @@ public class ManutencaoService {
         Ativo ativo = ativoRepository.findById(request.getAtivoId())
                 .orElseThrow(() -> new ResourceNotFoundException("Ativo não encontrado com ID: " + request.getAtivoId()));
 
+        if (ativo.getStatus() != StatusAtivo.ATIVO) {
+            throw new ResourceConflictException("Não é possível criar manutenção para um ativo que não está com status 'ATIVO'. Status atual: " + ativo.getStatus());
+        }
+
         Pessoa solicitante = pessoaRepository.findById(request.getSolicitanteId())
                 .orElseThrow(() -> new ResourceNotFoundException("Solicitante não encontrado com ID: " + request.getSolicitanteId()));
+
+        validarConsistenciaFilial(solicitante, ativo, "Solicitante");
 
         Fornecedor fornecedor = null;
         if (request.getFornecedorId() != null) {
@@ -179,6 +192,12 @@ public class ManutencaoService {
         manutencao.setObservacoes(request.getObservacoes());
 
         return manutencao;
+    }
+
+    private void validarConsistenciaFilial(Pessoa pessoa, Ativo ativo, String papel) {
+        if (!Objects.equals(pessoa.getFilial().getId(), ativo.getFilial().getId())) {
+            throw new IllegalArgumentException(papel + " deve pertencer à mesma filial do ativo.");
+        }
     }
 
     private ManutencaoResponseDTO convertToResponseDTO(Manutencao manutencao) {

@@ -82,10 +82,15 @@ public class PessoaService {
 
         Filial filial = filialRepository.findById(pessoaCreateDTO.filialId())
                 .orElseThrow(() -> new EntityNotFoundException("Filial não encontrada com ID: " + pessoaCreateDTO.filialId()));
-        pessoa.setFilial(filial);
 
         Departamento departamento = departamentoRepository.findById(pessoaCreateDTO.departamentoId())
                 .orElseThrow(() -> new EntityNotFoundException("Departamento não encontrado com ID: " + pessoaCreateDTO.departamentoId()));
+
+        if (!departamento.getFilial().getId().equals(filial.getId())) {
+            throw new IllegalArgumentException("O departamento " + departamento.getNome() + " não pertence à filial " + filial.getNome() + ".");
+        }
+
+        pessoa.setFilial(filial);
         pessoa.setDepartamento(departamento);
 
         pessoa.setPassword(passwordEncoder.encode(pessoaCreateDTO.password()));
@@ -101,15 +106,19 @@ public class PessoaService {
         Pessoa pessoa = pessoaRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Pessoa não encontrada com ID: " + id));
 
+        // Regras de autorização para não-admins
         if (!isAdmin(pessoaLogada)) {
+            // Garante que o usuário a ser editado pertence à mesma filial do usuário logado
             if (!pessoa.getFilial().getId().equals(pessoaLogada.getFilial().getId())) {
                 throw new AccessDeniedException("Você não tem permissão para editar usuários de outra filial.");
             }
-            if (!pessoa.getFilial().getId().equals(pessoaUpdateDTO.filialId())) {
+            // Garante que um não-admin não pode transferir um usuário para outra filial
+            if (pessoaUpdateDTO.filialId() != null && !pessoaLogada.getFilial().getId().equals(pessoaUpdateDTO.filialId())) {
                 throw new AccessDeniedException("Você não tem permissão para transferir usuários entre filiais.");
             }
         }
 
+        // Atualiza os campos básicos
         pessoa.setNome(pessoaUpdateDTO.nome());
         pessoa.setMatricula(pessoaUpdateDTO.matricula());
         pessoa.setCargo(pessoaUpdateDTO.cargo());
@@ -117,21 +126,31 @@ public class PessoaService {
         pessoa.setStatus(pessoaUpdateDTO.status());
         pessoa.setRole(pessoaUpdateDTO.role());
 
-        if (pessoaUpdateDTO.password() != null && !pessoaUpdateDTO.password().isEmpty()) {
+        // Atualiza a senha se uma nova for fornecida
+        if (pessoaUpdateDTO.password() != null && !pessoaUpdateDTO.password().trim().isEmpty()) {
             pessoa.setPassword(passwordEncoder.encode(pessoaUpdateDTO.password()));
         }
 
-        if (pessoaUpdateDTO.filialId() != null) {
-            Filial filial = filialRepository.findById(pessoaUpdateDTO.filialId())
+        // Lógica para atualização de Filial e Departamento
+        Filial filialAtualizada = pessoa.getFilial();
+        if (pessoaUpdateDTO.filialId() != null && !pessoaUpdateDTO.filialId().equals(pessoa.getFilial().getId())) {
+            filialAtualizada = filialRepository.findById(pessoaUpdateDTO.filialId())
                     .orElseThrow(() -> new EntityNotFoundException("Filial não encontrada com ID: " + pessoaUpdateDTO.filialId()));
-            pessoa.setFilial(filial);
         }
 
-        if (pessoaUpdateDTO.departamentoId() != null) {
-            Departamento departamento = departamentoRepository.findById(pessoaUpdateDTO.departamentoId())
+        Departamento departamentoAtualizado = pessoa.getDepartamento();
+        if (pessoaUpdateDTO.departamentoId() != null && !pessoaUpdateDTO.departamentoId().equals(pessoa.getDepartamento().getId())) {
+            departamentoAtualizado = departamentoRepository.findById(pessoaUpdateDTO.departamentoId())
                     .orElseThrow(() -> new EntityNotFoundException("Departamento não encontrado com ID: " + pessoaUpdateDTO.departamentoId()));
-            pessoa.setDepartamento(departamento);
         }
+
+        // Validação de consistência entre Filial e Departamento
+        if (!departamentoAtualizado.getFilial().getId().equals(filialAtualizada.getId())) {
+            throw new IllegalArgumentException("O departamento '" + departamentoAtualizado.getNome() + "' não pertence à filial '" + filialAtualizada.getNome() + "'.");
+        }
+
+        pessoa.setFilial(filialAtualizada);
+        pessoa.setDepartamento(departamentoAtualizado);
 
         Pessoa pessoaAtualizada = pessoaRepository.save(pessoa);
         return pessoaMapper.toDTO(pessoaAtualizada);

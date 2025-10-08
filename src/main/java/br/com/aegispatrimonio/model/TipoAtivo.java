@@ -1,51 +1,43 @@
 package br.com.aegispatrimonio.model;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import lombok.ToString;
-import org.hibernate.annotations.SQLDelete;
-import org.hibernate.annotations.Where;
 
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "tipos_ativo")
 @Getter
 @Setter
 @NoArgsConstructor
-@AllArgsConstructor
-@ToString
-@SQLDelete(sql = "UPDATE tipos_ativo SET status = 'INATIVO' WHERE id = ?")
-@Where(clause = "status = 'ATIVO'")
+@Entity
+@Table(name = "tipos_ativo")
 public class TipoAtivo {
-    
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
     @Column(nullable = false, unique = true)
     private String nome;
-    
+
     private String descricao;
-    
-    @Column(name = "categoria_contabil", nullable = false)
-    private String categoriaContabil;
-    
-    private String icone;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "categoria_contabil", nullable = false)
+    private CategoriaContabil categoriaContabil;
+
+    @Enumerated(EnumType.STRING)
     private Status status;
-    
+
+    private String icone;
+
     @Column(name = "criado_em")
     private LocalDateTime criadoEm;
-    
+
     @Column(name = "atualizado_em")
     private LocalDateTime atualizadoEm;
-    
+
     @PrePersist
     protected void onCreate() {
         criadoEm = LocalDateTime.now();
@@ -54,9 +46,9 @@ public class TipoAtivo {
             status = Status.ATIVO;
         }
     }
-    
+
     @PreUpdate
-    public void preUpdate() {
-        this.atualizadoEm = LocalDateTime.now();
+    protected void onUpdate() {
+        atualizadoEm = LocalDateTime.now();
     }
 }

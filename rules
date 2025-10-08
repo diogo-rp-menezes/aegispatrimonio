@@ -1,0 +1,26 @@
+# Regras de Desenvolvimento
+
+Este documento define as diretrizes e padrões a serem seguidos no desenvolvimento deste projeto.
+
+1.  **Desenvolvimento Orientado a Testes (TDD):**
+    *   Toda nova funcionalidade ou correção de bug deve ser acompanhada por testes correspondentes.
+    *   Escreva testes unitários para validar a lógica de negócio de componentes individuais (serviços, controladores) de forma isolada.
+    *   Escreva testes de integração para validar o fluxo completo de uma funcionalidade, incluindo a interação com a base de dados e outros componentes.
+
+2.  **Testes Unitários:**
+    *   Utilize o Mockito para simular dependências e isolar a unidade em teste.
+    *   Os testes devem ser rápidos, claros e cobrir os principais cenários de sucesso e de falha.
+
+3.  **Testes de Integração:**
+    *   Utilize o `Testcontainers` para criar um ambiente de teste realista e consistente, especialmente para a base de dados.
+    *   Aproveite o `TestRestTemplate` para realizar chamadas HTTP reais aos endpoints da API.
+    *   Use ficheiros SQL (`data.sql`, `cleanup.sql`) para gerir o estado da base de dados de teste, garantindo que os testes sejam independentes e reprodutíveis.
+    *   Para código assíncrono (ex: métodos com `@Async`), utilize bibliotecas como `Awaitility` para aguardar a conclusão das operações antes de fazer as asserções.
+
+4.  **Qualidade e Padrões de Código:**
+    *   Siga as convenções de nomenclatura e estilo de código já existentes no projeto.
+    *   Mantenha os métodos pequenos e focados numa única responsabilidade.
+    *   Use os verbos corretos nos endpoints da API (GET, POST, PUT, DELETE) e siga os princípios REST.
+
+5.  **Gestão de Dependências:**
+    *   Mantenha as dependências do Maven organizadas e atualizadas no `pom.xml`.

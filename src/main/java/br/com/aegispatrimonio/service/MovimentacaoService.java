@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Objects;
 import java.util.Optional;
 
 @Slf4j
@@ -34,15 +35,11 @@ public class MovimentacaoService {
     public MovimentacaoResponseDTO criar(MovimentacaoRequestDTO request) {
         log.info("Criando nova movimentação para o ativo ID: {}", request.getAtivoId());
 
-        // 1. Validação de regra de negócio
         if (movimentacaoRepository.existsByAtivoIdAndStatus(request.getAtivoId(), StatusMovimentacao.PENDENTE)) {
-            throw new ResourceConflictException("Já existe uma movimentação pendente para este ativo");
+            throw new ResourceConflictException("Já existe uma movimentação pendente para este ativo.");
         }
 
-        // 2. Conversão e validação de existência de entidades
         Movimentacao movimentacao = convertToEntity(request);
-
-        // 3. Persistência
         Movimentacao savedMovimentacao = movimentacaoRepository.save(movimentacao);
         return convertToResponseDTO(savedMovimentacao);
     }
@@ -92,16 +89,21 @@ public class MovimentacaoService {
         log.info("Efetivando movimentação ID: {}", id);
         Movimentacao movimentacao = movimentacaoRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Movimentação não encontrada com ID: " + id));
+
         if (movimentacao.getStatus() != StatusMovimentacao.PENDENTE) {
-            throw new ResourceConflictException("Somente movimentações pendentes podem ser efetivadas");
+            throw new ResourceConflictException("Somente movimentações pendentes podem ser efetivadas.");
         }
+
         Ativo ativo = movimentacao.getAtivo();
         ativo.setLocalizacao(movimentacao.getLocalizacaoDestino());
         ativo.setPessoaResponsavel(movimentacao.getPessoaDestino());
+        // A filial do ativo não muda, pois a validação garante que a movimentação é dentro da mesma filial.
         ativoRepository.save(ativo);
+
         movimentacao.setStatus(StatusMovimentacao.EFETIVADA);
         movimentacao.setDataEfetivacao(LocalDate.now());
         Movimentacao updatedMovimentacao = movimentacaoRepository.save(movimentacao);
+
         return convertToResponseDTO(updatedMovimentacao);
     }
 
@@ -110,35 +112,65 @@ public class MovimentacaoService {
         log.info("Cancelando movimentação ID: {}", id);
         Movimentacao movimentacao = movimentacaoRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Movimentação não encontrada com ID: " + id));
+
         if (movimentacao.getStatus() != StatusMovimentacao.PENDENTE) {
-            throw new ResourceConflictException("Somente movimentações pendentes podem ser canceladas");
+            throw new ResourceConflictException("Somente movimentações pendentes podem ser canceladas.");
         }
+
         movimentacao.setStatus(StatusMovimentacao.CANCELADA);
         movimentacao.setObservacoes(motivoCancelamento);
         Movimentacao updatedMovimentacao = movimentacaoRepository.save(movimentacao);
+
         return convertToResponseDTO(updatedMovimentacao);
     }
 
     @Transactional
     public void deletar(Long id) {
-        log.info("Deletando movimentação ID: {}", id);
-        if (!movimentacaoRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Movimentação não encontrada com ID: " + id);
+        log.warn("Tentativa de deletar movimentação ID: {}", id);
+        Movimentacao movimentacao = movimentacaoRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Movimentação não encontrada com ID: " + id));
+
+        if (movimentacao.getStatus() != StatusMovimentacao.PENDENTE) {
+            throw new ResourceConflictException("Apenas movimentações com status 'PENDENTE' podem ser deletadas.");
         }
-        movimentacaoRepository.deleteById(id);
+
+        movimentacaoRepository.delete(movimentacao);
+        log.info("Movimentação ID: {} deletada com sucesso.", id);
     }
 
     private Movimentacao convertToEntity(MovimentacaoRequestDTO request) {
         Ativo ativo = ativoRepository.findById(request.getAtivoId())
                 .orElseThrow(() -> new ResourceNotFoundException("Ativo não encontrado com ID: " + request.getAtivoId()));
-        Localizacao localizacaoOrigem = localizacaoRepository.findById(request.getLocalizacaoOrigemId())
-                .orElseThrow(() -> new ResourceNotFoundException("Localização de origem não encontrada com ID: " + request.getLocalizacaoOrigemId()));
+
+        // Valida se o ativo está em condição de ser movimentado
+        if (ativo.getStatus() != StatusAtivo.ATIVO) {
+            throw new ResourceConflictException("Não é possível movimentar um ativo que não está com status 'ATIVO'. Status atual: " + ativo.getStatus());
+        }
+
+        Localizacao localizacaoOrigem = ativo.getLocalizacao();
+        Pessoa pessoaOrigem = ativo.getPessoaResponsavel();
+
+        // Valida consistência da origem
+        if (!Objects.equals(localizacaoOrigem.getId(), request.getLocalizacaoOrigemId())) {
+            throw new ResourceConflictException("A localização de origem informada não corresponde à localização atual do ativo.");
+        }
+        if (!Objects.equals(pessoaOrigem.getId(), request.getPessoaOrigemId())) {
+            throw new ResourceConflictException("A pessoa de origem informada não corresponde ao responsável atual do ativo.");
+        }
+
         Localizacao localizacaoDestino = localizacaoRepository.findById(request.getLocalizacaoDestinoId())
                 .orElseThrow(() -> new ResourceNotFoundException("Localização de destino não encontrada com ID: " + request.getLocalizacaoDestinoId()));
-        Pessoa pessoaOrigem = pessoaRepository.findById(request.getPessoaOrigemId())
-                .orElseThrow(() -> new ResourceNotFoundException("Pessoa de origem não encontrada com ID: " + request.getPessoaOrigemId()));
         Pessoa pessoaDestino = pessoaRepository.findById(request.getPessoaDestinoId())
                 .orElseThrow(() -> new ResourceNotFoundException("Pessoa de destino não encontrada com ID: " + request.getPessoaDestinoId()));
+
+        // Valida se toda a movimentação ocorre dentro da mesma filial do ativo
+        Long filialIdDoAtivo = ativo.getFilial().getId();
+        if (!Objects.equals(localizacaoDestino.getFilial().getId(), filialIdDoAtivo)) {
+            throw new IllegalArgumentException("A localização de destino deve pertencer à mesma filial do ativo.");
+        }
+        if (!Objects.equals(pessoaDestino.getFilial().getId(), filialIdDoAtivo)) {
+            throw new IllegalArgumentException("A pessoa de destino deve pertencer à mesma filial do ativo.");
+        }
 
         Movimentacao movimentacao = new Movimentacao();
         movimentacao.setAtivo(ativo);

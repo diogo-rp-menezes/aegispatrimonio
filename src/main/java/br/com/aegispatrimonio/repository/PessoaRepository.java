@@ -12,4 +12,8 @@ public interface PessoaRepository extends JpaRepository<Pessoa, Long> {
     Optional<Pessoa> findByEmail(String email);
 
     List<Pessoa> findByFilialId(Long filialId);
+
+    boolean existsByDepartamentoId(Long departamentoId);
+
+    boolean existsByFilialId(Long filialId);
 }

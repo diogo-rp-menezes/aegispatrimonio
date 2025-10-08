@@ -5,12 +5,14 @@ import br.com.aegispatrimonio.dto.FornecedorDTO;
 import br.com.aegispatrimonio.dto.FornecedorUpdateDTO;
 import br.com.aegispatrimonio.mapper.FornecedorMapper;
 import br.com.aegispatrimonio.model.Fornecedor;
+import br.com.aegispatrimonio.repository.AtivoRepository;
 import br.com.aegispatrimonio.repository.FornecedorRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -18,10 +20,12 @@ public class FornecedorService {
 
     private final FornecedorRepository fornecedorRepository;
     private final FornecedorMapper fornecedorMapper;
+    private final AtivoRepository ativoRepository;
 
-    public FornecedorService(FornecedorRepository fornecedorRepository, FornecedorMapper fornecedorMapper) {
+    public FornecedorService(FornecedorRepository fornecedorRepository, FornecedorMapper fornecedorMapper, AtivoRepository ativoRepository) {
         this.fornecedorRepository = fornecedorRepository;
         this.fornecedorMapper = fornecedorMapper;
+        this.ativoRepository = ativoRepository;
     }
 
     @Transactional(readOnly = true)
@@ -41,6 +45,8 @@ public class FornecedorService {
 
     @Transactional
     public FornecedorDTO criar(FornecedorCreateDTO fornecedorCreateDTO) {
+        validarCnpjUnico(fornecedorCreateDTO.cnpj(), null);
+
         Fornecedor fornecedor = fornecedorMapper.toEntity(fornecedorCreateDTO);
         Fornecedor fornecedorSalvo = fornecedorRepository.save(fornecedor);
         return fornecedorMapper.toDTO(fornecedorSalvo);
@@ -50,6 +56,8 @@ public class FornecedorService {
     public FornecedorDTO atualizar(Long id, FornecedorUpdateDTO fornecedorUpdateDTO) {
         Fornecedor fornecedor = fornecedorRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Fornecedor não encontrado com ID: " + id));
+
+        validarCnpjUnico(fornecedorUpdateDTO.cnpj(), id);
 
         fornecedor.setNome(fornecedorUpdateDTO.nome());
         fornecedor.setCnpj(fornecedorUpdateDTO.cnpj());
@@ -66,8 +74,20 @@ public class FornecedorService {
 
     @Transactional
     public void deletar(Long id) {
-        fornecedorRepository.findById(id)
+        Fornecedor fornecedor = fornecedorRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Fornecedor não encontrado com ID: " + id));
-        fornecedorRepository.deleteById(id);
+
+        if (ativoRepository.existsByFornecedorId(id)) {
+            throw new IllegalStateException("Não é possível deletar o fornecedor, pois existem ativos associados a ele.");
+        }
+
+        fornecedorRepository.delete(fornecedor);
+    }
+
+    private void validarCnpjUnico(String cnpj, Long fornecedorId) {
+        Optional<Fornecedor> fornecedorExistente = fornecedorRepository.findByCnpj(cnpj);
+        if (fornecedorExistente.isPresent() && !fornecedorExistente.get().getId().equals(fornecedorId)) {
+            throw new IllegalArgumentException("Já existe um fornecedor cadastrado com o CNPJ informado.");
+        }
     }
 }

@@ -1,0 +1,12 @@
+SET FOREIGN_KEY_CHECKS = 0;
+
+TRUNCATE TABLE movimentacoes;
+TRUNCATE TABLE manutencoes;
+TRUNCATE TABLE ativos;
+TRUNCATE TABLE tipos_ativo;
+TRUNCATE TABLE localizacoes;
+TRUNCATE TABLE pessoas;
+TRUNCATE TABLE fornecedores;
+TRUNCATE TABLE filiais;
+
+SET FOREIGN_KEY_CHECKS = 1;

@@ -9,6 +9,7 @@ import br.com.aegispatrimonio.model.Filial;
 import br.com.aegispatrimonio.model.Pessoa;
 import br.com.aegispatrimonio.repository.DepartamentoRepository;
 import br.com.aegispatrimonio.repository.FilialRepository;
+import br.com.aegispatrimonio.repository.PessoaRepository;
 import br.com.aegispatrimonio.security.CustomUserDetails;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.security.access.AccessDeniedException;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -25,11 +27,13 @@ public class DepartamentoService {
     private final DepartamentoRepository departamentoRepository;
     private final DepartamentoMapper departamentoMapper;
     private final FilialRepository filialRepository;
+    private final PessoaRepository pessoaRepository;
 
-    public DepartamentoService(DepartamentoRepository departamentoRepository, DepartamentoMapper departamentoMapper, FilialRepository filialRepository) {
+    public DepartamentoService(DepartamentoRepository departamentoRepository, DepartamentoMapper departamentoMapper, FilialRepository filialRepository, PessoaRepository pessoaRepository) {
         this.departamentoRepository = departamentoRepository;
         this.departamentoMapper = departamentoMapper;
         this.filialRepository = filialRepository;
+        this.pessoaRepository = pessoaRepository;
     }
 
     private Pessoa getPessoaLogada() {
@@ -72,10 +76,12 @@ public class DepartamentoService {
             throw new AccessDeniedException("Você só pode criar departamentos para a sua própria filial.");
         }
 
-        Departamento departamento = departamentoMapper.toEntity(departamentoCreateDTO);
-
         Filial filial = filialRepository.findById(departamentoCreateDTO.filialId())
                 .orElseThrow(() -> new EntityNotFoundException("Filial não encontrada com ID: " + departamentoCreateDTO.filialId()));
+
+        validarNomeUnicoPorFilial(departamentoCreateDTO.nome(), filial.getId(), null);
+
+        Departamento departamento = departamentoMapper.toEntity(departamentoCreateDTO);
         departamento.setFilial(filial);
 
         Departamento departamentoSalvo = departamentoRepository.save(departamento);
@@ -92,18 +98,21 @@ public class DepartamentoService {
             if (!departamento.getFilial().getId().equals(pessoaLogada.getFilial().getId())) {
                 throw new AccessDeniedException("Você não tem permissão para editar departamentos de outra filial.");
             }
-            if (!departamento.getFilial().getId().equals(departamentoUpdateDTO.filialId())) {
+            if (departamentoUpdateDTO.filialId() != null && !departamento.getFilial().getId().equals(departamentoUpdateDTO.filialId())) {
                 throw new AccessDeniedException("Você não tem permissão para transferir departamentos entre filiais.");
             }
         }
 
-        departamento.setNome(departamentoUpdateDTO.nome());
-
+        Filial filial = departamento.getFilial();
         if (departamentoUpdateDTO.filialId() != null) {
-            Filial filial = filialRepository.findById(departamentoUpdateDTO.filialId())
+            filial = filialRepository.findById(departamentoUpdateDTO.filialId())
                     .orElseThrow(() -> new EntityNotFoundException("Filial não encontrada com ID: " + departamentoUpdateDTO.filialId()));
-            departamento.setFilial(filial);
         }
+
+        validarNomeUnicoPorFilial(departamentoUpdateDTO.nome(), filial.getId(), id);
+
+        departamento.setNome(departamentoUpdateDTO.nome());
+        departamento.setFilial(filial);
 
         Departamento departamentoAtualizado = departamentoRepository.save(departamento);
         return departamentoMapper.toDTO(departamentoAtualizado);
@@ -119,6 +128,18 @@ public class DepartamentoService {
             throw new AccessDeniedException("Você não tem permissão para deletar departamentos de outra filial.");
         }
 
-        departamentoRepository.deleteById(id);
+        if (pessoaRepository.existsByDepartamentoId(id)) {
+            throw new IllegalStateException("Não é possível deletar o departamento, pois existem pessoas associadas a ele.");
+        }
+
+        departamentoRepository.delete(departamento);
+    }
+
+    private void validarNomeUnicoPorFilial(String nome, Long filialId, Long departamentoId) {
+        Optional<Departamento> deptoExistente = departamentoRepository.findByNomeAndFilialId(nome, filialId);
+
+        if (deptoExistente.isPresent() && !deptoExistente.get().getId().equals(departamentoId)) {
+            throw new IllegalArgumentException("Já existe um departamento com este nome nesta filial.");
+        }
     }
 }

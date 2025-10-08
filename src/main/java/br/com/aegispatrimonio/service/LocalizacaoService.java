@@ -7,6 +7,7 @@ import br.com.aegispatrimonio.mapper.LocalizacaoMapper;
 import br.com.aegispatrimonio.model.Filial;
 import br.com.aegispatrimonio.model.Localizacao;
 import br.com.aegispatrimonio.model.Pessoa;
+import br.com.aegispatrimonio.repository.AtivoRepository;
 import br.com.aegispatrimonio.repository.FilialRepository;
 import br.com.aegispatrimonio.repository.LocalizacaoRepository;
 import br.com.aegispatrimonio.security.CustomUserDetails;
@@ -17,6 +18,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -25,11 +28,13 @@ public class LocalizacaoService {
     private final LocalizacaoRepository localizacaoRepository;
     private final LocalizacaoMapper localizacaoMapper;
     private final FilialRepository filialRepository;
+    private final AtivoRepository ativoRepository;
 
-    public LocalizacaoService(LocalizacaoRepository localizacaoRepository, LocalizacaoMapper localizacaoMapper, FilialRepository filialRepository) {
+    public LocalizacaoService(LocalizacaoRepository localizacaoRepository, LocalizacaoMapper localizacaoMapper, FilialRepository filialRepository, AtivoRepository ativoRepository) {
         this.localizacaoRepository = localizacaoRepository;
         this.localizacaoMapper = localizacaoMapper;
         this.filialRepository = filialRepository;
+        this.ativoRepository = ativoRepository;
     }
 
     private Pessoa getPessoaLogada() {
@@ -72,17 +77,21 @@ public class LocalizacaoService {
             throw new AccessDeniedException("Você só pode criar localizações para a sua própria filial.");
         }
 
-        Localizacao localizacao = localizacaoMapper.toEntity(localizacaoCreateDTO);
-
         Filial filial = filialRepository.findById(localizacaoCreateDTO.filialId())
                 .orElseThrow(() -> new EntityNotFoundException("Filial não encontrada com ID: " + localizacaoCreateDTO.filialId()));
-        localizacao.setFilial(filial);
 
+        Localizacao localizacaoPai = null;
         if (localizacaoCreateDTO.localizacaoPaiId() != null) {
-            Localizacao localizacaoPai = localizacaoRepository.findById(localizacaoCreateDTO.localizacaoPaiId())
+            localizacaoPai = localizacaoRepository.findById(localizacaoCreateDTO.localizacaoPaiId())
                     .orElseThrow(() -> new EntityNotFoundException("Localização Pai não encontrada com ID: " + localizacaoCreateDTO.localizacaoPaiId()));
-            localizacao.setLocalizacaoPai(localizacaoPai);
+            validarConsistenciaHierarquia(localizacaoPai, filial);
         }
+
+        validarNomeUnico(localizacaoCreateDTO.nome(), filial, localizacaoPai, null);
+
+        Localizacao localizacao = localizacaoMapper.toEntity(localizacaoCreateDTO);
+        localizacao.setFilial(filial);
+        localizacao.setLocalizacaoPai(localizacaoPai);
 
         Localizacao localizacaoSalva = localizacaoRepository.save(localizacao);
         return localizacaoMapper.toDTO(localizacaoSalva);
@@ -98,28 +107,31 @@ public class LocalizacaoService {
             if (!localizacao.getFilial().getId().equals(pessoaLogada.getFilial().getId())) {
                 throw new AccessDeniedException("Você não tem permissão para editar localizações de outra filial.");
             }
-            if (!localizacao.getFilial().getId().equals(localizacaoUpdateDTO.filialId())) {
+            if (localizacaoUpdateDTO.filialId() != null && !localizacao.getFilial().getId().equals(localizacaoUpdateDTO.filialId())) {
                 throw new AccessDeniedException("Você não tem permissão para transferir localizações entre filiais.");
             }
         }
 
+        Filial filial = filialRepository.findById(localizacaoUpdateDTO.filialId())
+                .orElseThrow(() -> new EntityNotFoundException("Filial não encontrada com ID: " + localizacaoUpdateDTO.filialId()));
+
+        Localizacao localizacaoPai = null;
+        if (localizacaoUpdateDTO.localizacaoPaiId() != null) {
+            if (id.equals(localizacaoUpdateDTO.localizacaoPaiId())) {
+                throw new IllegalArgumentException("Uma localização não pode ser sua própria localização pai.");
+            }
+            localizacaoPai = localizacaoRepository.findById(localizacaoUpdateDTO.localizacaoPaiId())
+                    .orElseThrow(() -> new EntityNotFoundException("Localização Pai não encontrada com ID: " + localizacaoUpdateDTO.localizacaoPaiId()));
+            validarConsistenciaHierarquia(localizacaoPai, filial);
+        }
+
+        validarNomeUnico(localizacaoUpdateDTO.nome(), filial, localizacaoPai, id);
+
         localizacao.setNome(localizacaoUpdateDTO.nome());
         localizacao.setDescricao(localizacaoUpdateDTO.descricao());
         localizacao.setStatus(localizacaoUpdateDTO.status());
-
-        if (localizacaoUpdateDTO.filialId() != null) {
-            Filial filial = filialRepository.findById(localizacaoUpdateDTO.filialId())
-                    .orElseThrow(() -> new EntityNotFoundException("Filial não encontrada com ID: " + localizacaoUpdateDTO.filialId()));
-            localizacao.setFilial(filial);
-        }
-
-        if (localizacaoUpdateDTO.localizacaoPaiId() != null) {
-            Localizacao localizacaoPai = localizacaoRepository.findById(localizacaoUpdateDTO.localizacaoPaiId())
-                    .orElseThrow(() -> new EntityNotFoundException("Localização Pai não encontrada com ID: " + localizacaoUpdateDTO.localizacaoPaiId()));
-            localizacao.setLocalizacaoPai(localizacaoPai);
-        } else {
-            localizacao.setLocalizacaoPai(null);
-        }
+        localizacao.setFilial(filial);
+        localizacao.setLocalizacaoPai(localizacaoPai);
 
         Localizacao localizacaoAtualizada = localizacaoRepository.save(localizacao);
         return localizacaoMapper.toDTO(localizacaoAtualizada);
@@ -135,6 +147,27 @@ public class LocalizacaoService {
             throw new AccessDeniedException("Você não tem permissão para deletar localizações de outra filial.");
         }
 
-        localizacaoRepository.deleteById(id);
+        if (ativoRepository.existsByLocalizacaoId(id)) {
+            throw new IllegalStateException("Não é possível deletar a localização, pois existem ativos associados a ela.");
+        }
+
+        if (localizacaoRepository.existsByLocalizacaoPaiId(id)) {
+            throw new IllegalStateException("Não é possível deletar a localização, pois ela é uma localização pai para outras localizações.");
+        }
+
+        localizacaoRepository.delete(localizacao);
+    }
+
+    private void validarNomeUnico(String nome, Filial filial, Localizacao localizacaoPai, Long id) {
+        Optional<Localizacao> existente = localizacaoRepository.findByNomeAndFilialAndLocalizacaoPai(nome, filial, localizacaoPai);
+        if (existente.isPresent() && !existente.get().getId().equals(id)) {
+            throw new IllegalArgumentException("Já existe uma localização com este nome dentro da mesma filial e localização pai.");
+        }
+    }
+
+    private void validarConsistenciaHierarquia(Localizacao pai, Filial filial) {
+        if (!pai.getFilial().getId().equals(filial.getId())) {
+            throw new IllegalArgumentException("A localização pai deve pertencer à mesma filial.");
+        }
     }
 }

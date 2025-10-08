@@ -4,12 +4,14 @@ import br.com.aegispatrimonio.dto.TipoAtivoCreateDTO;
 import br.com.aegispatrimonio.dto.TipoAtivoDTO;
 import br.com.aegispatrimonio.mapper.TipoAtivoMapper;
 import br.com.aegispatrimonio.model.TipoAtivo;
+import br.com.aegispatrimonio.repository.AtivoRepository;
 import br.com.aegispatrimonio.repository.TipoAtivoRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -17,10 +19,12 @@ public class TipoAtivoService {
 
     private final TipoAtivoRepository tipoAtivoRepository;
     private final TipoAtivoMapper tipoAtivoMapper;
+    private final AtivoRepository ativoRepository;
 
-    public TipoAtivoService(TipoAtivoRepository tipoAtivoRepository, TipoAtivoMapper tipoAtivoMapper) {
+    public TipoAtivoService(TipoAtivoRepository tipoAtivoRepository, TipoAtivoMapper tipoAtivoMapper, AtivoRepository ativoRepository) {
         this.tipoAtivoRepository = tipoAtivoRepository;
         this.tipoAtivoMapper = tipoAtivoMapper;
+        this.ativoRepository = ativoRepository;
     }
 
     @Transactional(readOnly = true)
@@ -39,6 +43,7 @@ public class TipoAtivoService {
 
     @Transactional
     public TipoAtivoDTO criar(TipoAtivoCreateDTO tipoAtivoCreateDTO) {
+        validarNomeUnico(tipoAtivoCreateDTO.nome(), null);
         TipoAtivo tipoAtivo = tipoAtivoMapper.toEntity(tipoAtivoCreateDTO);
         TipoAtivo tipoAtivoSalvo = tipoAtivoRepository.save(tipoAtivo);
         return tipoAtivoMapper.toDTO(tipoAtivoSalvo);
@@ -48,6 +53,9 @@ public class TipoAtivoService {
     public TipoAtivoDTO atualizar(Long id, TipoAtivoCreateDTO tipoAtivoUpdateDTO) {
         TipoAtivo tipoAtivo = tipoAtivoRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Tipo de Ativo não encontrado com ID: " + id));
+        
+        validarNomeUnico(tipoAtivoUpdateDTO.nome(), id);
+
         tipoAtivo.setNome(tipoAtivoUpdateDTO.nome());
         TipoAtivo tipoAtivoAtualizado = tipoAtivoRepository.save(tipoAtivo);
         return tipoAtivoMapper.toDTO(tipoAtivoAtualizado);
@@ -55,8 +63,20 @@ public class TipoAtivoService {
 
     @Transactional
     public void deletar(Long id) {
-        tipoAtivoRepository.findById(id)
+        TipoAtivo tipoAtivo = tipoAtivoRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Tipo de Ativo não encontrado com ID: " + id));
-        tipoAtivoRepository.deleteById(id);
+
+        if (ativoRepository.existsByTipoAtivoId(id)) {
+            throw new IllegalStateException("Não é possível deletar o tipo de ativo, pois existem ativos associados a ele.");
+        }
+
+        tipoAtivoRepository.delete(tipoAtivo);
+    }
+
+    private void validarNomeUnico(String nome, Long id) {
+        Optional<TipoAtivo> existente = tipoAtivoRepository.findByNome(nome);
+        if (existente.isPresent() && !existente.get().getId().equals(id)) {
+            throw new IllegalArgumentException("Já existe um tipo de ativo com este nome.");
+        }
     }
 }
