@@ -84,8 +84,8 @@ public class MovimentacaoControllerIT extends BaseIT {
     @Test
     @DisplayName("Deve criar uma movimentação e retornar 201 Created")
     void criar_deveCriarMovimentacao() throws Exception {
-        MovimentacaoRequestDTO request = new MovimentacaoRequestDTO(ativo.getId(), userOrigem.getId(), userDestino.getId(),
-                localOrigem.getId(), localDestino.getId(), LocalDate.now(), "Movimentação de teste", "Obs");
+        MovimentacaoRequestDTO request = new MovimentacaoRequestDTO(ativo.getId(), localOrigem.getId(), localDestino.getId(),
+                userOrigem.getId(), userDestino.getId(), LocalDate.now(), "Movimentação de teste", "Obs");
 
         mockMvc.perform(post("/movimentacoes")
                         .header("Authorization", "Bearer " + adminToken)

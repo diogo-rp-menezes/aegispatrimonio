@@ -15,6 +15,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -52,7 +53,7 @@ public class MovimentacaoController {
     @ApiResponse(responseCode = "200", description = "Lista de movimentações recuperada com sucesso")
     public ResponseEntity<Page<MovimentacaoResponseDTO>> listarTodos(
             @Parameter(description = "Parâmetros de paginação")
-            @PageableDefault(size = 10, sort = "dataMovimentacao,desc") Pageable pageable) {
+            @PageableDefault(size = 10, sort = "dataMovimentacao", direction = Sort.Direction.DESC) Pageable pageable) {
         Page<MovimentacaoResponseDTO> movimentacoes = movimentacaoService.findAll(pageable);
         return ResponseEntity.ok(movimentacoes);
     }
@@ -83,7 +84,7 @@ public class MovimentacaoController {
             @Parameter(description = "ID do ativo", example = "1") 
             @PathVariable Long ativoId,
             @Parameter(description = "Parâmetros de paginação")
-            @PageableDefault(size = 10, sort = "dataMovimentacao,desc") Pageable pageable) {
+            @PageableDefault(size = 10, sort = "dataMovimentacao", direction = Sort.Direction.DESC) Pageable pageable) {
         Page<MovimentacaoResponseDTO> movimentacoes = movimentacaoService.findByAtivoId(ativoId, pageable);
         return ResponseEntity.ok(movimentacoes);
     }
@@ -96,7 +97,7 @@ public class MovimentacaoController {
             @Parameter(description = "Status da movimentação", example = "PENDENTE") 
             @PathVariable StatusMovimentacao status,
             @Parameter(description = "Parâmetros de paginação")
-            @PageableDefault(size = 10, sort = "dataMovimentacao,desc") Pageable pageable) {
+            @PageableDefault(size = 10, sort = "dataMovimentacao", direction = Sort.Direction.DESC) Pageable pageable) {
         Page<MovimentacaoResponseDTO> movimentacoes = movimentacaoService.findByStatus(status, pageable);
         return ResponseEntity.ok(movimentacoes);
     }
@@ -112,7 +113,7 @@ public class MovimentacaoController {
             @Parameter(description = "ID da pessoa destino", example = "1") 
             @PathVariable Long pessoaDestinoId,
             @Parameter(description = "Parâmetros de paginação")
-            @PageableDefault(size = 10, sort = "dataMovimentacao,desc") Pageable pageable) {
+            @PageableDefault(size = 10, sort = "dataMovimentacao", direction = Sort.Direction.DESC) Pageable pageable) {
         Page<MovimentacaoResponseDTO> movimentacoes = movimentacaoService.findByPessoaDestinoId(pessoaDestinoId, pageable);
         return ResponseEntity.ok(movimentacoes);
     }
@@ -128,7 +129,7 @@ public class MovimentacaoController {
             @Parameter(description = "ID da localização destino", example = "1") 
             @PathVariable Long localizacaoDestinoId,
             @Parameter(description = "Parâmetros de paginação")
-            @PageableDefault(size = 10, sort = "dataMovimentacao,desc") Pageable pageable) {
+            @PageableDefault(size = 10, sort = "dataMovimentacao", direction = Sort.Direction.DESC) Pageable pageable) {
         Page<MovimentacaoResponseDTO> movimentacoes = movimentacaoService.findByLocalizacaoDestinoId(localizacaoDestinoId, pageable);
         return ResponseEntity.ok(movimentacoes);
     }
@@ -143,7 +144,7 @@ public class MovimentacaoController {
             @Parameter(description = "Data final do período", example = "2024-12-31") 
             @RequestParam LocalDate endDate,
             @Parameter(description = "Parâmetros de paginação")
-            @PageableDefault(size = 10, sort = "dataMovimentacao,desc") Pageable pageable) {
+            @PageableDefault(size = 10, sort = "dataMovimentacao", direction = Sort.Direction.DESC) Pageable pageable) {
         Page<MovimentacaoResponseDTO> movimentacoes = movimentacaoService.findByPeriodo(startDate, endDate, pageable);
         return ResponseEntity.ok(movimentacoes);
     }
@@ -156,7 +157,7 @@ public class MovimentacaoController {
             @Parameter(description = "ID do ativo", example = "1") 
             @PathVariable Long ativoId,
             @Parameter(description = "Parâmetros de paginação")
-            @PageableDefault(size = 10, sort = "dataMovimentacao,desc") Pageable pageable) {
+            @PageableDefault(size = 10, sort = "dataMovimentacao", direction = Sort.Direction.DESC) Pageable pageable) {
         Page<MovimentacaoResponseDTO> movimentacoes = movimentacaoService.findMovimentacoesPendentesPorAtivo(ativoId, pageable);
         return ResponseEntity.ok(movimentacoes);
     }

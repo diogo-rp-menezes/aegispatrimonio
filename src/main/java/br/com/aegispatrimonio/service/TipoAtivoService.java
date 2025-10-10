@@ -57,6 +57,8 @@ public class TipoAtivoService {
         validarNomeUnico(tipoAtivoUpdateDTO.nome(), id);
 
         tipoAtivo.setNome(tipoAtivoUpdateDTO.nome());
+        // CORREÇÃO: Adicionada a linha que faltava para atualizar a categoria contábil.
+        tipoAtivo.setCategoriaContabil(tipoAtivoUpdateDTO.categoriaContabil());
         TipoAtivo tipoAtivoAtualizado = tipoAtivoRepository.save(tipoAtivo);
         return tipoAtivoMapper.toDTO(tipoAtivoAtualizado);
     }

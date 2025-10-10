@@ -3,8 +3,9 @@ package br.com.aegispatrimonio.controller;
 import br.com.aegispatrimonio.BaseIT;
 import br.com.aegispatrimonio.dto.TipoAtivoCreateDTO;
 import br.com.aegispatrimonio.dto.TipoAtivoDTO;
-import br.com.aegispatrimonio.model.CategoriaContabil;
-import br.com.aegispatrimonio.model.Pessoa;
+import br.com.aegispatrimonio.model.*;
+import br.com.aegispatrimonio.repository.DepartamentoRepository;
+import br.com.aegispatrimonio.repository.FilialRepository;
 import br.com.aegispatrimonio.repository.PessoaRepository;
 import br.com.aegispatrimonio.security.CustomUserDetails;
 import br.com.aegispatrimonio.security.JwtService;
@@ -13,21 +14,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.transaction.annotation.Transactional;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest
-@ActiveProfiles("test")
-@AutoConfigureMockMvc
-@Transactional
 public class TipoAtivoControllerIT extends BaseIT {
 
     @Autowired
@@ -43,17 +36,42 @@ public class TipoAtivoControllerIT extends BaseIT {
     private PessoaRepository pessoaRepository;
 
     @Autowired
+    private FilialRepository filialRepository;
+
+    @Autowired
+    private DepartamentoRepository departamentoRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     private String adminToken;
 
     @BeforeEach
     void setUp() {
+        Filial filial = new Filial();
+        filial.setNome("Matriz Teste");
+        filial.setCodigo("MATRIZ");
+        filial.setTipo(TipoFilial.MATRIZ);
+        filial.setCnpj("00.000.000/0001-00");
+        filial.setStatus(Status.ATIVO);
+        filialRepository.save(filial);
+
+        Departamento depto = new Departamento();
+        depto.setNome("TI Teste");
+        depto.setFilial(filial);
+        departamentoRepository.save(depto);
+
         Pessoa admin = new Pessoa();
+        admin.setNome("Admin Teste");
         admin.setEmail("admin@aegis.com");
         admin.setPassword(passwordEncoder.encode("password"));
         admin.setRole("ROLE_ADMIN");
+        admin.setFilial(filial);
+        admin.setDepartamento(depto);
+        admin.setStatus(Status.ATIVO);
+        admin.setCargo("Administrador");
         pessoaRepository.save(admin);
+
         adminToken = jwtService.generateToken(new CustomUserDetails(admin));
     }
 
