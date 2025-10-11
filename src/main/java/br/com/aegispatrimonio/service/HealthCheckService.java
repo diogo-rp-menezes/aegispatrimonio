@@ -35,13 +35,16 @@ public class HealthCheckService {
 
     @Transactional
     public void updateHealthCheck(Long ativoId, HealthCheckDTO healthCheckDTO) {
-        Pessoa pessoaLogada = getPessoaLogada();
+        Usuario usuarioLogado = getUsuarioLogado(); // CORREÇÃO
         Ativo ativo = ativoRepository.findById(ativoId)
                 .orElseThrow(() -> new EntityNotFoundException("Ativo não encontrado com ID: " + ativoId));
 
         // --- Validação de Segurança ---
-        if (!isAdmin(pessoaLogada) && !ativo.getFilial().getId().equals(pessoaLogada.getFilial().getId())) {
-            throw new AccessDeniedException("Você não tem permissão para atualizar o health check de ativos de outra filial.");
+        if (!isAdmin(usuarioLogado)) { // CORREÇÃO
+            Funcionario funcionarioLogado = usuarioLogado.getFuncionario();
+            if (funcionarioLogado == null || funcionarioLogado.getFiliais().stream().noneMatch(f -> f.getId().equals(ativo.getFilial().getId()))) {
+                throw new AccessDeniedException("Você não tem permissão para atualizar o health check de ativos desta filial.");
+            }
         }
 
         // --- Lógica de Atualização ---
@@ -57,7 +60,6 @@ public class HealthCheckService {
         detalheHardwareRepository.save(detalhes);
 
         // Limpa e recria os componentes (Discos, Memórias, etc.)
-        // Esta abordagem é mais simples e agora mais eficiente.
         discoRepository.deleteByAtivoDetalheHardwareId(detalhes.getId());
         memoriaRepository.deleteByAtivoDetalheHardwareId(detalhes.getId());
         adaptadorRedeRepository.deleteByAtivoDetalheHardwareId(detalhes.getId());
@@ -82,12 +84,13 @@ public class HealthCheckService {
         }
     }
 
-    private Pessoa getPessoaLogada() {
+    // CORREÇÃO: Métodos auxiliares atualizados para usar a entidade Usuario
+    private Usuario getUsuarioLogado() {
         CustomUserDetails userDetails = (CustomUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        return userDetails.getPessoa();
+        return userDetails.getUsuario();
     }
 
-    private boolean isAdmin(Pessoa pessoa) {
-        return "ROLE_ADMIN".equals(pessoa.getRole());
+    private boolean isAdmin(Usuario usuario) {
+        return "ROLE_ADMIN".equals(usuario.getRole());
     }
 }

@@ -1,24 +1,23 @@
 package br.com.aegispatrimonio.dto.request;
 
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import lombok.Data;
+import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
+
 import java.math.BigDecimal;
 
-@Data
-public class ManutencaoConclusaoDTO {
-
+// CORREÇÃO: Transformado em record para um construtor claro e imutabilidade.
+public record ManutencaoConclusaoDTO(
     @NotBlank(message = "A descrição do serviço é obrigatória.")
-    private String descricaoServico;
+    @Size(max = 2000, message = "Descrição do serviço deve ter no máximo 2000 caracteres")
+    String descricaoServico,
 
     @NotNull(message = "O custo real é obrigatório.")
-    @DecimalMin(value = "0.0", inclusive = false, message = "O custo real deve ser maior que zero.")
-    private BigDecimal custoReal;
+    @PositiveOrZero(message = "Custo real não pode ser negativo.")
+    BigDecimal custoReal,
 
     @NotNull(message = "O tempo de execução é obrigatório.")
-    @Min(value = 1, message = "O tempo de execução deve ser de no mínimo 1 minuto.")
-    private Integer tempoExecucao;
-    
-}
+    @PositiveOrZero(message = "Tempo de execução não pode ser negativo.")
+    Integer tempoExecucao
+) {}

@@ -7,11 +7,13 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Repository
 public interface LocalizacaoRepository extends JpaRepository<Localizacao, Long> {
 
-    List<Localizacao> findByFilialId(Long filialId);
+    // CORREÇÃO: Adicionado método para buscar localizações em múltiplas filiais.
+    List<Localizacao> findByFilialIdIn(Set<Long> filialIds);
 
     boolean existsByLocalizacaoPaiId(Long localizacaoPaiId);
 

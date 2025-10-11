@@ -25,11 +25,13 @@ public class MovimentacaoResponseDTO {
     private Long localizacaoDestinoId;
     private String localizacaoDestinoNome;
     
-    private Long pessoaOrigemId;
-    private String pessoaOrigemNome;
+    // CORREÇÃO: Renomeado de pessoa para funcionario
+    private Long funcionarioOrigemId;
+    private String funcionarioOrigemNome;
     
-    private Long pessoaDestinoId;
-    private String pessoaDestinoNome;
+    // CORREÇÃO: Renomeado de pessoa para funcionario
+    private Long funcionarioDestinoId;
+    private String funcionarioDestinoNome;
     
     @JsonFormat(pattern = "dd/MM/yyyy")
     private LocalDate dataMovimentacao;

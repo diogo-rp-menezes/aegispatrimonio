@@ -20,7 +20,8 @@ public interface MovimentacaoRepository extends JpaRepository<Movimentacao, Long
 
     Page<Movimentacao> findByStatus(StatusMovimentacao status, Pageable pageable);
 
-    Page<Movimentacao> findByPessoaDestinoId(Long pessoaDestinoId, Pageable pageable);
+    // CORREÇÃO: Método renomeado para corresponder à entidade Movimentacao refatorada
+    Page<Movimentacao> findByFuncionarioDestinoId(Long funcionarioDestinoId, Pageable pageable);
 
     Page<Movimentacao> findByLocalizacaoDestinoId(Long localizacaoDestinoId, Pageable pageable);
 

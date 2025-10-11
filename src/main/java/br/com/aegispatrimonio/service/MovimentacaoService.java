@@ -5,17 +5,16 @@ import br.com.aegispatrimonio.dto.response.MovimentacaoResponseDTO;
 import br.com.aegispatrimonio.exception.ResourceConflictException;
 import br.com.aegispatrimonio.exception.ResourceNotFoundException;
 import br.com.aegispatrimonio.model.*;
-import br.com.aegispatrimonio.repository.AtivoRepository;
-import br.com.aegispatrimonio.repository.LocalizacaoRepository;
-import br.com.aegispatrimonio.repository.MovimentacaoRepository;
-import br.com.aegispatrimonio.repository.PessoaRepository;
+import br.com.aegispatrimonio.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Objects;
 import java.util.Optional;
@@ -29,13 +28,14 @@ public class MovimentacaoService {
     private final MovimentacaoRepository movimentacaoRepository;
     private final AtivoRepository ativoRepository;
     private final LocalizacaoRepository localizacaoRepository;
-    private final PessoaRepository pessoaRepository;
+    private final FuncionarioRepository funcionarioRepository;
+    private final FornecedorRepository fornecedorRepository;
 
     @Transactional
     public MovimentacaoResponseDTO criar(MovimentacaoRequestDTO request) {
-        log.info("Criando nova movimentação para o ativo ID: {}", request.getAtivoId());
+        log.info("Criando nova movimentação para o ativo ID: {}", request.ativoId());
 
-        if (movimentacaoRepository.existsByAtivoIdAndStatus(request.getAtivoId(), StatusMovimentacao.PENDENTE)) {
+        if (movimentacaoRepository.existsByAtivoIdAndStatus(request.ativoId(), StatusMovimentacao.PENDENTE)) {
             throw new ResourceConflictException("Já existe uma movimentação pendente para este ativo.");
         }
 
@@ -65,8 +65,8 @@ public class MovimentacaoService {
     }
 
     @Transactional(readOnly = true)
-    public Page<MovimentacaoResponseDTO> findByPessoaDestinoId(Long pessoaDestinoId, Pageable pageable) {
-        return movimentacaoRepository.findByPessoaDestinoId(pessoaDestinoId, pageable).map(this::convertToResponseDTO);
+    public Page<MovimentacaoResponseDTO> findByFuncionarioDestinoId(Long funcionarioDestinoId, Pageable pageable) {
+        return movimentacaoRepository.findByFuncionarioDestinoId(funcionarioDestinoId, pageable).map(this::convertToResponseDTO);
     }
 
     @Transactional(readOnly = true)
@@ -96,8 +96,7 @@ public class MovimentacaoService {
 
         Ativo ativo = movimentacao.getAtivo();
         ativo.setLocalizacao(movimentacao.getLocalizacaoDestino());
-        ativo.setPessoaResponsavel(movimentacao.getPessoaDestino());
-        // A filial do ativo não muda, pois a validação garante que a movimentação é dentro da mesma filial.
+        ativo.setFuncionarioResponsavel(movimentacao.getFuncionarioDestino());
         ativoRepository.save(ativo);
 
         movimentacao.setStatus(StatusMovimentacao.EFETIVADA);
@@ -139,48 +138,45 @@ public class MovimentacaoService {
     }
 
     private Movimentacao convertToEntity(MovimentacaoRequestDTO request) {
-        Ativo ativo = ativoRepository.findById(request.getAtivoId())
-                .orElseThrow(() -> new ResourceNotFoundException("Ativo não encontrado com ID: " + request.getAtivoId()));
+        Ativo ativo = ativoRepository.findById(request.ativoId())
+                .orElseThrow(() -> new ResourceNotFoundException("Ativo não encontrado com ID: " + request.ativoId()));
 
-        // Valida se o ativo está em condição de ser movimentado
         if (ativo.getStatus() != StatusAtivo.ATIVO) {
             throw new ResourceConflictException("Não é possível movimentar um ativo que não está com status 'ATIVO'. Status atual: " + ativo.getStatus());
         }
 
         Localizacao localizacaoOrigem = ativo.getLocalizacao();
-        Pessoa pessoaOrigem = ativo.getPessoaResponsavel();
+        Funcionario funcionarioOrigem = ativo.getFuncionarioResponsavel();
 
-        // Valida consistência da origem
-        if (!Objects.equals(localizacaoOrigem.getId(), request.getLocalizacaoOrigemId())) {
+        if (!Objects.equals(localizacaoOrigem.getId(), request.localizacaoOrigemId())) {
             throw new ResourceConflictException("A localização de origem informada não corresponde à localização atual do ativo.");
         }
-        if (!Objects.equals(pessoaOrigem.getId(), request.getPessoaOrigemId())) {
-            throw new ResourceConflictException("A pessoa de origem informada não corresponde ao responsável atual do ativo.");
+        if (!Objects.equals(funcionarioOrigem.getId(), request.funcionarioOrigemId())) {
+            throw new ResourceConflictException("O funcionário de origem informado não corresponde ao responsável atual do ativo.");
         }
 
-        Localizacao localizacaoDestino = localizacaoRepository.findById(request.getLocalizacaoDestinoId())
-                .orElseThrow(() -> new ResourceNotFoundException("Localização de destino não encontrada com ID: " + request.getLocalizacaoDestinoId()));
-        Pessoa pessoaDestino = pessoaRepository.findById(request.getPessoaDestinoId())
-                .orElseThrow(() -> new ResourceNotFoundException("Pessoa de destino não encontrada com ID: " + request.getPessoaDestinoId()));
+        Localizacao localizacaoDestino = localizacaoRepository.findById(request.localizacaoDestinoId())
+                .orElseThrow(() -> new ResourceNotFoundException("Localização de destino não encontrada com ID: " + request.localizacaoDestinoId()));
+        Funcionario funcionarioDestino = funcionarioRepository.findById(request.funcionarioDestinoId())
+                .orElseThrow(() -> new ResourceNotFoundException("Funcionário de destino não encontrado com ID: " + request.funcionarioDestinoId()));
 
-        // Valida se toda a movimentação ocorre dentro da mesma filial do ativo
         Long filialIdDoAtivo = ativo.getFilial().getId();
         if (!Objects.equals(localizacaoDestino.getFilial().getId(), filialIdDoAtivo)) {
             throw new IllegalArgumentException("A localização de destino deve pertencer à mesma filial do ativo.");
         }
-        if (!Objects.equals(pessoaDestino.getFilial().getId(), filialIdDoAtivo)) {
-            throw new IllegalArgumentException("A pessoa de destino deve pertencer à mesma filial do ativo.");
+        if (funcionarioDestino.getFiliais().stream().noneMatch(f -> f.getId().equals(filialIdDoAtivo))) {
+            throw new IllegalArgumentException("O funcionário de destino deve pertencer à mesma filial do ativo.");
         }
 
         Movimentacao movimentacao = new Movimentacao();
         movimentacao.setAtivo(ativo);
         movimentacao.setLocalizacaoOrigem(localizacaoOrigem);
         movimentacao.setLocalizacaoDestino(localizacaoDestino);
-        movimentacao.setPessoaOrigem(pessoaOrigem);
-        movimentacao.setPessoaDestino(pessoaDestino);
-        movimentacao.setDataMovimentacao(request.getDataMovimentacao());
-        movimentacao.setMotivo(request.getMotivo());
-        movimentacao.setObservacoes(request.getObservacoes());
+        movimentacao.setFuncionarioOrigem(funcionarioOrigem);
+        movimentacao.setFuncionarioDestino(funcionarioDestino);
+        movimentacao.setDataMovimentacao(request.dataMovimentacao());
+        movimentacao.setMotivo(request.motivo());
+        movimentacao.setObservacoes(request.observacoes());
         return movimentacao;
     }
 
@@ -194,10 +190,10 @@ public class MovimentacaoService {
         dto.setLocalizacaoOrigemNome(movimentacao.getLocalizacaoOrigem().getNome());
         dto.setLocalizacaoDestinoId(movimentacao.getLocalizacaoDestino().getId());
         dto.setLocalizacaoDestinoNome(movimentacao.getLocalizacaoDestino().getNome());
-        dto.setPessoaOrigemId(movimentacao.getPessoaOrigem().getId());
-        dto.setPessoaOrigemNome(movimentacao.getPessoaOrigem().getNome());
-        dto.setPessoaDestinoId(movimentacao.getPessoaDestino().getId());
-        dto.setPessoaDestinoNome(movimentacao.getPessoaDestino().getNome());
+        dto.setFuncionarioOrigemId(movimentacao.getFuncionarioOrigem().getId());
+        dto.setFuncionarioOrigemNome(movimentacao.getFuncionarioOrigem().getNome());
+        dto.setFuncionarioDestinoId(movimentacao.getFuncionarioDestino().getId());
+        dto.setFuncionarioDestinoNome(movimentacao.getFuncionarioDestino().getNome());
         dto.setDataMovimentacao(movimentacao.getDataMovimentacao());
         dto.setDataEfetivacao(movimentacao.getDataEfetivacao());
         dto.setStatus(movimentacao.getStatus());

@@ -1,6 +1,7 @@
 package br.com.aegispatrimonio.config;
 
-import br.com.aegispatrimonio.repository.PessoaRepository;
+import br.com.aegispatrimonio.model.Usuario;
+import br.com.aegispatrimonio.repository.UsuarioRepository;
 import br.com.aegispatrimonio.security.CustomUserDetails;
 import br.com.aegispatrimonio.security.JwtService;
 import lombok.RequiredArgsConstructor;
@@ -14,14 +15,15 @@ import org.springframework.context.annotation.Profile;
 @RequiredArgsConstructor
 public class DevConfig {
 
-    private final PessoaRepository pessoaRepository;
+    // CORREÇÃO: Injetado UsuarioRepository em vez de PessoaRepository
+    private final UsuarioRepository usuarioRepository;
     private final JwtService jwtService;
 
     @Bean
     public CommandLineRunner printDevToken() {
         return args -> {
-            // Busca o usuário administrador que criamos no script V2
-            pessoaRepository.findByEmail("admin@aegis.com").ifPresent(adminUser -> {
+            // CORREÇÃO: Busca o usuário na nova tabela de usuarios
+            usuarioRepository.findByEmail("admin@aegis.com").ifPresent(adminUser -> {
                 // Gera um token para ele
                 String token = jwtService.generateToken(new CustomUserDetails(adminUser));
 

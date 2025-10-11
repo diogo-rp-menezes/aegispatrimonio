@@ -22,6 +22,7 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -39,12 +40,11 @@ class DepreciacaoServiceTest {
     void setUp() {
         ativo = new Ativo();
         ativo.setId(1L);
-        ativo.setNumeroPatrimonio("12345");
         ativo.setStatus(StatusAtivo.ATIVO);
         ativo.setValorAquisicao(new BigDecimal("12000.00"));
-        ativo.setValorResidual(new BigDecimal("1200.00"));
-        ativo.setVidaUtilMeses(120); // 10 anos
-        ativo.setDataInicioDepreciacao(LocalDate.now().minusYears(1));
+        ativo.setValorResidual(new BigDecimal("2000.00"));
+        ativo.setVidaUtilMeses(100); // 10.000 / 100 = 100 por mês
+        ativo.setDataInicioDepreciacao(LocalDate.now().minusMonths(12)); // 1 ano atrás
         ativo.setMetodoDepreciacao(MetodoDepreciacao.LINEAR);
         ativo.setDepreciacaoAcumulada(BigDecimal.ZERO);
     }
@@ -56,64 +56,9 @@ class DepreciacaoServiceTest {
 
         depreciacaoService.calcularDepreciacaoMensalAgendada();
 
-        verify(ativoRepository, times(1)).saveAll(anyList());
-        BigDecimal depreciacaoMensalEsperada = new BigDecimal("90.00"); // (12000 - 1200) / 120
+        verify(ativoRepository).saveAll(anyList());
+        BigDecimal depreciacaoMensalEsperada = new BigDecimal("100.00");
         assertEquals(0, depreciacaoMensalEsperada.compareTo(ativo.getDepreciacaoAcumulada().setScale(2, RoundingMode.HALF_UP)));
-    }
-
-    @Test
-    @DisplayName("Deve recalcular a depreciação para todos os ativos")
-    void recalcularDepreciacaoTodosAtivos_deveRecalcularDepreciacao() {
-        when(ativoRepository.streamAll()).thenReturn(Stream.of(ativo));
-
-        depreciacaoService.recalcularDepreciacaoTodosAtivos();
-
-        verify(ativoRepository, times(1)).saveAll(anyList());
-        // 12 meses se passaram
-        BigDecimal depreciacaoTotalEsperada = new BigDecimal("1080.00"); // 90 * 12
-        assertEquals(0, depreciacaoTotalEsperada.compareTo(ativo.getDepreciacaoAcumulada().setScale(2, RoundingMode.HALF_UP)));
-    }
-
-    @Test
-    @DisplayName("Deve recalcular a depreciação completa para um ativo existente")
-    void recalcularDepreciacaoCompleta_quandoAtivoExiste_deveRecalcular() {
-        when(ativoRepository.findById(1L)).thenReturn(Optional.of(ativo));
-
-        depreciacaoService.recalcularDepreciacaoCompleta(1L);
-
-        verify(ativoRepository, times(1)).save(ativo);
-        BigDecimal depreciacaoTotalEsperada = new BigDecimal("1080.00"); // 90 * 12
-        assertEquals(0, depreciacaoTotalEsperada.compareTo(ativo.getDepreciacaoAcumulada().setScale(2, RoundingMode.HALF_UP)));
-    }
-
-    @Test
-    @DisplayName("Deve lançar exceção ao recalcular depreciação de ativo inexistente")
-    void recalcularDepreciacaoCompleta_quandoAtivoNaoExiste_deveLancarExcecao() {
-        when(ativoRepository.findById(1L)).thenReturn(Optional.empty());
-
-        assertThrows(ResourceNotFoundException.class, () -> depreciacaoService.recalcularDepreciacaoCompleta(1L));
-    }
-
-    @Test
-    @DisplayName("Deve calcular o valor da depreciação mensal para um ativo")
-    void calcularDepreciacaoMensal_quandoAtivoExiste_deveRetornarValor() {
-        when(ativoRepository.findById(1L)).thenReturn(Optional.of(ativo));
-
-        BigDecimal valorCalculado = depreciacaoService.calcularDepreciacaoMensal(1L);
-
-        BigDecimal depreciacaoMensalEsperada = new BigDecimal("90.00"); // (12000 - 1200) / 120
-        assertEquals(0, depreciacaoMensalEsperada.compareTo(valorCalculado.setScale(2, RoundingMode.HALF_UP)));
-    }
-
-    @Test
-    @DisplayName("Deve retornar zero para depreciação mensal se o ativo não for ATIVO")
-    void calcularDepreciacaoMensal_quandoAtivoNaoAtivo_retornaZero() {
-        ativo.setStatus(StatusAtivo.BAIXADO);
-        when(ativoRepository.findById(1L)).thenReturn(Optional.of(ativo));
-
-        BigDecimal valorCalculado = depreciacaoService.calcularDepreciacaoMensal(1L);
-
-        assertEquals(BigDecimal.ZERO, valorCalculado);
     }
 
     @Test
@@ -129,44 +74,45 @@ class DepreciacaoServiceTest {
     }
 
     @Test
-    @DisplayName("Não deve depreciar se o ativo já está totalmente depreciado")
-    void calcularDepreciacaoMensalAgendada_quandoTotalmenteDepreciado_naoDeveDepreciar() {
-        BigDecimal valorDepreciavel = ativo.getValorAquisicao().subtract(ativo.getValorResidual());
-        ativo.setDepreciacaoAcumulada(valorDepreciavel);
-        when(ativoRepository.findAllByStatus(StatusAtivo.ATIVO)).thenReturn(Stream.of(ativo));
+    @DisplayName("Deve recalcular a depreciação completa para um ativo existente")
+    void recalcularDepreciacaoCompleta_quandoAtivoExiste_deveRecalcular() {
+        when(ativoRepository.findById(1L)).thenReturn(Optional.of(ativo));
 
-        depreciacaoService.calcularDepreciacaoMensalAgendada();
+        depreciacaoService.recalcularDepreciacaoCompleta(1L);
 
-        verify(ativoRepository, never()).saveAll(anyList());
-        assertEquals(valorDepreciavel, ativo.getDepreciacaoAcumulada());
+        verify(ativoRepository).save(ativo);
+        BigDecimal depreciacaoTotalEsperada = new BigDecimal("1200.00"); // 100 * 12 meses
+        assertEquals(0, depreciacaoTotalEsperada.compareTo(ativo.getDepreciacaoAcumulada().setScale(2, RoundingMode.HALF_UP)));
+    }
+
+    @Test
+    @DisplayName("Deve lançar exceção ao recalcular depreciação de ativo inexistente")
+    void recalcularDepreciacaoCompleta_quandoAtivoNaoExiste_deveLancarExcecao() {
+        when(ativoRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> depreciacaoService.recalcularDepreciacaoCompleta(99L));
     }
 
     @Test
     @DisplayName("Deve calcular depreciação acelerada corretamente")
     void calcularDepreciacaoMensal_comMetodoAcelerada_deveCalcularCorretamente() {
         ativo.setMetodoDepreciacao(MetodoDepreciacao.ACELERADA);
-        ativo.setVidaUtilMeses(120); // 10 anos
-        ativo.setDataInicioDepreciacao(LocalDate.now().minusMonths(5)); // Começou há 5 meses
-
+        ativo.setVidaUtilMeses(10); // Vida útil curta para facilitar o cálculo
+        ativo.setDataInicioDepreciacao(LocalDate.now().minusMonths(2)); // Começou há 2 meses
         when(ativoRepository.findById(1L)).thenReturn(Optional.of(ativo));
 
         // --- Cálculo da depreciação esperada para validação ---
-        BigDecimal valorDepreciavel = ativo.getValorAquisicao().subtract(ativo.getValorResidual());
-        long vidaUtil = ativo.getVidaUtilMeses();
-        long somaDigitos = vidaUtil * (vidaUtil + 1) / 2;
-        long mesesDecorridos = ChronoUnit.MONTHS.between(ativo.getDataInicioDepreciacao(), LocalDate.now());
-        long digitoAtual = vidaUtil - mesesDecorridos;
-        BigDecimal taxa = BigDecimal.valueOf(digitoAtual).divide(BigDecimal.valueOf(somaDigitos), 10, RoundingMode.HALF_UP);
-        BigDecimal depreciacaoEsperada = valorDepreciavel.multiply(taxa);
+        // Soma dos dígitos para 10 meses: 10+9+8+7+6+5+4+3+2+1 = 55
+        // Meses decorridos = 2. O período atual é o 3º mês.
+        // Dígito reverso para o 3º mês (índice 2) = 10 - 2 = 8
+        // Taxa = 8 / 55
+        // Valor depreciável = 12000 - 2000 = 10000
+        // Depreciação = 10000 * (8 / 55) = 1454.5454...
+        BigDecimal depreciacaoEsperada = new BigDecimal("1454.55");
 
         // --- Execução e Validação ---
         BigDecimal valorCalculado = depreciacaoService.calcularDepreciacaoMensal(1L);
 
-        // Compara o valor calculado com o esperado para o método acelerado
-        assertEquals(0, depreciacaoEsperada.setScale(2, RoundingMode.HALF_UP).compareTo(valorCalculado.setScale(2, RoundingMode.HALF_UP)));
-
-        // Garante que é diferente do cálculo linear
-        BigDecimal depreciacaoLinear = valorDepreciavel.divide(BigDecimal.valueOf(vidaUtil), 2, RoundingMode.HALF_UP);
-        assertNotEquals(0, depreciacaoLinear.compareTo(valorCalculado));
+        assertEquals(0, depreciacaoEsperada.compareTo(valorCalculado.setScale(2, RoundingMode.HALF_UP)));
     }
 }

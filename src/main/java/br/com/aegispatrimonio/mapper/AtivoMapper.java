@@ -3,6 +3,7 @@ package br.com.aegispatrimonio.mapper;
 import br.com.aegispatrimonio.dto.AtivoCreateDTO;
 import br.com.aegispatrimonio.dto.AtivoDTO;
 import br.com.aegispatrimonio.model.Ativo;
+import br.com.aegispatrimonio.model.Funcionario;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -12,14 +13,22 @@ public class AtivoMapper {
         if (ativo == null) {
             return null;
         }
+
+        // CORREÇÃO: Lógica para extrair dados do funcionário responsável
+        Funcionario responsavel = ativo.getFuncionarioResponsavel();
+        Long responsavelId = (responsavel != null) ? responsavel.getId() : null;
+        String responsavelNome = (responsavel != null) ? responsavel.getNome() : null;
+
         return new AtivoDTO(
                 ativo.getId(),
                 ativo.getNome(),
                 ativo.getNumeroPatrimonio(),
                 ativo.getTipoAtivo().getNome(),
-                ativo.getLocalizacao() != null ? ativo.getLocalizacao().getNome() : null, // Trata campo opcional
-                ativo.getFilial().getNome(), // Mapeia o nome da Filial
-                ativo.getStatus()
+                ativo.getLocalizacao() != null ? ativo.getLocalizacao().getNome() : null,
+                ativo.getFilial().getNome(),
+                ativo.getStatus(),
+                responsavelId,
+                responsavelNome
         );
     }
 
@@ -36,8 +45,8 @@ public class AtivoMapper {
         ativo.setObservacoes(ativoCreateDTO.observacoes());
         ativo.setInformacoesGarantia(ativoCreateDTO.informacoesGarantia());
 
-        // As entidades relacionadas (Filial, TipoAtivo, Localizacao, etc.) serão
-        // buscadas e atribuídas na camada de Serviço (Service).
+        // As entidades relacionadas (Filial, TipoAtivo, Funcionario, etc.) 
+        // são buscadas e atribuídas na camada de Serviço (Service).
 
         return ativo;
     }

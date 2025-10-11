@@ -66,13 +66,15 @@ public class Manutencao {
     @JoinColumn(name = "fornecedor_id")
     private Fornecedor fornecedor;
 
+    // CORREÇÃO: Alterado de Pessoa para Funcionario
     @ManyToOne
     @JoinColumn(name = "solicitante_id", nullable = false)
-    private Pessoa solicitante;
+    private Funcionario solicitante;
 
+    // CORREÇÃO: Alterado de Pessoa para Funcionario
     @ManyToOne
     @JoinColumn(name = "tecnico_responsavel_id")
-    private Pessoa tecnicoResponsavel;
+    private Funcionario tecnicoResponsavel;
 
     private Integer tempoExecucaoMinutos;
 

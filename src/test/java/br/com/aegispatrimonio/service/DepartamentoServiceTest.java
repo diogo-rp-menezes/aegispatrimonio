@@ -1,15 +1,15 @@
 package br.com.aegispatrimonio.service;
 
 import br.com.aegispatrimonio.dto.DepartamentoCreateDTO;
-import br.com.aegispatrimonio.dto.DepartamentoDTO;
 import br.com.aegispatrimonio.dto.DepartamentoUpdateDTO;
 import br.com.aegispatrimonio.mapper.DepartamentoMapper;
 import br.com.aegispatrimonio.model.Departamento;
 import br.com.aegispatrimonio.model.Filial;
-import br.com.aegispatrimonio.model.Pessoa;
+import br.com.aegispatrimonio.model.Funcionario;
+import br.com.aegispatrimonio.model.Usuario;
 import br.com.aegispatrimonio.repository.DepartamentoRepository;
 import br.com.aegispatrimonio.repository.FilialRepository;
-import br.com.aegispatrimonio.repository.PessoaRepository;
+import br.com.aegispatrimonio.repository.FuncionarioRepository;
 import br.com.aegispatrimonio.security.CustomUserDetails;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.AfterEach;
@@ -20,15 +20,19 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -42,43 +46,59 @@ class DepartamentoServiceTest {
     @Mock
     private FilialRepository filialRepository;
     @Mock
-    private PessoaRepository pessoaRepository;
+    private FuncionarioRepository funcionarioRepository;
 
     @InjectMocks
     private DepartamentoService departamentoService;
 
     private MockedStatic<SecurityContextHolder> mockedSecurityContextHolder;
-    private Pessoa admin, userFilialA;
+
+    // Entidades de Teste
+    private Usuario adminUser, regularUser;
     private Filial filialA, filialB;
-    private Departamento departamento;
+    private Departamento deptoFilialA, deptoFilialB;
 
     @BeforeEach
     void setUp() {
+        // Configuração de Filiais
         filialA = new Filial();
         filialA.setId(1L);
-
         filialB = new Filial();
         filialB.setId(2L);
 
-        admin = new Pessoa();
-        admin.setId(1L);
-        admin.setRole("ROLE_ADMIN");
-        admin.setFilial(filialA);
+        // Configuração de Usuários e Funcionários
+        Funcionario adminFunc = new Funcionario();
+        adminFunc.setId(1L);
+        adminFunc.setFiliais(Set.of(filialA, filialB));
+        adminUser = new Usuario();
+        adminUser.setId(1L);
+        adminUser.setRole("ROLE_ADMIN");
+        adminUser.setFuncionario(adminFunc);
 
-        userFilialA = new Pessoa();
-        userFilialA.setId(2L);
-        userFilialA.setRole("ROLE_USER");
-        userFilialA.setFilial(filialA);
+        Funcionario regularFunc = new Funcionario();
+        regularFunc.setId(2L);
+        regularFunc.setFiliais(Set.of(filialA));
+        regularUser = new Usuario();
+        regularUser.setId(2L);
+        regularUser.setRole("ROLE_USER");
+        regularUser.setFuncionario(regularFunc);
 
-        departamento = new Departamento();
-        departamento.setId(10L);
-        departamento.setNome("TI");
-        departamento.setFilial(filialA);
+        // Configuração de Departamentos
+        deptoFilialA = new Departamento();
+        deptoFilialA.setId(10L);
+        deptoFilialA.setNome("TI");
+        deptoFilialA.setFilial(filialA);
 
-        Authentication authentication = mock(Authentication.class);
-        SecurityContext securityContext = mock(SecurityContext.class);
-        when(securityContext.getAuthentication()).thenReturn(authentication);
-        mockedSecurityContextHolder = mockStatic(SecurityContextHolder.class);
+        deptoFilialB = new Departamento();
+        deptoFilialB.setId(20L);
+        deptoFilialB.setNome("RH");
+        deptoFilialB.setFilial(filialB);
+
+        // Mock do SecurityContext
+        Authentication authentication = Mockito.mock(Authentication.class);
+        SecurityContext securityContext = Mockito.mock(SecurityContext.class);
+        lenient().when(securityContext.getAuthentication()).thenReturn(authentication);
+        mockedSecurityContextHolder = Mockito.mockStatic(SecurityContextHolder.class);
         mockedSecurityContextHolder.when(SecurityContextHolder::getContext).thenReturn(securityContext);
     }
 
@@ -87,70 +107,103 @@ class DepartamentoServiceTest {
         mockedSecurityContextHolder.close();
     }
 
-    private void mockUser(Pessoa pessoa) {
-        CustomUserDetails userDetails = new CustomUserDetails(pessoa);
-        when(SecurityContextHolder.getContext().getAuthentication().getPrincipal()).thenReturn(userDetails);
+    private void mockUser(Usuario usuario) {
+        CustomUserDetails userDetails = new CustomUserDetails(usuario);
+        lenient().when(SecurityContextHolder.getContext().getAuthentication().getPrincipal()).thenReturn(userDetails);
     }
 
     @Test
-    @DisplayName("Criar: Deve lançar exceção se nome do departamento já existir na mesma filial")
-    void criar_quandoNomeDuplicadoNaFilial_deveLancarExcecao() {
-        mockUser(admin);
+    @DisplayName("ListarTodos: Admin deve retornar todos os departamentos")
+    void listarTodos_quandoAdmin_deveRetornarTodos() {
+        mockUser(adminUser);
+        when(departamentoRepository.findAll()).thenReturn(List.of(deptoFilialA, deptoFilialB));
+
+        departamentoService.listarTodos();
+
+        verify(departamentoRepository).findAll();
+        verify(departamentoRepository, never()).findByFilialIdIn(any());
+    }
+
+    @Test
+    @DisplayName("ListarTodos: Usuário comum deve retornar apenas departamentos de suas filiais")
+    void listarTodos_quandoNaoAdmin_deveRetornarApenasDaSuaFilial() {
+        mockUser(regularUser);
+        Set<Long> expectedFilialIds = Set.of(1L);
+        when(departamentoRepository.findByFilialIdIn(expectedFilialIds)).thenReturn(List.of(deptoFilialA));
+
+        departamentoService.listarTodos();
+
+        verify(departamentoRepository, never()).findAll();
+        verify(departamentoRepository).findByFilialIdIn(expectedFilialIds);
+    }
+
+    @Test
+    @DisplayName("BuscarPorId: Admin pode acessar departamento de qualquer filial")
+    void buscarPorId_quandoAdmin_deveRetornarDepartamento() {
+        mockUser(adminUser);
+        when(departamentoRepository.findById(20L)).thenReturn(Optional.of(deptoFilialB));
+
+        assertDoesNotThrow(() -> departamentoService.buscarPorId(20L));
+        verify(departamentoRepository).findById(20L);
+    }
+
+    @Test
+    @DisplayName("BuscarPorId: Usuário comum não pode acessar departamento de outra filial")
+    void buscarPorId_quandoNaoAdminEOutraFilial_deveLancarExcecao() {
+        mockUser(regularUser);
+        when(departamentoRepository.findById(20L)).thenReturn(Optional.of(deptoFilialB));
+
+        assertThrows(AccessDeniedException.class, () -> departamentoService.buscarPorId(20L));
+    }
+
+    @Test
+    @DisplayName("Criar: Deve criar departamento com sucesso")
+    void criar_quandoValido_deveSalvar() {
+        DepartamentoCreateDTO createDTO = new DepartamentoCreateDTO("Financeiro", 1L);
+        when(filialRepository.findById(1L)).thenReturn(Optional.of(filialA));
+        when(departamentoRepository.findByNomeAndFilialId("Financeiro", 1L)).thenReturn(Optional.empty());
+        when(departamentoMapper.toEntity(createDTO)).thenReturn(new Departamento());
+
+        departamentoService.criar(createDTO);
+
+        verify(departamentoRepository).save(any(Departamento.class));
+    }
+
+    @Test
+    @DisplayName("Criar: Deve lançar exceção para nome duplicado na mesma filial")
+    void criar_quandoNomeDuplicado_deveLancarExcecao() {
         DepartamentoCreateDTO createDTO = new DepartamentoCreateDTO("TI", 1L);
         when(filialRepository.findById(1L)).thenReturn(Optional.of(filialA));
-        // CORREÇÃO: Retornar o departamento com ID para evitar NullPointerException na validação.
-        when(departamentoRepository.findByNomeAndFilialId("TI", 1L)).thenReturn(Optional.of(departamento));
+        when(departamentoRepository.findByNomeAndFilialId("TI", 1L)).thenReturn(Optional.of(deptoFilialA));
 
         assertThrows(IllegalArgumentException.class, () -> departamentoService.criar(createDTO));
     }
 
     @Test
-    @DisplayName("Criar: Deve permitir criar departamento com nome duplicado em filial diferente")
-    void criar_quandoNomeDuplicadoEmOutraFilial_deveCriar() {
-        mockUser(admin);
-        DepartamentoCreateDTO createDTO = new DepartamentoCreateDTO("Financeiro", 2L); // Criando na Filial B
-        when(filialRepository.findById(2L)).thenReturn(Optional.of(filialB));
-        // Simula que "Financeiro" já existe, mas em outra filial (não será encontrado por findByNomeAndFilialId)
-        when(departamentoRepository.findByNomeAndFilialId("Financeiro", 2L)).thenReturn(Optional.empty());
-        when(departamentoMapper.toEntity(createDTO)).thenReturn(new Departamento());
-        when(departamentoRepository.save(any(Departamento.class))).thenReturn(new Departamento());
-
-        assertDoesNotThrow(() -> departamentoService.criar(createDTO));
-        verify(departamentoRepository).save(any(Departamento.class));
-    }
-
-    @Test
-    @DisplayName("Deletar: Deve lançar exceção se houver pessoas associadas")
-    void deletar_quandoPessoasAssociadas_deveLancarExcecao() {
-        mockUser(admin);
-        when(departamentoRepository.findById(10L)).thenReturn(Optional.of(departamento));
-        when(pessoaRepository.existsByDepartamentoId(10L)).thenReturn(true);
-
-        assertThrows(IllegalStateException.class, () -> departamentoService.deletar(10L));
-        verify(departamentoRepository, never()).delete(any());
-    }
-
-    @Test
     @DisplayName("Deletar: Deve deletar com sucesso quando não há dependências")
-    void deletar_quandoSemPessoasAssociadas_deveDeletar() {
-        mockUser(admin);
-        when(departamentoRepository.findById(10L)).thenReturn(Optional.of(departamento));
-        when(pessoaRepository.existsByDepartamentoId(10L)).thenReturn(false);
+    void deletar_quandoSemDependencias_deveChamarDelete() {
+        when(departamentoRepository.existsById(10L)).thenReturn(true);
+        when(funcionarioRepository.existsByDepartamentoId(10L)).thenReturn(false);
 
         departamentoService.deletar(10L);
 
-        verify(departamentoRepository).delete(departamento);
+        verify(departamentoRepository).deleteById(10L);
     }
 
     @Test
-    @DisplayName("BuscarPorId: Não-admin não pode ver departamento de outra filial")
-    void buscarPorId_quandoNaoAdminEOutraFilial_deveLancarExcecao() {
-        mockUser(userFilialA);
-        Departamento deptoFilialB = new Departamento();
-        deptoFilialB.setId(20L);
-        deptoFilialB.setFilial(filialB);
-        when(departamentoRepository.findById(20L)).thenReturn(Optional.of(deptoFilialB));
+    @DisplayName("Deletar: Deve lançar exceção se houver funcionários associados")
+    void deletar_quandoFuncionarioAssociado_deveLancarExcecao() {
+        when(departamentoRepository.existsById(10L)).thenReturn(true);
+        when(funcionarioRepository.existsByDepartamentoId(10L)).thenReturn(true);
 
-        assertThrows(AccessDeniedException.class, () -> departamentoService.buscarPorId(20L));
+        assertThrows(IllegalStateException.class, () -> departamentoService.deletar(10L));
+    }
+
+    @Test
+    @DisplayName("Deletar: Deve lançar exceção se departamento não existe")
+    void deletar_quandoNaoExiste_deveLancarExcecao() {
+        when(departamentoRepository.existsById(99L)).thenReturn(false);
+
+        assertThrows(EntityNotFoundException.class, () -> departamentoService.deletar(99L));
     }
 }

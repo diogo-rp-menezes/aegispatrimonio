@@ -66,6 +66,7 @@ public class DepreciacaoService {
     }
 
     public BigDecimal calcularDepreciacaoMensal(Long ativoId) {
+        // CORREÇÃO: Utiliza o método auxiliar que já trata o caso de 'não encontrado'.
         Ativo ativo = findAtivoById(ativoId);
         if (isAtivoElegivelParaDepreciacao(ativo)) {
             return calcularValorDepreciacaoMensal(ativo);

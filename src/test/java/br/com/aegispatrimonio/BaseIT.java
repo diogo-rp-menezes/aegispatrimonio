@@ -1,37 +1,56 @@
 package br.com.aegispatrimonio;
 
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.jdbc.Sql;
 import org.testcontainers.containers.MySQLContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-
-import java.time.Duration;
+import org.testcontainers.DockerClientFactory;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
-@Sql(scripts = "/cleanup.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 @ActiveProfiles("test")
-@AutoConfigureMockMvc
-@DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_CLASS)
+@Sql(scripts = "/cleanup.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 public abstract class BaseIT {
 
-    @Container
-    public static MySQLContainer<?> mysqlContainer = new MySQLContainer<>("mysql:8.3.0")
-            .withStartupTimeout(Duration.ofSeconds(240))
-            .waitingFor(Wait.forLogMessage(".*mysqld: ready for connections.*\\s", 1));
+    // Tenta usar Testcontainers/MySQL quando o Docker estiver disponível.
+    // Caso contrário, fazemos fallback para H2 in-memory para permitir execução local sem Docker.
 
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", mysqlContainer::getJdbcUrl);
-        registry.add("spring.datasource.username", mysqlContainer::getUsername);
-        registry.add("spring.datasource.password", mysqlContainer::getPassword);
+    public static MySQLContainer<?> mysqlContainer;
+
+    static {
+        if (DockerClientFactory.instance().isDockerAvailable()) {
+            mysqlContainer = new MySQLContainer<>("mysql:8.0.26")
+                    .withDatabaseName("testdb")
+                    .withUsername("testuser")
+                    .withPassword("testpass");
+            // Start container programmatically so lifecycle is explicit
+            mysqlContainer.start();
+        } else {
+            mysqlContainer = null; // Indica fallback para H2
+        }
     }
 
+    @DynamicPropertySource
+    static void setProperties(DynamicPropertyRegistry registry) {
+        if (mysqlContainer != null) {
+            registry.add("spring.datasource.url", mysqlContainer::getJdbcUrl);
+            registry.add("spring.datasource.username", mysqlContainer::getUsername);
+            registry.add("spring.datasource.password", mysqlContainer::getPassword);
+            registry.add("spring.datasource.driver-class-name", mysqlContainer::getDriverClassName);
+            // Use update to allow Hibernate to add missing columns when migrations are out-of-sync
+            registry.add("spring.flyway.enabled", () -> "true");
+            registry.add("spring.jpa.hibernate.ddl-auto", () -> "update");
+        } else {
+            // Fallback: H2 in-memory - bom para testes unitários/locais sem Docker.
+            registry.add("spring.datasource.url", () -> "jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=MYSQL");
+            registry.add("spring.datasource.username", () -> "sa");
+            registry.add("spring.datasource.password", () -> "");
+            registry.add("spring.datasource.driver-class-name", () -> "org.h2.Driver");
+            registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
+            registry.add("spring.flyway.enabled", () -> "false");
+        }
+    }
 }

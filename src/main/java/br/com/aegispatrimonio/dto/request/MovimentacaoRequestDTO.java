@@ -3,38 +3,32 @@ package br.com.aegispatrimonio.dto.request;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-public class MovimentacaoRequestDTO {
-
+// CORREÇÃO: Transformado em record para padronização e imutabilidade.
+public record MovimentacaoRequestDTO(
     @NotNull(message = "Ativo é obrigatório")
-    private Long ativoId;
+    Long ativoId,
 
     @NotNull(message = "Localização de origem é obrigatória")
-    private Long localizacaoOrigemId;
+    Long localizacaoOrigemId,
 
     @NotNull(message = "Localização de destino é obrigatória")
-    private Long localizacaoDestinoId;
+    Long localizacaoDestinoId,
 
-    @NotNull(message = "Pessoa de origem é obrigatória")
-    private Long pessoaOrigemId;
+    @NotNull(message = "Funcionário de origem é obrigatório")
+    Long funcionarioOrigemId,
 
-    @NotNull(message = "Pessoa de destino é obrigatória")
-    private Long pessoaDestinoId;
+    @NotNull(message = "Funcionário de destino é obrigatório")
+    Long funcionarioDestinoId,
 
-    private LocalDate dataMovimentacao;
+    LocalDate dataMovimentacao,
 
     @NotBlank(message = "Motivo é obrigatório")
     @Size(max = 255, message = "Motivo deve ter no máximo 255 caracteres")
-    private String motivo;
+    String motivo,
 
     @Size(max = 500, message = "Observações devem ter no máximo 500 caracteres")
-    private String observacoes;
-}
+    String observacoes
+) {}

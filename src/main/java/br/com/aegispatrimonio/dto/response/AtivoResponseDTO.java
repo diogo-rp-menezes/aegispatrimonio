@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import br.com.aegispatrimonio.model.Ativo;
+import br.com.aegispatrimonio.model.Funcionario;
 import br.com.aegispatrimonio.model.MetodoDepreciacao;
 import br.com.aegispatrimonio.model.StatusAtivo;
 import lombok.AllArgsConstructor;
@@ -44,8 +45,11 @@ public class AtivoResponseDTO {
     private BigDecimal depreciacaoAcumulada;
     private BigDecimal valorContabilAtual;
     private String informacoesGarantia;
-    private Long pessoaResponsavelId;
-    private String pessoaResponsavelNome;
+    
+    // CORREÇÃO: Nomenclatura dos campos atualizada
+    private Long funcionarioResponsavelId;
+    private String funcionarioResponsavelNome;
+    
     private String observacoes;
     
     @JsonFormat(pattern = "dd/MM/yyyy")
@@ -89,7 +93,6 @@ public class AtivoResponseDTO {
         dto.setDataInicioDepreciacao(ativo.getDataInicioDepreciacao());
         dto.setTaxaDepreciacaoMensal(ativo.getTaxaDepreciacaoMensal());
         
-        // Calcular depreciação acumulada e valor contábil
         if (ativo.getDataInicioDepreciacao() != null && ativo.getTaxaDepreciacaoMensal() != null) {
             dto.setDepreciacaoAcumulada(ativo.calcularDepreciacaoAtual());
             dto.setValorContabilAtual(ativo.getValorAquisicao().subtract(dto.getDepreciacaoAcumulada()));
@@ -97,9 +100,11 @@ public class AtivoResponseDTO {
         
         dto.setInformacoesGarantia(ativo.getInformacoesGarantia());
         
-        if (ativo.getPessoaResponsavel() != null) {
-            dto.setPessoaResponsavelId(ativo.getPessoaResponsavel().getId());
-            dto.setPessoaResponsavelNome(ativo.getPessoaResponsavel().getNome());
+        // CORREÇÃO: Usa o novo método getFuncionarioResponsavel()
+        if (ativo.getFuncionarioResponsavel() != null) {
+            Funcionario responsavel = ativo.getFuncionarioResponsavel();
+            dto.setFuncionarioResponsavelId(responsavel.getId());
+            dto.setFuncionarioResponsavelNome(responsavel.getNome());
         }
         
         dto.setObservacoes(ativo.getObservacoes());

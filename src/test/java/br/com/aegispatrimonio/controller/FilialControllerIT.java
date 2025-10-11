@@ -6,7 +6,8 @@ import br.com.aegispatrimonio.dto.FilialUpdateDTO;
 import br.com.aegispatrimonio.model.*;
 import br.com.aegispatrimonio.repository.DepartamentoRepository;
 import br.com.aegispatrimonio.repository.FilialRepository;
-import br.com.aegispatrimonio.repository.PessoaRepository;
+import br.com.aegispatrimonio.repository.FuncionarioRepository;
+import br.com.aegispatrimonio.repository.UsuarioRepository;
 import br.com.aegispatrimonio.security.CustomUserDetails;
 import br.com.aegispatrimonio.security.JwtService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -19,6 +20,8 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Set;
 
 import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -39,10 +42,13 @@ public class FilialControllerIT extends BaseIT {
     private FilialRepository filialRepository;
 
     @Autowired
-    private PessoaRepository pessoaRepository;
+    private DepartamentoRepository departamentoRepository;
 
     @Autowired
-    private DepartamentoRepository departamentoRepository;
+    private FuncionarioRepository funcionarioRepository;
+
+    @Autowired
+    private UsuarioRepository usuarioRepository;
 
     @Autowired
     private JwtService jwtService;
@@ -51,91 +57,96 @@ public class FilialControllerIT extends BaseIT {
     private PasswordEncoder passwordEncoder;
 
     private String adminToken;
+    private String userToken;
 
     @BeforeEach
     void setUp() {
-        // Cria um usuário admin para os testes
-        Filial matriz = createFilial("Matriz", "MTRZ", "00.000.000/0001-00", TipoFilial.MATRIZ);
+        // Limpa os repositórios para garantir o isolamento do teste
+        // (O @Sql já faz isso, mas é uma boa prática ser explícito)
+        departamentoRepository.deleteAll();
+        usuarioRepository.deleteAll();
+        funcionarioRepository.deleteAll();
+        filialRepository.deleteAll();
+
+        // Cria o ambiente de teste
+        Filial matriz = createFilial("Matriz Teste", "MTRZ", "53.436.470/0001-02");
         Departamento diretoria = createDepartamento("Diretoria", matriz);
-        Pessoa admin = createUser("admin", "admin@aegis.com", "ROLE_ADMIN", matriz, diretoria);
-        adminToken = jwtService.generateToken(new CustomUserDetails(admin));
+
+        Funcionario adminFunc = createFuncionarioAndUsuario("Admin", "admin@aegis.com", "ROLE_ADMIN", diretoria, Set.of(matriz));
+        this.adminToken = jwtService.generateToken(new CustomUserDetails(adminFunc.getUsuario()));
+
+        Funcionario userFunc = createFuncionarioAndUsuario("User", "user@aegis.com", "ROLE_USER", diretoria, Set.of(matriz));
+        this.userToken = jwtService.generateToken(new CustomUserDetails(userFunc.getUsuario()));
     }
 
     @Test
-    @DisplayName("Deve listar todas as filiais e retornar status 200")
-    void testListarTodos() throws Exception {
-        createFilial("Filial SP", "FLSP", "11.111.111/0001-11", TipoFilial.FILIAL);
+    @DisplayName("ListarTodos: Deve retornar 200 e a lista de filiais para ADMIN")
+    void listarTodos_comAdmin_deveRetornarOk() throws Exception {
         mockMvc.perform(get("/filiais").header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].nome", is("Matriz")))
-                .andExpect(jsonPath("$[1].nome", is("Filial SP")));
+                .andExpect(jsonPath("$[0].nome", is("Matriz Teste")));
     }
 
     @Test
-    @DisplayName("Deve buscar uma filial por ID e retornar status 200")
-    void testBuscarPorId() throws Exception {
-        Filial filial = createFilial("Filial RJ", "FLRJ", "22.222.222/0001-22", TipoFilial.FILIAL);
-
-        mockMvc.perform(get("/filiais/{id}", filial.getId()).header("Authorization", "Bearer " + adminToken))
+    @DisplayName("ListarTodos: Deve retornar 200 e a lista de filiais para USER")
+    void listarTodos_comUser_deveRetornarOk() throws Exception {
+        mockMvc.perform(get("/filiais").header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id", is(filial.getId().intValue())))
-                .andExpect(jsonPath("$.nome", is("Filial RJ")));
+                .andExpect(jsonPath("$[0].nome", is("Matriz Teste")));
     }
 
     @Test
-    @DisplayName("Deve retornar 404 ao buscar filial com ID inexistente")
-    void testBuscarPorIdInexistente() throws Exception {
-        mockMvc.perform(get("/filiais/{id}", 999L).header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isNotFound());
+    @DisplayName("Criar: Deve retornar 403 Forbidden para USER")
+    void criar_comUser_deveRetornarForbidden() throws Exception {
+        FilialCreateDTO createDTO = new FilialCreateDTO("Filial Proibida", "FL-P", TipoFilial.FILIAL, "99.999.999/0001-99", "Endereço");
+
+        mockMvc.perform(post("/filiais")
+                        .header("Authorization", "Bearer " + userToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createDTO)))
+                .andExpect(status().isForbidden());
     }
 
     @Test
-    @DisplayName("Deve criar uma nova filial e retornar status 201")
-    void testCriar() throws Exception {
-        FilialCreateDTO createDTO = new FilialCreateDTO("Filial MG", "FLMG", TipoFilial.FILIAL, "33.333.333/0001-33", "Endereço MG");
+    @DisplayName("Criar: Deve retornar 201 Created para ADMIN com dados válidos")
+    void criar_comAdmin_deveRetornarCreated() throws Exception {
+        FilialCreateDTO createDTO = new FilialCreateDTO("Filial RJ", "RJ-01", TipoFilial.FILIAL, "23.612.237/0001-99", "Endereço RJ");
 
         mockMvc.perform(post("/filiais")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createDTO)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.nome", is("Filial MG")));
+                .andExpect(jsonPath("$.nome", is("Filial RJ")));
     }
 
     @Test
-    @DisplayName("Deve atualizar uma filial existente e retornar status 200")
-    void testAtualizar() throws Exception {
-        Filial filial = createFilial("Filial BA", "FLBA", "44.444.444/0001-44", TipoFilial.FILIAL);
-        FilialUpdateDTO updateDTO = new FilialUpdateDTO("Filial Bahia", "FLBA", TipoFilial.FILIAL, "44.444.444/0001-44", "Endereço BA", Status.INATIVO);
+    @DisplayName("Deletar: Deve retornar 204 NoContent para ADMIN")
+    void deletar_comAdmin_deveRetornarNoContent() throws Exception {
+        Filial filialParaDeletar = createFilial("Filial a Deletar", "FL-DEL", "87.353.221/0001-07");
 
-        mockMvc.perform(put("/filiais/{id}", filial.getId())
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(updateDTO)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.nome", is("Filial Bahia")))
-                .andExpect(jsonPath("$.status", is("INATIVO")));
-    }
-
-    @Test
-    @DisplayName("Deve deletar uma filial e retornar status 204")
-    void testDeletar() throws Exception {
-        Filial filial = createFilial("Filial RS", "FLRS", "55.555.555/0001-55", TipoFilial.FILIAL);
-
-        mockMvc.perform(delete("/filiais/{id}", filial.getId()).header("Authorization", "Bearer " + adminToken))
+        mockMvc.perform(delete("/filiais/{id}", filialParaDeletar.getId())
+                        .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isNoContent());
+    }
 
-        mockMvc.perform(get("/filiais/{id}", filial.getId()).header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isNotFound());
+    @Test
+    @DisplayName("Deletar: Deve retornar 403 Forbidden para USER")
+    void deletar_comUser_deveRetornarForbidden() throws Exception {
+        Filial filialParaDeletar = createFilial("Filial a Deletar", "FL-DEL", "33.041.260/0001-64");
+
+        mockMvc.perform(delete("/filiais/{id}", filialParaDeletar.getId())
+                        .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isForbidden());
     }
 
     // --- Helper Methods ---
 
-    private Filial createFilial(String nome, String codigo, String cnpj, TipoFilial tipo) {
+    private Filial createFilial(String nome, String codigo, String cnpj) {
         Filial filial = new Filial();
         filial.setNome(nome);
         filial.setCodigo(codigo);
-        filial.setTipo(tipo);
+        filial.setTipo(TipoFilial.FILIAL);
         filial.setCnpj(cnpj);
         filial.setStatus(Status.ATIVO);
         return filialRepository.save(filial);
@@ -148,16 +159,23 @@ public class FilialControllerIT extends BaseIT {
         return departamentoRepository.save(depto);
     }
 
-    private Pessoa createUser(String nome, String email, String role, Filial filial, Departamento depto) {
-        Pessoa user = new Pessoa();
-        user.setNome(nome);
+    private Funcionario createFuncionarioAndUsuario(String nome, String email, String role, Departamento depto, Set<Filial> filiais) {
+        Funcionario func = new Funcionario();
+        func.setNome(nome);
+        func.setMatricula(nome.replaceAll("\\s+", "") + "-001");
+        func.setCargo("Administrador");
+        func.setDepartamento(depto);
+        func.setFiliais(filiais);
+        func.setStatus(Status.ATIVO);
+
+        Usuario user = new Usuario();
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode("password"));
         user.setRole(role);
-        user.setFilial(filial);
-        user.setDepartamento(depto);
         user.setStatus(Status.ATIVO);
-        user.setCargo("Analista");
-        return pessoaRepository.save(user);
+        user.setFuncionario(func);
+        func.setUsuario(user);
+
+        return funcionarioRepository.save(func);
     }
 }

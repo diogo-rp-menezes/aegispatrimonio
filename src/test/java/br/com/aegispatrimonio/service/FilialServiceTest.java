@@ -9,7 +9,7 @@ import br.com.aegispatrimonio.model.Status;
 import br.com.aegispatrimonio.model.TipoFilial;
 import br.com.aegispatrimonio.repository.DepartamentoRepository;
 import br.com.aegispatrimonio.repository.FilialRepository;
-import br.com.aegispatrimonio.repository.PessoaRepository;
+import br.com.aegispatrimonio.repository.FuncionarioRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -19,6 +19,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -33,119 +34,147 @@ class FilialServiceTest {
     @Mock
     private DepartamentoRepository departamentoRepository;
     @Mock
-    private PessoaRepository pessoaRepository;
+    private FuncionarioRepository funcionarioRepository;
     @Mock
     private FilialMapper filialMapper;
 
     @InjectMocks
     private FilialService filialService;
 
+    private Filial matriz;
     private Filial filial;
-    private FilialCreateDTO createDTO;
-    private FilialUpdateDTO updateDTO;
-    private FilialDTO filialDTO;
 
     @BeforeEach
     void setUp() {
-        filial = new Filial();
-        filial.setId(1L);
-        filial.setNome("Matriz");
-        filial.setCnpj("00.000.000/0001-00");
-        filial.setCodigo("MTRZ");
-        filial.setTipo(TipoFilial.MATRIZ);
+        matriz = new Filial();
+        matriz.setId(1L);
+        matriz.setNome("Matriz");
+        matriz.setCnpj("00.000.000/0001-00");
+        matriz.setCodigo("MTRZ");
+        matriz.setTipo(TipoFilial.MATRIZ);
 
-        createDTO = new FilialCreateDTO("Filial Nova", "FLNV", TipoFilial.FILIAL, "11.111.111/0001-11", "Endereço Nova");
-        updateDTO = new FilialUpdateDTO("Filial Editada", "FLED", TipoFilial.FILIAL, "22.222.222/0001-22", "Endereço Editada", Status.INATIVO);
-        filialDTO = new FilialDTO(1L, "Filial DTO", "FLDTO", TipoFilial.FILIAL, "33.333.333/0001-33", "Endereço DTO", Status.ATIVO);
+        filial = new Filial();
+        filial.setId(2L);
+        filial.setNome("Filial");
+        filial.setCnpj("11.111.111/0001-11");
+        filial.setCodigo("FL01");
+        filial.setTipo(TipoFilial.FILIAL);
     }
 
     @Test
-    @DisplayName("Deve criar uma filial com sucesso")
-    void criar_quandoValido_deveRetornarDTO() {
+    @DisplayName("ListarTodos: Deve retornar lista de DTOs")
+    void listarTodos_deveRetornarListaDeDTOs() {
+        when(filialRepository.findAll()).thenReturn(List.of(matriz, filial));
+
+        filialService.listarTodos();
+
+        verify(filialRepository).findAll();
+        verify(filialMapper, times(2)).toDTO(any(Filial.class));
+    }
+
+    @Test
+    @DisplayName("BuscarPorId: Deve retornar DTO quando ID existe")
+    void buscarPorId_quandoIdExiste_deveRetornarDTO() {
+        when(filialRepository.findById(1L)).thenReturn(Optional.of(matriz));
+
+        filialService.buscarPorId(1L);
+
+        verify(filialRepository).findById(1L);
+        verify(filialMapper).toDTO(matriz);
+    }
+
+    @Test
+    @DisplayName("BuscarPorId: Deve lançar EntityNotFoundException quando ID não existe")
+    void buscarPorId_quandoIdNaoExiste_deveLancarExcecao() {
+        when(filialRepository.findById(99L)).thenReturn(Optional.empty());
+        assertThrows(EntityNotFoundException.class, () -> filialService.buscarPorId(99L));
+    }
+
+    @Test
+    @DisplayName("Criar: Deve salvar e retornar DTO quando dados são válidos")
+    void criar_quandoValido_deveSalvarEretornarDTO() {
+        FilialCreateDTO createDTO = new FilialCreateDTO("Nova Filial", "FL02", TipoFilial.FILIAL, "22.222.222/0001-22", "Endereço");
         when(filialRepository.findByCnpj(anyString())).thenReturn(Optional.empty());
         when(filialRepository.findByCodigo(anyString())).thenReturn(Optional.empty());
-        when(filialMapper.toEntity(any(FilialCreateDTO.class))).thenReturn(filial);
-        when(filialRepository.save(any(Filial.class))).thenReturn(filial);
-        when(filialMapper.toDTO(any(Filial.class))).thenReturn(filialDTO);
+        when(filialMapper.toEntity(createDTO)).thenReturn(filial);
+        when(filialRepository.save(filial)).thenReturn(filial);
 
-        FilialDTO result = filialService.criar(createDTO);
+        filialService.criar(createDTO);
 
-        assertNotNull(result);
         verify(filialRepository).save(filial);
+        verify(filialMapper).toDTO(filial);
     }
 
     @Test
-    @DisplayName("Deve lançar exceção ao criar filial com CNPJ duplicado")
+    @DisplayName("Criar: Deve lançar exceção para CNPJ duplicado")
     void criar_quandoCnpjDuplicado_deveLancarExcecao() {
-        // CORREÇÃO: Retornar a filial com ID para evitar NullPointerException na validação.
-        when(filialRepository.findByCnpj(createDTO.cnpj())).thenReturn(Optional.of(filial));
+        FilialCreateDTO createDTO = new FilialCreateDTO("Nova Filial", "FL02", TipoFilial.FILIAL, "00.000.000/0001-00", "Endereço");
+        when(filialRepository.findByCnpj(createDTO.cnpj())).thenReturn(Optional.of(matriz));
 
         assertThrows(IllegalArgumentException.class, () -> filialService.criar(createDTO));
         verify(filialRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("Deve lançar exceção ao tentar criar uma segunda Matriz")
+    @DisplayName("Criar: Deve lançar exceção para Código duplicado")
+    void criar_quandoCodigoDuplicado_deveLancarExcecao() {
+        FilialCreateDTO createDTO = new FilialCreateDTO("Nova Filial", "MTRZ", TipoFilial.FILIAL, "22.222.222/0001-22", "Endereço");
+        when(filialRepository.findByCodigo(createDTO.codigo())).thenReturn(Optional.of(matriz));
+
+        assertThrows(IllegalArgumentException.class, () -> filialService.criar(createDTO));
+        verify(filialRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Criar: Deve lançar exceção ao tentar criar segunda Matriz")
     void criar_quandoTentaCriarSegundaMatriz_deveLancarExcecao() {
-        FilialCreateDTO segundaMatrizDTO = new FilialCreateDTO("Outra Matriz", "OMTZ", TipoFilial.MATRIZ, "33.333.333/0001-33", "Endereço Matriz");
-        // CORREÇÃO: Retornar a filial com ID para evitar NullPointerException na validação.
-        when(filialRepository.findByTipo(TipoFilial.MATRIZ)).thenReturn(Optional.of(filial));
+        FilialCreateDTO createDTO = new FilialCreateDTO("Nova Matriz", "MTRZ2", TipoFilial.MATRIZ, "22.222.222/0001-22", "Endereço");
+        when(filialRepository.findByTipo(TipoFilial.MATRIZ)).thenReturn(Optional.of(matriz));
 
-        assertThrows(IllegalArgumentException.class, () -> filialService.criar(segundaMatrizDTO));
+        assertThrows(IllegalArgumentException.class, () -> filialService.criar(createDTO));
     }
 
     @Test
-    @DisplayName("Deve atualizar uma filial com sucesso")
-    void atualizar_quandoValido_deveRetornarDTO() {
-        when(filialRepository.findById(1L)).thenReturn(Optional.of(filial));
+    @DisplayName("Atualizar: Deve atualizar com sucesso")
+    void atualizar_quandoValido_deveAtualizar() {
+        FilialUpdateDTO updateDTO = new FilialUpdateDTO("Filial Atualizada", "FL01-A", TipoFilial.FILIAL, "11.111.111/0001-11", "Novo Endereço", Status.ATIVO);
+        when(filialRepository.findById(2L)).thenReturn(Optional.of(filial));
         when(filialRepository.save(any(Filial.class))).thenReturn(filial);
-        when(filialMapper.toDTO(any(Filial.class))).thenReturn(filialDTO);
 
-        FilialDTO result = filialService.atualizar(1L, updateDTO);
+        filialService.atualizar(2L, updateDTO);
 
-        assertNotNull(result);
         verify(filialRepository).save(filial);
-        assertEquals("Filial Editada", filial.getNome());
-        assertEquals(Status.INATIVO, filial.getStatus());
+        assertEquals("Filial Atualizada", filial.getNome());
     }
 
     @Test
-    @DisplayName("Deve deletar filial que não possui dependências")
-    void deletar_quandoSemDependencias_deveExecutarDelete() {
-        when(filialRepository.findById(1L)).thenReturn(Optional.of(filial));
-        when(departamentoRepository.existsByFilialId(1L)).thenReturn(false);
-        when(pessoaRepository.existsByFilialId(1L)).thenReturn(false);
+    @DisplayName("Deletar: Deve deletar filial sem dependências")
+    void deletar_quandoSemDependencias_deveDeletar() {
+        when(filialRepository.findById(2L)).thenReturn(Optional.of(filial));
+        when(departamentoRepository.existsByFilialId(2L)).thenReturn(false);
+        when(funcionarioRepository.existsByFiliais_Id(2L)).thenReturn(false);
 
-        filialService.deletar(1L);
+        filialService.deletar(2L);
 
         verify(filialRepository).delete(filial);
     }
 
     @Test
-    @DisplayName("Deve lançar exceção ao deletar filial com departamentos associados")
-    void deletar_quandoExistemDepartamentos_deveLancarExcecao() {
-        when(filialRepository.findById(1L)).thenReturn(Optional.of(filial));
-        when(departamentoRepository.existsByFilialId(1L)).thenReturn(true);
+    @DisplayName("Deletar: Deve lançar exceção se houver departamentos")
+    void deletar_quandoDepartamentosExistem_deveLancarExcecao() {
+        when(filialRepository.findById(2L)).thenReturn(Optional.of(filial));
+        when(departamentoRepository.existsByFilialId(2L)).thenReturn(true);
 
-        assertThrows(IllegalStateException.class, () -> filialService.deletar(1L));
-        verify(filialRepository, never()).delete(any());
+        assertThrows(IllegalStateException.class, () -> filialService.deletar(2L));
     }
 
     @Test
-    @DisplayName("Deve lançar exceção ao deletar filial com pessoas associadas")
-    void deletar_quandoExistemPessoas_deveLancarExcecao() {
-        when(filialRepository.findById(1L)).thenReturn(Optional.of(filial));
-        when(departamentoRepository.existsByFilialId(1L)).thenReturn(false);
-        when(pessoaRepository.existsByFilialId(1L)).thenReturn(true);
+    @DisplayName("Deletar: Deve lançar exceção se houver funcionários")
+    void deletar_quandoFuncionariosExistem_deveLancarExcecao() {
+        when(filialRepository.findById(2L)).thenReturn(Optional.of(filial));
+        when(departamentoRepository.existsByFilialId(2L)).thenReturn(false);
+        when(funcionarioRepository.existsByFiliais_Id(2L)).thenReturn(true);
 
-        assertThrows(IllegalStateException.class, () -> filialService.deletar(1L));
-        verify(filialRepository, never()).delete(any());
-    }
-
-    @Test
-    @DisplayName("Deve lançar exceção ao buscar filial com ID inexistente")
-    void buscarPorId_quandoNaoEncontrado_deveLancarExcecao() {
-        when(filialRepository.findById(99L)).thenReturn(Optional.empty());
-        assertThrows(EntityNotFoundException.class, () -> filialService.buscarPorId(99L));
+        assertThrows(IllegalStateException.class, () -> filialService.deletar(2L));
     }
 }

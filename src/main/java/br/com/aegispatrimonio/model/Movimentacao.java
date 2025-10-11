@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString(exclude = {"ativo", "localizacaoOrigem", "localizacaoDestino", "pessoaOrigem", "pessoaDestino"})
+@ToString(exclude = {"ativo", "localizacaoOrigem", "localizacaoDestino", "funcionarioOrigem", "funcionarioDestino"})
 @SQLDelete(sql = "UPDATE movimentacoes SET status = 'CANCELADA' WHERE id = ?")
 @Where(clause = "status <> 'CANCELADA'")
 public class Movimentacao {
@@ -39,13 +39,15 @@ public class Movimentacao {
     @JoinColumn(name = "localizacao_destino_id", nullable = false)
     private Localizacao localizacaoDestino;
 
+    // CORREÇÃO: Alterado de Pessoa para Funcionario
     @ManyToOne
-    @JoinColumn(name = "pessoa_origem_id", nullable = false)
-    private Pessoa pessoaOrigem;
+    @JoinColumn(name = "funcionario_origem_id", nullable = false)
+    private Funcionario funcionarioOrigem;
 
+    // CORREÇÃO: Alterado de Pessoa para Funcionario
     @ManyToOne
-    @JoinColumn(name = "pessoa_destino_id", nullable = false)
-    private Pessoa pessoaDestino;
+    @JoinColumn(name = "funcionario_destino_id", nullable = false)
+    private Funcionario funcionarioDestino;
 
     @Column(name = "data_movimentacao", nullable = false)
     private LocalDate dataMovimentacao;

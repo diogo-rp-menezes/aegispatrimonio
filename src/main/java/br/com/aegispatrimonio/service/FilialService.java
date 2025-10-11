@@ -8,7 +8,7 @@ import br.com.aegispatrimonio.model.Filial;
 import br.com.aegispatrimonio.model.TipoFilial;
 import br.com.aegispatrimonio.repository.DepartamentoRepository;
 import br.com.aegispatrimonio.repository.FilialRepository;
-import br.com.aegispatrimonio.repository.PessoaRepository;
+import br.com.aegispatrimonio.repository.FuncionarioRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,13 +22,13 @@ public class FilialService {
 
     private final FilialRepository filialRepository;
     private final DepartamentoRepository departamentoRepository;
-    private final PessoaRepository pessoaRepository;
+    private final FuncionarioRepository funcionarioRepository; // CORREÇÃO
     private final FilialMapper filialMapper;
 
-    public FilialService(FilialRepository filialRepository, DepartamentoRepository departamentoRepository, PessoaRepository pessoaRepository, FilialMapper filialMapper) {
+    public FilialService(FilialRepository filialRepository, DepartamentoRepository departamentoRepository, FuncionarioRepository funcionarioRepository, FilialMapper filialMapper) {
         this.filialRepository = filialRepository;
         this.departamentoRepository = departamentoRepository;
-        this.pessoaRepository = pessoaRepository;
+        this.funcionarioRepository = funcionarioRepository;
         this.filialMapper = filialMapper;
     }
 
@@ -42,9 +42,12 @@ public class FilialService {
 
     @Transactional(readOnly = true)
     public FilialDTO buscarPorId(Long id) {
-        return filialRepository.findById(id)
-                .map(filialMapper::toDTO)
-                .orElseThrow(() -> new EntityNotFoundException("Filial não encontrada com ID: " + id));
+        // DEBUG: imprimir presença no repositório para ajudar a diagnosticar falhas de mock em testes
+        var opt = filialRepository.findById(id);
+        System.out.println("DEBUG FilialService.buscarPorId: id=" + id + " present=" + opt.isPresent());
+        Filial filial = opt.orElseThrow(() -> new EntityNotFoundException("Filial não encontrada com ID: " + id));
+        // Chamar o mapper explicitamente; se o mapper for um mock e retornar null, não transformamos isso em 'não encontrado'
+        return filialMapper.toDTO(filial);
     }
 
     @Transactional
@@ -85,8 +88,9 @@ public class FilialService {
             throw new IllegalStateException("Não é possível deletar a filial, pois existem departamentos associados a ela.");
         }
 
-        if (pessoaRepository.existsByFilialId(id)) {
-            throw new IllegalStateException("Não é possível deletar a filial, pois existem pessoas associadas a ela.");
+        // CORREÇÃO: Usa o novo repositório e o método correto para o relacionamento ManyToMany
+        if (funcionarioRepository.existsByFiliais_Id(id)) {
+            throw new IllegalStateException("Não é possível deletar a filial, pois existem funcionários associados a ela.");
         }
 
         filialRepository.delete(filial);

@@ -8,12 +8,16 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 
 @Repository
 public interface AtivoRepository extends JpaRepository<Ativo, Long> {
 
-    List<Ativo> findByFilialId(Long filialId);
+    // CORREÇÃO: Adicionado método para buscar ativos em múltiplas filiais.
+    List<Ativo> findByFilialIdIn(Set<Long> filialIds);
+
+    // O método findByFilialId(Long filialId) foi removido por ser obsoleto.
 
     Optional<Ativo> findByNumeroPatrimonio(String numeroPatrimonio);
 

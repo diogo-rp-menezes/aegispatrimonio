@@ -44,6 +44,7 @@ public class ManutencaoResponseDTO {
     private Long fornecedorId;
     private String fornecedorNome;
     
+    // Os nomes dos campos podem ser mantidos, pois o serviço já sabe que se referem a Funcionário
     private Long solicitanteId;
     private String solicitanteNome;
     

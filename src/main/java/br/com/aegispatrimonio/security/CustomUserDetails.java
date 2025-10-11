@@ -1,6 +1,7 @@
 package br.com.aegispatrimonio.security;
 
-import br.com.aegispatrimonio.model.Pessoa;
+import br.com.aegispatrimonio.model.Status;
+import br.com.aegispatrimonio.model.Usuario;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -8,31 +9,39 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.util.Collection;
 import java.util.Collections;
 
+/**
+ * Implementação de UserDetails que encapsula um objeto Usuario.
+ * É usado pelo Spring Security para realizar a autenticação e autorização.
+ */
 public class CustomUserDetails implements UserDetails {
 
-    private final Pessoa pessoa;
+    // CORREÇÃO: Alterado de Pessoa para Usuario
+    private final Usuario usuario;
 
-    public CustomUserDetails(Pessoa pessoa) {
-        this.pessoa = pessoa;
+    public CustomUserDetails(Usuario usuario) {
+        this.usuario = usuario;
     }
 
-    public Pessoa getPessoa() {
-        return pessoa;
+    public Usuario getUsuario() {
+        return usuario;
     }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return Collections.singletonList(new SimpleGrantedAuthority(pessoa.getRole()));
+        // CORREÇÃO: Busca a role do objeto Usuario
+        return Collections.singletonList(new SimpleGrantedAuthority(usuario.getRole()));
     }
 
     @Override
     public String getPassword() {
-        return pessoa.getPassword();
+        // CORREÇÃO: Busca a senha do objeto Usuario
+        return usuario.getPassword();
     }
 
     @Override
     public String getUsername() {
-        return pessoa.getEmail();
+        // CORREÇÃO: Busca o email do objeto Usuario
+        return usuario.getEmail();
     }
 
     @Override
@@ -52,6 +61,7 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return pessoa.getStatus() == br.com.aegispatrimonio.model.Status.ATIVO;
+        // CORREÇÃO: Verifica o status do objeto Usuario
+        return usuario.getStatus() == Status.ATIVO;
     }
 }

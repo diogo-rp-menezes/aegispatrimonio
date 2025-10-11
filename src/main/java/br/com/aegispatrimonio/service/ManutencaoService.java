@@ -31,11 +31,11 @@ public class ManutencaoService {
     private final ManutencaoRepository manutencaoRepository;
     private final AtivoRepository ativoRepository;
     private final FornecedorRepository fornecedorRepository;
-    private final PessoaRepository pessoaRepository;
+    private final FuncionarioRepository funcionarioRepository;
 
     @Transactional
     public ManutencaoResponseDTO criar(ManutencaoRequestDTO request) {
-        log.info("Criando nova manutenção para ativo ID: {}", request.getAtivoId());
+        log.info("Criando nova manutenção para ativo ID: {}", request.ativoId());
         Manutencao manutencao = convertToEntity(request);
         Manutencao savedManutencao = manutencaoRepository.save(manutencao);
         return convertToResponseDTO(savedManutencao);
@@ -72,8 +72,8 @@ public class ManutencaoService {
         Manutencao manutencao = buscarEntidadePorId(id);
         validarStatus(manutencao, StatusManutencao.APROVADA, "iniciada");
 
-        Pessoa tecnico = pessoaRepository.findById(inicioDTO.getTecnicoId())
-                .orElseThrow(() -> new ResourceNotFoundException("Técnico não encontrado com ID: " + inicioDTO.getTecnicoId()));
+        Funcionario tecnico = funcionarioRepository.findById(inicioDTO.tecnicoId())
+                .orElseThrow(() -> new ResourceNotFoundException("Técnico não encontrado com ID: " + inicioDTO.tecnicoId()));
 
         Ativo ativo = manutencao.getAtivo();
         validarConsistenciaFilial(tecnico, ativo, "Técnico responsável");
@@ -99,9 +99,9 @@ public class ManutencaoService {
         ativoRepository.save(ativo);
 
         manutencao.setStatus(StatusManutencao.CONCLUIDA);
-        manutencao.setDescricaoServico(conclusaoDTO.getDescricaoServico());
-        manutencao.setCustoReal(conclusaoDTO.getCustoReal());
-        manutencao.setTempoExecucaoMinutos(conclusaoDTO.getTempoExecucao());
+        manutencao.setDescricaoServico(conclusaoDTO.descricaoServico());
+        manutencao.setCustoReal(conclusaoDTO.custoReal());
+        manutencao.setTempoExecucaoMinutos(conclusaoDTO.tempoExecucao());
         manutencao.setDataConclusao(LocalDate.now());
 
         return convertToResponseDTO(manutencaoRepository.save(manutencao));
@@ -123,7 +123,7 @@ public class ManutencaoService {
         }
 
         manutencao.setStatus(StatusManutencao.CANCELADA);
-        manutencao.setObservacoes(cancelDTO.getMotivo());
+        manutencao.setObservacoes(cancelDTO.motivo());
 
         return convertToResponseDTO(manutencaoRepository.save(manutencao));
     }
@@ -134,7 +134,7 @@ public class ManutencaoService {
         Manutencao manutencao = buscarEntidadePorId(id);
 
         if (manutencao.getStatus() != StatusManutencao.SOLICITADA) {
-            throw new ResourceConflictException("Manutenções com status '" + manutencao.getStatus() + "' não podem ser deletadas. Considere cancelar a manutenção para preservar o histórico.");
+            throw new ResourceConflictException("Apenas manutenções com status 'SOLICITADA' podem ser deletadas. Considere cancelar a manutenção para preservar o histórico.");
         }
 
         manutencaoRepository.delete(manutencao);
@@ -163,39 +163,41 @@ public class ManutencaoService {
     }
 
     private Manutencao convertToEntity(ManutencaoRequestDTO request) {
-        Ativo ativo = ativoRepository.findById(request.getAtivoId())
-                .orElseThrow(() -> new ResourceNotFoundException("Ativo não encontrado com ID: " + request.getAtivoId()));
+        Ativo ativo = ativoRepository.findById(request.ativoId())
+                .orElseThrow(() -> new ResourceNotFoundException("Ativo não encontrado com ID: " + request.ativoId()));
 
         if (ativo.getStatus() != StatusAtivo.ATIVO) {
             throw new ResourceConflictException("Não é possível criar manutenção para um ativo que não está com status 'ATIVO'. Status atual: " + ativo.getStatus());
         }
 
-        Pessoa solicitante = pessoaRepository.findById(request.getSolicitanteId())
-                .orElseThrow(() -> new ResourceNotFoundException("Solicitante não encontrado com ID: " + request.getSolicitanteId()));
+        Funcionario solicitante = funcionarioRepository.findById(request.solicitanteId())
+                .orElseThrow(() -> new ResourceNotFoundException("Solicitante não encontrado com ID: " + request.solicitanteId()));
 
         validarConsistenciaFilial(solicitante, ativo, "Solicitante");
 
         Fornecedor fornecedor = null;
-        if (request.getFornecedorId() != null) {
-            fornecedor = fornecedorRepository.findById(request.getFornecedorId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Fornecedor não encontrado com ID: " + request.getFornecedorId()));
+        if (request.fornecedorId() != null) {
+            fornecedor = fornecedorRepository.findById(request.fornecedorId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Fornecedor não encontrado com ID: " + request.fornecedorId()));
         }
 
         Manutencao manutencao = new Manutencao();
         manutencao.setAtivo(ativo);
         manutencao.setSolicitante(solicitante);
         manutencao.setFornecedor(fornecedor);
-        manutencao.setTipo(request.getTipo());
-        manutencao.setDescricaoProblema(request.getDescricaoProblema());
-        manutencao.setCustoEstimado(request.getCustoEstimado());
-        manutencao.setDataPrevistaConclusao(request.getDataPrevistaConclusao());
-        manutencao.setObservacoes(request.getObservacoes());
+        manutencao.setTipo(request.tipo());
+        manutencao.setDescricaoProblema(request.descricaoProblema());
+        manutencao.setCustoEstimado(request.custoEstimado());
+        manutencao.setDataPrevistaConclusao(request.dataPrevistaConclusao());
+        manutencao.setObservacoes(request.observacoes());
 
         return manutencao;
     }
 
-    private void validarConsistenciaFilial(Pessoa pessoa, Ativo ativo, String papel) {
-        if (!Objects.equals(pessoa.getFilial().getId(), ativo.getFilial().getId())) {
+    private void validarConsistenciaFilial(Funcionario funcionario, Ativo ativo, String papel) {
+        boolean pertenceAFilial = funcionario.getFiliais().stream()
+                .anyMatch(f -> f.getId().equals(ativo.getFilial().getId()));
+        if (!pertenceAFilial) {
             throw new IllegalArgumentException(papel + " deve pertencer à mesma filial do ativo.");
         }
     }

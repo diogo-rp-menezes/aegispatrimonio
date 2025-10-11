@@ -30,11 +30,11 @@ public class AtivoSpecification {
             }
 
             // Otimização N+1: Evita queries separadas para buscar entidades relacionadas.
-            // A verificação do tipo de resultado previne que o fetch seja aplicado em queries de contagem (count).
             if (query.getResultType() != Long.class && query.getResultType() != long.class) {
                  root.fetch("tipoAtivo", jakarta.persistence.criteria.JoinType.LEFT);
                  root.fetch("localizacao", jakarta.persistence.criteria.JoinType.LEFT);
-                 root.fetch("pessoaResponsavel", jakarta.persistence.criteria.JoinType.LEFT);
+                 // CORREÇÃO: Renomeado para corresponder à entidade Ativo
+                 root.fetch("funcionarioResponsavel", jakarta.persistence.criteria.JoinType.LEFT);
                  root.fetch("fornecedor", jakarta.persistence.criteria.JoinType.LEFT);
             }
             query.distinct(true);

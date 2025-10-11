@@ -15,11 +15,11 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @NoArgsConstructor
-@ToString(exclude = {"tipoAtivo", "localizacao", "fornecedor", "pessoaResponsavel", "filial"}) // Exclui todas as relações
+@ToString(exclude = {"tipoAtivo", "localizacao", "fornecedor", "funcionarioResponsavel", "filial"}) // CORREÇÃO
 @Entity
 @Table(name = "ativos")
 @SQLDelete(sql = "UPDATE ativos SET status = 'BAIXADO' WHERE id = ?")
-@Where(clause = "status <> 'BAIXADO'") // Ignora ativos baixados em todas as consultas
+@Where(clause = "status <> 'BAIXADO'")
 public class Ativo {
     
     @Id
@@ -28,7 +28,7 @@ public class Ativo {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "filial_id", nullable = false)
-    private Filial filial; // Vínculo com a Filial
+    private Filial filial;
     
     @Column(nullable = false)
     private String nome;
@@ -41,7 +41,7 @@ public class Ativo {
     private String numeroPatrimonio;
     
     @ManyToOne
-    @JoinColumn(name = "localizacao_id") // Localização pode ser nula
+    @JoinColumn(name = "localizacao_id")
     private Localizacao localizacao;
     
     @Enumerated(EnumType.STRING)
@@ -76,9 +76,10 @@ public class Ativo {
     @Column(name = "informacoes_garantia")
     private String informacoesGarantia;
     
+    // CORREÇÃO: Renomeado de pessoaResponsavel para funcionarioResponsavel
     @ManyToOne
-    @JoinColumn(name = "pessoa_responsavel_id") // Responsável pode ser nulo
-    private Pessoa pessoaResponsavel;
+    @JoinColumn(name = "funcionario_responsavel_id")
+    private Funcionario funcionarioResponsavel;
     
     private String observacoes;
     
@@ -106,7 +107,6 @@ public class Ativo {
         atualizadoEm = LocalDateTime.now();
         dataRegistro = LocalDate.now();
         
-        // Inicializa valores padrão corretamente
         if (status == null) {
             status = StatusAtivo.ATIVO;
         }
@@ -123,9 +123,7 @@ public class Ativo {
         this.atualizadoEm = LocalDateTime.now();
     }
     
-    // Método para calcular depreciação
     public BigDecimal calcularDepreciacaoAtual() {
-        // Implementação será feita posteriormente
         return BigDecimal.ZERO;
     }
 }

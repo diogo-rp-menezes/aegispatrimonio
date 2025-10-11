@@ -4,6 +4,7 @@ import br.com.aegispatrimonio.dto.LoginRequestDTO;
 import br.com.aegispatrimonio.dto.LoginResponseDTO;
 import br.com.aegispatrimonio.security.CustomUserDetailsService;
 import br.com.aegispatrimonio.security.JwtService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -13,8 +14,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Controller responsável pelo processo de autenticação.
+ * Fornece um endpoint público para que os usuários possam obter um token JWT.
+ */
 @RestController
-@RequestMapping("/auth") // REMOVIDO o /api
+@RequestMapping("/auth")
 public class AuthController {
 
     private final AuthenticationManager authenticationManager;
@@ -27,8 +32,16 @@ public class AuthController {
         this.userDetailsService = userDetailsService;
     }
 
+    /**
+     * Autentica um usuário com base em seu email e senha e retorna um token JWT se as credenciais forem válidas.
+     * Este é um endpoint público e não requer autenticação prévia.
+     *
+     * @param loginRequest DTO contendo o email e a senha do usuário.
+     * @return ResponseEntity com status 200 OK e um LoginResponseDTO contendo o token JWT em caso de sucesso.
+     * @throws org.springframework.security.core.AuthenticationException se as credenciais forem inválidas, resultando em uma resposta 401 Unauthorized.
+     */
     @PostMapping("/login")
-    public ResponseEntity<LoginResponseDTO> login(@RequestBody LoginRequestDTO loginRequest) {
+    public ResponseEntity<LoginResponseDTO> login(@RequestBody @Valid LoginRequestDTO loginRequest) {
         // Autentica o usuário com o Spring Security
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(loginRequest.email(), loginRequest.password())

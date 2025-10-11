@@ -1,2 +1,0 @@
--- Este script foi intencionalmente deixado em branco para os testes.
--- Dados de seed para ambientes de desenvolvimento devem ser gerenciados separadamente.

@@ -1,13 +1,15 @@
 SET FOREIGN_KEY_CHECKS = 0;
-
-DELETE FROM movimentacoes;
-DELETE FROM manutencoes;
-DELETE FROM ativos;
-DELETE FROM tipos_ativo;
-DELETE FROM localizacoes;
-DELETE FROM pessoas;
-DELETE FROM fornecedores;
-DELETE FROM departamentos;
-DELETE FROM filiais;
-
+TRUNCATE TABLE movimentacoes;
+TRUNCATE TABLE manutencoes;
+TRUNCATE TABLE ativo_detalhe_hardware;
+TRUNCATE TABLE adaptadores_rede;
+TRUNCATE TABLE discos;
+TRUNCATE TABLE memorias;
+TRUNCATE TABLE ativos;
+TRUNCATE TABLE tipos_ativo;
+TRUNCATE TABLE funcionarios;
+TRUNCATE TABLE departamentos;
+TRUNCATE TABLE localizacoes;
+TRUNCATE TABLE fornecedores;
+TRUNCATE TABLE filiais;
 SET FOREIGN_KEY_CHECKS = 1;

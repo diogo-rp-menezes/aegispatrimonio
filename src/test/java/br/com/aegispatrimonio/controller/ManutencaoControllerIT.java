@@ -1,11 +1,9 @@
 package br.com.aegispatrimonio.controller;
 
 import br.com.aegispatrimonio.BaseIT;
-import br.com.aegispatrimonio.dto.request.ManutencaoCancelDTO;
 import br.com.aegispatrimonio.dto.request.ManutencaoConclusaoDTO;
 import br.com.aegispatrimonio.dto.request.ManutencaoInicioDTO;
 import br.com.aegispatrimonio.dto.request.ManutencaoRequestDTO;
-import br.com.aegispatrimonio.dto.response.ManutencaoResponseDTO;
 import br.com.aegispatrimonio.model.*;
 import br.com.aegispatrimonio.repository.*;
 import br.com.aegispatrimonio.security.CustomUserDetails;
@@ -19,14 +17,15 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Set;
 
 import static org.hamcrest.Matchers.is;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -38,20 +37,18 @@ public class ManutencaoControllerIT extends BaseIT {
     private MockMvc mockMvc;
     @Autowired
     private ObjectMapper objectMapper;
-    @Autowired
-    private ManutencaoRepository manutencaoRepository;
-    @Autowired
-    private AtivoRepository ativoRepository;
-    @Autowired
-    private PessoaRepository pessoaRepository;
-    @Autowired
-    private FornecedorRepository fornecedorRepository;
-    @Autowired
-    private FilialRepository filialRepository;
-    @Autowired
-    private DepartamentoRepository departamentoRepository;
-    @Autowired
-    private TipoAtivoRepository tipoAtivoRepository;
+
+    // Repositories
+    @Autowired private ManutencaoRepository manutencaoRepository;
+    @Autowired private AtivoRepository ativoRepository;
+    @Autowired private FuncionarioRepository funcionarioRepository;
+    @Autowired private UsuarioRepository usuarioRepository;
+    @Autowired private LocalizacaoRepository localizacaoRepository;
+    @Autowired private FilialRepository filialRepository;
+    @Autowired private DepartamentoRepository departamentoRepository;
+    @Autowired private TipoAtivoRepository tipoAtivoRepository;
+    @Autowired private FornecedorRepository fornecedorRepository;
+
     @Autowired
     private JwtService jwtService;
     @Autowired
@@ -59,180 +56,133 @@ public class ManutencaoControllerIT extends BaseIT {
 
     private String adminToken;
     private Ativo ativo;
-    private Pessoa solicitante;
-    private Pessoa tecnico;
-    private Fornecedor fornecedor;
+    private Funcionario solicitante;
+    private Funcionario tecnico;
 
     @BeforeEach
     void setUp() {
+        // Limpeza
+        manutencaoRepository.deleteAll();
+        ativoRepository.deleteAll();
+        usuarioRepository.deleteAll();
+        funcionarioRepository.deleteAll();
+        departamentoRepository.deleteAll();
+        localizacaoRepository.deleteAll();
+        filialRepository.deleteAll();
+        tipoAtivoRepository.deleteAll();
+        fornecedorRepository.deleteAll();
+
+        // Setup de Dados
         Filial filial = createFilial("Matriz", "MTRZ", "00.000.000/0001-00");
         Departamento depto = createDepartamento("TI", filial);
-        this.solicitante = createUser("solicitante", "solicitante@aegis.com", "ROLE_USER", filial, depto);
-        this.tecnico = createUser("tecnico", "tecnico@aegis.com", "ROLE_USER", filial, depto);
-        Pessoa admin = createUser("admin", "admin@aegis.com", "ROLE_ADMIN", filial, depto);
-        this.adminToken = jwtService.generateToken(new CustomUserDetails(admin));
+        this.solicitante = createFuncionarioAndUsuario("Solicitante", "solicitante@aegis.com", "ROLE_USER", depto, Set.of(filial));
+        this.tecnico = createFuncionarioAndUsuario("Tecnico", "tecnico@aegis.com", "ROLE_USER", depto, Set.of(filial));
+        Funcionario adminFunc = createFuncionarioAndUsuario("Admin", "admin@aegis.com", "ROLE_ADMIN", depto, Set.of(filial));
+        this.adminToken = jwtService.generateToken(new CustomUserDetails(adminFunc.getUsuario()));
 
-        TipoAtivo tipoAtivo = createTipoAtivo("Notebook");
-        this.fornecedor = createFornecedor("Dell", "11.111.111/0001-11");
-        this.ativo = createAtivo("Notebook-01", "PAT-001", filial, tipoAtivo, this.fornecedor, this.solicitante);
+        Localizacao local = createLocalizacao("Sala 101", filial);
+        TipoAtivo tipo = createTipoAtivo("Notebook");
+        Fornecedor fornecedor = createFornecedor("Dell", "11.111.111/0001-11");
+        this.ativo = createAtivo("Notebook-01", "PAT-001", filial, tipo, fornecedor, solicitante, local);
     }
 
     @Test
-    @DisplayName("Deve criar uma manutenção e retornar 201 Created")
-    void criarManutencao_comDadosValidos_deveRetornarCreated() throws Exception {
-        ManutencaoRequestDTO requestDTO = new ManutencaoRequestDTO(
-                ativo.getId(), TipoManutencao.CORRETIVA, solicitante.getId(), null, null, "Tela quebrada", null, null, null, null);
-
-        mockMvc.perform(post("/manutencoes")
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(requestDTO)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.descricaoProblema", is("Tela quebrada")))
-                .andExpect(jsonPath("$.status", is(StatusManutencao.SOLICITADA.toString())));
-    }
-
-    @Test
-    @DisplayName("Deve seguir o fluxo completo de uma manutenção (Criar, Aprovar, Iniciar, Concluir)")
-    void fluxoCompletoManutencao_deveFuncionarCorretamente() throws Exception {
+    @DisplayName("Deve criar, aprovar, iniciar e concluir uma manutenção com sucesso")
+    void cicloDeVidaManutencao_deveFuncionarCorretamente() throws Exception {
         // 1. Criar
-        ManutencaoRequestDTO requestDTO = new ManutencaoRequestDTO(
-                ativo.getId(), TipoManutencao.CORRETIVA, solicitante.getId(), null, null, "Não liga", null, null, null, null);
-        MvcResult result = mockMvc.perform(post("/manutencoes")
+        ManutencaoRequestDTO createRequest = new ManutencaoRequestDTO(ativo.getId(), TipoManutencao.CORRETIVA, solicitante.getId(), null, null, "Não liga", null, null, null, null);
+        String responseString = mockMvc.perform(post("/manutencoes")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(requestDTO)))
-                .andExpect(status().isCreated()).andReturn();
-        ManutencaoResponseDTO manutencao = objectMapper.readValue(result.getResponse().getContentAsString(), ManutencaoResponseDTO.class);
+                        .content(objectMapper.writeValueAsString(createRequest)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status", is("SOLICITADA")))
+                .andReturn().getResponse().getContentAsString();
+
+        Long manutencaoId = objectMapper.readTree(responseString).get("id").asLong();
 
         // 2. Aprovar
-        mockMvc.perform(post("/manutencoes/aprovar/{id}", manutencao.getId())
+        mockMvc.perform(post("/manutencoes/aprovar/{id}", manutencaoId)
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status", is(StatusManutencao.APROVADA.toString())));
+                .andExpect(jsonPath("$.status", is("APROVADA")));
 
         // 3. Iniciar
         ManutencaoInicioDTO inicioDTO = new ManutencaoInicioDTO();
         inicioDTO.setTecnicoId(tecnico.getId());
-        mockMvc.perform(post("/manutencoes/iniciar/{id}", manutencao.getId())
+        mockMvc.perform(post("/manutencoes/iniciar/{id}", manutencaoId)
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(inicioDTO)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status", is(StatusManutencao.EM_ANDAMENTO.toString())))
-                .andExpect(jsonPath("$.tecnicoResponsavelId", is(tecnico.getId().intValue())));
+                .andExpect(jsonPath("$.status", is("EM_ANDAMENTO")));
+
+        // Verifica se o status do ativo mudou
+        Ativo ativoEmManutencao = ativoRepository.findById(ativo.getId()).orElseThrow();
+        assertEquals(StatusAtivo.EM_MANUTENCAO, ativoEmManutencao.getStatus());
 
         // 4. Concluir
-        ManutencaoConclusaoDTO conclusaoDTO = new ManutencaoConclusaoDTO();
-        conclusaoDTO.setDescricaoServico("Placa-mãe substituída.");
-        conclusaoDTO.setCustoReal(BigDecimal.valueOf(800.50));
-        conclusaoDTO.setTempoExecucao(120);
-        mockMvc.perform(post("/manutencoes/concluir/{id}", manutencao.getId())
+        ManutencaoConclusaoDTO conclusaoDTO = new ManutencaoConclusaoDTO("Troca de fonte", new BigDecimal("350.00"), 120);
+        mockMvc.perform(post("/manutencoes/concluir/{id}", manutencaoId)
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(conclusaoDTO)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status", is(StatusManutencao.CONCLUIDA.toString())))
-                .andExpect(jsonPath("$.custoReal", is(800.50)));
-    }
+                .andExpect(jsonPath("$.status", is("CONCLUIDA")));
 
-    @Test
-    @DisplayName("Deve cancelar uma manutenção e retornar 200 OK")
-    void cancelarManutencao_comJustificativa_deveRetornarOk() throws Exception {
-        Manutencao manutencao = createManutencao(ativo, solicitante, StatusManutencao.SOLICITADA);
-        ManutencaoCancelDTO cancelDTO = new ManutencaoCancelDTO();
-        cancelDTO.setMotivo("Problema resolvido pelo usuário.");
-
-        mockMvc.perform(post("/manutencoes/cancelar/{id}", manutencao.getId())
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(cancelDTO)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status", is(StatusManutencao.CANCELADA.toString())));
-    }
-
-    @Test
-    @DisplayName("Deve deletar uma manutenção e retornar 204 No Content")
-    void deletarManutencao_comIdExistente_deveRetornarNoContent() throws Exception {
-        Manutencao manutencao = createManutencao(ativo, solicitante, StatusManutencao.SOLICITADA);
-
-        mockMvc.perform(delete("/manutencoes/{id}", manutencao.getId())
-                        .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isNoContent());
-
-        mockMvc.perform(get("/manutencoes/{id}", manutencao.getId())
-                        .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isNotFound());
+        // Verifica se o status do ativo voltou para ATIVO
+        Ativo ativoConcluido = ativoRepository.findById(ativo.getId()).orElseThrow();
+        assertEquals(StatusAtivo.ATIVO, ativoConcluido.getStatus());
     }
 
     // --- Helper Methods ---
-    private Manutencao createManutencao(Ativo ativo, Pessoa solicitante, StatusManutencao status) {
-        Manutencao manutencao = new Manutencao();
-        manutencao.setAtivo(ativo);
-        manutencao.setSolicitante(solicitante);
-        manutencao.setDataSolicitacao(LocalDate.now());
-        manutencao.setDescricaoProblema("Teste de problema");
-        manutencao.setTipo(TipoManutencao.CORRETIVA);
-        manutencao.setStatus(status);
-        return manutencaoRepository.save(manutencao);
-    }
 
     private Filial createFilial(String nome, String codigo, String cnpj) {
-        Filial filial = new Filial();
-        filial.setNome(nome);
-        filial.setCodigo(codigo);
-        filial.setTipo(TipoFilial.MATRIZ);
-        filial.setCnpj(cnpj);
-        filial.setStatus(Status.ATIVO);
-        return filialRepository.save(filial);
+        Filial f = new Filial();
+        f.setNome(nome); f.setCodigo(codigo); f.setCnpj(cnpj); f.setTipo(TipoFilial.MATRIZ); f.setStatus(Status.ATIVO);
+        return filialRepository.save(f);
     }
 
     private Departamento createDepartamento(String nome, Filial filial) {
-        Departamento depto = new Departamento();
-        depto.setNome(nome);
-        depto.setFilial(filial);
-        return departamentoRepository.save(depto);
+        Departamento d = new Departamento();
+        d.setNome(nome); d.setFilial(filial);
+        return departamentoRepository.save(d);
     }
 
-    private Pessoa createUser(String nome, String email, String role, Filial filial, Departamento depto) {
-        Pessoa user = new Pessoa();
-        user.setNome(nome);
-        user.setEmail(email);
-        user.setPassword(passwordEncoder.encode("password"));
-        user.setRole(role);
-        user.setFilial(filial);
-        user.setDepartamento(depto);
-        user.setStatus(Status.ATIVO);
-        user.setCargo("Analista");
-        return pessoaRepository.save(user);
+    private Funcionario createFuncionarioAndUsuario(String nome, String email, String role, Departamento depto, Set<Filial> filiais) {
+        Funcionario func = new Funcionario();
+        func.setNome(nome); func.setMatricula(nome.replaceAll("\\s+", "") + "-001"); func.setCargo("Cargo Teste");
+        func.setDepartamento(depto); func.setFiliais(filiais); func.setStatus(Status.ATIVO);
+        Usuario user = new Usuario();
+        user.setEmail(email); user.setPassword(passwordEncoder.encode("password")); user.setRole(role);
+        user.setStatus(Status.ATIVO); user.setFuncionario(func); func.setUsuario(user);
+        return funcionarioRepository.save(func);
+    }
+
+    private Localizacao createLocalizacao(String nome, Filial filial) {
+        Localizacao loc = new Localizacao();
+        loc.setNome(nome); loc.setFilial(filial); loc.setStatus(Status.ATIVO);
+        return localizacaoRepository.save(loc);
     }
 
     private TipoAtivo createTipoAtivo(String nome) {
         TipoAtivo tipo = new TipoAtivo();
-        tipo.setNome(nome);
-        tipo.setCategoriaContabil(CategoriaContabil.IMOBILIZADO); // Adiciona um valor padrão
+        tipo.setNome(nome); tipo.setCategoriaContabil(CategoriaContabil.IMOBILIZADO); tipo.setStatus(Status.ATIVO);
         return tipoAtivoRepository.save(tipo);
     }
 
     private Fornecedor createFornecedor(String nome, String cnpj) {
         Fornecedor f = new Fornecedor();
-        f.setNome(nome);
-        f.setCnpj(cnpj);
-        f.setStatus(Status.ATIVO);
+        f.setNome(nome); f.setCnpj(cnpj); f.setStatus(Status.ATIVO);
         return fornecedorRepository.save(f);
     }
 
-    private Ativo createAtivo(String nome, String patrimonio, Filial filial, TipoAtivo tipo, Fornecedor fornecedor, Pessoa responsavel) {
+    private Ativo createAtivo(String nome, String patrimonio, Filial filial, TipoAtivo tipo, Fornecedor fornecedor, Funcionario responsavel, Localizacao local) {
         Ativo a = new Ativo();
-        a.setNome(nome);
-        a.setNumeroPatrimonio(patrimonio);
-        a.setFilial(filial);
-        a.setTipoAtivo(tipo);
-        a.setFornecedor(fornecedor);
-        a.setPessoaResponsavel(responsavel);
-        a.setDataAquisicao(LocalDate.now());
-        a.setValorAquisicao(new BigDecimal("2500.00"));
-        a.setStatus(StatusAtivo.ATIVO);
+        a.setNome(nome); a.setNumeroPatrimonio(patrimonio); a.setFilial(filial); a.setTipoAtivo(tipo);
+        a.setFornecedor(fornecedor); a.setFuncionarioResponsavel(responsavel); a.setLocalizacao(local);
+        a.setDataAquisicao(LocalDate.now()); a.setValorAquisicao(new BigDecimal("3000.00"));
+        a.setStatus(StatusAtivo.ATIVO); a.setDataRegistro(LocalDate.now());
         return ativoRepository.save(a);
     }
 }

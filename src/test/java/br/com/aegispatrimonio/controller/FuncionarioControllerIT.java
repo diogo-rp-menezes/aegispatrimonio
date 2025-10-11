@@ -1,9 +1,12 @@
 package br.com.aegispatrimonio.controller;
 
 import br.com.aegispatrimonio.BaseIT;
-import br.com.aegispatrimonio.dto.LocalizacaoCreateDTO;
+import br.com.aegispatrimonio.dto.FuncionarioCreateDTO;
 import br.com.aegispatrimonio.model.*;
-import br.com.aegispatrimonio.repository.*;
+import br.com.aegispatrimonio.repository.DepartamentoRepository;
+import br.com.aegispatrimonio.repository.FilialRepository;
+import br.com.aegispatrimonio.repository.FuncionarioRepository;
+import br.com.aegispatrimonio.repository.UsuarioRepository;
 import br.com.aegispatrimonio.security.CustomUserDetails;
 import br.com.aegispatrimonio.security.JwtService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -19,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Set;
 
-import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -27,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @AutoConfigureMockMvc
 @Transactional
-public class LocalizacaoControllerIT extends BaseIT {
+public class FuncionarioControllerIT extends BaseIT {
 
     @Autowired
     private MockMvc mockMvc;
@@ -35,12 +37,17 @@ public class LocalizacaoControllerIT extends BaseIT {
     @Autowired
     private ObjectMapper objectMapper;
 
-    // Repositórios para setup de dados
-    @Autowired private LocalizacaoRepository localizacaoRepository;
-    @Autowired private FuncionarioRepository funcionarioRepository;
-    @Autowired private UsuarioRepository usuarioRepository;
-    @Autowired private FilialRepository filialRepository;
-    @Autowired private DepartamentoRepository departamentoRepository;
+    @Autowired
+    private FilialRepository filialRepository;
+
+    @Autowired
+    private DepartamentoRepository departamentoRepository;
+
+    @Autowired
+    private FuncionarioRepository funcionarioRepository;
+
+    @Autowired
+    private UsuarioRepository usuarioRepository;
 
     @Autowired
     private JwtService jwtService;
@@ -50,26 +57,20 @@ public class LocalizacaoControllerIT extends BaseIT {
 
     private String adminToken;
     private String userToken;
-    private Filial filialA, filialB;
+    private Filial filialA;
+    private Departamento deptoA;
 
     @BeforeEach
     void setUp() {
-        // Limpeza geral para garantir isolamento do teste
+        departamentoRepository.deleteAll();
         usuarioRepository.deleteAll();
         funcionarioRepository.deleteAll();
-        departamentoRepository.deleteAll();
-        localizacaoRepository.deleteAll();
         filialRepository.deleteAll();
 
-        // Criação de dados base para os testes
-        this.filialA = createFilial("Filial A", "FL-A", "01.000.000/0001-01");
-        this.filialB = createFilial("Filial B", "FL-B", "02.000.000/0001-02");
+        filialA = createFilial("Filial A", "FL-A", "01.000.000/0001-01");
+        deptoA = createDepartamento("TI A", filialA);
 
-        Departamento deptoA = createDepartamento("TI A", this.filialA);
-        createLocalizacao("Sala 101", filialA);
-        createLocalizacao("Sala 201", filialB);
-
-        Funcionario adminFunc = createFuncionarioAndUsuario("Admin", "admin@aegis.com", "ROLE_ADMIN", deptoA, Set.of(filialA, filialB));
+        Funcionario adminFunc = createFuncionarioAndUsuario("Admin", "admin@aegis.com", "ROLE_ADMIN", deptoA, Set.of(filialA));
         this.adminToken = jwtService.generateToken(new CustomUserDetails(adminFunc.getUsuario()));
 
         Funcionario userFunc = createFuncionarioAndUsuario("User", "user@aegis.com", "ROLE_USER", deptoA, Set.of(filialA));
@@ -77,42 +78,47 @@ public class LocalizacaoControllerIT extends BaseIT {
     }
 
     @Test
-    @DisplayName("ListarTodos: Deve retornar 200 e todas as localizações para ADMIN")
-    void listarTodos_comAdmin_deveRetornarTodas() throws Exception {
-        mockMvc.perform(get("/localizacoes").header("Authorization", "Bearer " + adminToken))
+    @DisplayName("ListarTodos: Deve retornar 200 e a lista de funcionários para ADMIN")
+    void listarTodos_comAdmin_deveRetornarOk() throws Exception {
+        mockMvc.perform(get("/funcionarios").header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2)));
+                .andExpect(jsonPath("$[0].nome", is("Admin")));
     }
 
     @Test
-    @DisplayName("ListarTodos: Deve retornar 200 e apenas localizações da sua filial para USER")
-    void listarTodos_comUser_deveRetornarLocalizacoesDaFilial() throws Exception {
-        mockMvc.perform(get("/localizacoes").header("Authorization", "Bearer " + userToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].nome", is("Sala 101")));
+    @DisplayName("Criar: Deve retornar 403 Forbidden para USER")
+    void criar_comUser_deveRetornarForbidden() throws Exception {
+        FuncionarioCreateDTO createDTO = new FuncionarioCreateDTO("Novo Func", "M-003", "Cargo", deptoA.getId(), Set.of(filialA.getId()), "novo@aegis.com", "senha1234", "ROLE_USER");
+
+        mockMvc.perform(post("/funcionarios")
+                        .header("Authorization", "Bearer " + userToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createDTO)))
+                .andExpect(status().isForbidden());
     }
 
     @Test
     @DisplayName("Criar: Deve retornar 201 Created para ADMIN com dados válidos")
     void criar_comAdmin_deveRetornarCreated() throws Exception {
-        LocalizacaoCreateDTO createDTO = new LocalizacaoCreateDTO("Almoxarifado", "Piso -1", filialA.getId(), null);
+        FuncionarioCreateDTO createDTO = new FuncionarioCreateDTO("Novo Func", "M-003", "Cargo", deptoA.getId(), Set.of(filialA.getId()), "novo@aegis.com", "senha1234", "ROLE_USER");
 
-        mockMvc.perform(post("/localizacoes")
+        mockMvc.perform(post("/funcionarios")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createDTO)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.nome", is("Almoxarifado")));
+                .andExpect(jsonPath("$.nome", is("Novo Func")))
+                .andExpect(jsonPath("$.email", is("novo@aegis.com")));
     }
 
     @Test
-    @DisplayName("Deletar: Deve retornar 403 Forbidden para USER")
-    void deletar_comUser_deveRetornarForbidden() throws Exception {
-        Localizacao loc = localizacaoRepository.findAll().get(0);
-        mockMvc.perform(delete("/localizacoes/{id}", loc.getId())
-                        .header("Authorization", "Bearer " + userToken))
-                .andExpect(status().isForbidden());
+    @DisplayName("Deletar: Deve retornar 204 NoContent para ADMIN")
+    void deletar_comAdmin_deveRetornarNoContent() throws Exception {
+        Funcionario funcParaDeletar = createFuncionarioAndUsuario("Para Deletar", "deletar@aegis.com", "ROLE_USER", deptoA, Set.of(filialA));
+
+        mockMvc.perform(delete("/funcionarios/{id}", funcParaDeletar.getId())
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNoContent());
     }
 
     // --- Helper Methods ---
@@ -132,14 +138,6 @@ public class LocalizacaoControllerIT extends BaseIT {
         depto.setNome(nome);
         depto.setFilial(filial);
         return departamentoRepository.save(depto);
-    }
-
-    private Localizacao createLocalizacao(String nome, Filial filial) {
-        Localizacao loc = new Localizacao();
-        loc.setNome(nome);
-        loc.setFilial(filial);
-        loc.setStatus(Status.ATIVO);
-        return localizacaoRepository.save(loc);
     }
 
     private Funcionario createFuncionarioAndUsuario(String nome, String email, String role, Departamento depto, Set<Filial> filiais) {

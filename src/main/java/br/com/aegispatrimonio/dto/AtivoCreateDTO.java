@@ -26,7 +26,8 @@ public record AtivoCreateDTO(
 
     @NotNull @Positive BigDecimal valorAquisicao,
 
-    @Positive Long pessoaResponsavelId, // Opcional, mas se enviado, deve ser positivo
+    // CORREÇÃO: Renomeado de pessoaResponsavelId para funcionarioResponsavelId
+    @Positive Long funcionarioResponsavelId, // Opcional, mas se enviado, deve ser positivo
 
     String observacoes,
 

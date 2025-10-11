@@ -29,7 +29,8 @@ public record AtivoUpdateDTO(
 
     @NotNull @Positive BigDecimal valorAquisicao,
 
-    @Positive Long pessoaResponsavelId,
+    // CORREÇÃO: Renomeado de pessoaResponsavelId para funcionarioResponsavelId
+    @Positive Long funcionarioResponsavelId,
 
     String observacoes,
 

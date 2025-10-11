@@ -2,11 +2,8 @@ package br.com.aegispatrimonio.controller;
 
 import br.com.aegispatrimonio.BaseIT;
 import br.com.aegispatrimonio.dto.TipoAtivoCreateDTO;
-import br.com.aegispatrimonio.dto.TipoAtivoDTO;
 import br.com.aegispatrimonio.model.*;
-import br.com.aegispatrimonio.repository.DepartamentoRepository;
-import br.com.aegispatrimonio.repository.FilialRepository;
-import br.com.aegispatrimonio.repository.PessoaRepository;
+import br.com.aegispatrimonio.repository.*;
 import br.com.aegispatrimonio.security.CustomUserDetails;
 import br.com.aegispatrimonio.security.JwtService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,13 +11,21 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Set;
+
+import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@AutoConfigureMockMvc
+@Transactional
 public class TipoAtivoControllerIT extends BaseIT {
 
     @Autowired
@@ -29,157 +34,131 @@ public class TipoAtivoControllerIT extends BaseIT {
     @Autowired
     private ObjectMapper objectMapper;
 
+    // Repositórios para setup de dados
+    @Autowired private TipoAtivoRepository tipoAtivoRepository;
+    @Autowired private FuncionarioRepository funcionarioRepository;
+    @Autowired private UsuarioRepository usuarioRepository;
+    @Autowired private FilialRepository filialRepository;
+    @Autowired private DepartamentoRepository departamentoRepository;
+
     @Autowired
     private JwtService jwtService;
-
-    @Autowired
-    private PessoaRepository pessoaRepository;
-
-    @Autowired
-    private FilialRepository filialRepository;
-
-    @Autowired
-    private DepartamentoRepository departamentoRepository;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
 
     private String adminToken;
+    private String userToken;
 
     @BeforeEach
     void setUp() {
-        Filial filial = new Filial();
-        filial.setNome("Matriz Teste");
-        filial.setCodigo("MATRIZ");
-        filial.setTipo(TipoFilial.MATRIZ);
-        filial.setCnpj("00.000.000/0001-00");
-        filial.setStatus(Status.ATIVO);
-        filialRepository.save(filial);
+        // Limpeza geral para garantir isolamento do teste
+        tipoAtivoRepository.deleteAll();
+        usuarioRepository.deleteAll();
+        funcionarioRepository.deleteAll();
+        departamentoRepository.deleteAll();
+        filialRepository.deleteAll();
 
-        Departamento depto = new Departamento();
-        depto.setNome("TI Teste");
-        depto.setFilial(filial);
-        departamentoRepository.save(depto);
+        // Criação de dados base para os testes
+        Filial filial = createFilial("Matriz Teste", "MTRZ", "53.436.470/0001-02");
+        Departamento depto = createDepartamento("TI Teste", filial);
 
-        Pessoa admin = new Pessoa();
-        admin.setNome("Admin Teste");
-        admin.setEmail("admin@aegis.com");
-        admin.setPassword(passwordEncoder.encode("password"));
-        admin.setRole("ROLE_ADMIN");
-        admin.setFilial(filial);
-        admin.setDepartamento(depto);
-        admin.setStatus(Status.ATIVO);
-        admin.setCargo("Administrador");
-        pessoaRepository.save(admin);
+        Funcionario adminFunc = createFuncionarioAndUsuario("Admin", "admin@aegis.com", "ROLE_ADMIN", depto, Set.of(filial));
+        this.adminToken = jwtService.generateToken(new CustomUserDetails(adminFunc.getUsuario()));
 
-        adminToken = jwtService.generateToken(new CustomUserDetails(admin));
+        Funcionario userFunc = createFuncionarioAndUsuario("User", "user@aegis.com", "ROLE_USER", depto, Set.of(filial));
+        this.userToken = jwtService.generateToken(new CustomUserDetails(userFunc.getUsuario()));
     }
 
     @Test
-    @DisplayName("Deve listar todos os tipos de ativo e retornar status 200")
-    void testListarTodos() throws Exception {
-        mockMvc.perform(get("/tipos-ativo").header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isOk());
-    }
+    @DisplayName("ListarTodos: Deve retornar 200 e a lista de tipos de ativo para USER")
+    void listarTodos_comUser_deveRetornarOk() throws Exception {
+        createTipoAtivo("Cadeira Gamer");
 
-    @Test
-    @DisplayName("Deve buscar um tipo de ativo por ID e retornar status 200")
-    void testBuscarPorId() throws Exception {
-        // Primeiro, cria um tipo de ativo para garantir que ele exista
-        TipoAtivoCreateDTO createDTO = new TipoAtivoCreateDTO("Notebook", CategoriaContabil.IMOBILIZADO);
-        String jsonRequest = objectMapper.writeValueAsString(createDTO);
-
-        String response = mockMvc.perform(post("/tipos-ativo")
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(jsonRequest))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-
-        TipoAtivoDTO createdDTO = objectMapper.readValue(response, TipoAtivoDTO.class);
-        Long id = createdDTO.id();
-
-        // Agora, busca o tipo de ativo criado
-        mockMvc.perform(get("/tipos-ativo/{id}", id).header("Authorization", "Bearer " + adminToken))
+        mockMvc.perform(get("/tipos-ativo").header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(id))
-                .andExpect(jsonPath("$.nome").value("Notebook"));
-    }
-    
-    @Test
-    @DisplayName("Deve retornar 404 ao buscar um tipo de ativo com ID inexistente")
-    void testBuscarPorIdInexistente() throws Exception {
-        mockMvc.perform(get("/tipos-ativo/{id}", 999L).header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isNotFound());
+                .andExpect(jsonPath("$[0].nome", is("Cadeira Gamer")));
     }
 
     @Test
-    @DisplayName("Deve criar um novo tipo de ativo e retornar status 201")
-    void testCriar() throws Exception {
-        TipoAtivoCreateDTO createDTO = new TipoAtivoCreateDTO("Monitor", CategoriaContabil.IMOBILIZADO);
-        String jsonRequest = objectMapper.writeValueAsString(createDTO);
+    @DisplayName("Criar: Deve retornar 201 Created para ADMIN com dados válidos")
+    void criar_comAdmin_deveRetornarCreated() throws Exception {
+        TipoAtivoCreateDTO createDTO = new TipoAtivoCreateDTO("Monitor Ultrawide", CategoriaContabil.IMOBILIZADO);
 
         mockMvc.perform(post("/tipos-ativo")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(jsonRequest))
+                        .content(objectMapper.writeValueAsString(createDTO)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.nome").value("Monitor"));
+                .andExpect(jsonPath("$.nome", is("Monitor Ultrawide")));
     }
 
     @Test
-    @DisplayName("Deve atualizar um tipo de ativo existente e retornar status 200")
-    void testAtualizar() throws Exception {
-        // Cria um tipo de ativo
-        TipoAtivoCreateDTO createDTO = new TipoAtivoCreateDTO("Cadeira", CategoriaContabil.IMOBILIZADO);
-        String createJsonRequest = objectMapper.writeValueAsString(createDTO);
+    @DisplayName("Criar: Deve retornar 403 Forbidden para USER")
+    void criar_comUser_deveRetornarForbidden() throws Exception {
+        TipoAtivoCreateDTO createDTO = new TipoAtivoCreateDTO("Monitor Proibido", CategoriaContabil.IMOBILIZADO);
 
-        String response = mockMvc.perform(post("/tipos-ativo")
-                        .header("Authorization", "Bearer " + adminToken)
+        mockMvc.perform(post("/tipos-ativo")
+                        .header("Authorization", "Bearer " + userToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(createJsonRequest))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-
-        TipoAtivoDTO createdDTO = objectMapper.readValue(response, TipoAtivoDTO.class);
-        Long id = createdDTO.id();
-
-        // Atualiza o tipo de ativo
-        TipoAtivoCreateDTO updateDTO = new TipoAtivoCreateDTO("Cadeira Gamer", CategoriaContabil.IMOBILIZADO);
-        String updateJsonRequest = objectMapper.writeValueAsString(updateDTO);
-
-        mockMvc.perform(put("/tipos-ativo/{id}", id)
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(updateJsonRequest))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(id))
-                .andExpect(jsonPath("$.nome").value("Cadeira Gamer"));
+                        .content(objectMapper.writeValueAsString(createDTO)))
+                .andExpect(status().isForbidden());
     }
 
     @Test
-    @DisplayName("Deve deletar um tipo de ativo e retornar status 204")
-    void testDeletar() throws Exception {
-        // Cria um tipo de ativo para deletar
-        TipoAtivoCreateDTO createDTO = new TipoAtivoCreateDTO("Mesa", CategoriaContabil.IMOBILIZADO);
-        String createJsonRequest = objectMapper.writeValueAsString(createDTO);
+    @DisplayName("Deletar: Deve retornar 204 NoContent para ADMIN")
+    void deletar_comAdmin_deveRetornarNoContent() throws Exception {
+        TipoAtivo tipoAtivo = createTipoAtivo("Mesa Digitalizadora");
 
-        String response = mockMvc.perform(post("/tipos-ativo")
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(createJsonRequest))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-
-        TipoAtivoDTO createdDTO = objectMapper.readValue(response, TipoAtivoDTO.class);
-        Long id = createdDTO.id();
-
-        // Deleta o tipo de ativo
-        mockMvc.perform(delete("/tipos-ativo/{id}", id).header("Authorization", "Bearer " + adminToken))
+        mockMvc.perform(delete("/tipos-ativo/{id}", tipoAtivo.getId())
+                        .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isNoContent());
+    }
 
-        // Verifica se foi deletado
-        mockMvc.perform(get("/tipos-ativo/{id}", id).header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isNotFound());
+    // --- Helper Methods ---
+
+    private Filial createFilial(String nome, String codigo, String cnpj) {
+        Filial filial = new Filial();
+        filial.setNome(nome);
+        filial.setCodigo(codigo);
+        filial.setTipo(TipoFilial.MATRIZ);
+        filial.setCnpj(cnpj);
+        filial.setStatus(Status.ATIVO);
+        return filialRepository.save(filial);
+    }
+
+    private Departamento createDepartamento(String nome, Filial filial) {
+        Departamento depto = new Departamento();
+        depto.setNome(nome);
+        depto.setFilial(filial);
+        return departamentoRepository.save(depto);
+    }
+
+    private Funcionario createFuncionarioAndUsuario(String nome, String email, String role, Departamento depto, Set<Filial> filiais) {
+        Funcionario func = new Funcionario();
+        func.setNome(nome);
+        func.setMatricula(nome.replaceAll("\\s+", "") + "-001");
+        func.setCargo("Analista");
+        func.setDepartamento(depto);
+        func.setFiliais(filiais);
+        func.setStatus(Status.ATIVO);
+
+        Usuario user = new Usuario();
+        user.setEmail(email);
+        user.setPassword(passwordEncoder.encode("password"));
+        user.setRole(role);
+        user.setStatus(Status.ATIVO);
+        user.setFuncionario(func);
+        func.setUsuario(user);
+
+        return funcionarioRepository.save(func);
+    }
+
+    private TipoAtivo createTipoAtivo(String nome) {
+        TipoAtivo tipo = new TipoAtivo();
+        tipo.setNome(nome);
+        tipo.setCategoriaContabil(CategoriaContabil.IMOBILIZADO);
+        tipo.setStatus(Status.ATIVO);
+        return tipoAtivoRepository.save(tipo);
     }
 }

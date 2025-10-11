@@ -1,9 +1,15 @@
 package br.com.aegispatrimonio.security;
 
-import br.com.aegispatrimonio.model.Pessoa;
+import br.com.aegispatrimonio.model.Filial;
+import br.com.aegispatrimonio.model.Funcionario;
+import br.com.aegispatrimonio.model.Usuario;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+
+import java.util.Collections;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Component
 public class SecurityUtil {
@@ -21,19 +27,27 @@ public class SecurityUtil {
         if (userDetails == null) {
             return false;
         }
-        // Checa a autoridade de forma robusta, em vez de comparar strings.
         return userDetails.getAuthorities().stream()
                 .anyMatch(grantedAuthority -> grantedAuthority.getAuthority().equals("ROLE_ADMIN"));
     }
 
-    public static Long getCurrentUserFilialId() {
+    /**
+     * Retorna os IDs de todas as filiais às quais o usuário logado está associado.
+     * @return Um Set de Long contendo os IDs das filiais. Retorna um conjunto vazio se o usuário não for um funcionário ou não tiver filiais.
+     */
+    public static Set<Long> getCurrentUserFilialIds() {
         CustomUserDetails userDetails = getAuthenticatedUser();
         if (userDetails != null) {
-            Pessoa pessoa = userDetails.getPessoa();
-            if (pessoa != null && pessoa.getFilial() != null) {
-                return pessoa.getFilial().getId();
+            Usuario usuario = userDetails.getUsuario();
+            if (usuario != null) {
+                Funcionario funcionario = usuario.getFuncionario();
+                if (funcionario != null && funcionario.getFiliais() != null) {
+                    return funcionario.getFiliais().stream()
+                            .map(Filial::getId)
+                            .collect(Collectors.toSet());
+                }
             }
         }
-        return null; // Ou lançar uma exceção se um usuário sem filial for um estado inválido
+        return Collections.emptySet();
     }
 }
