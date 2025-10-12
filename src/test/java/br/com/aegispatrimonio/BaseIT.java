@@ -9,7 +9,11 @@ import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.DockerClientFactory;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+// CORREÇÃO: Especifica a classe de aplicação principal para garantir que todo o contexto seja carregado.
+@SpringBootTest(
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+    classes = AegispatrimonioApplication.class
+)
 @Testcontainers
 @ActiveProfiles("test")
 @Sql(scripts = "/cleanup.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)

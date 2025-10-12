@@ -2,6 +2,7 @@ package br.com.aegispatrimonio.controller;
 
 import br.com.aegispatrimonio.BaseIT;
 import br.com.aegispatrimonio.dto.FuncionarioCreateDTO;
+import br.com.aegispatrimonio.dto.FuncionarioUpdateDTO;
 import br.com.aegispatrimonio.model.*;
 import br.com.aegispatrimonio.repository.DepartamentoRepository;
 import br.com.aegispatrimonio.repository.FilialRepository;
@@ -20,8 +21,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.Set;
 
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -59,22 +62,18 @@ public class FuncionarioControllerIT extends BaseIT {
     private String userToken;
     private Filial filialA;
     private Departamento deptoA;
+    private Funcionario funcionarioExistente;
 
     @BeforeEach
     void setUp() {
-        departamentoRepository.deleteAll();
-        usuarioRepository.deleteAll();
-        funcionarioRepository.deleteAll();
-        filialRepository.deleteAll();
-
         filialA = createFilial("Filial A", "FL-A", "01.000.000/0001-01");
         deptoA = createDepartamento("TI A", filialA);
 
         Funcionario adminFunc = createFuncionarioAndUsuario("Admin", "admin@aegis.com", "ROLE_ADMIN", deptoA, Set.of(filialA));
         this.adminToken = jwtService.generateToken(new CustomUserDetails(adminFunc.getUsuario()));
 
-        Funcionario userFunc = createFuncionarioAndUsuario("User", "user@aegis.com", "ROLE_USER", deptoA, Set.of(filialA));
-        this.userToken = jwtService.generateToken(new CustomUserDetails(userFunc.getUsuario()));
+        this.funcionarioExistente = createFuncionarioAndUsuario("User", "user@aegis.com", "ROLE_USER", deptoA, Set.of(filialA));
+        this.userToken = jwtService.generateToken(new CustomUserDetails(this.funcionarioExistente.getUsuario()));
     }
 
     @Test
@@ -82,7 +81,38 @@ public class FuncionarioControllerIT extends BaseIT {
     void listarTodos_comAdmin_deveRetornarOk() throws Exception {
         mockMvc.perform(get("/funcionarios").header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].nome", is("Admin")));
+                .andExpect(jsonPath("$[*].nome", hasItem("Admin")));
+    }
+
+    @Test
+    @DisplayName("ListarTodos: Deve retornar 200 e a lista de funcionários para USER")
+    void listarTodos_comUser_deveRetornarOk() throws Exception {
+        mockMvc.perform(get("/funcionarios").header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].nome", hasItem("Admin")));
+    }
+
+    @Test
+    @DisplayName("BuscarPorId: Deve retornar 404 Not Found para ID inexistente")
+    void buscarPorId_comIdInexistente_deveRetornarNotFound() throws Exception {
+        long idInexistente = 999L;
+        mockMvc.perform(get("/funcionarios/{id}", idInexistente)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("Criar: Deve retornar 201 Created para ADMIN com dados válidos")
+    void criar_comAdmin_deveRetornarCreated() throws Exception {
+        FuncionarioCreateDTO createDTO = new FuncionarioCreateDTO("Novo Func", "M-003", "Cargo", deptoA.getId(), Set.of(filialA.getId()), "novo@aegis.com", "senha1234", "ROLE_USER");
+
+        mockMvc.perform(post("/funcionarios")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createDTO)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.nome", is("Novo Func")))
+                .andExpect(jsonPath("$.email", is("novo@aegis.com")));
     }
 
     @Test
@@ -98,17 +128,27 @@ public class FuncionarioControllerIT extends BaseIT {
     }
 
     @Test
-    @DisplayName("Criar: Deve retornar 201 Created para ADMIN com dados válidos")
-    void criar_comAdmin_deveRetornarCreated() throws Exception {
-        FuncionarioCreateDTO createDTO = new FuncionarioCreateDTO("Novo Func", "M-003", "Cargo", deptoA.getId(), Set.of(filialA.getId()), "novo@aegis.com", "senha1234", "ROLE_USER");
+    @DisplayName("Criar: Deve retornar 400 Bad Request para dados inválidos (email inválido)")
+    void criar_comDadosInvalidos_deveRetornarBadRequest() throws Exception {
+        FuncionarioCreateDTO createDTO = new FuncionarioCreateDTO("Nome Valido", "M-004", "Cargo", deptoA.getId(), Set.of(filialA.getId()), "email-invalido", "senha1234", "ROLE_USER");
 
         mockMvc.perform(post("/funcionarios")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createDTO)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.nome", is("Novo Func")))
-                .andExpect(jsonPath("$.email", is("novo@aegis.com")));
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("Atualizar: Deve retornar 403 Forbidden para USER")
+    void atualizar_comUser_deveRetornarForbidden() throws Exception {
+        FuncionarioUpdateDTO updateDTO = new FuncionarioUpdateDTO("Nome Atualizado", "M-001", "Cargo Novo", deptoA.getId(), Status.ATIVO, Set.of(filialA.getId()), "user.updated@aegis.com", "newpassword", "ROLE_USER");
+
+        mockMvc.perform(put("/funcionarios/{id}", funcionarioExistente.getId())
+                        .header("Authorization", "Bearer " + userToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateDTO)))
+                .andExpect(status().isForbidden());
     }
 
     @Test

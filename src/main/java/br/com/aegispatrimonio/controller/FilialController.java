@@ -7,6 +7,7 @@ import br.com.aegispatrimonio.service.FilialService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,6 +18,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/filiais")
+@Validated // Ativa a validação para os parâmetros de método nesta classe
 public class FilialController {
 
     private final FilialService filialService;

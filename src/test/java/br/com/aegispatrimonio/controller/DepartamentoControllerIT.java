@@ -2,6 +2,7 @@ package br.com.aegispatrimonio.controller;
 
 import br.com.aegispatrimonio.BaseIT;
 import br.com.aegispatrimonio.dto.DepartamentoCreateDTO;
+import br.com.aegispatrimonio.dto.DepartamentoUpdateDTO;
 import br.com.aegispatrimonio.model.*;
 import br.com.aegispatrimonio.repository.DepartamentoRepository;
 import br.com.aegispatrimonio.repository.FilialRepository;
@@ -59,18 +60,14 @@ public class DepartamentoControllerIT extends BaseIT {
     private String adminToken;
     private String userToken;
     private Filial filialA, filialB;
+    private Departamento deptoA;
 
     @BeforeEach
     void setUp() {
-        departamentoRepository.deleteAll();
-        usuarioRepository.deleteAll();
-        funcionarioRepository.deleteAll();
-        filialRepository.deleteAll();
-
         filialA = createFilial("Filial A", "FL-A", "01.000.000/0001-01");
         filialB = createFilial("Filial B", "FL-B", "02.000.000/0001-02");
 
-        Departamento deptoA = createDepartamento("TI A", filialA);
+        deptoA = createDepartamento("TI A", filialA);
         createDepartamento("RH B", filialB);
 
         Funcionario adminFunc = createFuncionarioAndUsuario("Admin", "admin@aegis.com", "ROLE_ADMIN", deptoA, Set.of(filialA, filialB));
@@ -91,10 +88,33 @@ public class DepartamentoControllerIT extends BaseIT {
     @Test
     @DisplayName("ListarTodos: Deve retornar 200 e apenas departamentos da sua filial para USER")
     void listarTodos_comUser_deveRetornarDepartamentosDaFilial() throws Exception {
+        // Este teste depende da lógica do serviço, que deve filtrar por filial do usuário
         mockMvc.perform(get("/departamentos").header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].nome", is("TI A")));
+    }
+
+    @Test
+    @DisplayName("BuscarPorId: Deve retornar 404 Not Found para ID inexistente")
+    void buscarPorId_comIdInexistente_deveRetornarNotFound() throws Exception {
+        long idInexistente = 999L;
+        mockMvc.perform(get("/departamentos/{id}", idInexistente)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("Criar: Deve retornar 201 Created para ADMIN com dados válidos")
+    void criar_comAdmin_deveRetornarCreated() throws Exception {
+        DepartamentoCreateDTO createDTO = new DepartamentoCreateDTO("Marketing", filialA.getId());
+
+        mockMvc.perform(post("/departamentos")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createDTO)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.nome", is("Marketing")));
     }
 
     @Test
@@ -110,16 +130,35 @@ public class DepartamentoControllerIT extends BaseIT {
     }
 
     @Test
-    @DisplayName("Criar: Deve retornar 201 Created para ADMIN com dados válidos")
-    void criar_comAdmin_deveRetornarCreated() throws Exception {
-        DepartamentoCreateDTO createDTO = new DepartamentoCreateDTO("Marketing", filialA.getId());
+    @DisplayName("Criar: Deve retornar 400 Bad Request para dados inválidos")
+    void criar_comDadosInvalidos_deveRetornarBadRequest() throws Exception {
+        DepartamentoCreateDTO createDTO = new DepartamentoCreateDTO("", filialA.getId()); // Nome em branco
 
         mockMvc.perform(post("/departamentos")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createDTO)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.nome", is("Marketing")));
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("Atualizar: Deve retornar 403 Forbidden para USER")
+    void atualizar_comUser_deveRetornarForbidden() throws Exception {
+        DepartamentoUpdateDTO updateDTO = new DepartamentoUpdateDTO("TI A-Update", filialA.getId());
+
+        mockMvc.perform(put("/departamentos/{id}", deptoA.getId())
+                        .header("Authorization", "Bearer " + userToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateDTO)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Deletar: Deve retornar 403 Forbidden para USER")
+    void deletar_comUser_deveRetornarForbidden() throws Exception {
+        mockMvc.perform(delete("/departamentos/{id}", deptoA.getId())
+                        .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isForbidden());
     }
 
     // --- Helper Methods ---

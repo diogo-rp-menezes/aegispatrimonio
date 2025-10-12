@@ -24,7 +24,6 @@
         <java.version>21</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <testcontainers.version>1.19.7</testcontainers.version>
-        <!-- Coverage threshold (can be raised to 0.80 once tests are added) -->
         <jacoco.minimum.coverage>0.40</jacoco.minimum.coverage>
     </properties>
 
@@ -177,16 +176,33 @@
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
-            <!-- JaCoCo plugin: gera relatório de cobertura em target/site/jacoco -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>${argLine}</argLine>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <argLine>${argLine}</argLine>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>0.8.13</version>
                 <configuration>
-                    <!-- Excluir DTOs (data holders/transfer objects) da verificação de cobertura
-                         porque concentram grande parte das linhas não testadas e são simples POJOs.
-                         Isso permite impor 80% cobertura nas demais camadas (services/controllers)
-                         enquanto vamos adicionando testes unitários/integrados onde realmente importam. -->
                     <excludes>
                         <exclude>**/br/com/aegispatrimonio/dto/**</exclude>
                     </excludes>
@@ -212,7 +228,6 @@
                             <goal>check</goal>
                         </goals>
                         <configuration>
-                            <!-- Atualizado para exigir cobertura mínima de 80% conforme rules -->
                             <rules>
                                 <rule>
                                     <element>BUNDLE</element>
