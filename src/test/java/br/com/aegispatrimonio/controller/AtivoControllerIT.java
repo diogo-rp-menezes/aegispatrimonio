@@ -60,18 +60,11 @@ public class AtivoControllerIT extends BaseIT {
     private TipoAtivo tipoAtivo;
     private Fornecedor fornecedor;
     private Localizacao localizacao;
+    private Ativo ativoExistente;
 
     @BeforeEach
     void setUp() {
-        // Limpeza geral para garantir isolamento
-        ativoRepository.deleteAll();
-        usuarioRepository.deleteAll();
-        funcionarioRepository.deleteAll();
-        departamentoRepository.deleteAll();
-        localizacaoRepository.deleteAll();
-        filialRepository.deleteAll();
-        tipoAtivoRepository.deleteAll();
-        fornecedorRepository.deleteAll();
+        // Limpeza é feita pelo @Transactional, mas podemos deletar para garantir IDs previsíveis se necessário
 
         // Criação de dados base para os testes
         this.filialA = createFilial("Filial A", "FL-A", "01.000.000/0001-01");
@@ -85,12 +78,14 @@ public class AtivoControllerIT extends BaseIT {
 
         this.userA = createFuncionarioAndUsuario("User", "user@aegis.com", "ROLE_USER", deptoA, Set.of(filialA));
         this.userToken = jwtService.generateToken(new CustomUserDetails(this.userA.getUsuario()));
+
+        this.ativoExistente = createAtivo("Desktop-01", "PAT-DESK-01", filialA, tipoAtivo, fornecedor, userA, localizacao);
     }
 
     @Test
     @DisplayName("Criar Ativo: Deve retornar 201 Created para ADMIN com dados válidos")
     void criar_comAdmin_deveRetornarCreated() throws Exception {
-        AtivoCreateDTO createDTO = new AtivoCreateDTO(filialA.getId(), "Notebook-01", tipoAtivo.getId(), "PAT-NOTE-01", localizacao.getId(), LocalDate.now(), fornecedor.getId(), BigDecimal.valueOf(3500.50), userA.getId(), "Em uso", null);
+        AtivoCreateDTO createDTO = new AtivoCreateDTO(filialA.getId(), "Notebook-01", tipoAtivo.getId(), "PAT-NOTE-01", localizacao.getId(), LocalDate.now(), fornecedor.getId(), BigDecimal.valueOf(3500.50), userA.getId(), "Em uso", "Garantia de 2 anos");
 
         mockMvc.perform(post("/ativos")
                         .header("Authorization", "Bearer " + adminToken)
@@ -103,7 +98,7 @@ public class AtivoControllerIT extends BaseIT {
     @Test
     @DisplayName("Criar Ativo: Deve retornar 403 Forbidden para USER")
     void criar_comUser_deveRetornarForbidden() throws Exception {
-        AtivoCreateDTO createDTO = new AtivoCreateDTO(filialA.getId(), "Notebook-01", tipoAtivo.getId(), "PAT-NOTE-01", localizacao.getId(), LocalDate.now(), fornecedor.getId(), BigDecimal.valueOf(3500.50), userA.getId(), "Em uso", null);
+        AtivoCreateDTO createDTO = new AtivoCreateDTO(filialA.getId(), "Notebook-01", tipoAtivo.getId(), "PAT-NOTE-01", localizacao.getId(), LocalDate.now(), fornecedor.getId(), BigDecimal.valueOf(3500.50), userA.getId(), "Em uso", "Garantia de 2 anos");
 
         mockMvc.perform(post("/ativos")
                         .header("Authorization", "Bearer " + userToken)
@@ -113,13 +108,49 @@ public class AtivoControllerIT extends BaseIT {
     }
 
     @Test
+    @DisplayName("Criar Ativo: Deve retornar 400 Bad Request para dados inválidos")
+    void criar_comDadosInvalidos_deveRetornarBadRequest() throws Exception {
+        // Nome em branco, que é obrigatório
+        AtivoCreateDTO createDTO = new AtivoCreateDTO(filialA.getId(), "", tipoAtivo.getId(), "PAT-NOTE-02", localizacao.getId(), LocalDate.now(), fornecedor.getId(), BigDecimal.valueOf(3500.50), userA.getId(), "Em uso", "Garantia de 2 anos");
+
+        mockMvc.perform(post("/ativos")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createDTO)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     @DisplayName("ListarTodos: Deve retornar 200 e a lista de ativos para ADMIN")
     void listarTodos_comAdmin_deveRetornarOk() throws Exception {
-        createAtivo("Desktop-01", "PAT-DESK-01", filialA, tipoAtivo, fornecedor, userA, localizacao);
-
         mockMvc.perform(get("/ativos").header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].nome", is("Desktop-01")));
+    }
+
+    @Test
+    @DisplayName("ListarTodos: Deve retornar 200 e a lista de ativos para USER")
+    void listarTodos_comUser_deveRetornarOk() throws Exception {
+        mockMvc.perform(get("/ativos").header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].nome", is("Desktop-01")));
+    }
+
+    @Test
+    @DisplayName("BuscarPorId: Deve retornar 404 Not Found para ID inexistente")
+    void buscarPorId_comIdInexistente_deveRetornarNotFound() throws Exception {
+        long idInexistente = 999L;
+        mockMvc.perform(get("/ativos/{id}", idInexistente)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("Deletar: Deve retornar 403 Forbidden para USER")
+    void deletar_comUser_deveRetornarForbidden() throws Exception {
+        mockMvc.perform(delete("/ativos/{id}", ativoExistente.getId())
+                        .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isForbidden());
     }
 
     // --- Helper Methods ---
