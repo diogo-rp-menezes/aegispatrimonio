@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: br.com.aegispatrimonio.controller.ManutencaoControllerIT
--------------------------------------------------------------------------------
-Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.769 s -- in br.com.aegispatrimonio.controller.ManutencaoControllerIT
