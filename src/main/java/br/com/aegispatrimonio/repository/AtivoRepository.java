@@ -2,6 +2,8 @@ package br.com.aegispatrimonio.repository;
 
 import br.com.aegispatrimonio.model.Ativo;
 import br.com.aegispatrimonio.model.StatusAtivo;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -40,6 +42,9 @@ public interface AtivoRepository extends JpaRepository<Ativo, Long> {
     List<Ativo> findByFilialIdInWithDetails(@Param("filialIds") Set<Long> filialIds);
 
     List<Ativo> findByFilialIdIn(Set<Long> filialIds);
+
+    // Suporte à paginação mantendo compatibilidade no controller/serviço
+    Page<Ativo> findByFilialIdIn(Set<Long> filialIds, Pageable pageable);
 
     Optional<Ativo> findByNumeroPatrimonio(String numeroPatrimonio);
 

@@ -58,11 +58,17 @@ public class AtivoService {
     }
 
     @Transactional(readOnly = true)
-    public List<AtivoDTO> listarTodos() {
+    public List<AtivoDTO> listarTodos(org.springframework.data.domain.Pageable pageable) {
         Usuario usuarioLogado = getUsuarioLogado();
 
+        boolean unpaged = (pageable == null || pageable.isUnpaged());
+
         if (isAdmin(usuarioLogado)) {
-            return ativoRepository.findAllWithDetails().stream().map(ativoMapper::toDTO).collect(Collectors.toList());
+            if (unpaged) {
+                return ativoRepository.findAllWithDetails().stream().map(ativoMapper::toDTO).collect(Collectors.toList());
+            } else {
+                return ativoRepository.findAll(pageable).map(ativoMapper::toDTO).getContent();
+            }
         }
 
         Funcionario funcionarioPrincipal = usuarioLogado.getFuncionario();
@@ -78,9 +84,14 @@ public class AtivoService {
         }
 
         Set<Long> filiaisIds = funcionarioLogado.getFiliais().stream().map(Filial::getId).collect(Collectors.toSet());
-        
-        // CORREÇÃO: Usar findByFilialIdInWithDetails para evitar LazyInitializationException.
-        return ativoRepository.findByFilialIdInWithDetails(filiaisIds).stream().map(ativoMapper::toDTO).collect(Collectors.toList());
+
+        if (unpaged) {
+            // Mantém comportamento anterior com FETCH JOIN para evitar LazyInitializationException
+            return ativoRepository.findByFilialIdInWithDetails(filiaisIds).stream().map(ativoMapper::toDTO).collect(Collectors.toList());
+        } else {
+            // Paginação usando consulta padrão (evita problemas de FETCH JOIN + Pageable)
+            return ativoRepository.findByFilialIdIn(filiaisIds, pageable).map(ativoMapper::toDTO).getContent();
+        }
     }
 
     @Transactional(readOnly = true)

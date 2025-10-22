@@ -37,3 +37,10 @@ jobs:
         with:
           name: jacoco-exec
           path: target/jacoco.exec
+
+      - name: Upload JaCoCo HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report-html
+          path: target/site/jacoco/**
