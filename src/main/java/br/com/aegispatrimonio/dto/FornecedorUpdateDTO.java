@@ -1,6 +1,6 @@
 package br.com.aegispatrimonio.dto;
 
-import br.com.aegispatrimonio.model.Status;
+import br.com.aegispatrimonio.model.StatusFornecedor;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -22,6 +22,6 @@ public record FornecedorUpdateDTO(
 
     String observacoes,
 
-    @NotNull Status status
+    @NotNull StatusFornecedor status
 ) {
 }

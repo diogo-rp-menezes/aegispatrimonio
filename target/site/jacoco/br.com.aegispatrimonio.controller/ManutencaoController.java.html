@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="pt"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ManutencaoController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">aegispatrimonio</a> &gt; <a href="index.source.html" class="el_package">br.com.aegispatrimonio.controller</a> &gt; <span class="el_source">ManutencaoController.java</span></div><h1>ManutencaoController.java</h1><pre class="source lang-java linenums">package br.com.aegispatrimonio.controller;
+
+import br.com.aegispatrimonio.dto.request.ManutencaoCancelDTO;
+import br.com.aegispatrimonio.dto.request.ManutencaoConclusaoDTO;
+import br.com.aegispatrimonio.dto.request.ManutencaoInicioDTO;
+import br.com.aegispatrimonio.dto.request.ManutencaoRequestDTO;
+import br.com.aegispatrimonio.dto.response.ManutencaoResponseDTO;
+import br.com.aegispatrimonio.model.StatusManutencao;
+import br.com.aegispatrimonio.model.TipoManutencao;
+import br.com.aegispatrimonio.service.ManutencaoService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
+@RestController
+@RequestMapping(&quot;/manutencoes&quot;)
+<span class="fc" id="L30">@RequiredArgsConstructor</span>
+@Tag(name = &quot;Manutenções&quot;, description = &quot;Operações relacionadas à gestão de manutenções de ativos&quot;)
+public class ManutencaoController {
+
+    private final ManutencaoService manutencaoService;
+
+    @PostMapping
+    @Operation(summary = &quot;Criar manutenção&quot;, description = &quot;Cria uma nova solicitação de manutenção&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;201&quot;, description = &quot;Manutenção criada com sucesso&quot;),
+        @ApiResponse(responseCode = &quot;400&quot;, description = &quot;Dados inválidos&quot;),
+        @ApiResponse(responseCode = &quot;404&quot;, description = &quot;Recurso não encontrado&quot;)
+    })
+    public ResponseEntity&lt;ManutencaoResponseDTO&gt; criar(@Valid @RequestBody ManutencaoRequestDTO request) {
+<span class="fc" id="L44">        return ResponseEntity.status(HttpStatus.CREATED).body(manutencaoService.criar(request));</span>
+    }
+
+    @GetMapping(&quot;/{id}&quot;)
+    @Operation(summary = &quot;Buscar manutenção por ID&quot;, description = &quot;Recupera uma manutenção específica&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Manutenção encontrada&quot;),
+        @ApiResponse(responseCode = &quot;404&quot;, description = &quot;Manutenção não encontrada&quot;)
+    })
+    public ResponseEntity&lt;ManutencaoResponseDTO&gt; buscarPorId(
+            @Parameter(description = &quot;ID da manutenção&quot;, example = &quot;1&quot;) @PathVariable Long id) {
+<span class="nc" id="L55">        return manutencaoService.buscarPorId(id)</span>
+<span class="nc" id="L56">                .map(ResponseEntity::ok)</span>
+<span class="nc" id="L57">                .orElse(ResponseEntity.notFound().build());</span>
+    }
+
+    @GetMapping
+    @Operation(summary = &quot;Listar e filtrar manutenções&quot;, description = &quot;Retorna manutenções paginadas com filtros dinâmicos&quot;)
+    @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Manutenções listadas com sucesso&quot;)
+    public ResponseEntity&lt;Page&lt;ManutencaoResponseDTO&gt;&gt; listar(
+            @Parameter(description = &quot;ID do ativo&quot;) @RequestParam(required = false) Long ativoId,
+            @Parameter(description = &quot;Status da manutenção&quot;) @RequestParam(required = false) StatusManutencao status,
+            @Parameter(description = &quot;Tipo de manutenção&quot;) @RequestParam(required = false) TipoManutencao tipo,
+            @Parameter(description = &quot;ID do solicitante&quot;) @RequestParam(required = false) Long solicitanteId,
+            @Parameter(description = &quot;ID do fornecedor&quot;) @RequestParam(required = false) Long fornecedorId,
+            @Parameter(description = &quot;Data inicial da solicitação&quot;) @RequestParam(required = false) LocalDate dataSolicitacaoInicio,
+            @Parameter(description = &quot;Data final da solicitação&quot;) @RequestParam(required = false) LocalDate dataSolicitacaoFim,
+            @Parameter(description = &quot;Data inicial da conclusão&quot;) @RequestParam(required = false) LocalDate dataConclusaoInicio,
+            @Parameter(description = &quot;Data final da conclusão&quot;) @RequestParam(required = false) LocalDate dataConclusaoFim,
+            @Parameter(description = &quot;Parâmetros de paginação&quot;) @PageableDefault(size = 10, sort = &quot;dataSolicitacao,desc&quot;) Pageable pageable) {
+
+<span class="nc" id="L75">        Page&lt;ManutencaoResponseDTO&gt; manutenções = manutencaoService.listar(ativoId, status, tipo, solicitanteId, fornecedorId,</span>
+                dataSolicitacaoInicio, dataSolicitacaoFim, dataConclusaoInicio, dataConclusaoFim, pageable);
+<span class="nc" id="L77">        return ResponseEntity.ok(manutenções);</span>
+    }
+
+    @PostMapping(&quot;/aprovar/{id}&quot;)
+    @Operation(summary = &quot;Aprovar manutenção&quot;, description = &quot;Aprova uma manutenção solicitada&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Manutenção aprovada&quot;),
+        @ApiResponse(responseCode = &quot;404&quot;, description = &quot;Manutenção não encontrada&quot;),
+        @ApiResponse(responseCode = &quot;400&quot;, description = &quot;Status inválido para aprovação&quot;)
+    })
+    public ResponseEntity&lt;ManutencaoResponseDTO&gt; aprovar(
+            @Parameter(description = &quot;ID da manutenção&quot;, example = &quot;1&quot;) @PathVariable Long id) {
+<span class="fc" id="L89">        return ResponseEntity.ok(manutencaoService.aprovar(id));</span>
+    }
+
+    @PostMapping(&quot;/iniciar/{id}&quot;)
+    @Operation(summary = &quot;Iniciar manutenção&quot;, description = &quot;Inicia a execução de uma manutenção aprovada&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Manutenção iniciada&quot;),
+        @ApiResponse(responseCode = &quot;404&quot;, description = &quot;Manutenção ou técnico não encontrado&quot;),
+        @ApiResponse(responseCode = &quot;400&quot;, description = &quot;Status inválido para início&quot;)
+    })
+    public ResponseEntity&lt;ManutencaoResponseDTO&gt; iniciar(
+            @Parameter(description = &quot;ID da manutenção&quot;, example = &quot;1&quot;) @PathVariable Long id,
+            @Valid @RequestBody ManutencaoInicioDTO inicioDTO) {
+<span class="fc" id="L102">        return ResponseEntity.ok(manutencaoService.iniciar(id, inicioDTO));</span>
+    }
+
+    @PostMapping(&quot;/concluir/{id}&quot;)
+    @Operation(summary = &quot;Concluir manutenção&quot;, description = &quot;Conclui uma manutenção em andamento&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Manutenção concluída&quot;),
+        @ApiResponse(responseCode = &quot;404&quot;, description = &quot;Manutenção não encontrada&quot;),
+        @ApiResponse(responseCode = &quot;400&quot;, description = &quot;Status inválido para conclusão&quot;)
+    })
+    public ResponseEntity&lt;ManutencaoResponseDTO&gt; concluir(
+            @Parameter(description = &quot;ID da manutenção&quot;, example = &quot;1&quot;) @PathVariable Long id,
+            @Valid @RequestBody ManutencaoConclusaoDTO conclusaoDTO) {
+<span class="fc" id="L115">        return ResponseEntity.ok(manutencaoService.concluir(id, conclusaoDTO));</span>
+    }
+
+    @PostMapping(&quot;/cancelar/{id}&quot;)
+    @Operation(summary = &quot;Cancelar manutenção&quot;, description = &quot;Cancela uma manutenção&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Manutenção cancelada&quot;),
+        @ApiResponse(responseCode = &quot;404&quot;, description = &quot;Manutenção não encontrada&quot;),
+        @ApiResponse(responseCode = &quot;400&quot;, description = &quot;Não é possível cancelar&quot;)
+    })
+    public ResponseEntity&lt;ManutencaoResponseDTO&gt; cancelar(
+            @Parameter(description = &quot;ID da manutenção&quot;, example = &quot;1&quot;) @PathVariable Long id,
+            @Valid @RequestBody ManutencaoCancelDTO cancelDTO) {
+<span class="nc" id="L128">        return ResponseEntity.ok(manutencaoService.cancelar(id, cancelDTO));</span>
+    }
+
+    @DeleteMapping(&quot;/{id}&quot;)
+    @Operation(summary = &quot;Deletar manutenção&quot;, description = &quot;Remove uma manutenção do sistema&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;204&quot;, description = &quot;Manutenção deletada&quot;),
+        @ApiResponse(responseCode = &quot;404&quot;, description = &quot;Manutenção não encontrada&quot;)
+    })
+    public ResponseEntity&lt;Void&gt; deletar(
+            @Parameter(description = &quot;ID da manutenção&quot;, example = &quot;1&quot;) @PathVariable Long id) {
+<span class="nc" id="L139">        manutencaoService.deletar(id);</span>
+<span class="nc" id="L140">        return ResponseEntity.noContent().build();</span>
+    }
+
+    @GetMapping(&quot;/custo-total&quot;)
+    @Operation(summary = &quot;Obter custo total por ativo&quot;, description = &quot;Calcula custo total de manutenções concluídas&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Custo calculado&quot;),
+        @ApiResponse(responseCode = &quot;404&quot;, description = &quot;Ativo não encontrado&quot;)
+    })
+    public ResponseEntity&lt;BigDecimal&gt; custoTotalPorAtivo(
+            @Parameter(description = &quot;ID do ativo&quot;, example = &quot;1&quot;) @RequestParam Long ativoId) {
+<span class="nc" id="L151">        return ResponseEntity.ok(manutencaoService.custoTotalPorAtivo(ativoId));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

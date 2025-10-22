@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="pt"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AtivoMapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">aegispatrimonio</a> &gt; <a href="index.source.html" class="el_package">br.com.aegispatrimonio.mapper</a> &gt; <span class="el_source">AtivoMapper.java</span></div><h1>AtivoMapper.java</h1><pre class="source lang-java linenums">package br.com.aegispatrimonio.mapper;
+
+import br.com.aegispatrimonio.dto.AtivoCreateDTO;
+import br.com.aegispatrimonio.dto.AtivoDTO;
+import br.com.aegispatrimonio.model.Ativo;
+import br.com.aegispatrimonio.model.Funcionario;
+import org.springframework.stereotype.Component;
+
+@Component
+<span class="fc" id="L10">public class AtivoMapper {</span>
+
+    public AtivoDTO toDTO(Ativo ativo) {
+<span class="fc bfc" id="L13" title="All 2 branches covered.">        if (ativo == null) {</span>
+<span class="fc" id="L14">            return null;</span>
+        }
+
+        // CORREÇÃO: Lógica para extrair dados do funcionário responsável
+<span class="fc" id="L18">        Funcionario responsavel = ativo.getFuncionarioResponsavel();</span>
+<span class="fc bfc" id="L19" title="All 2 branches covered.">        Long responsavelId = (responsavel != null) ? responsavel.getId() : null;</span>
+<span class="fc bfc" id="L20" title="All 2 branches covered.">        String responsavelNome = (responsavel != null) ? responsavel.getNome() : null;</span>
+
+<span class="fc" id="L22">        return new AtivoDTO(</span>
+<span class="fc" id="L23">                ativo.getId(),</span>
+<span class="fc" id="L24">                ativo.getNome(),</span>
+<span class="fc" id="L25">                ativo.getNumeroPatrimonio(),</span>
+<span class="fc" id="L26">                ativo.getTipoAtivo().getNome(),</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">                ativo.getLocalizacao() != null ? ativo.getLocalizacao().getNome() : null,</span>
+<span class="fc" id="L28">                ativo.getFilial().getNome(),</span>
+<span class="fc" id="L29">                ativo.getStatus(),</span>
+                responsavelId,
+                responsavelNome
+        );
+    }
+
+    public Ativo toEntity(AtivoCreateDTO ativoCreateDTO) {
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        if (ativoCreateDTO == null) {</span>
+<span class="fc" id="L37">            return null;</span>
+        }
+
+<span class="fc" id="L40">        Ativo ativo = new Ativo();</span>
+<span class="fc" id="L41">        ativo.setNome(ativoCreateDTO.nome());</span>
+<span class="fc" id="L42">        ativo.setNumeroPatrimonio(ativoCreateDTO.numeroPatrimonio());</span>
+<span class="fc" id="L43">        ativo.setDataAquisicao(ativoCreateDTO.dataAquisicao());</span>
+<span class="fc" id="L44">        ativo.setValorAquisicao(ativoCreateDTO.valorAquisicao());</span>
+<span class="fc" id="L45">        ativo.setObservacoes(ativoCreateDTO.observacoes());</span>
+<span class="fc" id="L46">        ativo.setInformacoesGarantia(ativoCreateDTO.informacoesGarantia());</span>
+
+        // As entidades relacionadas (Filial, TipoAtivo, Funcionario, etc.) 
+        // são buscadas e atribuídas na camada de Serviço (Service).
+
+<span class="fc" id="L51">        return ativo;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

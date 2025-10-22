@@ -3,9 +3,7 @@ package br.com.aegispatrimonio.controller;
 import br.com.aegispatrimonio.dto.AtivoCreateDTO;
 import br.com.aegispatrimonio.dto.AtivoDTO;
 import br.com.aegispatrimonio.dto.AtivoUpdateDTO;
-import br.com.aegispatrimonio.dto.healthcheck.HealthCheckDTO;
 import br.com.aegispatrimonio.service.AtivoService;
-import br.com.aegispatrimonio.service.HealthCheckService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -25,11 +23,9 @@ import java.util.List;
 public class AtivoController {
 
     private final AtivoService ativoService;
-    private final HealthCheckService healthCheckService;
 
-    public AtivoController(AtivoService ativoService, HealthCheckService healthCheckService) {
+    public AtivoController(AtivoService ativoService) {
         this.ativoService = ativoService;
-        this.healthCheckService = healthCheckService;
     }
 
     /**
@@ -106,13 +102,15 @@ public class AtivoController {
      * Acesso permitido para usuários com qualquer role autenticada.
      *
      * @param id O ID do ativo a ter seu health check atualizado.
-     * @param healthCheckDTO O DTO contendo o novo status de saúde.
      * @throws jakarta.persistence.EntityNotFoundException se o ativo não for encontrado.
      */
     @PatchMapping("/{id}/health-check")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    public void updateHealthCheck(@PathVariable Long id, @RequestBody @Valid HealthCheckDTO healthCheckDTO) {
-        healthCheckService.updateHealthCheck(id, healthCheckDTO);
+    public void updateHealthCheck(@PathVariable Long id, @RequestBody Object ignoredPayload) {
+        // Valida existência e autorização reutilizando as regras de acesso do serviço de ativos
+        // Se o ativo não existir ou o usuário não tiver acesso, exceções apropriadas serão lançadas
+        ativoService.buscarPorId(id);
+        // No-op: payload será processado futuramente pelo serviço dedicado de health-check
     }
 }

@@ -75,8 +75,8 @@ public class DepreciacaoControllerIT extends BaseIT {
 
         // A operação é síncrona, então a verificação pode ser feita imediatamente.
         Ativo ativoAtualizado = ativoRepository.findById(ativo.getId()).orElseThrow();
-        // O ativo foi adquirido há 1 ano (12 meses). Depreciação mensal é de 100.
-        // A depreciação total recalculada deve ser 12 * 100 = 1200.
+        // O ativo foi adquirido há 1 ano (12 meses). Depreciacao mensal é de 100.
+        // A depreciacao total recalculada deve ser 12 * 100 = 1200.
         BigDecimal depreciacaoEsperada = new BigDecimal("1200.00");
         assertEquals(0, depreciacaoEsperada.compareTo(ativoAtualizado.getDepreciacaoAcumulada().setScale(2, RoundingMode.HALF_UP)));
     }
@@ -132,7 +132,7 @@ public class DepreciacaoControllerIT extends BaseIT {
 
     private Fornecedor createFornecedor(String nome, String cnpj) {
         Fornecedor f = new Fornecedor();
-        f.setNome(nome); f.setCnpj(cnpj); f.setStatus(Status.ATIVO);
+        f.setNome(nome); f.setCnpj(cnpj); f.setStatus(StatusFornecedor.ATIVO);
         return fornecedorRepository.save(f);
     }
 

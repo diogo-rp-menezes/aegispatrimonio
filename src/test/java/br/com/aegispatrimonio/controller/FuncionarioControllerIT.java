@@ -11,6 +11,8 @@ import br.com.aegispatrimonio.repository.UsuarioRepository;
 import br.com.aegispatrimonio.security.CustomUserDetails;
 import br.com.aegispatrimonio.security.JwtService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.EntityManager; // Importar EntityManager
+import jakarta.persistence.PersistenceContext; // Importar PersistenceContext
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,7 +24,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
@@ -58,21 +62,41 @@ public class FuncionarioControllerIT extends BaseIT {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @PersistenceContext // Injetar EntityManager
+    private EntityManager entityManager;
+
     private String adminToken;
     private String userToken;
     private Filial filialA;
     private Departamento deptoA;
     private Funcionario funcionarioExistente;
 
+    // Contador estático para gerar IDs únicos para funcionários nos testes (não será mais usado para setId, mas mantido para referência se necessário)
+    private static Long nextFuncionarioId = 1L;
+
     @BeforeEach
     void setUp() {
+        // Limpar repositórios para garantir um estado limpo para cada teste
+        usuarioRepository.deleteAll();
+        funcionarioRepository.deleteAll();
+        departamentoRepository.deleteAll();
+        filialRepository.deleteAll();
+
+        // Resetar auto-incremento para tabelas relevantes e limpar a tabela de junção
+        resetAutoIncrement();
+
+        // Resetar o contador de ID para cada execução do setUp
+        nextFuncionarioId = 1L;
+
         filialA = createFilial("Filial A", "FL-A", "01.000.000/0001-01");
         deptoA = createDepartamento("TI A", filialA);
 
-        Funcionario adminFunc = createFuncionarioAndUsuario("Admin", "admin@aegis.com", "ROLE_ADMIN", deptoA, Set.of(filialA));
+        String adminEmail = "admin." + UUID.randomUUID().toString() + "@aegis.com";
+        Funcionario adminFunc = createFuncionarioAndUsuario("Admin", adminEmail, "ROLE_ADMIN", deptoA, new HashSet<>(Set.of(filialA)));
         this.adminToken = jwtService.generateToken(new CustomUserDetails(adminFunc.getUsuario()));
 
-        this.funcionarioExistente = createFuncionarioAndUsuario("User", "user@aegis.com", "ROLE_USER", deptoA, Set.of(filialA));
+        String userEmail = "user." + UUID.randomUUID().toString() + "@aegis.com";
+        this.funcionarioExistente = createFuncionarioAndUsuario("User", userEmail, "ROLE_USER", deptoA, new HashSet<>(Set.of(filialA)));
         this.userToken = jwtService.generateToken(new CustomUserDetails(this.funcionarioExistente.getUsuario()));
     }
 
@@ -154,7 +178,7 @@ public class FuncionarioControllerIT extends BaseIT {
     @Test
     @DisplayName("Deletar: Deve retornar 204 NoContent para ADMIN")
     void deletar_comAdmin_deveRetornarNoContent() throws Exception {
-        Funcionario funcParaDeletar = createFuncionarioAndUsuario("Para Deletar", "deletar@aegis.com", "ROLE_USER", deptoA, Set.of(filialA));
+        Funcionario funcParaDeletar = createFuncionarioAndUsuario("Para Deletar", "deletar@aegis.com", "ROLE_USER", deptoA, new HashSet<>(Set.of(filialA)));
 
         mockMvc.perform(delete("/funcionarios/{id}", funcParaDeletar.getId())
                         .header("Authorization", "Bearer " + adminToken))
@@ -183,20 +207,39 @@ public class FuncionarioControllerIT extends BaseIT {
     private Funcionario createFuncionarioAndUsuario(String nome, String email, String role, Departamento depto, Set<Filial> filiais) {
         Funcionario func = new Funcionario();
         func.setNome(nome);
-        func.setMatricula(nome.replaceAll("\\s+", "") + "-001");
+        func.setMatricula(nome.replaceAll("\\s+", "") + "-" + UUID.randomUUID().toString().substring(0, 8)); // Gerar matrícula única
         func.setCargo("Analista");
         func.setDepartamento(depto);
-        func.setFiliais(filiais);
         func.setStatus(Status.ATIVO);
+        //func.setId(nextFuncionarioId++); // REMOVIDO: Remover atribuição manual de ID
 
         Usuario user = new Usuario();
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode("password"));
         user.setRole(role);
         user.setStatus(Status.ATIVO);
-        user.setFuncionario(func);
-        func.setUsuario(user);
+        user.setFuncionario(func); // Associar ao funcionário
+        func.setUsuario(user); // Manter a bidirecionalidade
 
-        return funcionarioRepository.save(func);
+        // Salvar o funcionário. Se houver cascade, o usuário também será salvo.
+        Funcionario savedFunc = funcionarioRepository.save(func);
+        // Adicionar flush para garantir que o ID seja gerado e atribuído imediatamente
+        entityManager.flush(); 
+
+        // Agora associar as filiais e salvar novamente o funcionário para persistir a associação ManyToMany
+        savedFunc.setFiliais(filiais);
+        return funcionarioRepository.save(savedFunc);
+    }
+
+    // Novo método para resetar os contadores de auto-incremento e limpar tabelas de junção
+    private void resetAutoIncrement() {
+        // Para MySQL, o comando é ALTER TABLE table_name AUTO_INCREMENT = 1;
+        // Certifique-se de que os nomes das tabelas estão corretos.
+        entityManager.createNativeQuery("ALTER TABLE funcionarios AUTO_INCREMENT = 1").executeUpdate();
+        entityManager.createNativeQuery("ALTER TABLE usuarios AUTO_INCREMENT = 1").executeUpdate();
+        entityManager.createNativeQuery("ALTER TABLE filiais AUTO_INCREMENT = 1").executeUpdate(); // Resetar auto-incremento para filiais
+        // Excluir explicitamente os dados da tabela de junção funcionario_filial
+        entityManager.createNativeQuery("DELETE FROM funcionario_filial").executeUpdate();
+        entityManager.flush(); // Garante que os comandos sejam executados
     }
 }

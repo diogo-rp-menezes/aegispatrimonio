@@ -173,16 +173,25 @@ public class ManutencaoControllerIT extends BaseIT {
 
     private Fornecedor createFornecedor(String nome, String cnpj) {
         Fornecedor f = new Fornecedor();
-        f.setNome(nome); f.setCnpj(cnpj); f.setStatus(Status.ATIVO);
+        f.setNome(nome);
+        f.setCnpj(cnpj);
+        f.setStatus(br.com.aegispatrimonio.model.StatusFornecedor.ATIVO); // CORREÇÃO: Usa o enum 'StatusFornecedor'
         return fornecedorRepository.save(f);
     }
 
     private Ativo createAtivo(String nome, String patrimonio, Filial filial, TipoAtivo tipo, Fornecedor fornecedor, Funcionario responsavel, Localizacao local) {
         Ativo a = new Ativo();
-        a.setNome(nome); a.setNumeroPatrimonio(patrimonio); a.setFilial(filial); a.setTipoAtivo(tipo);
-        a.setFornecedor(fornecedor); a.setFuncionarioResponsavel(responsavel); a.setLocalizacao(local);
-        a.setDataAquisicao(LocalDate.now()); a.setValorAquisicao(new BigDecimal("3000.00"));
-        a.setStatus(StatusAtivo.ATIVO); a.setDataRegistro(LocalDate.now());
+        a.setNome(nome);
+        a.setNumeroPatrimonio(patrimonio);
+        a.setFilial(filial);
+        a.setTipoAtivo(tipo);
+        a.setFornecedor(fornecedor);
+        a.setFuncionarioResponsavel(responsavel);
+        a.setLocalizacao(local);
+        a.setDataAquisicao(LocalDate.now());
+        a.setValorAquisicao(new BigDecimal("3000.00"));
+        a.setStatus(StatusAtivo.ATIVO);
+        a.setDataRegistro(LocalDate.now());
         return ativoRepository.save(a);
     }
 }

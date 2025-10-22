@@ -62,27 +62,41 @@ public class AtivoService {
         Usuario usuarioLogado = getUsuarioLogado();
 
         if (isAdmin(usuarioLogado)) {
-            return ativoRepository.findAll().stream().map(ativoMapper::toDTO).collect(Collectors.toList());
+            return ativoRepository.findAllWithDetails().stream().map(ativoMapper::toDTO).collect(Collectors.toList());
         }
 
-        Funcionario funcionarioLogado = usuarioLogado.getFuncionario();
-        if (funcionarioLogado == null || funcionarioLogado.getFiliais().isEmpty()) {
+        Funcionario funcionarioPrincipal = usuarioLogado.getFuncionario();
+        if (funcionarioPrincipal == null || funcionarioPrincipal.getId() == null) {
             throw new AccessDeniedException("Usuário não é um funcionário ou não está associado a nenhuma filial.");
         }
 
+        // Recarrega o funcionário do banco para garantir as filiais carregadas
+        Funcionario funcionarioLogado = funcionarioRepository.findById(funcionarioPrincipal.getId())
+                .orElseThrow(() -> new AccessDeniedException("Funcionário associado ao usuário não foi encontrado."));
+        if (funcionarioLogado.getFiliais() == null || funcionarioLogado.getFiliais().isEmpty()) {
+            throw new AccessDeniedException("Usuário não está associado a nenhuma filial.");
+        }
+
         Set<Long> filiaisIds = funcionarioLogado.getFiliais().stream().map(Filial::getId).collect(Collectors.toSet());
-        return ativoRepository.findByFilialIdIn(filiaisIds).stream().map(ativoMapper::toDTO).collect(Collectors.toList());
+        
+        // CORREÇÃO: Usar findByFilialIdInWithDetails para evitar LazyInitializationException.
+        return ativoRepository.findByFilialIdInWithDetails(filiaisIds).stream().map(ativoMapper::toDTO).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public AtivoDTO buscarPorId(Long id) {
         Usuario usuarioLogado = getUsuarioLogado();
-        Ativo ativo = ativoRepository.findById(id)
+        Ativo ativo = ativoRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new EntityNotFoundException("Ativo não encontrado com ID: " + id));
 
         if (!isAdmin(usuarioLogado)) {
-            Funcionario funcionarioLogado = usuarioLogado.getFuncionario();
-            if (funcionarioLogado == null || funcionarioLogado.getFiliais().stream().noneMatch(f -> f.getId().equals(ativo.getFilial().getId()))) {
+            Funcionario funcionarioPrincipal = usuarioLogado.getFuncionario();
+            if (funcionarioPrincipal == null || funcionarioPrincipal.getId() == null) {
+                throw new AccessDeniedException("Usuário não é um funcionário ou não está associado a nenhuma filial.");
+            }
+            Funcionario funcionarioLogado = funcionarioRepository.findById(funcionarioPrincipal.getId())
+                    .orElseThrow(() -> new AccessDeniedException("Funcionário associado ao usuário não foi encontrado."));
+            if (funcionarioLogado.getFiliais().stream().noneMatch(f -> f.getId().equals(ativo.getFilial().getId()))) {
                 throw new AccessDeniedException("Você não tem permissão para acessar ativos desta filial.");
             }
         }
@@ -94,18 +108,13 @@ public class AtivoService {
     public AtivoDTO criar(AtivoCreateDTO ativoCreateDTO) {
         validarNumeroPatrimonio(ativoCreateDTO.numeroPatrimonio(), null);
 
-        Ativo ativo = ativoMapper.toEntity(ativoCreateDTO);
-
-        // Se o mapper for um mock nos testes e retornar null, crie a entidade manualmente para evitar NPEs
-        if (ativo == null) {
-            ativo = new Ativo();
-            ativo.setNome(ativoCreateDTO.nome());
-            ativo.setNumeroPatrimonio(ativoCreateDTO.numeroPatrimonio());
-            ativo.setDataAquisicao(ativoCreateDTO.dataAquisicao());
-            ativo.setValorAquisicao(ativoCreateDTO.valorAquisicao());
-            ativo.setObservacoes(ativoCreateDTO.observacoes());
-            ativo.setInformacoesGarantia(ativoCreateDTO.informacoesGarantia());
-        }
+        Ativo ativo = new Ativo();
+        ativo.setNome(ativoCreateDTO.nome());
+        ativo.setNumeroPatrimonio(ativoCreateDTO.numeroPatrimonio());
+        ativo.setDataAquisicao(ativoCreateDTO.dataAquisicao());
+        ativo.setValorAquisicao(ativoCreateDTO.valorAquisicao());
+        ativo.setObservacoes(ativoCreateDTO.observacoes());
+        ativo.setInformacoesGarantia(ativoCreateDTO.informacoesGarantia());
 
         Filial filial = filialRepository.findById(ativoCreateDTO.filialId())
                 .orElseThrow(() -> new EntityNotFoundException("Filial não encontrada com ID: " + ativoCreateDTO.filialId()));
@@ -115,10 +124,9 @@ public class AtivoService {
                 .orElseThrow(() -> new EntityNotFoundException("Tipo de Ativo não encontrado com ID: " + ativoCreateDTO.tipoAtivoId()));
         ativo.setTipoAtivo(tipoAtivo);
 
-        // Buscar fornecedor aqui para garantir que mocks nas classes de teste sejam usados (evita UnnecessaryStubbing)
         Fornecedor fornecedor = fornecedorRepository.findById(ativoCreateDTO.fornecedorId())
                 .orElseThrow(() -> new EntityNotFoundException("Fornecedor não encontrado com ID: " + ativoCreateDTO.fornecedorId()));
-        // Não setamos ainda, vamos validar localização antes de persistir
+        ativo.setFornecedor(fornecedor);
 
         if (ativoCreateDTO.localizacaoId() != null) {
             Localizacao localizacao = localizacaoRepository.findById(ativoCreateDTO.localizacaoId())
@@ -127,22 +135,24 @@ public class AtivoService {
             ativo.setLocalizacao(localizacao);
         }
 
-        if (ativoCreateDTO.funcionarioResponsavelId() != null) { // CORREÇÃO
+        if (ativoCreateDTO.funcionarioResponsavelId() != null) {
             Funcionario responsavel = funcionarioRepository.findById(ativoCreateDTO.funcionarioResponsavelId())
                     .orElseThrow(() -> new EntityNotFoundException("Funcionário responsável não encontrado com ID: " + ativoCreateDTO.funcionarioResponsavelId()));
             validarConsistenciaResponsavel(responsavel, filial);
-            ativo.setFuncionarioResponsavel(responsavel); // CORREÇÃO
+            ativo.setFuncionarioResponsavel(responsavel);
         }
 
-        ativo.setFornecedor(fornecedor);
-
         Ativo ativoSalvo = ativoRepository.save(ativo);
-        return ativoMapper.toDTO(ativoSalvo);
+        
+        Ativo ativoCompleto = ativoRepository.findByIdWithDetails(ativoSalvo.getId())
+                .orElseThrow(() -> new IllegalStateException("Ativo recém-criado não encontrado. ID: " + ativoSalvo.getId()));
+
+        return ativoMapper.toDTO(ativoCompleto);
     }
 
     @Transactional
     public AtivoDTO atualizar(Long id, AtivoUpdateDTO ativoUpdateDTO) {
-        Ativo ativo = ativoRepository.findById(id)
+        Ativo ativo = ativoRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new EntityNotFoundException("Ativo não encontrado com ID: " + id));
 
         validarNumeroPatrimonio(ativoUpdateDTO.numeroPatrimonio(), id);
@@ -166,6 +176,10 @@ public class AtivoService {
                 .orElseThrow(() -> new EntityNotFoundException("Tipo de Ativo não encontrado com ID: " + ativoUpdateDTO.tipoAtivoId()));
         ativo.setTipoAtivo(tipoAtivo);
 
+        Fornecedor fornecedor = fornecedorRepository.findById(ativoUpdateDTO.fornecedorId())
+                .orElseThrow(() -> new EntityNotFoundException("Fornecedor não encontrado com ID: " + ativoUpdateDTO.fornecedorId()));
+        ativo.setFornecedor(fornecedor);
+
         if (ativoUpdateDTO.localizacaoId() != null) {
             Localizacao localizacao = localizacaoRepository.findById(ativoUpdateDTO.localizacaoId())
                     .orElseThrow(() -> new EntityNotFoundException("Localização não encontrada com ID: " + ativoUpdateDTO.localizacaoId()));
@@ -175,18 +189,13 @@ public class AtivoService {
             ativo.setLocalizacao(null);
         }
 
-        // Buscar fornecedor aqui para garantir que mocks nas classes de teste sejam usados (evita UnnecessaryStubbing)
-        Fornecedor fornecedor = fornecedorRepository.findById(ativoUpdateDTO.fornecedorId())
-                .orElseThrow(() -> new EntityNotFoundException("Fornecedor não encontrado com ID: " + ativoUpdateDTO.fornecedorId()));
-        ativo.setFornecedor(fornecedor);
-
-        if (ativoUpdateDTO.funcionarioResponsavelId() != null) { // CORREÇÃO
+        if (ativoUpdateDTO.funcionarioResponsavelId() != null) {
             Funcionario responsavel = funcionarioRepository.findById(ativoUpdateDTO.funcionarioResponsavelId())
                     .orElseThrow(() -> new EntityNotFoundException("Funcionário responsável não encontrado com ID: " + ativoUpdateDTO.funcionarioResponsavelId()));
             validarConsistenciaResponsavel(responsavel, filial);
-            ativo.setFuncionarioResponsavel(responsavel); // CORREÇÃO
+            ativo.setFuncionarioResponsavel(responsavel);
         } else {
-            ativo.setFuncionarioResponsavel(null); // CORREÇÃO
+            ativo.setFuncionarioResponsavel(null);
         }
 
         Ativo ativoAtualizado = ativoRepository.save(ativo);
@@ -197,7 +206,7 @@ public class AtivoService {
         if (precisaRecalcular) {
             depreciacaoService.recalcularDepreciacaoCompleta(ativoAtualizado.getId());
         }
-
+        
         return ativoMapper.toDTO(ativoAtualizado);
     }
 

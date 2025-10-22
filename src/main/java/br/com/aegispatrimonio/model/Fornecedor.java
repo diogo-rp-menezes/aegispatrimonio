@@ -49,7 +49,7 @@ public class Fornecedor {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Status status;
+    private StatusFornecedor status;
     
     @Column(name = "criado_em")
     private LocalDateTime criadoEm;
@@ -62,7 +62,7 @@ public class Fornecedor {
         criadoEm = LocalDateTime.now();
         atualizadoEm = LocalDateTime.now();
         if (status == null) {
-            status = Status.ATIVO;
+            status = StatusFornecedor.ATIVO;
         }
     }
     

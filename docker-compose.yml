@@ -15,6 +15,12 @@ services:
     volumes:
       # Garante que os dados do banco persistam entre as execuções
       - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # Serviço da Aplicação Spring Boot
   app:
@@ -32,8 +38,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/aegis-patrimonio?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: Admin123
-      # Garante que a aplicação espere o banco de dados estar pronto
-      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      # Evita que o Hibernate valide o schema antes das migrações do Flyway aplicadas.
+      SPRING_JPA_HIBERNATE_DDL_AUTO: none
 
 # Define o volume nomeado para persistência dos dados do MySQL
 volumes:

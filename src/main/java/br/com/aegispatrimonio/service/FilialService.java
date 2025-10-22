@@ -12,6 +12,8 @@ import br.com.aegispatrimonio.repository.FuncionarioRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 import java.util.List;
 import java.util.Optional;
@@ -22,7 +24,7 @@ public class FilialService {
 
     private final FilialRepository filialRepository;
     private final DepartamentoRepository departamentoRepository;
-    private final FuncionarioRepository funcionarioRepository; // CORREÇÃO
+    private final FuncionarioRepository funcionarioRepository;
     private final FilialMapper filialMapper;
 
     public FilialService(FilialRepository filialRepository, DepartamentoRepository departamentoRepository, FuncionarioRepository funcionarioRepository, FilialMapper filialMapper) {
@@ -41,13 +43,11 @@ public class FilialService {
     }
 
     @Transactional(readOnly = true)
-    public FilialDTO buscarPorId(Long id) {
-        // DEBUG: imprimir presença no repositório para ajudar a diagnosticar falhas de mock em testes
+    public Optional<FilialDTO> buscarPorId(Long id) { // Alterado o tipo de retorno para Optional<FilialDTO>
         var opt = filialRepository.findById(id);
         System.out.println("DEBUG FilialService.buscarPorId: id=" + id + " present=" + opt.isPresent());
-        Filial filial = opt.orElseThrow(() -> new EntityNotFoundException("Filial não encontrada com ID: " + id));
-        // Chamar o mapper explicitamente; se o mapper for um mock e retornar null, não transformamos isso em 'não encontrado'
-        return filialMapper.toDTO(filial);
+        // Retorna Optional.of(DTO) se encontrado, ou Optional.empty() se não
+        return opt.map(filialMapper::toDTO);
     }
 
     @Transactional
@@ -61,9 +61,14 @@ public class FilialService {
     }
 
     @Transactional
-    public FilialDTO atualizar(Long id, FilialUpdateDTO filialUpdateDTO) {
-        Filial filial = filialRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Filial não encontrada com ID: " + id));
+    public Optional<FilialDTO> atualizar(Long id, FilialUpdateDTO filialUpdateDTO) { // Alterado o tipo de retorno
+        Optional<Filial> optionalFilial = filialRepository.findById(id);
+
+        if (optionalFilial.isEmpty()) {
+            return Optional.empty(); // Retorna Optional vazio se não encontrar
+        }
+
+        Filial filial = optionalFilial.get();
 
         validarUnicidade(filialUpdateDTO.cnpj(), filialUpdateDTO.codigo(), id);
         validarTipoMatriz(filialUpdateDTO.tipo(), id);
@@ -76,19 +81,18 @@ public class FilialService {
         filial.setStatus(filialUpdateDTO.status());
 
         Filial filialAtualizada = filialRepository.save(filial);
-        return filialMapper.toDTO(filialAtualizada);
+        return Optional.of(filialMapper.toDTO(filialAtualizada)); // Retorna Optional com o DTO
     }
 
     @Transactional
     public void deletar(Long id) {
         Filial filial = filialRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Filial não encontrada com ID: " + id));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Filial não encontrada com ID: " + id));
 
         if (departamentoRepository.existsByFilialId(id)) {
             throw new IllegalStateException("Não é possível deletar a filial, pois existem departamentos associados a ela.");
         }
 
-        // CORREÇÃO: Usa o novo repositório e o método correto para o relacionamento ManyToMany
         if (funcionarioRepository.existsByFiliais_Id(id)) {
             throw new IllegalStateException("Não é possível deletar a filial, pois existem funcionários associados a ela.");
         }

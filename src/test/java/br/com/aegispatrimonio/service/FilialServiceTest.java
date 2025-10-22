@@ -65,6 +65,7 @@ class FilialServiceTest {
     @DisplayName("ListarTodos: Deve retornar lista de DTOs")
     void listarTodos_deveRetornarListaDeDTOs() {
         when(filialRepository.findAll()).thenReturn(List.of(matriz, filial));
+        when(filialMapper.toDTO(any(Filial.class))).thenReturn(new FilialDTO(1L, "Matriz", "MTRZ", TipoFilial.MATRIZ, "00.000.000/0001-00", "End", Status.ATIVO)); // Adicionado mock para toDTO
 
         filialService.listarTodos();
 
@@ -76,18 +77,25 @@ class FilialServiceTest {
     @DisplayName("BuscarPorId: Deve retornar DTO quando ID existe")
     void buscarPorId_quandoIdExiste_deveRetornarDTO() {
         when(filialRepository.findById(1L)).thenReturn(Optional.of(matriz));
+        when(filialMapper.toDTO(matriz)).thenReturn(new FilialDTO(1L, "Matriz", "MTRZ", TipoFilial.MATRIZ, "00.000.000/0001-00", "End", Status.ATIVO)); // Adicionado mock para toDTO
 
-        filialService.buscarPorId(1L);
-
+        Optional<FilialDTO> result = filialService.buscarPorId(1L); // Capturar o Optional
+        
+        assertTrue(result.isPresent()); // Verificar se o Optional não está vazio
         verify(filialRepository).findById(1L);
         verify(filialMapper).toDTO(matriz);
     }
 
     @Test
-    @DisplayName("BuscarPorId: Deve lançar EntityNotFoundException quando ID não existe")
-    void buscarPorId_quandoIdNaoExiste_deveLancarExcecao() {
+    @DisplayName("BuscarPorId: Deve retornar Optional vazio quando ID não existe") // Nome do teste atualizado
+    void buscarPorId_quandoIdNaoExiste_deveRetornarOptionalVazio() { // Nome do método atualizado
         when(filialRepository.findById(99L)).thenReturn(Optional.empty());
-        assertThrows(EntityNotFoundException.class, () -> filialService.buscarPorId(99L));
+        
+        Optional<FilialDTO> result = filialService.buscarPorId(99L); // Capturar o Optional
+        
+        assertTrue(result.isEmpty()); // Verificar se o Optional está vazio
+        verify(filialRepository).findById(99L);
+        verify(filialMapper, never()).toDTO(any(Filial.class)); // toDTO não deve ser chamado
     }
 
     @Test
@@ -98,6 +106,7 @@ class FilialServiceTest {
         when(filialRepository.findByCodigo(anyString())).thenReturn(Optional.empty());
         when(filialMapper.toEntity(createDTO)).thenReturn(filial);
         when(filialRepository.save(filial)).thenReturn(filial);
+        when(filialMapper.toDTO(filial)).thenReturn(new FilialDTO(2L, "Filial", "FL01", TipoFilial.FILIAL, "11.111.111/0001-11", "End", Status.ATIVO)); // Adicionado mock para toDTO
 
         filialService.criar(createDTO);
 
@@ -140,9 +149,12 @@ class FilialServiceTest {
         FilialUpdateDTO updateDTO = new FilialUpdateDTO("Filial Atualizada", "FL01-A", TipoFilial.FILIAL, "11.111.111/0001-11", "Novo Endereço", Status.ATIVO);
         when(filialRepository.findById(2L)).thenReturn(Optional.of(filial));
         when(filialRepository.save(any(Filial.class))).thenReturn(filial);
+        // CORREÇÃO: Mockar o retorno de filialMapper.toDTO para evitar NullPointerException
+        when(filialMapper.toDTO(any(Filial.class))).thenReturn(new FilialDTO(2L, "Filial Atualizada", "FL01-A", TipoFilial.FILIAL, "11.111.111/0001-11", "Novo Endereço", Status.ATIVO));
 
-        filialService.atualizar(2L, updateDTO);
+        Optional<FilialDTO> result = filialService.atualizar(2L, updateDTO); // Capturar o Optional
 
+        assertTrue(result.isPresent()); // Verificar se o Optional não está vazio
         verify(filialRepository).save(filial);
         assertEquals("Filial Atualizada", filial.getNome());
     }

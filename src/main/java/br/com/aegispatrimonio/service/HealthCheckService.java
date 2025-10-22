@@ -23,68 +23,82 @@ public class HealthCheckService {
     private final MemoriaRepository memoriaRepository;
     private final AdaptadorRedeRepository adaptadorRedeRepository;
     private final HealthCheckMapper healthCheckMapper;
+    private final FuncionarioRepository funcionarioRepository;
 
-    public HealthCheckService(AtivoRepository ativoRepository, AtivoDetalheHardwareRepository detalheHardwareRepository, DiscoRepository discoRepository, MemoriaRepository memoriaRepository, AdaptadorRedeRepository adaptadorRedeRepository, HealthCheckMapper healthCheckMapper) {
+    public HealthCheckService(AtivoRepository ativoRepository, AtivoDetalheHardwareRepository detalheHardwareRepository, DiscoRepository discoRepository, MemoriaRepository memoriaRepository, AdaptadorRedeRepository adaptadorRedeRepository, HealthCheckMapper healthCheckMapper, FuncionarioRepository funcionarioRepository) {
         this.ativoRepository = ativoRepository;
         this.detalheHardwareRepository = detalheHardwareRepository;
         this.discoRepository = discoRepository;
         this.memoriaRepository = memoriaRepository;
         this.adaptadorRedeRepository = adaptadorRedeRepository;
         this.healthCheckMapper = healthCheckMapper;
+        this.funcionarioRepository = funcionarioRepository;
     }
 
     @Transactional
     public void updateHealthCheck(Long ativoId, HealthCheckDTO healthCheckDTO) {
-        Usuario usuarioLogado = getUsuarioLogado(); // CORREÇÃO
-        Ativo ativo = ativoRepository.findById(ativoId)
+        Usuario usuarioLogado = getUsuarioLogado();
+        Ativo ativo = ativoRepository.findByIdWithDetails(ativoId)
                 .orElseThrow(() -> new EntityNotFoundException("Ativo não encontrado com ID: " + ativoId));
 
-        // --- Validação de Segurança ---
-        if (!isAdmin(usuarioLogado)) { // CORREÇÃO
-            Funcionario funcionarioLogado = usuarioLogado.getFuncionario();
-            if (funcionarioLogado == null || funcionarioLogado.getFiliais().stream().noneMatch(f -> f.getId().equals(ativo.getFilial().getId()))) {
+        if (!isAdmin(usuarioLogado)) {
+            Funcionario funcionarioPrincipal = usuarioLogado.getFuncionario();
+            if (funcionarioPrincipal == null) {
+                 throw new AccessDeniedException("Usuário não está associado a um funcionário.");
+            }
+
+            Funcionario funcionarioLogado = funcionarioRepository.findById(funcionarioPrincipal.getId())
+                    .orElseThrow(() -> new AccessDeniedException("Funcionário associado ao usuário não foi encontrado no sistema."));
+
+            if (funcionarioLogado.getFiliais().stream().noneMatch(f -> f.getId().equals(ativo.getFilial().getId()))) {
                 throw new AccessDeniedException("Você não tem permissão para atualizar o health check de ativos desta filial.");
             }
         }
 
-        // --- Lógica de Atualização ---
         AtivoDetalheHardware detalhes = detalheHardwareRepository.findById(ativoId)
                 .orElseGet(() -> {
                     AtivoDetalheHardware novoDetalhe = new AtivoDetalheHardware();
                     novoDetalhe.setAtivo(ativo);
+                    novoDetalhe.setId(ativo.getId());
+                    // Não persistimos aqui para evitar dupla invocação de save() nos testes; a persistência ocorrerá após o mapeamento
                     return novoDetalhe;
                 });
 
-        // Atualiza os campos principais
+        // Se a entidade já existia, ou se foi recém-criada, agora 'detalhes' é a instância gerenciada com ID.
+        // Aplicar as atualizações do DTO
         healthCheckMapper.updateEntityFromDto(detalhes, healthCheckDTO);
+        // Salvar novamente para aplicar as atualizações (se houverem)
         detalheHardwareRepository.save(detalhes);
+        detalheHardwareRepository.flush(); // Garante que as atualizações sejam persistidas
+
+        final AtivoDetalheHardware finalDetalhes = detalhes;
 
         // Limpa e recria os componentes (Discos, Memórias, etc.)
-        discoRepository.deleteByAtivoDetalheHardwareId(detalhes.getId());
-        memoriaRepository.deleteByAtivoDetalheHardwareId(detalhes.getId());
-        adaptadorRedeRepository.deleteByAtivoDetalheHardwareId(detalhes.getId());
+        if (finalDetalhes.getId() != null) {
+            discoRepository.deleteByAtivoDetalheHardwareId(finalDetalhes.getId());
+            memoriaRepository.deleteByAtivoDetalheHardwareId(finalDetalhes.getId());
+            adaptadorRedeRepository.deleteByAtivoDetalheHardwareId(finalDetalhes.getId());
+        }
 
-        // Salva os novos componentes
         if (healthCheckDTO.discos() != null) {
             List<Disco> discos = healthCheckDTO.discos().stream().map(healthCheckMapper::toEntity).collect(Collectors.toList());
-            discos.forEach(d -> d.setAtivoDetalheHardware(detalhes));
+            discos.forEach(d -> d.setAtivoDetalheHardware(finalDetalhes));
             discoRepository.saveAll(discos);
         }
 
         if (healthCheckDTO.memorias() != null) {
             List<Memoria> memorias = healthCheckDTO.memorias().stream().map(healthCheckMapper::toEntity).collect(Collectors.toList());
-            memorias.forEach(m -> m.setAtivoDetalheHardware(detalhes));
+            memorias.forEach(m -> m.setAtivoDetalheHardware(finalDetalhes));
             memoriaRepository.saveAll(memorias);
         }
 
         if (healthCheckDTO.adaptadoresRede() != null) {
             List<AdaptadorRede> adaptadores = healthCheckDTO.adaptadoresRede().stream().map(healthCheckMapper::toEntity).collect(Collectors.toList());
-            adaptadores.forEach(a -> a.setAtivoDetalheHardware(detalhes));
+            adaptadores.forEach(a -> a.setAtivoDetalheHardware(finalDetalhes));
             adaptadorRedeRepository.saveAll(adaptadores);
         }
     }
 
-    // CORREÇÃO: Métodos auxiliares atualizados para usar a entidade Usuario
     private Usuario getUsuarioLogado() {
         CustomUserDetails userDetails = (CustomUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         return userDetails.getUsuario();

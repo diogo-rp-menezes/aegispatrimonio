@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="pt"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AtivoDetalheHardware.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">aegispatrimonio</a> &gt; <a href="index.source.html" class="el_package">br.com.aegispatrimonio.model</a> &gt; <span class="el_source">AtivoDetalheHardware.java</span></div><h1>AtivoDetalheHardware.java</h1><pre class="source lang-java linenums">package br.com.aegispatrimonio.model;
+
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = &quot;ativo_detalhes_hardware&quot;)
+@Getter
+<span class="pc" id="L13">@Setter</span>
+<span class="fc" id="L14">@NoArgsConstructor</span>
+public class AtivoDetalheHardware {
+
+    @Id
+<span class="fc" id="L18">    private Long id; // Mesma chave primária do Ativo</span>
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @MapsId // Mapeia a chave primária para a entidade Ativo
+    @JoinColumn(name = &quot;id&quot;)
+<span class="nc" id="L23">    private Ativo ativo;</span>
+
+    // --- Workstation Info ---
+    @Column(name = &quot;computer_name&quot;)
+<span class="fc" id="L27">    private String computerName;</span>
+
+    @Column(name = &quot;domain&quot;)
+<span class="fc" id="L30">    private String domain;</span>
+
+    @Column(name = &quot;os_name&quot;)
+<span class="fc" id="L33">    private String osName;</span>
+
+    @Column(name = &quot;os_version&quot;)
+<span class="fc" id="L36">    private String osVersion;</span>
+
+    @Column(name = &quot;os_architecture&quot;)
+<span class="fc" id="L39">    private String osArchitecture;</span>
+
+    // --- Motherboard Info ---
+    @Column(name = &quot;motherboard_manufacturer&quot;)
+<span class="fc" id="L43">    private String motherboardManufacturer;</span>
+
+    @Column(name = &quot;motherboard_model&quot;)
+<span class="fc" id="L46">    private String motherboardModel;</span>
+
+    @Column(name = &quot;motherboard_serial_number&quot;)
+<span class="fc" id="L49">    private String motherboardSerialNumber;</span>
+
+    // --- CPU Info ---
+    @Column(name = &quot;cpu_model&quot;)
+<span class="fc" id="L53">    private String cpuModel;</span>
+
+    @Column(name = &quot;cpu_cores&quot;)
+<span class="fc" id="L56">    private Integer cpuCores;</span>
+
+    @Column(name = &quot;cpu_threads&quot;)
+<span class="fc" id="L59">    private Integer cpuThreads;</span>
+
+    @Column(name = &quot;last_updated&quot;)
+<span class="nc" id="L62">    private LocalDateTime lastUpdated; // Data da última atualização do Health Check</span>
+
+    @PreUpdate
+    @PrePersist
+    protected void onUpdate() {
+<span class="nc" id="L67">        lastUpdated = LocalDateTime.now();</span>
+<span class="nc" id="L68">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

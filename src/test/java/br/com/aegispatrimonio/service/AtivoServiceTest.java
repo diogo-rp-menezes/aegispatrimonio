@@ -24,12 +24,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+// CORREÇÃO: Importar todos os métodos estáticos do Mockito para resolver os erros de compilação.
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -66,7 +65,6 @@ class AtivoServiceTest {
     private Filial filialA, filialB;
     private Ativo ativo;
     private Localizacao localizacao;
-    private Funcionario funcionario;
 
     @BeforeEach
     void setUp() {
@@ -88,7 +86,7 @@ class AtivoServiceTest {
         adminUser.setRole("ROLE_ADMIN");
         adminUser.setFuncionario(adminFunc);
 
-        funcionario = new Funcionario();
+        Funcionario funcionario = new Funcionario();
         funcionario.setId(2L);
         funcionario.setFiliais(Set.of(filialA));
         regularUser = new Usuario();
@@ -124,7 +122,7 @@ class AtivoServiceTest {
         Ativo ativoOutraFilial = new Ativo();
         ativoOutraFilial.setId(11L);
         ativoOutraFilial.setFilial(filialB);
-        when(ativoRepository.findById(11L)).thenReturn(Optional.of(ativoOutraFilial));
+        when(ativoRepository.findByIdWithDetails(11L)).thenReturn(Optional.of(ativoOutraFilial));
 
         assertThrows(AccessDeniedException.class, () -> ativoService.buscarPorId(11L));
     }
@@ -155,7 +153,7 @@ class AtivoServiceTest {
 
         AtivoUpdateDTO updateDTO = new AtivoUpdateDTO(1L, "Nome", "PAT-10", 1L, 1L, StatusAtivo.ATIVO, LocalDate.now(), 1L, BigDecimal.TEN, responsavelOutraFilial.getId(), "Obs", null);
 
-        when(ativoRepository.findById(10L)).thenReturn(Optional.of(ativo));
+        when(ativoRepository.findByIdWithDetails(10L)).thenReturn(Optional.of(ativo));
         when(filialRepository.findById(1L)).thenReturn(Optional.of(filialA));
         when(tipoAtivoRepository.findById(1L)).thenReturn(Optional.of(new TipoAtivo()));
         when(fornecedorRepository.findById(1L)).thenReturn(Optional.of(new Fornecedor()));

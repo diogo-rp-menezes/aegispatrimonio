@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="pt"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MovimentacaoService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">aegispatrimonio</a> &gt; <a href="index.source.html" class="el_package">br.com.aegispatrimonio.service</a> &gt; <span class="el_source">MovimentacaoService.java</span></div><h1>MovimentacaoService.java</h1><pre class="source lang-java linenums">package br.com.aegispatrimonio.service;
+
+import br.com.aegispatrimonio.dto.request.MovimentacaoRequestDTO;
+import br.com.aegispatrimonio.dto.response.MovimentacaoResponseDTO;
+import br.com.aegispatrimonio.exception.ResourceConflictException;
+import br.com.aegispatrimonio.exception.ResourceNotFoundException;
+import br.com.aegispatrimonio.model.*;
+import br.com.aegispatrimonio.repository.*;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.Objects;
+import java.util.Optional;
+
+<span class="fc" id="L22">@Slf4j</span>
+@Service
+@Transactional
+<span class="fc" id="L25">@RequiredArgsConstructor</span>
+public class MovimentacaoService {
+
+    private final MovimentacaoRepository movimentacaoRepository;
+    private final AtivoRepository ativoRepository;
+    private final LocalizacaoRepository localizacaoRepository;
+    private final FuncionarioRepository funcionarioRepository;
+    private final FornecedorRepository fornecedorRepository;
+
+    @Transactional
+    public MovimentacaoResponseDTO criar(MovimentacaoRequestDTO request) {
+<span class="fc" id="L36">        log.info(&quot;Criando nova movimentação para o ativo ID: {}&quot;, request.ativoId());</span>
+
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        if (movimentacaoRepository.existsByAtivoIdAndStatus(request.ativoId(), StatusMovimentacao.PENDENTE)) {</span>
+<span class="fc" id="L39">            throw new ResourceConflictException(&quot;Já existe uma movimentação pendente para este ativo.&quot;);</span>
+        }
+
+<span class="fc" id="L42">        Movimentacao movimentacao = convertToEntity(request);</span>
+<span class="fc" id="L43">        Movimentacao savedMovimentacao = movimentacaoRepository.save(movimentacao);</span>
+<span class="fc" id="L44">        return convertToResponseDTO(savedMovimentacao);</span>
+    }
+
+    @Transactional(readOnly = true)
+    public Page&lt;MovimentacaoResponseDTO&gt; findAll(Pageable pageable) {
+<span class="nc" id="L49">        return movimentacaoRepository.findAll(pageable).map(this::convertToResponseDTO);</span>
+    }
+
+    @Transactional(readOnly = true)
+    public Optional&lt;MovimentacaoResponseDTO&gt; buscarPorId(Long id) {
+<span class="nc" id="L54">        return movimentacaoRepository.findById(id).map(this::convertToResponseDTO);</span>
+    }
+
+    @Transactional(readOnly = true)
+    public Page&lt;MovimentacaoResponseDTO&gt; findByAtivoId(Long ativoId, Pageable pageable) {
+<span class="nc" id="L59">        return movimentacaoRepository.findByAtivoId(ativoId, pageable).map(this::convertToResponseDTO);</span>
+    }
+
+    @Transactional(readOnly = true)
+    public Page&lt;MovimentacaoResponseDTO&gt; findByStatus(StatusMovimentacao status, Pageable pageable) {
+<span class="nc" id="L64">        return movimentacaoRepository.findByStatus(status, pageable).map(this::convertToResponseDTO);</span>
+    }
+
+    @Transactional(readOnly = true)
+    public Page&lt;MovimentacaoResponseDTO&gt; findByFuncionarioDestinoId(Long funcionarioDestinoId, Pageable pageable) {
+<span class="nc" id="L69">        return movimentacaoRepository.findByFuncionarioDestinoId(funcionarioDestinoId, pageable).map(this::convertToResponseDTO);</span>
+    }
+
+    @Transactional(readOnly = true)
+    public Page&lt;MovimentacaoResponseDTO&gt; findByLocalizacaoDestinoId(Long localizacaoDestinoId, Pageable pageable) {
+<span class="nc" id="L74">        return movimentacaoRepository.findByLocalizacaoDestinoId(localizacaoDestinoId, pageable).map(this::convertToResponseDTO);</span>
+    }
+
+    @Transactional(readOnly = true)
+    public Page&lt;MovimentacaoResponseDTO&gt; findByPeriodo(LocalDate startDate, LocalDate endDate, Pageable pageable) {
+<span class="nc" id="L79">        return movimentacaoRepository.findByDataMovimentacaoBetween(startDate, endDate, pageable).map(this::convertToResponseDTO);</span>
+    }
+
+    @Transactional(readOnly = true)
+    public Page&lt;MovimentacaoResponseDTO&gt; findMovimentacoesPendentesPorAtivo(Long ativoId, Pageable pageable) {
+<span class="nc" id="L84">        return movimentacaoRepository.findByAtivoIdAndStatus(ativoId, StatusMovimentacao.PENDENTE, pageable).map(this::convertToResponseDTO);</span>
+    }
+
+    @Transactional
+    public MovimentacaoResponseDTO efetivarMovimentacao(Long id) {
+<span class="fc" id="L89">        log.info(&quot;Efetivando movimentação ID: {}&quot;, id);</span>
+<span class="fc" id="L90">        Movimentacao movimentacao = movimentacaoRepository.findById(id)</span>
+<span class="pc" id="L91">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Movimentação não encontrada com ID: &quot; + id));</span>
+
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (movimentacao.getStatus() != StatusMovimentacao.PENDENTE) {</span>
+<span class="fc" id="L94">            throw new ResourceConflictException(&quot;Somente movimentações pendentes podem ser efetivadas.&quot;);</span>
+        }
+
+<span class="fc" id="L97">        Ativo ativo = movimentacao.getAtivo();</span>
+<span class="fc" id="L98">        ativo.setLocalizacao(movimentacao.getLocalizacaoDestino());</span>
+<span class="fc" id="L99">        ativo.setFuncionarioResponsavel(movimentacao.getFuncionarioDestino());</span>
+<span class="fc" id="L100">        ativoRepository.save(ativo);</span>
+
+<span class="fc" id="L102">        movimentacao.setStatus(StatusMovimentacao.EFETIVADA);</span>
+<span class="fc" id="L103">        movimentacao.setDataEfetivacao(LocalDate.now());</span>
+<span class="fc" id="L104">        Movimentacao updatedMovimentacao = movimentacaoRepository.save(movimentacao);</span>
+
+<span class="fc" id="L106">        return convertToResponseDTO(updatedMovimentacao);</span>
+    }
+
+    @Transactional
+    public MovimentacaoResponseDTO cancelarMovimentacao(Long id, String motivoCancelamento) {
+<span class="fc" id="L111">        log.info(&quot;Cancelando movimentação ID: {}&quot;, id);</span>
+<span class="fc" id="L112">        Movimentacao movimentacao = movimentacaoRepository.findById(id)</span>
+<span class="pc" id="L113">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Movimentação não encontrada com ID: &quot; + id));</span>
+
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        if (movimentacao.getStatus() != StatusMovimentacao.PENDENTE) {</span>
+<span class="nc" id="L116">            throw new ResourceConflictException(&quot;Somente movimentações pendentes podem ser canceladas.&quot;);</span>
+        }
+
+<span class="fc" id="L119">        movimentacao.setStatus(StatusMovimentacao.CANCELADA);</span>
+<span class="fc" id="L120">        movimentacao.setObservacoes(motivoCancelamento);</span>
+<span class="fc" id="L121">        Movimentacao updatedMovimentacao = movimentacaoRepository.save(movimentacao);</span>
+
+<span class="fc" id="L123">        return convertToResponseDTO(updatedMovimentacao);</span>
+    }
+
+    @Transactional
+    public void deletar(Long id) {
+<span class="fc" id="L128">        log.warn(&quot;Tentativa de deletar movimentação ID: {}&quot;, id);</span>
+<span class="fc" id="L129">        Movimentacao movimentacao = movimentacaoRepository.findById(id)</span>
+<span class="pc" id="L130">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Movimentação não encontrada com ID: &quot; + id));</span>
+
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        if (movimentacao.getStatus() != StatusMovimentacao.PENDENTE) {</span>
+<span class="fc" id="L133">            throw new ResourceConflictException(&quot;Apenas movimentações com status 'PENDENTE' podem ser deletadas.&quot;);</span>
+        }
+
+<span class="fc" id="L136">        movimentacaoRepository.delete(movimentacao);</span>
+<span class="fc" id="L137">        log.info(&quot;Movimentação ID: {} deletada com sucesso.&quot;, id);</span>
+<span class="fc" id="L138">    }</span>
+
+    private Movimentacao convertToEntity(MovimentacaoRequestDTO request) {
+<span class="fc" id="L141">        Ativo ativo = ativoRepository.findById(request.ativoId())</span>
+<span class="pc" id="L142">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Ativo não encontrado com ID: &quot; + request.ativoId()));</span>
+
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        if (ativo.getStatus() != StatusAtivo.ATIVO) {</span>
+<span class="nc" id="L145">            throw new ResourceConflictException(&quot;Não é possível movimentar um ativo que não está com status 'ATIVO'. Status atual: &quot; + ativo.getStatus());</span>
+        }
+
+<span class="fc" id="L148">        Localizacao localizacaoOrigem = ativo.getLocalizacao();</span>
+<span class="fc" id="L149">        Funcionario funcionarioOrigem = ativo.getFuncionarioResponsavel();</span>
+
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">        if (!Objects.equals(localizacaoOrigem.getId(), request.localizacaoOrigemId())) {</span>
+<span class="nc" id="L152">            throw new ResourceConflictException(&quot;A localização de origem informada não corresponde à localização atual do ativo.&quot;);</span>
+        }
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        if (!Objects.equals(funcionarioOrigem.getId(), request.funcionarioOrigemId())) {</span>
+<span class="nc" id="L155">            throw new ResourceConflictException(&quot;O funcionário de origem informado não corresponde ao responsável atual do ativo.&quot;);</span>
+        }
+
+<span class="fc" id="L158">        Localizacao localizacaoDestino = localizacaoRepository.findById(request.localizacaoDestinoId())</span>
+<span class="pc" id="L159">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Localização de destino não encontrada com ID: &quot; + request.localizacaoDestinoId()));</span>
+<span class="fc" id="L160">        Funcionario funcionarioDestino = funcionarioRepository.findById(request.funcionarioDestinoId())</span>
+<span class="pc" id="L161">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Funcionário de destino não encontrado com ID: &quot; + request.funcionarioDestinoId()));</span>
+
+<span class="fc" id="L163">        Long filialIdDoAtivo = ativo.getFilial().getId();</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        if (!Objects.equals(localizacaoDestino.getFilial().getId(), filialIdDoAtivo)) {</span>
+<span class="nc" id="L165">            throw new IllegalArgumentException(&quot;A localização de destino deve pertencer à mesma filial do ativo.&quot;);</span>
+        }
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        if (funcionarioDestino.getFiliais().stream().noneMatch(f -&gt; f.getId().equals(filialIdDoAtivo))) {</span>
+<span class="nc" id="L168">            throw new IllegalArgumentException(&quot;O funcionário de destino deve pertencer à mesma filial do ativo.&quot;);</span>
+        }
+
+<span class="fc" id="L171">        Movimentacao movimentacao = new Movimentacao();</span>
+<span class="fc" id="L172">        movimentacao.setAtivo(ativo);</span>
+<span class="fc" id="L173">        movimentacao.setLocalizacaoOrigem(localizacaoOrigem);</span>
+<span class="fc" id="L174">        movimentacao.setLocalizacaoDestino(localizacaoDestino);</span>
+<span class="fc" id="L175">        movimentacao.setFuncionarioOrigem(funcionarioOrigem);</span>
+<span class="fc" id="L176">        movimentacao.setFuncionarioDestino(funcionarioDestino);</span>
+<span class="fc" id="L177">        movimentacao.setDataMovimentacao(request.dataMovimentacao());</span>
+<span class="fc" id="L178">        movimentacao.setMotivo(request.motivo());</span>
+<span class="fc" id="L179">        movimentacao.setObservacoes(request.observacoes());</span>
+<span class="fc" id="L180">        return movimentacao;</span>
+    }
+
+    private MovimentacaoResponseDTO convertToResponseDTO(Movimentacao movimentacao) {
+<span class="fc" id="L184">        MovimentacaoResponseDTO dto = new MovimentacaoResponseDTO();</span>
+<span class="fc" id="L185">        dto.setId(movimentacao.getId());</span>
+<span class="fc" id="L186">        dto.setAtivoId(movimentacao.getAtivo().getId());</span>
+<span class="fc" id="L187">        dto.setAtivoNome(movimentacao.getAtivo().getNome());</span>
+<span class="fc" id="L188">        dto.setAtivoNumeroPatrimonio(movimentacao.getAtivo().getNumeroPatrimonio());</span>
+<span class="fc" id="L189">        dto.setLocalizacaoOrigemId(movimentacao.getLocalizacaoOrigem().getId());</span>
+<span class="fc" id="L190">        dto.setLocalizacaoOrigemNome(movimentacao.getLocalizacaoOrigem().getNome());</span>
+<span class="fc" id="L191">        dto.setLocalizacaoDestinoId(movimentacao.getLocalizacaoDestino().getId());</span>
+<span class="fc" id="L192">        dto.setLocalizacaoDestinoNome(movimentacao.getLocalizacaoDestino().getNome());</span>
+<span class="fc" id="L193">        dto.setFuncionarioOrigemId(movimentacao.getFuncionarioOrigem().getId());</span>
+<span class="fc" id="L194">        dto.setFuncionarioOrigemNome(movimentacao.getFuncionarioOrigem().getNome());</span>
+<span class="fc" id="L195">        dto.setFuncionarioDestinoId(movimentacao.getFuncionarioDestino().getId());</span>
+<span class="fc" id="L196">        dto.setFuncionarioDestinoNome(movimentacao.getFuncionarioDestino().getNome());</span>
+<span class="fc" id="L197">        dto.setDataMovimentacao(movimentacao.getDataMovimentacao());</span>
+<span class="fc" id="L198">        dto.setDataEfetivacao(movimentacao.getDataEfetivacao());</span>
+<span class="fc" id="L199">        dto.setStatus(movimentacao.getStatus());</span>
+<span class="fc" id="L200">        dto.setMotivo(movimentacao.getMotivo());</span>
+<span class="fc" id="L201">        dto.setObservacoes(movimentacao.getObservacoes());</span>
+<span class="fc" id="L202">        dto.setCriadoEm(movimentacao.getCriadoEm());</span>
+<span class="fc" id="L203">        dto.setAtualizadoEm(movimentacao.getAtualizadoEm());</span>
+<span class="fc" id="L204">        return dto;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

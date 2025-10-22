@@ -251,6 +251,7 @@ Resolução de Conflitos
 CONFLICT RESOLUTION PROTOCOL:
 1. Identifique o conflito técnico específico
 2. Escalone para ARCHITECT se necessário
+   - **Mecanismo de Lock:** Ao escalar, o `ARCHITECT` pode "travar" temporariamente o componente em questão, impedindo modificações de outros agentes até que a decisão seja tomada.
 3. Considere múltiplas perspectivas
 4. Baseie decisões em dados e melhores práticas
 5. Documente a decisão e rationale

@@ -3,7 +3,7 @@ package br.com.aegispatrimonio.mapper;
 import br.com.aegispatrimonio.dto.FornecedorCreateDTO;
 import br.com.aegispatrimonio.dto.FornecedorDTO;
 import br.com.aegispatrimonio.model.Fornecedor;
-import br.com.aegispatrimonio.model.Status;
+import br.com.aegispatrimonio.model.StatusFornecedor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,7 +32,7 @@ class FornecedorMapperTest {
         fornecedor.setEmailPrincipal("carlos.andrade@dell.com");
         fornecedor.setTelefonePrincipal("11987654321");
         fornecedor.setObservacoes("Contato para compras de hardware");
-        fornecedor.setStatus(Status.ATIVO);
+        fornecedor.setStatus(StatusFornecedor.ATIVO);
 
         // Act
         FornecedorDTO dto = fornecedorMapper.toDTO(fornecedor);

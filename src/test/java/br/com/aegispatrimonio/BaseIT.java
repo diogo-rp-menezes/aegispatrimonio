@@ -1,13 +1,20 @@
 package br.com.aegispatrimonio;
 
+// import org.springframework.beans.factory.annotation.Autowired; // Removido
 import org.springframework.boot.test.context.SpringBootTest;
+// import org.springframework.context.annotation.Bean; // Removido
+// import org.springframework.context.annotation.Import; // Removido
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.jdbc.Sql;
+// import org.springframework.transaction.PlatformTransactionManager; // Removido
+// import org.springframework.transaction.support.TransactionTemplate; // Removido
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.DockerClientFactory;
+
+// import br.com.aegispatrimonio.config.TestTransactionConfig; // Removido
 
 // CORREÇÃO: Especifica a classe de aplicação principal para garantir que todo o contexto seja carregado.
 @SpringBootTest(
@@ -17,6 +24,7 @@ import org.testcontainers.DockerClientFactory;
 @Testcontainers
 @ActiveProfiles("test")
 @Sql(scripts = "/cleanup.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
+// @Import(TestTransactionConfig.class) // Removido: Importar TransactionTemplate apenas onde for necessário
 public abstract class BaseIT {
 
     // Tenta usar Testcontainers/MySQL quando o Docker estiver disponível.
@@ -57,4 +65,12 @@ public abstract class BaseIT {
             registry.add("spring.flyway.enabled", () -> "false");
         }
     }
+
+    // @Autowired // Removido
+    // protected PlatformTransactionManager transactionManager; // Removido
+
+    // @Bean // Removido
+    // public TransactionTemplate transactionTemplate(PlatformTransactionManager transactionManager) { // Removido
+    //     return new TransactionTemplate(transactionManager); // Removido
+    // }
 }

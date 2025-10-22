@@ -1,6 +1,6 @@
 package br.com.aegispatrimonio.dto;
 
-import br.com.aegispatrimonio.model.Status;
+import br.com.aegispatrimonio.model.StatusFornecedor;
 
 public record FornecedorDTO(
     Long id,
@@ -11,6 +11,6 @@ public record FornecedorDTO(
     String emailPrincipal,
     String telefonePrincipal,
     String observacoes,
-    Status status
+    StatusFornecedor status
 ) {
 }

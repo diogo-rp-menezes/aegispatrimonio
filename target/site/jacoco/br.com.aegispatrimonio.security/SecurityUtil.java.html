@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="pt"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SecurityUtil.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">aegispatrimonio</a> &gt; <a href="index.source.html" class="el_package">br.com.aegispatrimonio.security</a> &gt; <span class="el_source">SecurityUtil.java</span></div><h1>SecurityUtil.java</h1><pre class="source lang-java linenums">package br.com.aegispatrimonio.security;
+
+import br.com.aegispatrimonio.model.Filial;
+import br.com.aegispatrimonio.model.Funcionario;
+import br.com.aegispatrimonio.model.Usuario;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
+
+import java.util.Collections;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+@Component
+<span class="fc" id="L15">public class SecurityUtil {</span>
+
+    public static CustomUserDetails getAuthenticatedUser() {
+<span class="fc" id="L18">        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();</span>
+<span class="pc bpc" id="L19" title="1 of 4 branches missed.">        if (authentication != null &amp;&amp; authentication.getPrincipal() instanceof CustomUserDetails) {</span>
+<span class="fc" id="L20">            return (CustomUserDetails) authentication.getPrincipal();</span>
+        }
+<span class="fc" id="L22">        return null;</span>
+    }
+
+    public static boolean isCurrentUserAdmin() {
+<span class="fc" id="L26">        CustomUserDetails userDetails = getAuthenticatedUser();</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        if (userDetails == null) {</span>
+<span class="fc" id="L28">            return false;</span>
+        }
+<span class="fc" id="L30">        return userDetails.getAuthorities().stream()</span>
+<span class="fc" id="L31">                .anyMatch(grantedAuthority -&gt; grantedAuthority.getAuthority().equals(&quot;ROLE_ADMIN&quot;));</span>
+    }
+
+    /**
+     * Retorna os IDs de todas as filiais às quais o usuário logado está associado.
+     * @return Um Set de Long contendo os IDs das filiais. Retorna um conjunto vazio se o usuário não for um funcionário ou não tiver filiais.
+     */
+    public static Set&lt;Long&gt; getCurrentUserFilialIds() {
+<span class="fc" id="L39">        CustomUserDetails userDetails = getAuthenticatedUser();</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        if (userDetails != null) {</span>
+<span class="fc" id="L41">            Usuario usuario = userDetails.getUsuario();</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">            if (usuario != null) {</span>
+<span class="fc" id="L43">                Funcionario funcionario = usuario.getFuncionario();</span>
+<span class="pc bpc" id="L44" title="2 of 4 branches missed.">                if (funcionario != null &amp;&amp; funcionario.getFiliais() != null) {</span>
+<span class="fc" id="L45">                    return funcionario.getFiliais().stream()</span>
+<span class="fc" id="L46">                            .map(Filial::getId)</span>
+<span class="fc" id="L47">                            .collect(Collectors.toSet());</span>
+                }
+            }
+        }
+<span class="fc" id="L51">        return Collections.emptySet();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

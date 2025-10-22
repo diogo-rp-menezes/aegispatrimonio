@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="pt"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Ativo.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">aegispatrimonio</a> &gt; <a href="index.source.html" class="el_package">br.com.aegispatrimonio.model</a> &gt; <span class="el_source">Ativo.java</span></div><h1>Ativo.java</h1><pre class="source lang-java linenums">package br.com.aegispatrimonio.model;
+
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.Where;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+@Getter
+<span class="pc" id="L16">@Setter</span>
+<span class="fc" id="L17">@NoArgsConstructor</span>
+<span class="nc" id="L18">@ToString(exclude = {&quot;tipoAtivo&quot;, &quot;localizacao&quot;, &quot;fornecedor&quot;, &quot;funcionarioResponsavel&quot;, &quot;filial&quot;}) // CORREÇÃO</span>
+@Entity
+@Table(name = &quot;ativos&quot;)
+@SQLDelete(sql = &quot;UPDATE ativos SET status = 'BAIXADO' WHERE id = ?&quot;)
+@Where(clause = &quot;status &lt;&gt; 'BAIXADO'&quot;)
+public class Ativo {
+    
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+<span class="fc" id="L27">    private Long id;</span>
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;filial_id&quot;, nullable = false)
+<span class="fc" id="L31">    private Filial filial;</span>
+    
+    @Column(nullable = false)
+<span class="fc" id="L34">    private String nome;</span>
+    
+    @ManyToOne
+    @JoinColumn(name = &quot;tipo_ativo_id&quot;, nullable = false)
+<span class="fc" id="L38">    private TipoAtivo tipoAtivo;</span>
+    
+    @Column(name = &quot;numero_patrimonio&quot;, nullable = false, unique = true)
+<span class="fc" id="L41">    private String numeroPatrimonio;</span>
+    
+    @ManyToOne
+    @JoinColumn(name = &quot;localizacao_id&quot;)
+<span class="fc" id="L45">    private Localizacao localizacao;</span>
+    
+    @Enumerated(EnumType.STRING)
+<span class="fc" id="L48">    private StatusAtivo status;</span>
+    
+    @Column(name = &quot;data_aquisicao&quot;, nullable = false)
+<span class="fc" id="L51">    private LocalDate dataAquisicao;</span>
+    
+    @ManyToOne
+    @JoinColumn(name = &quot;fornecedor_id&quot;, nullable = false)
+<span class="fc" id="L55">    private Fornecedor fornecedor;</span>
+    
+    @Column(name = &quot;valor_aquisicao&quot;, nullable = false, precision = 15, scale = 2)
+<span class="fc" id="L58">    private BigDecimal valorAquisicao;</span>
+    
+    @Column(name = &quot;valor_residual&quot;, precision = 15, scale = 2)
+<span class="fc" id="L61">    private BigDecimal valorResidual;</span>
+    
+    @Column(name = &quot;vida_util_meses&quot;)
+<span class="fc" id="L64">    private Integer vidaUtilMeses;</span>
+    
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;metodo_depreciacao&quot;)
+<span class="fc" id="L68">    private MetodoDepreciacao metodoDepreciacao;</span>
+    
+    @Column(name = &quot;data_inicio_depreciacao&quot;)
+<span class="fc" id="L71">    private LocalDate dataInicioDepreciacao;</span>
+    
+    @Column(name = &quot;taxa_depreciacao_mensal&quot;, precision = 15, scale = 6)
+<span class="nc" id="L74">    private BigDecimal taxaDepreciacaoMensal;</span>
+    
+    @Column(name = &quot;informacoes_garantia&quot;)
+<span class="fc" id="L77">    private String informacoesGarantia;</span>
+    
+    // CORREÇÃO: Renomeado de pessoaResponsavel para funcionarioResponsavel
+    @ManyToOne
+    @JoinColumn(name = &quot;funcionario_responsavel_id&quot;)
+<span class="fc" id="L82">    private Funcionario funcionarioResponsavel;</span>
+    
+<span class="fc" id="L84">    private String observacoes;</span>
+    
+    @Column(name = &quot;data_registro&quot;, nullable = false)
+<span class="nc" id="L87">    private LocalDate dataRegistro;</span>
+    
+    @Column(name = &quot;criado_em&quot;)
+<span class="nc" id="L90">    private LocalDateTime criadoEm;</span>
+    
+    @Column(name = &quot;atualizado_em&quot;)
+<span class="nc" id="L93">    private LocalDateTime atualizadoEm;</span>
+    
+    @Column(name = &quot;depreciacao_acumulada&quot;, precision = 15, scale = 2)
+<span class="fc" id="L96">    private BigDecimal depreciacaoAcumulada;</span>
+
+    @Column(name = &quot;valor_contabil_atual&quot;, precision = 15, scale = 2)
+<span class="nc" id="L99">    private BigDecimal valorContabilAtual;</span>
+
+    @Column(name = &quot;data_ultima_depreciacao&quot;)
+<span class="fc" id="L102">    private LocalDate dataUltimaDepreciacao;</span>
+    
+    @PrePersist
+    protected void onCreate() {
+<span class="fc" id="L106">        criadoEm = LocalDateTime.now();</span>
+<span class="fc" id="L107">        atualizadoEm = LocalDateTime.now();</span>
+<span class="fc" id="L108">        dataRegistro = LocalDate.now();</span>
+        
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        if (status == null) {</span>
+<span class="fc" id="L111">            status = StatusAtivo.ATIVO;</span>
+        }
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (valorResidual == null) {</span>
+<span class="fc" id="L114">            valorResidual = BigDecimal.ZERO;</span>
+        }
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (metodoDepreciacao == null) {</span>
+<span class="fc" id="L117">            metodoDepreciacao = MetodoDepreciacao.LINEAR;</span>
+        }
+<span class="fc" id="L119">    }</span>
+    
+    @PreUpdate
+    protected void preUpdate() {
+<span class="fc" id="L123">        this.atualizadoEm = LocalDateTime.now();</span>
+<span class="fc" id="L124">    }</span>
+    
+    public BigDecimal calcularDepreciacaoAtual() {
+<span class="nc" id="L127">        return BigDecimal.ZERO;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

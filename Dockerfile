@@ -1,15 +1,17 @@
-# Usa uma imagem base oficial do OpenJDK 21, otimizada para tamanho (slim).
+# Multi-stage Dockerfile: build jar with Maven, then copy to a lightweight JRE image
+
+# Build stage
+FROM maven:3.9.6-eclipse-temurin-21 AS build
+WORKDIR /workspace/app
+COPY pom.xml mvnw .mvn/ ./
+COPY src ./src
+# Enable Maven wrapper execution permissions
+RUN mvn -B -DskipTests package -DskipITs
+
+# Run stage
 FROM openjdk:21-slim
-
-# Define o diretório de trabalho dentro do container.
 WORKDIR /app
-
-# Copia o arquivo .jar gerado pelo Maven para o diretório de trabalho no container.
-# O nome do .jar deve corresponder ao que foi gerado na sua pasta 'target'.
-COPY target/aegispatrimonio-0.0.1-SNAPSHOT.jar app.jar
-
-# Expõe a porta 8080, que é a porta que nossa aplicação Spring Boot usa.
+# copy jar from build stage
+COPY --from=build /workspace/app/target/aegispatrimonio-0.0.1-SNAPSHOT.jar app.jar
 EXPOSE 8080
-
-# Define o comando que será executado quando o container for iniciado.
 ENTRYPOINT ["java", "-jar", "app.jar"]

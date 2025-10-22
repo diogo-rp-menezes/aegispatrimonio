@@ -19,9 +19,9 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Set;
+import java.util.UUID;
 
 import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -29,8 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @AutoConfigureMockMvc
-@Transactional
-public class FilialControllerIT extends BaseIT {
+class FilialControllerIT extends BaseIT {
 
     @Autowired
     private MockMvc mockMvc;
@@ -60,22 +59,29 @@ public class FilialControllerIT extends BaseIT {
     private String userToken;
     private Filial filialExistente;
 
-    // CNPJs Válidos para os testes
     private static final String CNPJ_VALIDO_1 = "45543915000181";
     private static final String CNPJ_VALIDO_2 = "17298092000130";
-    private static final String CNPJ_VALIDO_3 = "15302930000177"; // Fornecido pelo usuário
+    private static final String CNPJ_VALIDO_3 = "15302930000177";
     private static final String CNPJ_VALIDO_4 = "73110356000108";
     private static final String CNPJ_VALIDO_5 = "87353221000107";
 
     @BeforeEach
     void setUp() {
+        // Limpar repositórios para garantir um estado limpo para cada teste
+        usuarioRepository.deleteAll();
+        funcionarioRepository.deleteAll();
+        departamentoRepository.deleteAll();
+        filialRepository.deleteAll();
+
         this.filialExistente = createFilial("Matriz Teste", "MTRZ", CNPJ_VALIDO_1);
         Departamento diretoria = createDepartamento("Diretoria", filialExistente);
 
-        Funcionario adminFunc = createFuncionarioAndUsuario("Admin Filial", "admin.filial@aegis.com", "ROLE_ADMIN", diretoria, Set.of(filialExistente));
+        String adminEmail = "admin.filial." + UUID.randomUUID().toString() + "@aegis.com";
+        Funcionario adminFunc = createFuncionarioAndUsuario("Admin Filial", adminEmail, "ROLE_ADMIN", diretoria, Set.of(filialExistente));
         this.adminToken = jwtService.generateToken(new CustomUserDetails(adminFunc.getUsuario()));
 
-        Funcionario userFunc = createFuncionarioAndUsuario("User Filial", "user.filial@aegis.com", "ROLE_USER", diretoria, Set.of(filialExistente));
+        String userEmail = "user.filial." + UUID.randomUUID().toString() + "@aegis.com";
+        Funcionario userFunc = createFuncionarioAndUsuario("User Filial", userEmail, "ROLE_USER", diretoria, Set.of(filialExistente));
         this.userToken = jwtService.generateToken(new CustomUserDetails(userFunc.getUsuario()));
     }
 
@@ -173,8 +179,8 @@ public class FilialControllerIT extends BaseIT {
 
         mockMvc.perform(put("/filiais/{id}", 999L)
                         .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(updateDTO)))
+                        .contentType(MediaType.APPLICATION_JSON) // Adicionado
+                        .content(objectMapper.writeValueAsString(updateDTO))) // Adicionado
                 .andExpect(status().isNotFound());
     }
 
@@ -217,33 +223,39 @@ public class FilialControllerIT extends BaseIT {
         filial.setTipo(TipoFilial.FILIAL);
         filial.setCnpj(cnpj);
         filial.setStatus(Status.ATIVO);
-        return filialRepository.saveAndFlush(filial);
+        return filialRepository.save(filial);
     }
 
     private Departamento createDepartamento(String nome, Filial filial) {
         Departamento depto = new Departamento();
         depto.setNome(nome);
         depto.setFilial(filial);
-        return departamentoRepository.saveAndFlush(depto);
+        return departamentoRepository.save(depto);
     }
 
     private Funcionario createFuncionarioAndUsuario(String nome, String email, String role, Departamento depto, Set<Filial> filiais) {
         Funcionario func = new Funcionario();
         func.setNome(nome);
-        func.setMatricula(nome.replaceAll("\\s+", "") + "-001");
+        func.setMatricula(nome.replaceAll("\\s+", "") + "-" + UUID.randomUUID().toString().substring(0, 8));
         func.setCargo("Administrador");
         func.setDepartamento(depto);
-        func.setFiliais(filiais);
         func.setStatus(Status.ATIVO);
+        func.setId(null); // Adicionado: Explicitamente define o ID como null para forçar a geração de um novo ID
+
+        // Salvar o funcionário primeiro para garantir que o ID seja gerado
+        Funcionario savedFunc = funcionarioRepository.save(func);
+        funcionarioRepository.flush(); // Força a sincronização com o banco de dados para garantir o ID
 
         Usuario user = new Usuario();
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode("password"));
         user.setRole(role);
         user.setStatus(Status.ATIVO);
-        user.setFuncionario(func);
-        func.setUsuario(user);
+        user.setFuncionario(savedFunc); // Associar ao funcionário já salvo
+        savedFunc.setUsuario(user); // Manter a bidirecionalidade
 
-        return funcionarioRepository.saveAndFlush(func);
+        // Agora associar as filiais e salvar novamente o funcionário para persistir a associação ManyToMany
+        savedFunc.setFiliais(filiais);
+        return funcionarioRepository.save(savedFunc);
     }
 }

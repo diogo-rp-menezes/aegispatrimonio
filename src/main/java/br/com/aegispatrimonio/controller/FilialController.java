@@ -9,8 +9,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.ResponseEntity; // Importar ResponseEntity
+import org.springframework.web.server.ResponseStatusException; // Importar ResponseStatusException
 
 import java.util.List;
+import java.util.Optional; // Importar Optional
 
 /**
  * Controller para gerenciar as operações CRUD de Filiais.
@@ -49,8 +52,10 @@ public class FilialController {
      */
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    public FilialDTO buscarPorId(@PathVariable Long id) {
-        return filialService.buscarPorId(id);
+    public ResponseEntity<FilialDTO> buscarPorId(@PathVariable Long id) { // Alterado o tipo de retorno
+        Optional<FilialDTO> filial = filialService.buscarPorId(id); // O serviço retorna Optional
+        return filial.map(ResponseEntity::ok)
+                     .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     /**
@@ -78,8 +83,10 @@ public class FilialController {
      */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public FilialDTO atualizar(@PathVariable Long id, @RequestBody @Valid FilialUpdateDTO filialUpdateDTO) {
-        return filialService.atualizar(id, filialUpdateDTO);
+    public ResponseEntity<FilialDTO> atualizar(@PathVariable Long id, @RequestBody @Valid FilialUpdateDTO filialUpdateDTO) {
+        Optional<FilialDTO> filialAtualizada = filialService.atualizar(id, filialUpdateDTO);
+        return filialAtualizada.map(ResponseEntity::ok)
+                               .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     /**

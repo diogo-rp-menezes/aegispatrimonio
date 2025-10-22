@@ -36,9 +36,9 @@ class ManutencaoServiceTest {
     @Mock
     private AtivoRepository ativoRepository;
     @Mock
-    private FuncionarioRepository funcionarioRepository;
-    @Mock
     private FornecedorRepository fornecedorRepository;
+    @Mock
+    private FuncionarioRepository funcionarioRepository;
 
     @InjectMocks
     private ManutencaoService manutencaoService;
@@ -58,69 +58,79 @@ class ManutencaoServiceTest {
         ativo.setId(1L);
         ativo.setStatus(StatusAtivo.ATIVO);
         ativo.setFilial(filial);
+        ativo.setNome("Notebook Dell");
+        ativo.setNumeroPatrimonio("NTB-001");
 
         solicitante = new Funcionario();
-        solicitante.setId(1L);
+        solicitante.setId(10L);
         solicitante.setFiliais(Set.of(filial));
+        solicitante.setNome("Solicitante Teste");
 
         tecnico = new Funcionario();
-        tecnico.setId(2L);
+        tecnico.setId(20L);
         tecnico.setFiliais(Set.of(filial));
+        tecnico.setNome("Tecnico Teste");
 
         manutencao = new Manutencao();
-        manutencao.setId(1L);
+        manutencao.setId(100L);
         manutencao.setAtivo(ativo);
         manutencao.setSolicitante(solicitante);
+        manutencao.setStatus(StatusManutencao.SOLICITADA);
     }
 
     @Test
-    @DisplayName("Criar: Deve criar uma manutenção com sucesso")
-    void criar_quandoValido_deveSalvarManutencao() {
-        ManutencaoRequestDTO request = new ManutencaoRequestDTO(1L, TipoManutencao.CORRETIVA, 1L, null, null, "Problema", null, null, null, null);
+    @DisplayName("Criar: Deve criar manutenção com sucesso para ativo ATIVO")
+    void criar_comAtivoAtivo_deveCriarComSucesso() {
+        ManutencaoRequestDTO request = new ManutencaoRequestDTO(1L, TipoManutencao.CORRETIVA, 10L, null, null, "Tela quebrada", null, null, null, null);
         when(ativoRepository.findById(1L)).thenReturn(Optional.of(ativo));
-        when(funcionarioRepository.findById(1L)).thenReturn(Optional.of(solicitante));
+        when(funcionarioRepository.findById(10L)).thenReturn(Optional.of(solicitante));
         when(manutencaoRepository.save(any(Manutencao.class))).thenReturn(manutencao);
 
-        assertDoesNotThrow(() -> manutencaoService.criar(request));
-
+        assertNotNull(manutencaoService.criar(request));
         verify(manutencaoRepository).save(any(Manutencao.class));
     }
 
     @Test
-    @DisplayName("Criar: Deve lançar exceção ao criar manutenção para ativo não ATIVO")
-    void criar_quandoAtivoNaoAtivo_deveLancarExcecao() {
+    @DisplayName("Criar: Deve lançar exceção para ativo com status diferente de ATIVO")
+    void criar_comAtivoNaoAtivo_deveLancarExcecao() {
         ativo.setStatus(StatusAtivo.EM_MANUTENCAO);
-        ManutencaoRequestDTO request = new ManutencaoRequestDTO(1L, TipoManutencao.CORRETIVA, 1L, null, null, "Problema", null, null, null, null);
+        ManutencaoRequestDTO request = new ManutencaoRequestDTO(1L, TipoManutencao.CORRETIVA, 10L, null, null, "Tela quebrada", null, null, null, null);
         when(ativoRepository.findById(1L)).thenReturn(Optional.of(ativo));
 
         assertThrows(ResourceConflictException.class, () -> manutencaoService.criar(request));
     }
 
     @Test
-    @DisplayName("Aprovar: Deve aprovar uma manutenção SOLICITADA")
-    void aprovar_quandoStatusSolicitada_deveMudarStatusParaAprovada() {
-        manutencao.setStatus(StatusManutencao.SOLICITADA);
-        when(manutencaoRepository.findById(1L)).thenReturn(Optional.of(manutencao));
+    @DisplayName("Aprovar: Deve aprovar manutenção com status SOLICITADA")
+    void aprovar_comStatusSolicitada_deveAprovar() {
+        when(manutencaoRepository.findById(100L)).thenReturn(Optional.of(manutencao));
         when(manutencaoRepository.save(any(Manutencao.class))).thenReturn(manutencao);
 
-        manutencaoService.aprovar(1L);
+        manutencaoService.aprovar(100L);
 
         assertEquals(StatusManutencao.APROVADA, manutencao.getStatus());
         verify(manutencaoRepository).save(manutencao);
     }
 
     @Test
-    @DisplayName("Iniciar: Deve iniciar uma manutenção APROVADA")
-    void iniciar_quandoAprovada_deveMudarStatusParaEmAndamento() {
+    @DisplayName("Aprovar: Deve lançar exceção para status diferente de SOLICITADA")
+    void aprovar_comStatusDiferente_deveLancarExcecao() {
         manutencao.setStatus(StatusManutencao.APROVADA);
-        ManutencaoInicioDTO inicioDTO = new ManutencaoInicioDTO();
-        inicioDTO.setTecnicoId(2L);
+        when(manutencaoRepository.findById(100L)).thenReturn(Optional.of(manutencao));
 
-        when(manutencaoRepository.findById(1L)).thenReturn(Optional.of(manutencao));
-        when(funcionarioRepository.findById(2L)).thenReturn(Optional.of(tecnico));
+        assertThrows(ResourceConflictException.class, () -> manutencaoService.aprovar(100L));
+    }
+
+    @Test
+    @DisplayName("Iniciar: Deve iniciar manutenção com status APROVADA")
+    void iniciar_comStatusAprovada_deveIniciar() {
+        manutencao.setStatus(StatusManutencao.APROVADA);
+        ManutencaoInicioDTO inicioDTO = new ManutencaoInicioDTO(20L);
+        when(manutencaoRepository.findById(100L)).thenReturn(Optional.of(manutencao));
+        when(funcionarioRepository.findById(20L)).thenReturn(Optional.of(tecnico));
         when(manutencaoRepository.save(any(Manutencao.class))).thenReturn(manutencao);
 
-        manutencaoService.iniciar(1L, inicioDTO);
+        manutencaoService.iniciar(100L, inicioDTO);
 
         assertEquals(StatusManutencao.EM_ANDAMENTO, manutencao.getStatus());
         assertEquals(StatusAtivo.EM_MANUTENCAO, ativo.getStatus());
@@ -129,39 +139,130 @@ class ManutencaoServiceTest {
     }
 
     @Test
-    @DisplayName("Concluir: Deve concluir uma manutenção EM_ANDAMENTO")
-    void concluir_quandoEmAndamento_deveMudarStatusParaConcluida() {
-        manutencao.setStatus(StatusManutencao.EM_ANDAMENTO);
-        ManutencaoConclusaoDTO conclusaoDTO = new ManutencaoConclusaoDTO("Serviço feito", BigDecimal.TEN, 60);
+    @DisplayName("Iniciar: Deve lançar exceção se técnico não pertence à filial do ativo")
+    void iniciar_comTecnicoDeOutraFilial_deveLancarExcecao() {
+        manutencao.setStatus(StatusManutencao.APROVADA);
+        
+        // CORREÇÃO: A filial mockada deve ter um ID para evitar NullPointerException na lógica de validação.
+        Filial outraFilial = new Filial();
+        outraFilial.setId(99L);
 
-        when(manutencaoRepository.findById(1L)).thenReturn(Optional.of(manutencao));
+        Funcionario tecnicoOutraFilial = new Funcionario();
+        tecnicoOutraFilial.setId(30L);
+        tecnicoOutraFilial.setFiliais(Set.of(outraFilial));
+        ManutencaoInicioDTO inicioDTO = new ManutencaoInicioDTO(30L);
+
+        when(manutencaoRepository.findById(100L)).thenReturn(Optional.of(manutencao));
+        when(funcionarioRepository.findById(30L)).thenReturn(Optional.of(tecnicoOutraFilial));
+
+        assertThrows(IllegalArgumentException.class, () -> manutencaoService.iniciar(100L, inicioDTO));
+    }
+
+    @Test
+    @DisplayName("Concluir: Deve concluir manutenção com status EM_ANDAMENTO")
+    void concluir_comStatusEmAndamento_deveConcluir() {
+        manutencao.setStatus(StatusManutencao.EM_ANDAMENTO);
+        ManutencaoConclusaoDTO conclusaoDTO = new ManutencaoConclusaoDTO("Serviço finalizado", BigDecimal.TEN, 60);
+        when(manutencaoRepository.findById(100L)).thenReturn(Optional.of(manutencao));
         when(manutencaoRepository.save(any(Manutencao.class))).thenReturn(manutencao);
 
-        manutencaoService.concluir(1L, conclusaoDTO);
+        manutencaoService.concluir(100L, conclusaoDTO);
 
         assertEquals(StatusManutencao.CONCLUIDA, manutencao.getStatus());
+        assertEquals(StatusAtivo.ATIVO, ativo.getStatus());
+        assertEquals("Serviço finalizado", manutencao.getDescricaoServico());
+        verify(ativoRepository).save(ativo);
+        verify(manutencaoRepository).save(manutencao);
+    }
+
+    @Test
+    @DisplayName("Cancelar: Deve cancelar manutenção com status SOLICITADA")
+    void cancelar_comStatusSolicitada_deveCancelar() {
+        ManutencaoCancelDTO cancelDTO = new ManutencaoCancelDTO("Motivo teste");
+        when(manutencaoRepository.findById(100L)).thenReturn(Optional.of(manutencao));
+        when(manutencaoRepository.save(any(Manutencao.class))).thenReturn(manutencao);
+
+        manutencaoService.cancelar(100L, cancelDTO);
+
+        assertEquals(StatusManutencao.CANCELADA, manutencao.getStatus());
+        assertEquals(StatusAtivo.ATIVO, ativo.getStatus()); // Garante que o status do ativo não mudou
+        verify(ativoRepository, never()).save(any(Ativo.class));
+        verify(manutencaoRepository).save(manutencao);
+    }
+
+    @Test
+    @DisplayName("Cancelar: Deve cancelar manutenção EM_ANDAMENTO e reativar o ativo")
+    void cancelar_comStatusEmAndamento_deveCancelarEReativarAtivo() {
+        manutencao.setStatus(StatusManutencao.EM_ANDAMENTO);
+        ativo.setStatus(StatusAtivo.EM_MANUTENCAO);
+        ManutencaoCancelDTO cancelDTO = new ManutencaoCancelDTO("Motivo teste");
+        when(manutencaoRepository.findById(100L)).thenReturn(Optional.of(manutencao));
+        when(manutencaoRepository.save(any(Manutencao.class))).thenReturn(manutencao);
+
+        manutencaoService.cancelar(100L, cancelDTO);
+
+        assertEquals(StatusManutencao.CANCELADA, manutencao.getStatus());
         assertEquals(StatusAtivo.ATIVO, ativo.getStatus());
         verify(ativoRepository).save(ativo);
         verify(manutencaoRepository).save(manutencao);
     }
 
     @Test
-    @DisplayName("Deletar: Deve deletar uma manutenção SOLICITADA")
-    void deletar_quandoSolicitada_deveDeletar() {
-        manutencao.setStatus(StatusManutencao.SOLICITADA);
-        when(manutencaoRepository.findById(1L)).thenReturn(Optional.of(manutencao));
+    @DisplayName("Cancelar: Deve lançar exceção para manutenção CONCLUIDA")
+    void cancelar_comStatusConcluida_deveLancarExcecao() {
+        manutencao.setStatus(StatusManutencao.CONCLUIDA);
+        ManutencaoCancelDTO cancelDTO = new ManutencaoCancelDTO("Motivo teste");
+        when(manutencaoRepository.findById(100L)).thenReturn(Optional.of(manutencao));
 
-        manutencaoService.deletar(1L);
+        assertThrows(ResourceConflictException.class, () -> manutencaoService.cancelar(100L, cancelDTO));
+    }
+
+    @Test
+    @DisplayName("Deletar: Deve deletar manutenção com status SOLICITADA")
+    void deletar_comStatusSolicitada_deveDeletar() {
+        when(manutencaoRepository.findById(100L)).thenReturn(Optional.of(manutencao));
+
+        manutencaoService.deletar(100L);
 
         verify(manutencaoRepository).delete(manutencao);
     }
 
     @Test
-    @DisplayName("Deletar: Deve lançar exceção ao deletar manutenção que não está SOLICITADA")
-    void deletar_quandoNaoSolicitada_deveLancarExcecao() {
+    @DisplayName("Deletar: Deve lançar exceção para status diferente de SOLICITADA")
+    void deletar_comStatusDiferente_deveLancarExcecao() {
         manutencao.setStatus(StatusManutencao.APROVADA);
-        when(manutencaoRepository.findById(1L)).thenReturn(Optional.of(manutencao));
+        when(manutencaoRepository.findById(100L)).thenReturn(Optional.of(manutencao));
 
-        assertThrows(ResourceConflictException.class, () -> manutencaoService.deletar(1L));
+        assertThrows(ResourceConflictException.class, () -> manutencaoService.deletar(100L));
+    }
+
+    @Test
+    @DisplayName("CustoTotalPorAtivo: Deve retornar o custo total de manutenções concluídas")
+    void custoTotalPorAtivo_deveRetornarSoma() {
+        when(ativoRepository.existsById(1L)).thenReturn(true);
+        when(manutencaoRepository.findCustoTotalManutencaoPorAtivo(1L)).thenReturn(new BigDecimal("150.75"));
+
+        BigDecimal custo = manutencaoService.custoTotalPorAtivo(1L);
+
+        assertEquals(new BigDecimal("150.75"), custo);
+    }
+
+    @Test
+    @DisplayName("CustoTotalPorAtivo: Deve retornar ZERO se não houver custos")
+    void custoTotalPorAtivo_semCustos_deveRetornarZero() {
+        when(ativoRepository.existsById(1L)).thenReturn(true);
+        when(manutencaoRepository.findCustoTotalManutencaoPorAtivo(1L)).thenReturn(null);
+
+        BigDecimal custo = manutencaoService.custoTotalPorAtivo(1L);
+
+        assertEquals(BigDecimal.ZERO, custo);
+    }
+
+    @Test
+    @DisplayName("CustoTotalPorAtivo: Deve lançar exceção se ativo não existe")
+    void custoTotalPorAtivo_comAtivoInexistente_deveLancarExcecao() {
+        when(ativoRepository.existsById(99L)).thenReturn(false);
+
+        assertThrows(ResourceNotFoundException.class, () -> manutencaoService.custoTotalPorAtivo(99L));
     }
 }

@@ -1,8 +1,3 @@
 package br.com.aegispatrimonio.dto;
 
-public record HealthCheckAdaptadorRedeDTO(
-    String description,
-    String macAddress,
-    String ipAddress
-) {
-}
+// Arquivado: legacy. Utilize br.com.aegispatrimonio.dto.healthcheck.AdaptadorRedeDTO

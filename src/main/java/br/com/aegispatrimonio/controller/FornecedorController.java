@@ -6,6 +6,7 @@ import br.com.aegispatrimonio.dto.FornecedorUpdateDTO;
 import br.com.aegispatrimonio.service.FornecedorService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -93,5 +94,10 @@ public class FornecedorController {
     @PreAuthorize("hasRole('ADMIN')")
     public void deletar(@PathVariable Long id) {
         fornecedorService.deletar(id);
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<String> handleIllegalArgumentException(IllegalArgumentException ex) {
+        return new ResponseEntity<>(ex.getMessage(), HttpStatus.BAD_REQUEST);
     }
 }

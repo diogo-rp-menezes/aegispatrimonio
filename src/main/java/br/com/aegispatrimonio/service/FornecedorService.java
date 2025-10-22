@@ -5,6 +5,7 @@ import br.com.aegispatrimonio.dto.FornecedorDTO;
 import br.com.aegispatrimonio.dto.FornecedorUpdateDTO;
 import br.com.aegispatrimonio.mapper.FornecedorMapper;
 import br.com.aegispatrimonio.model.Fornecedor;
+import br.com.aegispatrimonio.model.StatusFornecedor;
 import br.com.aegispatrimonio.repository.AtivoRepository;
 import br.com.aegispatrimonio.repository.FornecedorRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -81,7 +82,8 @@ public class FornecedorService {
             throw new IllegalStateException("Não é possível deletar o fornecedor, pois existem ativos associados a ele.");
         }
 
-        fornecedorRepository.delete(fornecedor);
+        fornecedor.setStatus(StatusFornecedor.INATIVO); // Realiza o soft delete
+        fornecedorRepository.save(fornecedor); // Salva a alteração de status
     }
 
     private void validarCnpjUnico(String cnpj, Long fornecedorId) {
