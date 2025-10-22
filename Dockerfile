@@ -9,8 +9,10 @@ COPY src ./src
 RUN mvn -B -DskipTests package -DskipITs
 
 # Run stage
-FROM openjdk:21-slim
+FROM eclipse-temurin:21-jre
 WORKDIR /app
+# Set safe JVM defaults for containers; can be overridden at runtime
+ENV JAVA_TOOL_OPTIONS="-XX:InitialRAMPercentage=25 -XX:MaxRAMPercentage=75 -XX:MaxMetaspaceSize=256m -XX:+UseStringDeduplication -XX:+ExitOnOutOfMemoryError -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Dfile.encoding=UTF-8"
 # copy jar from build stage
 COPY --from=build /workspace/app/target/aegispatrimonio-0.0.1-SNAPSHOT.jar app.jar
 EXPOSE 8080

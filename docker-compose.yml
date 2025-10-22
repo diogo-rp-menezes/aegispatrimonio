@@ -34,12 +34,16 @@ services:
       # Mapeia a porta 8080 do container para a 8080 da sua máquina
       - "8080:8080"
     environment:
+      # Perfil de execução para containers
+      SPRING_PROFILES_ACTIVE: prod
       # Sobrescreve a URL do datasource para apontar para o container do banco
       SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/aegis-patrimonio?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: Admin123
       # Evita que o Hibernate valide o schema antes das migrações do Flyway aplicadas.
       SPRING_JPA_HIBERNATE_DDL_AUTO: none
+      # Recomendações de memória da JVM dentro do container (pode ser sobrescrito)
+      JAVA_TOOL_OPTIONS: "-XX:InitialRAMPercentage=25 -XX:MaxRAMPercentage=75 -XX:MaxMetaspaceSize=256m -XX:+UseStringDeduplication -XX:+ExitOnOutOfMemoryError -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Dfile.encoding=UTF-8"
 
 # Define o volume nomeado para persistência dos dados do MySQL
 volumes:

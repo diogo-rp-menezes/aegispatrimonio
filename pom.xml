@@ -24,7 +24,7 @@
         <java.version>21</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <testcontainers.version>1.19.7</testcontainers.version>
-        <jacoco.minimum.coverage>0.40</jacoco.minimum.coverage>
+        <jacoco.minimum.coverage>0.80</jacoco.minimum.coverage>
     </properties>
 
     <dependencyManagement>

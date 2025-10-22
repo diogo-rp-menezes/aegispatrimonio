@@ -33,15 +33,27 @@ public abstract class BaseIT {
     public static MySQLContainer<?> mysqlContainer;
 
     static {
-        if (DockerClientFactory.instance().isDockerAvailable()) {
-            mysqlContainer = new MySQLContainer<>("mysql:8.0.26")
-                    .withDatabaseName("testdb")
-                    .withUsername("testuser")
-                    .withPassword("testpass");
-            // Start container programmatically so lifecycle is explicit
-            mysqlContainer.start();
+        // Estratégia estável por padrão: usar H2 em memória.
+        // Para habilitar Testcontainers/MySQL, defina:
+        //   -DuseTestcontainers=true (system property) OU variável de ambiente USE_TESTCONTAINERS=true
+        boolean useTestcontainers = Boolean.parseBoolean(System.getProperty("useTestcontainers", "false"))
+                || "true".equalsIgnoreCase(System.getenv("USE_TESTCONTAINERS"));
+
+        if (useTestcontainers) {
+            // Usa Testcontainers somente quando explicitamente habilitado
+            if (DockerClientFactory.instance().isDockerAvailable()) {
+                mysqlContainer = new MySQLContainer<>("mysql:8.0.26")
+                        .withDatabaseName("testdb")
+                        .withUsername("testuser")
+                        .withPassword("testpass");
+                mysqlContainer.start();
+            } else {
+                // Docker indisponível: faz fallback para H2
+                mysqlContainer = null;
+            }
         } else {
-            mysqlContainer = null; // Indica fallback para H2
+            // Padrão: H2 em memória para reduzir flakiness e acelerar o pipeline
+            mysqlContainer = null;
         }
     }
 

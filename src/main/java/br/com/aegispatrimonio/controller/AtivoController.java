@@ -36,8 +36,13 @@ public class AtivoController {
      */
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    public List<AtivoDTO> listarTodos(org.springframework.data.domain.Pageable pageable) {
-        return ativoService.listarTodos(pageable);
+    public List<AtivoDTO> listarTodos(
+            org.springframework.data.domain.Pageable pageable,
+            @RequestParam(required = false) Long filialId,
+            @RequestParam(required = false) Long tipoAtivoId,
+            @RequestParam(required = false) br.com.aegispatrimonio.model.StatusAtivo status
+    ) {
+        return ativoService.listarTodos(pageable, filialId, tipoAtivoId, status);
     }
 
     /**

@@ -44,7 +44,7 @@ class JwtAuthFilterTest extends BaseIT {
     @Test
     @DisplayName("Filtro: Deve retornar 401 Unauthorized para requisição sem token")
     void doFilterInternal_semToken_deveRetornarUnauthorized() throws Exception {
-        mockMvc.perform(get("/ativos"))
+        mockMvc.perform(get("/api/v1/ativos"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -58,7 +58,7 @@ class JwtAuthFilterTest extends BaseIT {
         when(userDetailsService.loadUserByUsername(anyString())).thenReturn(userDetails);
         when(jwtService.isTokenValid(token, userDetails)).thenReturn(false);
 
-        mockMvc.perform(get("/ativos").header("Authorization", "Bearer " + token))
+        mockMvc.perform(get("/api/v1/ativos").header("Authorization", "Bearer " + token))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -73,7 +73,7 @@ class JwtAuthFilterTest extends BaseIT {
 
         // CORREÇÃO: O MockMvc propaga a exceção original do mock, então a verificamos diretamente.
         assertThrows(UsernameNotFoundException.class, () -> {
-            mockMvc.perform(get("/ativos").header("Authorization", "Bearer " + token));
+            mockMvc.perform(get("/api/v1/ativos").header("Authorization", "Bearer " + token));
         });
     }
 
@@ -88,7 +88,7 @@ class JwtAuthFilterTest extends BaseIT {
         when(userDetailsService.loadUserByUsername(email)).thenReturn(userDetails);
         when(jwtService.isTokenValid(token, userDetails)).thenReturn(true);
 
-        mockMvc.perform(get("/ativos").header("Authorization", "Bearer " + token))
+        mockMvc.perform(get("/api/v1/ativos").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk());
     }
 }

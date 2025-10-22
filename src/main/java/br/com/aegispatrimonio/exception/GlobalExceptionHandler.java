@@ -1,48 +1,63 @@
 package br.com.aegispatrimonio.exception;
 
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.ProblemDetail;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
+import java.net.URI;
+import java.util.UUID;
+
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(EntityNotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
-    public ResponseEntity<String> handleEntityNotFound(EntityNotFoundException ex) {
-        return new ResponseEntity<>(ex.getMessage(), HttpStatus.NOT_FOUND);
+    public ProblemDetail handleEntityNotFound(EntityNotFoundException ex, HttpServletRequest request) {
+        return buildProblem(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage(), request);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ResponseEntity<String> handleIllegalArgument(IllegalArgumentException ex) {
-        return new ResponseEntity<>(ex.getMessage(), HttpStatus.BAD_REQUEST);
+    public ProblemDetail handleIllegalArgument(IllegalArgumentException ex, HttpServletRequest request) {
+        return buildProblem(HttpStatus.BAD_REQUEST, "Bad Request", ex.getMessage(), request);
     }
 
     @ExceptionHandler(IllegalStateException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
-    public ResponseEntity<String> handleIllegalState(IllegalStateException ex) {
-        return new ResponseEntity<>(ex.getMessage(), HttpStatus.CONFLICT);
+    public ProblemDetail handleIllegalState(IllegalStateException ex, HttpServletRequest request) {
+        return buildProblem(HttpStatus.CONFLICT, "Conflict", ex.getMessage(), request);
     }
 
     @ExceptionHandler(AccessDeniedException.class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
-    public ResponseEntity<String> handleAccessDenied(AccessDeniedException ex) {
-        return new ResponseEntity<>(ex.getMessage(), HttpStatus.FORBIDDEN);
+    public ProblemDetail handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
+        return buildProblem(HttpStatus.FORBIDDEN, "Forbidden", ex.getMessage(), request);
     }
 
-    // CORREÇÃO: Adicionado handler específico para falhas de autenticação.
+    // Handler específico para falhas de autenticação (401)
     @ExceptionHandler(AuthenticationException.class)
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
-    public ResponseEntity<String> handleAuthenticationException(AuthenticationException ex) {
-        return new ResponseEntity<>(ex.getMessage(), HttpStatus.UNAUTHORIZED);
+    public ProblemDetail handleAuthenticationException(AuthenticationException ex, HttpServletRequest request) {
+        return buildProblem(HttpStatus.UNAUTHORIZED, "Unauthorized", ex.getMessage(), request);
     }
 
-    // O handler genérico para Exception.class foi removido para não interferir
-    // com os handlers padrão do Spring e do Spring Security.
+    private ProblemDetail buildProblem(HttpStatus status, String title, String detail, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
+        problem.setTitle(title);
+        problem.setType(URI.create("about:blank"));
+        String correlationId = getOrGenerateCorrelationId(request);
+        problem.setProperty("correlationId", correlationId);
+        return problem;
+    }
+
+    private String getOrGenerateCorrelationId(HttpServletRequest request) {
+        String header = request.getHeader("X-Correlation-Id");
+        return (header != null && !header.isBlank()) ? header : UUID.randomUUID().toString();
+    }
 }
