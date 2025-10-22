@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="pt"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DepartamentoController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">aegispatrimonio</a> &gt; <a href="index.source.html" class="el_package">br.com.aegispatrimonio.controller</a> &gt; <span class="el_source">DepartamentoController.java</span></div><h1>DepartamentoController.java</h1><pre class="source lang-java linenums">package br.com.aegispatrimonio.controller;
+
+import br.com.aegispatrimonio.dto.DepartamentoCreateDTO;
+import br.com.aegispatrimonio.dto.DepartamentoDTO;
+import br.com.aegispatrimonio.dto.DepartamentoUpdateDTO;
+import br.com.aegispatrimonio.service.DepartamentoService;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+/**
+ * Controller para gerenciar as operações CRUD de Departamentos.
+ * Fornece endpoints para listar, buscar, criar, atualizar e deletar departamentos.
+ */
+@RestController
+@RequestMapping(&quot;/departamentos&quot;)
+public class DepartamentoController {
+
+    private final DepartamentoService departamentoService;
+
+<span class="fc" id="L24">    public DepartamentoController(DepartamentoService departamentoService) {</span>
+<span class="fc" id="L25">        this.departamentoService = departamentoService;</span>
+<span class="fc" id="L26">    }</span>
+
+    /**
+     * Lista todos os departamentos cadastrados.
+     * Acesso permitido para usuários com qualquer role autenticada.
+     *
+     * @return Uma lista de DepartamentoDTO.
+     */
+    @GetMapping
+    @PreAuthorize(&quot;hasAnyRole('ADMIN', 'USER')&quot;)
+    public List&lt;DepartamentoDTO&gt; listarTodos() {
+<span class="fc" id="L37">        return departamentoService.listarTodos();</span>
+    }
+
+    /**
+     * Busca um departamento específico pelo seu ID.
+     * Acesso permitido para usuários com qualquer role autenticada.
+     *
+     * @param id O ID do departamento a ser buscado.
+     * @return O DepartamentoDTO correspondente ao ID fornecido.
+     * @throws jakarta.persistence.EntityNotFoundException se o departamento não for encontrado.
+     */
+    @GetMapping(&quot;/{id}&quot;)
+    @PreAuthorize(&quot;hasAnyRole('ADMIN', 'USER')&quot;)
+    public DepartamentoDTO buscarPorId(@PathVariable Long id) {
+<span class="nc" id="L51">        return departamentoService.buscarPorId(id);</span>
+    }
+
+    /**
+     * Cria um novo departamento.
+     * Acesso restrito a usuários com a role 'ADMIN'.
+     *
+     * @param departamentoCreateDTO O DTO contendo os dados para a criação do novo departamento.
+     * @return O DepartamentoDTO recém-criado.
+     */
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize(&quot;hasRole('ADMIN')&quot;)
+    public DepartamentoDTO criar(@RequestBody @Valid DepartamentoCreateDTO departamentoCreateDTO) {
+<span class="fc" id="L65">        return departamentoService.criar(departamentoCreateDTO);</span>
+    }
+
+    /**
+     * Atualiza um departamento existente.
+     * Acesso restrito a usuários com a role 'ADMIN'.
+     *
+     * @param id O ID do departamento a ser atualizado.
+     * @param departamentoUpdateDTO O DTO contendo os dados para a atualização.
+     * @return O DepartamentoDTO com os dados atualizados.
+     * @throws jakarta.persistence.EntityNotFoundException se o departamento não for encontrado.
+     */
+    @PutMapping(&quot;/{id}&quot;)
+    @PreAuthorize(&quot;hasRole('ADMIN')&quot;)
+    public DepartamentoDTO atualizar(@PathVariable Long id, @RequestBody @Valid DepartamentoUpdateDTO departamentoUpdateDTO) {
+<span class="nc" id="L80">        return departamentoService.atualizar(id, departamentoUpdateDTO);</span>
+    }
+
+    /**
+     * Deleta um departamento.
+     * Acesso restrito a usuários com a role 'ADMIN'.
+     *
+     * @param id O ID do departamento a ser deletado.
+     * @throws jakarta.persistence.EntityNotFoundException se o departamento não for encontrado.
+     * @throws IllegalStateException se existirem pessoas associadas a este departamento.
+     */
+    @DeleteMapping(&quot;/{id}&quot;)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize(&quot;hasRole('ADMIN')&quot;)
+    public void deletar(@PathVariable Long id) {
+<span class="nc" id="L95">        departamentoService.deletar(id);</span>
+<span class="nc" id="L96">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

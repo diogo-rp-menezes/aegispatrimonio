@@ -80,7 +80,7 @@ class AtivoControllerIT extends BaseIT {
         void criar_comAdmin_deveRetornarCreated() throws Exception {
             AtivoCreateDTO createDTO = new AtivoCreateDTO(filialA.getId(), "Notebook-01", tipoAtivo.getId(), "PAT-NOTE-01", localizacao.getId(), LocalDate.now(), fornecedor.getId(), new BigDecimal("3500.50"), userA.getId(), "Em uso", "Garantia de 2 anos");
 
-            mockMvc.perform(post("/ativos")
+            mockMvc.perform(post("/api/v1/ativos")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(createDTO)))
                     .andExpect(status().isCreated())
@@ -95,7 +95,7 @@ class AtivoControllerIT extends BaseIT {
         void criar_comUser_deveRetornarForbidden() throws Exception {
             AtivoCreateDTO createDTO = new AtivoCreateDTO(filialA.getId(), "Notebook-01", tipoAtivo.getId(), "PAT-NOTE-01", localizacao.getId(), LocalDate.now(), fornecedor.getId(), new BigDecimal("3500.50"), userA.getId(), "Em uso", "Garantia de 2 anos");
 
-            mockMvc.perform(post("/ativos")
+            mockMvc.perform(post("/api/v1/ativos")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(createDTO)))
                     .andExpect(status().isForbidden());
@@ -107,7 +107,7 @@ class AtivoControllerIT extends BaseIT {
         void criar_comDadosInvalidos_deveRetornarBadRequest() throws Exception {
             AtivoCreateDTO createDTO = new AtivoCreateDTO(null, "", null, "", null, null, null, null, null, "", "");
 
-            mockMvc.perform(post("/ativos")
+            mockMvc.perform(post("/api/v1/ativos")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(createDTO)))
                     .andExpect(status().isBadRequest());
@@ -122,7 +122,7 @@ class AtivoControllerIT extends BaseIT {
         @DisplayName("Deve retornar 200 OK e uma lista de ativos para ADMIN")
         @WithMockCustomUser(role = "ROLE_ADMIN") // CORREÇÃO
         void listar_comAdmin_deveRetornarOkComLista() throws Exception {
-            mockMvc.perform(get("/ativos"))
+            mockMvc.perform(get("/api/v1/ativos"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$", hasSize(1)))
                     .andExpect(jsonPath("$[0].nome", is(ativoExistente.getNome())));
@@ -132,7 +132,7 @@ class AtivoControllerIT extends BaseIT {
         @DisplayName("Deve retornar 200 OK e uma lista de ativos para USER")
         @WithMockCustomUser(role = "ROLE_USER", funcionarioId = 1L) // CORREÇÃO
         void listar_comUser_deveRetornarOkComLista() throws Exception {
-            mockMvc.perform(get("/ativos"))
+            mockMvc.perform(get("/api/v1/ativos"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$", hasSize(1)))
                     .andExpect(jsonPath("$[0].nome", is(ativoExistente.getNome())));
@@ -141,7 +141,7 @@ class AtivoControllerIT extends BaseIT {
         @Test
         @DisplayName("Deve retornar 401 Unauthorized para usuário não autenticado")
         void listar_semAutenticacao_deveRetornarUnauthorized() throws Exception {
-            mockMvc.perform(get("/ativos"))
+            mockMvc.perform(get("/api/v1/ativos"))
                     .andExpect(status().isUnauthorized());
         }
     }
@@ -154,7 +154,7 @@ class AtivoControllerIT extends BaseIT {
         @DisplayName("Deve retornar 200 OK e o ativo correto para USER")
         @WithMockCustomUser(role = "ROLE_USER", funcionarioId = 1L) // CORREÇÃO
         void buscarPorId_comUserEIdExistente_deveRetornarOk() throws Exception {
-            mockMvc.perform(get("/ativos/{id}", ativoExistente.getId()))
+            mockMvc.perform(get("/api/v1/ativos/{id}", ativoExistente.getId()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.id", is(ativoExistente.getId().intValue())))
                     .andExpect(jsonPath("$.nome", is(ativoExistente.getNome())));
@@ -164,7 +164,7 @@ class AtivoControllerIT extends BaseIT {
         @DisplayName("Deve retornar 404 Not Found para ID inexistente")
         @WithMockCustomUser(role = "ROLE_USER", funcionarioId = 1L) // CORREÇÃO
         void buscarPorId_comIdInexistente_deveRetornarNotFound() throws Exception {
-            mockMvc.perform(get("/ativos/{id}", 9999L))
+            mockMvc.perform(get("/api/v1/ativos/{id}", 9999L))
                     .andExpect(status().isNotFound());
         }
     }
@@ -192,7 +192,7 @@ class AtivoControllerIT extends BaseIT {
                     ativoExistente.getInformacoesGarantia()
             );
 
-            mockMvc.perform(put("/ativos/{id}", ativoExistente.getId())
+            mockMvc.perform(put("/api/v1/ativos/{id}", ativoExistente.getId())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(updateDTO)))
                     .andExpect(status().isOk())
@@ -211,7 +211,7 @@ class AtivoControllerIT extends BaseIT {
                     BigDecimal.TEN, ativoExistente.getFuncionarioResponsavel().getId(), "Obs", "Garantia"
             );
 
-            mockMvc.perform(put("/ativos/{id}", ativoExistente.getId())
+            mockMvc.perform(put("/api/v1/ativos/{id}", ativoExistente.getId())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(updateDTO)))
                     .andExpect(status().isForbidden());
@@ -228,7 +228,7 @@ class AtivoControllerIT extends BaseIT {
                     BigDecimal.TEN, ativoExistente.getFuncionarioResponsavel().getId(), "Obs", "Garantia"
             );
 
-            mockMvc.perform(put("/ativos/{id}", 9999L)
+            mockMvc.perform(put("/api/v1/ativos/{id}", 9999L)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(updateDTO)))
                     .andExpect(status().isNotFound());
@@ -243,7 +243,7 @@ class AtivoControllerIT extends BaseIT {
         @DisplayName("Deve retornar 204 No Content para ADMIN")
         @WithMockCustomUser(role = "ROLE_ADMIN") // CORREÇÃO
         void deletar_comAdmin_deveRetornarNoContent() throws Exception {
-            mockMvc.perform(delete("/ativos/{id}", ativoExistente.getId()))
+            mockMvc.perform(delete("/api/v1/ativos/{id}", ativoExistente.getId()))
                     .andExpect(status().isNoContent());
         }
 
@@ -251,7 +251,7 @@ class AtivoControllerIT extends BaseIT {
         @DisplayName("Deve retornar 403 Forbidden para USER")
         @WithMockCustomUser(role = "ROLE_USER") // CORREÇÃO
         void deletar_comUser_deveRetornarForbidden() throws Exception {
-            mockMvc.perform(delete("/ativos/{id}", ativoExistente.getId()))
+            mockMvc.perform(delete("/api/v1/ativos/{id}", ativoExistente.getId()))
                     .andExpect(status().isForbidden());
         }
 
@@ -259,7 +259,7 @@ class AtivoControllerIT extends BaseIT {
         @DisplayName("Deve retornar 404 Not Found para ID inexistente")
         @WithMockCustomUser(role = "ROLE_ADMIN") // CORREÇÃO
         void deletar_comIdInexistente_deveRetornarNotFound() throws Exception {
-            mockMvc.perform(delete("/ativos/{id}", 9999L))
+            mockMvc.perform(delete("/api/v1/ativos/{id}", 9999L))
                     .andExpect(status().isNotFound());
         }
     }
@@ -274,7 +274,7 @@ class AtivoControllerIT extends BaseIT {
         void healthCheck_comUser_deveRetornarNoContent() throws Exception {
             HealthCheckDTO healthCheckDTO = createMockHealthCheckDTO();
 
-            mockMvc.perform(patch("/ativos/{id}/health-check", ativoExistente.getId())
+            mockMvc.perform(patch("/api/v1/ativos/{id}/health-check", ativoExistente.getId())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(healthCheckDTO)))
                     .andExpect(status().isNoContent());
@@ -286,7 +286,7 @@ class AtivoControllerIT extends BaseIT {
         void healthCheck_comIdInexistente_deveRetornarNotFound() throws Exception {
             HealthCheckDTO healthCheckDTO = createMockHealthCheckDTO();
 
-            mockMvc.perform(patch("/ativos/{id}/health-check", 9999L)
+            mockMvc.perform(patch("/api/v1/ativos/{id}/health-check", 9999L)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(healthCheckDTO)))
                     .andExpect(status().isNotFound());

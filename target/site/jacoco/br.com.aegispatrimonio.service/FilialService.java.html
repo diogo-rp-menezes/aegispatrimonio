@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="pt"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FilialService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">aegispatrimonio</a> &gt; <a href="index.source.html" class="el_package">br.com.aegispatrimonio.service</a> &gt; <span class="el_source">FilialService.java</span></div><h1>FilialService.java</h1><pre class="source lang-java linenums">package br.com.aegispatrimonio.service;
+
+import br.com.aegispatrimonio.dto.FilialCreateDTO;
+import br.com.aegispatrimonio.dto.FilialDTO;
+import br.com.aegispatrimonio.dto.FilialUpdateDTO;
+import br.com.aegispatrimonio.mapper.FilialMapper;
+import br.com.aegispatrimonio.model.Filial;
+import br.com.aegispatrimonio.model.TipoFilial;
+import br.com.aegispatrimonio.repository.DepartamentoRepository;
+import br.com.aegispatrimonio.repository.FilialRepository;
+import br.com.aegispatrimonio.repository.FuncionarioRepository;
+import jakarta.persistence.EntityNotFoundException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+@Service
+public class FilialService {
+
+    private final FilialRepository filialRepository;
+    private final DepartamentoRepository departamentoRepository;
+    private final FuncionarioRepository funcionarioRepository;
+    private final FilialMapper filialMapper;
+
+<span class="fc" id="L30">    public FilialService(FilialRepository filialRepository, DepartamentoRepository departamentoRepository, FuncionarioRepository funcionarioRepository, FilialMapper filialMapper) {</span>
+<span class="fc" id="L31">        this.filialRepository = filialRepository;</span>
+<span class="fc" id="L32">        this.departamentoRepository = departamentoRepository;</span>
+<span class="fc" id="L33">        this.funcionarioRepository = funcionarioRepository;</span>
+<span class="fc" id="L34">        this.filialMapper = filialMapper;</span>
+<span class="fc" id="L35">    }</span>
+
+    @Transactional(readOnly = true)
+    public List&lt;FilialDTO&gt; listarTodos() {
+<span class="fc" id="L39">        return filialRepository.findAll()</span>
+<span class="fc" id="L40">                .stream()</span>
+<span class="fc" id="L41">                .map(filialMapper::toDTO)</span>
+<span class="fc" id="L42">                .collect(Collectors.toList());</span>
+    }
+
+    @Transactional(readOnly = true)
+    public Optional&lt;FilialDTO&gt; buscarPorId(Long id) { // Alterado o tipo de retorno para Optional&lt;FilialDTO&gt;
+<span class="fc" id="L47">        var opt = filialRepository.findById(id);</span>
+<span class="fc" id="L48">        System.out.println(&quot;DEBUG FilialService.buscarPorId: id=&quot; + id + &quot; present=&quot; + opt.isPresent());</span>
+        // Retorna Optional.of(DTO) se encontrado, ou Optional.empty() se não
+<span class="fc" id="L50">        return opt.map(filialMapper::toDTO);</span>
+    }
+
+    @Transactional
+    public FilialDTO criar(FilialCreateDTO filialCreateDTO) {
+<span class="fc" id="L55">        validarUnicidade(filialCreateDTO.cnpj(), filialCreateDTO.codigo(), null);</span>
+<span class="fc" id="L56">        validarTipoMatriz(filialCreateDTO.tipo(), null);</span>
+
+<span class="fc" id="L58">        Filial filial = filialMapper.toEntity(filialCreateDTO);</span>
+<span class="fc" id="L59">        Filial filialSalva = filialRepository.save(filial);</span>
+<span class="fc" id="L60">        return filialMapper.toDTO(filialSalva);</span>
+    }
+
+    @Transactional
+    public Optional&lt;FilialDTO&gt; atualizar(Long id, FilialUpdateDTO filialUpdateDTO) { // Alterado o tipo de retorno
+<span class="fc" id="L65">        Optional&lt;Filial&gt; optionalFilial = filialRepository.findById(id);</span>
+
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        if (optionalFilial.isEmpty()) {</span>
+<span class="fc" id="L68">            return Optional.empty(); // Retorna Optional vazio se não encontrar</span>
+        }
+
+<span class="fc" id="L71">        Filial filial = optionalFilial.get();</span>
+
+<span class="fc" id="L73">        validarUnicidade(filialUpdateDTO.cnpj(), filialUpdateDTO.codigo(), id);</span>
+<span class="fc" id="L74">        validarTipoMatriz(filialUpdateDTO.tipo(), id);</span>
+
+<span class="fc" id="L76">        filial.setNome(filialUpdateDTO.nome());</span>
+<span class="fc" id="L77">        filial.setCodigo(filialUpdateDTO.codigo());</span>
+<span class="fc" id="L78">        filial.setTipo(filialUpdateDTO.tipo());</span>
+<span class="fc" id="L79">        filial.setCnpj(filialUpdateDTO.cnpj());</span>
+<span class="fc" id="L80">        filial.setEndereco(filialUpdateDTO.endereco());</span>
+<span class="fc" id="L81">        filial.setStatus(filialUpdateDTO.status());</span>
+
+<span class="fc" id="L83">        Filial filialAtualizada = filialRepository.save(filial);</span>
+<span class="fc" id="L84">        return Optional.of(filialMapper.toDTO(filialAtualizada)); // Retorna Optional com o DTO</span>
+    }
+
+    @Transactional
+    public void deletar(Long id) {
+<span class="fc" id="L89">        Filial filial = filialRepository.findById(id)</span>
+<span class="pc" id="L90">                .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.NOT_FOUND, &quot;Filial não encontrada com ID: &quot; + id));</span>
+
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        if (departamentoRepository.existsByFilialId(id)) {</span>
+<span class="fc" id="L93">            throw new IllegalStateException(&quot;Não é possível deletar a filial, pois existem departamentos associados a ela.&quot;);</span>
+        }
+
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (funcionarioRepository.existsByFiliais_Id(id)) {</span>
+<span class="fc" id="L97">            throw new IllegalStateException(&quot;Não é possível deletar a filial, pois existem funcionários associados a ela.&quot;);</span>
+        }
+
+<span class="fc" id="L100">        filialRepository.delete(filial);</span>
+<span class="fc" id="L101">    }</span>
+
+    private void validarUnicidade(String cnpj, String codigo, Long id) {
+<span class="fc" id="L104">        Optional&lt;Filial&gt; filialPorCnpj = filialRepository.findByCnpj(cnpj);</span>
+<span class="fc bfc" id="L105" title="All 4 branches covered.">        if (filialPorCnpj.isPresent() &amp;&amp; !filialPorCnpj.get().getId().equals(id)) {</span>
+<span class="fc" id="L106">            throw new IllegalArgumentException(&quot;Já existe uma filial cadastrada com o CNPJ informado.&quot;);</span>
+        }
+
+<span class="fc" id="L109">        Optional&lt;Filial&gt; filialPorCodigo = filialRepository.findByCodigo(codigo);</span>
+<span class="pc bpc" id="L110" title="1 of 4 branches missed.">        if (filialPorCodigo.isPresent() &amp;&amp; !filialPorCodigo.get().getId().equals(id)) {</span>
+<span class="fc" id="L111">            throw new IllegalArgumentException(&quot;Já existe uma filial cadastrada com o código informado.&quot;);</span>
+        }
+<span class="fc" id="L113">    }</span>
+
+    private void validarTipoMatriz(TipoFilial tipo, Long id) {
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        if (tipo == TipoFilial.MATRIZ) {</span>
+<span class="fc" id="L117">            Optional&lt;Filial&gt; matrizExistente = filialRepository.findByTipo(TipoFilial.MATRIZ);</span>
+<span class="pc bpc" id="L118" title="1 of 4 branches missed.">            if (matrizExistente.isPresent() &amp;&amp; !matrizExistente.get().getId().equals(id)) {</span>
+<span class="fc" id="L119">                throw new IllegalArgumentException(&quot;Já existe uma filial cadastrada como MATRIZ.&quot;);</span>
+            }
+        }
+<span class="fc" id="L122">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

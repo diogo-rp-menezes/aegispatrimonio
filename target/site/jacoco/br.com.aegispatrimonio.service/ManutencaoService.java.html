@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="pt"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ManutencaoService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">aegispatrimonio</a> &gt; <a href="index.source.html" class="el_package">br.com.aegispatrimonio.service</a> &gt; <span class="el_source">ManutencaoService.java</span></div><h1>ManutencaoService.java</h1><pre class="source lang-java linenums">package br.com.aegispatrimonio.service;
+
+import br.com.aegispatrimonio.dto.request.ManutencaoCancelDTO;
+import br.com.aegispatrimonio.dto.request.ManutencaoConclusaoDTO;
+import br.com.aegispatrimonio.dto.request.ManutencaoInicioDTO;
+import br.com.aegispatrimonio.dto.request.ManutencaoRequestDTO;
+import br.com.aegispatrimonio.dto.response.ManutencaoResponseDTO;
+import br.com.aegispatrimonio.exception.ResourceConflictException;
+import br.com.aegispatrimonio.exception.ResourceNotFoundException;
+import br.com.aegispatrimonio.model.*;
+import br.com.aegispatrimonio.repository.*;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.Objects;
+import java.util.Optional;
+
+<span class="fc" id="L25">@Slf4j</span>
+@Service
+@Transactional
+<span class="fc" id="L28">@RequiredArgsConstructor</span>
+public class ManutencaoService {
+
+    private final ManutencaoRepository manutencaoRepository;
+    private final AtivoRepository ativoRepository;
+    private final FornecedorRepository fornecedorRepository;
+    private final FuncionarioRepository funcionarioRepository;
+
+    @Transactional
+    public ManutencaoResponseDTO criar(ManutencaoRequestDTO request) {
+<span class="fc" id="L38">        log.info(&quot;Criando nova manutenção para ativo ID: {}&quot;, request.ativoId());</span>
+<span class="fc" id="L39">        Manutencao manutencao = convertToEntity(request);</span>
+<span class="fc" id="L40">        Manutencao savedManutencao = manutencaoRepository.save(manutencao);</span>
+<span class="fc" id="L41">        return convertToResponseDTO(savedManutencao);</span>
+    }
+
+    @Transactional(readOnly = true)
+    public Optional&lt;ManutencaoResponseDTO&gt; buscarPorId(Long id) {
+<span class="nc" id="L46">        log.debug(&quot;Buscando manutenção ID: {}&quot;, id);</span>
+<span class="nc" id="L47">        return manutencaoRepository.findById(id).map(this::convertToResponseDTO);</span>
+    }
+
+    @Transactional(readOnly = true)
+    public Page&lt;ManutencaoResponseDTO&gt; listar(Long ativoId, StatusManutencao status, TipoManutencao tipo, Long solicitanteId, Long fornecedorId,
+                                              LocalDate dataSolicitacaoInicio, LocalDate dataSolicitacaoFim, LocalDate dataConclusaoInicio,
+                                              LocalDate dataConclusaoFim, Pageable pageable) {
+<span class="nc" id="L54">        log.debug(&quot;Listando manutenções com filtros&quot;);</span>
+<span class="nc" id="L55">        Specification&lt;Manutencao&gt; spec = ManutencaoSpecification.build(ativoId, status, tipo, solicitanteId, fornecedorId,</span>
+                dataSolicitacaoInicio, dataSolicitacaoFim, dataConclusaoInicio, dataConclusaoFim);
+<span class="nc" id="L57">        return manutencaoRepository.findAll(spec, pageable).map(this::convertToResponseDTO);</span>
+    }
+
+    @Transactional
+    public ManutencaoResponseDTO aprovar(Long id) {
+<span class="fc" id="L62">        log.info(&quot;Aprovando manutenção ID: {}&quot;, id);</span>
+<span class="fc" id="L63">        Manutencao manutencao = buscarEntidadePorId(id);</span>
+<span class="fc" id="L64">        validarStatus(manutencao, StatusManutencao.SOLICITADA, &quot;aprovada&quot;);</span>
+<span class="fc" id="L65">        manutencao.setStatus(StatusManutencao.APROVADA);</span>
+<span class="fc" id="L66">        return convertToResponseDTO(manutencaoRepository.save(manutencao));</span>
+    }
+
+    @Transactional
+    public ManutencaoResponseDTO iniciar(Long id, ManutencaoInicioDTO inicioDTO) {
+<span class="fc" id="L71">        log.info(&quot;Iniciando manutenção ID: {}&quot;, id);</span>
+<span class="fc" id="L72">        Manutencao manutencao = buscarEntidadePorId(id);</span>
+<span class="fc" id="L73">        validarStatus(manutencao, StatusManutencao.APROVADA, &quot;iniciada&quot;);</span>
+
+<span class="fc" id="L75">        Funcionario tecnico = funcionarioRepository.findById(inicioDTO.tecnicoId())</span>
+<span class="pc" id="L76">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Técnico não encontrado com ID: &quot; + inicioDTO.tecnicoId()));</span>
+
+<span class="fc" id="L78">        Ativo ativo = manutencao.getAtivo();</span>
+<span class="fc" id="L79">        validarConsistenciaFilial(tecnico, ativo, &quot;Técnico responsável&quot;);</span>
+
+<span class="fc" id="L81">        ativo.setStatus(StatusAtivo.EM_MANUTENCAO);</span>
+<span class="fc" id="L82">        ativoRepository.save(ativo);</span>
+
+<span class="fc" id="L84">        manutencao.setStatus(StatusManutencao.EM_ANDAMENTO);</span>
+<span class="fc" id="L85">        manutencao.setTecnicoResponsavel(tecnico);</span>
+<span class="fc" id="L86">        manutencao.setDataInicio(LocalDate.now());</span>
+
+<span class="fc" id="L88">        return convertToResponseDTO(manutencaoRepository.save(manutencao));</span>
+    }
+
+    @Transactional
+    public ManutencaoResponseDTO concluir(Long id, ManutencaoConclusaoDTO conclusaoDTO) {
+<span class="fc" id="L93">        log.info(&quot;Concluindo manutenção ID: {}&quot;, id);</span>
+<span class="fc" id="L94">        Manutencao manutencao = buscarEntidadePorId(id);</span>
+<span class="fc" id="L95">        validarStatus(manutencao, StatusManutencao.EM_ANDAMENTO, &quot;concluída&quot;);</span>
+
+<span class="fc" id="L97">        Ativo ativo = manutencao.getAtivo();</span>
+<span class="fc" id="L98">        ativo.setStatus(StatusAtivo.ATIVO);</span>
+<span class="fc" id="L99">        ativoRepository.save(ativo);</span>
+
+<span class="fc" id="L101">        manutencao.setStatus(StatusManutencao.CONCLUIDA);</span>
+<span class="fc" id="L102">        manutencao.setDescricaoServico(conclusaoDTO.descricaoServico());</span>
+<span class="fc" id="L103">        manutencao.setCustoReal(conclusaoDTO.custoReal());</span>
+<span class="fc" id="L104">        manutencao.setTempoExecucaoMinutos(conclusaoDTO.tempoExecucao());</span>
+<span class="fc" id="L105">        manutencao.setDataConclusao(LocalDate.now());</span>
+
+<span class="fc" id="L107">        return convertToResponseDTO(manutencaoRepository.save(manutencao));</span>
+    }
+
+    @Transactional
+    public ManutencaoResponseDTO cancelar(Long id, ManutencaoCancelDTO cancelDTO) {
+<span class="fc" id="L112">        log.info(&quot;Cancelando manutenção ID: {}&quot;, id);</span>
+<span class="fc" id="L113">        Manutencao manutencao = buscarEntidadePorId(id);</span>
+
+<span class="pc bpc" id="L115" title="1 of 4 branches missed.">        if (manutencao.getStatus() == StatusManutencao.CONCLUIDA || manutencao.getStatus() == StatusManutencao.CANCELADA) {</span>
+<span class="fc" id="L116">            throw new ResourceConflictException(&quot;Manutenção já foi concluída ou cancelada e não pode ser alterada.&quot;);</span>
+        }
+
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (manutencao.getStatus() == StatusManutencao.EM_ANDAMENTO) {</span>
+<span class="fc" id="L120">            Ativo ativo = manutencao.getAtivo();</span>
+<span class="fc" id="L121">            ativo.setStatus(StatusAtivo.ATIVO);</span>
+<span class="fc" id="L122">            ativoRepository.save(ativo);</span>
+        }
+
+<span class="fc" id="L125">        manutencao.setStatus(StatusManutencao.CANCELADA);</span>
+<span class="fc" id="L126">        manutencao.setObservacoes(cancelDTO.motivo());</span>
+
+<span class="fc" id="L128">        return convertToResponseDTO(manutencaoRepository.save(manutencao));</span>
+    }
+
+    @Transactional
+    public void deletar(Long id) {
+<span class="fc" id="L133">        log.warn(&quot;Tentativa de deletar manutenção ID: {}&quot;, id);</span>
+<span class="fc" id="L134">        Manutencao manutencao = buscarEntidadePorId(id);</span>
+
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (manutencao.getStatus() != StatusManutencao.SOLICITADA) {</span>
+<span class="fc" id="L137">            throw new ResourceConflictException(&quot;Apenas manutenções com status 'SOLICITADA' podem ser deletadas. Considere cancelar a manutenção para preservar o histórico.&quot;);</span>
+        }
+
+<span class="fc" id="L140">        manutencaoRepository.delete(manutencao);</span>
+<span class="fc" id="L141">        log.info(&quot;Manutenção ID: {} deletada com sucesso.&quot;, id);</span>
+<span class="fc" id="L142">    }</span>
+
+    @Transactional(readOnly = true)
+    public BigDecimal custoTotalPorAtivo(Long ativoId) {
+<span class="fc" id="L146">        log.debug(&quot;Calculando custo total para ativo ID: {}&quot;, ativoId);</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        if (!ativoRepository.existsById(ativoId)) {</span>
+<span class="fc" id="L148">            throw new ResourceNotFoundException(&quot;Ativo não encontrado com ID: &quot; + ativoId);</span>
+        }
+<span class="fc" id="L150">        BigDecimal custoTotal = manutencaoRepository.findCustoTotalManutencaoPorAtivo(ativoId);</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        return custoTotal != null ? custoTotal : BigDecimal.ZERO;</span>
+    }
+
+    private Manutencao buscarEntidadePorId(Long id) {
+<span class="fc" id="L155">        return manutencaoRepository.findById(id)</span>
+<span class="pc" id="L156">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Manutenção não encontrada com ID: &quot; + id));</span>
+    }
+
+    private void validarStatus(Manutencao manutencao, StatusManutencao statusEsperado, String acao) {
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        if (manutencao.getStatus() != statusEsperado) {</span>
+<span class="fc" id="L161">            throw new ResourceConflictException(&quot;A manutenção não pode ser &quot; + acao + &quot; pois seu status atual é '&quot; + manutencao.getStatus() + &quot;' e o esperado era '&quot; + statusEsperado + &quot;'.&quot;);</span>
+        }
+<span class="fc" id="L163">    }</span>
+
+    private Manutencao convertToEntity(ManutencaoRequestDTO request) {
+<span class="fc" id="L166">        Ativo ativo = ativoRepository.findById(request.ativoId())</span>
+<span class="pc" id="L167">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Ativo não encontrado com ID: &quot; + request.ativoId()));</span>
+
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        if (ativo.getStatus() != StatusAtivo.ATIVO) {</span>
+<span class="fc" id="L170">            throw new ResourceConflictException(&quot;Não é possível criar manutenção para um ativo que não está com status 'ATIVO'. Status atual: &quot; + ativo.getStatus());</span>
+        }
+
+<span class="fc" id="L173">        Funcionario solicitante = funcionarioRepository.findById(request.solicitanteId())</span>
+<span class="pc" id="L174">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Solicitante não encontrado com ID: &quot; + request.solicitanteId()));</span>
+
+<span class="fc" id="L176">        validarConsistenciaFilial(solicitante, ativo, &quot;Solicitante&quot;);</span>
+
+<span class="fc" id="L178">        Fornecedor fornecedor = null;</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">        if (request.fornecedorId() != null) {</span>
+<span class="nc" id="L180">            fornecedor = fornecedorRepository.findById(request.fornecedorId())</span>
+<span class="nc" id="L181">                    .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Fornecedor não encontrado com ID: &quot; + request.fornecedorId()));</span>
+        }
+
+<span class="fc" id="L184">        Manutencao manutencao = new Manutencao();</span>
+<span class="fc" id="L185">        manutencao.setAtivo(ativo);</span>
+<span class="fc" id="L186">        manutencao.setSolicitante(solicitante);</span>
+<span class="fc" id="L187">        manutencao.setFornecedor(fornecedor);</span>
+<span class="fc" id="L188">        manutencao.setTipo(request.tipo());</span>
+<span class="fc" id="L189">        manutencao.setDescricaoProblema(request.descricaoProblema());</span>
+<span class="fc" id="L190">        manutencao.setCustoEstimado(request.custoEstimado());</span>
+<span class="fc" id="L191">        manutencao.setDataPrevistaConclusao(request.dataPrevistaConclusao());</span>
+<span class="fc" id="L192">        manutencao.setObservacoes(request.observacoes());</span>
+
+<span class="fc" id="L194">        return manutencao;</span>
+    }
+
+    private void validarConsistenciaFilial(Funcionario funcionario, Ativo ativo, String papel) {
+<span class="fc" id="L198">        boolean pertenceAFilial = funcionario.getFiliais().stream()</span>
+<span class="fc" id="L199">                .anyMatch(f -&gt; f.getId().equals(ativo.getFilial().getId()));</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        if (!pertenceAFilial) {</span>
+<span class="fc" id="L201">            throw new IllegalArgumentException(papel + &quot; deve pertencer à mesma filial do ativo.&quot;);</span>
+        }
+<span class="fc" id="L203">    }</span>
+
+    private ManutencaoResponseDTO convertToResponseDTO(Manutencao manutencao) {
+<span class="fc" id="L206">        ManutencaoResponseDTO dto = new ManutencaoResponseDTO();</span>
+<span class="fc" id="L207">        dto.setId(manutencao.getId());</span>
+<span class="fc" id="L208">        dto.setAtivoId(manutencao.getAtivo().getId());</span>
+<span class="fc" id="L209">        dto.setAtivoNome(manutencao.getAtivo().getNome());</span>
+<span class="fc" id="L210">        dto.setAtivoNumeroPatrimonio(manutencao.getAtivo().getNumeroPatrimonio());</span>
+<span class="fc" id="L211">        dto.setTipo(manutencao.getTipo());</span>
+<span class="fc" id="L212">        dto.setStatus(manutencao.getStatus());</span>
+<span class="fc" id="L213">        dto.setDataSolicitacao(manutencao.getDataSolicitacao());</span>
+<span class="fc" id="L214">        dto.setDataInicio(manutencao.getDataInicio());</span>
+<span class="fc" id="L215">        dto.setDataConclusao(manutencao.getDataConclusao());</span>
+<span class="fc" id="L216">        dto.setDataPrevistaConclusao(manutencao.getDataPrevistaConclusao());</span>
+<span class="fc" id="L217">        dto.setDescricaoProblema(manutencao.getDescricaoProblema());</span>
+<span class="fc" id="L218">        dto.setDescricaoServico(manutencao.getDescricaoServico());</span>
+<span class="fc" id="L219">        dto.setCustoEstimado(manutencao.getCustoEstimado());</span>
+<span class="fc" id="L220">        dto.setCustoReal(manutencao.getCustoReal());</span>
+<span class="fc" id="L221">        dto.setSolicitanteId(manutencao.getSolicitante().getId());</span>
+<span class="fc" id="L222">        dto.setSolicitanteNome(manutencao.getSolicitante().getNome());</span>
+<span class="fc" id="L223">        dto.setTempoExecucaoMinutos(manutencao.getTempoExecucaoMinutos());</span>
+<span class="fc" id="L224">        dto.setObservacoes(manutencao.getObservacoes());</span>
+<span class="fc" id="L225">        dto.setCriadoEm(manutencao.getCriadoEm());</span>
+<span class="fc" id="L226">        dto.setAtualizadoEm(manutencao.getAtualizadoEm());</span>
+
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">        if (manutencao.getFornecedor() != null) {</span>
+<span class="nc" id="L229">            dto.setFornecedorId(manutencao.getFornecedor().getId());</span>
+<span class="nc" id="L230">            dto.setFornecedorNome(manutencao.getFornecedor().getNome());</span>
+        }
+
+<span class="fc bfc" id="L233" title="All 2 branches covered.">        if (manutencao.getTecnicoResponsavel() != null) {</span>
+<span class="fc" id="L234">            dto.setTecnicoResponsavelId(manutencao.getTecnicoResponsavel().getId());</span>
+<span class="fc" id="L235">            dto.setTecnicoResponsavelNome(manutencao.getTecnicoResponsavel().getNome());</span>
+        }
+
+<span class="fc" id="L238">        return dto;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

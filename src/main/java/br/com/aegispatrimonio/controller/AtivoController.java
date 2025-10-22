@@ -18,7 +18,7 @@ import java.util.List;
  * Acesso geral requer autenticação.
  */
 @RestController
-@RequestMapping("/ativos")
+@RequestMapping("/api/v1/ativos")
 @Validated
 public class AtivoController {
 

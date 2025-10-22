@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="pt"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ManutencaoSpecification.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">aegispatrimonio</a> &gt; <a href="index.source.html" class="el_package">br.com.aegispatrimonio.repository</a> &gt; <span class="el_source">ManutencaoSpecification.java</span></div><h1>ManutencaoSpecification.java</h1><pre class="source lang-java linenums">package br.com.aegispatrimonio.repository;
+
+import br.com.aegispatrimonio.model.Manutencao;
+import br.com.aegispatrimonio.model.StatusManutencao;
+import br.com.aegispatrimonio.model.TipoManutencao;
+import org.springframework.data.jpa.domain.Specification;
+import jakarta.persistence.criteria.Predicate;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+
+<span class="nc" id="L12">public class ManutencaoSpecification {</span>
+
+    public static Specification&lt;Manutencao&gt; build(Long ativoId, StatusManutencao status, TipoManutencao tipo,
+                                                  Long solicitanteId, Long fornecedorId, LocalDate dataSolicitacaoInicio,
+                                                  LocalDate dataSolicitacaoFim, LocalDate dataConclusaoInicio,
+                                                  LocalDate dataConclusaoFim) {
+<span class="nc" id="L18">        return (root, query, criteriaBuilder) -&gt; {</span>
+<span class="nc" id="L19">            List&lt;Predicate&gt; predicates = new ArrayList&lt;&gt;();</span>
+
+<span class="nc bnc" id="L21" title="All 2 branches missed.">            if (ativoId != null) {</span>
+<span class="nc" id="L22">                predicates.add(criteriaBuilder.equal(root.get(&quot;ativo&quot;).get(&quot;id&quot;), ativoId));</span>
+            }
+<span class="nc bnc" id="L24" title="All 2 branches missed.">            if (status != null) {</span>
+<span class="nc" id="L25">                predicates.add(criteriaBuilder.equal(root.get(&quot;status&quot;), status));</span>
+            }
+<span class="nc bnc" id="L27" title="All 2 branches missed.">            if (tipo != null) {</span>
+<span class="nc" id="L28">                predicates.add(criteriaBuilder.equal(root.get(&quot;tipo&quot;), tipo));</span>
+            }
+<span class="nc bnc" id="L30" title="All 2 branches missed.">            if (solicitanteId != null) {</span>
+<span class="nc" id="L31">                predicates.add(criteriaBuilder.equal(root.get(&quot;solicitante&quot;).get(&quot;id&quot;), solicitanteId));</span>
+            }
+<span class="nc bnc" id="L33" title="All 2 branches missed.">            if (fornecedorId != null) {</span>
+<span class="nc" id="L34">                predicates.add(criteriaBuilder.equal(root.get(&quot;fornecedor&quot;).get(&quot;id&quot;), fornecedorId));</span>
+            }
+<span class="nc bnc" id="L36" title="All 4 branches missed.">            if (dataSolicitacaoInicio != null &amp;&amp; dataSolicitacaoFim != null) {</span>
+<span class="nc" id="L37">                predicates.add(criteriaBuilder.between(root.get(&quot;dataSolicitacao&quot;), dataSolicitacaoInicio, dataSolicitacaoFim));</span>
+            }
+<span class="nc bnc" id="L39" title="All 4 branches missed.">            if (dataConclusaoInicio != null &amp;&amp; dataConclusaoFim != null) {</span>
+<span class="nc" id="L40">                predicates.add(criteriaBuilder.between(root.get(&quot;dataConclusao&quot;), dataConclusaoInicio, dataConclusaoFim));</span>
+            }
+
+<span class="nc bnc" id="L43" title="All 4 branches missed.">            if (query.getResultType() != Long.class &amp;&amp; query.getResultType() != long.class) {</span>
+<span class="nc" id="L44">                root.fetch(&quot;ativo&quot;, jakarta.persistence.criteria.JoinType.LEFT);</span>
+<span class="nc" id="L45">                root.fetch(&quot;solicitante&quot;, jakarta.persistence.criteria.JoinType.LEFT);</span>
+<span class="nc" id="L46">                root.fetch(&quot;tecnicoResponsavel&quot;, jakarta.persistence.criteria.JoinType.LEFT);</span>
+<span class="nc" id="L47">                root.fetch(&quot;fornecedor&quot;, jakarta.persistence.criteria.JoinType.LEFT);</span>
+            }
+<span class="nc" id="L49">            query.distinct(true);</span>
+
+<span class="nc" id="L51">            return criteriaBuilder.and(predicates.toArray(new Predicate[0]));</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
