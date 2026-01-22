@@ -6,10 +6,13 @@ import br.com.aegispatrimonio.dto.FilialUpdateDTO;
 import br.com.aegispatrimonio.mapper.FilialMapper;
 import br.com.aegispatrimonio.model.Filial;
 import br.com.aegispatrimonio.model.TipoFilial;
+import br.com.aegispatrimonio.model.Usuario;
 import br.com.aegispatrimonio.repository.DepartamentoRepository;
 import br.com.aegispatrimonio.repository.FilialRepository;
 import br.com.aegispatrimonio.repository.FuncionarioRepository;
 import jakarta.persistence.EntityNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -22,16 +25,20 @@ import java.util.stream.Collectors;
 @Service
 public class FilialService {
 
+    private static final Logger logger = LoggerFactory.getLogger(FilialService.class);
+
     private final FilialRepository filialRepository;
     private final DepartamentoRepository departamentoRepository;
     private final FuncionarioRepository funcionarioRepository;
     private final FilialMapper filialMapper;
+    private final CurrentUserProvider currentUserProvider; // Injetando CurrentUserProvider
 
-    public FilialService(FilialRepository filialRepository, DepartamentoRepository departamentoRepository, FuncionarioRepository funcionarioRepository, FilialMapper filialMapper) {
+    public FilialService(FilialRepository filialRepository, DepartamentoRepository departamentoRepository, FuncionarioRepository funcionarioRepository, FilialMapper filialMapper, CurrentUserProvider currentUserProvider) {
         this.filialRepository = filialRepository;
         this.departamentoRepository = departamentoRepository;
         this.funcionarioRepository = funcionarioRepository;
         this.filialMapper = filialMapper;
+        this.currentUserProvider = currentUserProvider;
     }
 
     @Transactional(readOnly = true)
@@ -43,10 +50,9 @@ public class FilialService {
     }
 
     @Transactional(readOnly = true)
-    public Optional<FilialDTO> buscarPorId(Long id) { // Alterado o tipo de retorno para Optional<FilialDTO>
+    public Optional<FilialDTO> buscarPorId(Long id) {
         var opt = filialRepository.findById(id);
-        System.out.println("DEBUG FilialService.buscarPorId: id=" + id + " present=" + opt.isPresent());
-        // Retorna Optional.of(DTO) se encontrado, ou Optional.empty() se não
+        logger.debug("FilialService.buscarPorId: id={} present={}", id, opt.isPresent());
         return opt.map(filialMapper::toDTO);
     }
 
@@ -57,15 +63,19 @@ public class FilialService {
 
         Filial filial = filialMapper.toEntity(filialCreateDTO);
         Filial filialSalva = filialRepository.save(filial);
+
+        Usuario usuarioLogado = currentUserProvider.getCurrentUsuario();
+        logger.info("AUDIT: Usuário {} criou a filial com ID {} e nome {}.", usuarioLogado.getEmail(), filialSalva.getId(), filialSalva.getNome());
+
         return filialMapper.toDTO(filialSalva);
     }
 
     @Transactional
-    public Optional<FilialDTO> atualizar(Long id, FilialUpdateDTO filialUpdateDTO) { // Alterado o tipo de retorno
+    public Optional<FilialDTO> atualizar(Long id, FilialUpdateDTO filialUpdateDTO) {
         Optional<Filial> optionalFilial = filialRepository.findById(id);
 
         if (optionalFilial.isEmpty()) {
-            return Optional.empty(); // Retorna Optional vazio se não encontrar
+            return Optional.empty();
         }
 
         Filial filial = optionalFilial.get();
@@ -81,7 +91,11 @@ public class FilialService {
         filial.setStatus(filialUpdateDTO.status());
 
         Filial filialAtualizada = filialRepository.save(filial);
-        return Optional.of(filialMapper.toDTO(filialAtualizada)); // Retorna Optional com o DTO
+
+        Usuario usuarioLogado = currentUserProvider.getCurrentUsuario();
+        logger.info("AUDIT: Usuário {} atualizou a filial com ID {} e nome {}.", usuarioLogado.getEmail(), filialAtualizada.getId(), filialAtualizada.getNome());
+
+        return Optional.of(filialMapper.toDTO(filialAtualizada));
     }
 
     @Transactional
@@ -98,6 +112,9 @@ public class FilialService {
         }
 
         filialRepository.delete(filial);
+
+        Usuario usuarioLogado = currentUserProvider.getCurrentUsuario();
+        logger.info("AUDIT: Usuário {} deletou a filial com ID {} e nome {}.", usuarioLogado.getEmail(), id, filial.getNome());
     }
 
     private void validarUnicidade(String cnpj, String codigo, Long id) {

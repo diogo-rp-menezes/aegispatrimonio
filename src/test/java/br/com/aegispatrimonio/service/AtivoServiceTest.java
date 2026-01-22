@@ -54,6 +54,8 @@ class AtivoServiceTest {
     private MovimentacaoRepository movimentacaoRepository;
     @Mock
     private DepreciacaoService depreciacaoService;
+    @Mock
+    private CurrentUserProvider currentUserProvider; // Adicionado mock para CurrentUserProvider
 
     @InjectMocks
     private AtivoService ativoService;
@@ -84,6 +86,7 @@ class AtivoServiceTest {
         adminUser = new Usuario();
         adminUser.setId(1L);
         adminUser.setRole("ROLE_ADMIN");
+        adminUser.setEmail("admin@aegis.com"); // Adicionado email
         adminUser.setFuncionario(adminFunc);
 
         Funcionario funcionario = new Funcionario();
@@ -92,27 +95,28 @@ class AtivoServiceTest {
         regularUser = new Usuario();
         regularUser.setId(2L);
         regularUser.setRole("ROLE_USER");
+        regularUser.setEmail("user@aegis.com"); // Adicionado email
         regularUser.setFuncionario(funcionario);
 
         ativo = new Ativo();
         ativo.setId(10L);
         ativo.setFilial(filialA);
 
-        Authentication authentication = Mockito.mock(Authentication.class);
-        SecurityContext securityContext = Mockito.mock(SecurityContext.class);
-        lenient().when(securityContext.getAuthentication()).thenReturn(authentication);
-        mockedSecurityContextHolder = Mockito.mockStatic(SecurityContextHolder.class);
-        mockedSecurityContextHolder.when(SecurityContextHolder::getContext).thenReturn(securityContext);
+        // Mock do currentUserProvider no setUp para garantir que sempre haja um usuário
+        lenient().when(currentUserProvider.getCurrentUsuario()).thenReturn(adminUser); 
     }
 
     @AfterEach
     void tearDown() {
-        mockedSecurityContextHolder.close();
+        // Se mockedSecurityContextHolder foi inicializado, feche-o.
+        // if (mockedSecurityContextHolder != null) {
+        //     mockedSecurityContextHolder.close();
+        // }
     }
 
     private void mockUser(Usuario usuario) {
-        CustomUserDetails userDetails = new CustomUserDetails(usuario);
-        lenient().when(SecurityContextHolder.getContext().getAuthentication().getPrincipal()).thenReturn(userDetails);
+        // Agora mockamos o currentUserProvider diretamente
+        lenient().when(currentUserProvider.getCurrentUsuario()).thenReturn(usuario);
     }
 
     @Test

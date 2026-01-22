@@ -52,7 +52,7 @@ public class SecurityConfig {
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/login", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers("/auth/login", "/swagger-ui/**", "/v3/api-docs/**", "/actuator/**").permitAll() // Permitir acesso a endpoints do Actuator
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(authenticationProvider())

@@ -17,7 +17,7 @@ public class AtivoDetalheHardware {
     @Id
     private Long id; // Mesma chave primária do Ativo
 
-    @OneToOne(fetch = FetchType.LAZY)
+    @OneToOne(fetch = FetchType.EAGER, optional = false)
     @MapsId // Mapeia a chave primária para a entidade Ativo
     @JoinColumn(name = "id")
     private Ativo ativo;

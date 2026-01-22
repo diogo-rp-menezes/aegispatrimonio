@@ -39,6 +39,8 @@ class ManutencaoServiceTest {
     private FornecedorRepository fornecedorRepository;
     @Mock
     private FuncionarioRepository funcionarioRepository;
+    @Mock
+    private CurrentUserProvider currentUserProvider; // Adicionado mock para CurrentUserProvider
 
     @InjectMocks
     private ManutencaoService manutencaoService;
@@ -48,6 +50,7 @@ class ManutencaoServiceTest {
     private Funcionario tecnico;
     private Manutencao manutencao;
     private Filial filial;
+    private Usuario adminUser; // Adicionado para mockar o usuário
 
     @BeforeEach
     void setUp() {
@@ -76,6 +79,11 @@ class ManutencaoServiceTest {
         manutencao.setAtivo(ativo);
         manutencao.setSolicitante(solicitante);
         manutencao.setStatus(StatusManutencao.SOLICITADA);
+
+        adminUser = new Usuario();
+        adminUser.setId(1L);
+        adminUser.setRole("ROLE_ADMIN");
+        lenient().when(currentUserProvider.getCurrentUsuario()).thenReturn(adminUser); // Mockando o usuário logado (lenient para evitar UnnecessaryStubbing)
     }
 
     @Test

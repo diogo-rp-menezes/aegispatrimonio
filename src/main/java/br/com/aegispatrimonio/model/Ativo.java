@@ -113,6 +113,7 @@ public class Ativo {
     @OneToOne(mappedBy = "ativo", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private AtivoDetalheHardware detalheHardware;
     
+    
     @PrePersist
     protected void onCreate() {
         criadoEm = LocalDateTime.now();

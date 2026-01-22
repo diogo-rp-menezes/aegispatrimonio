@@ -6,6 +6,7 @@ import br.com.aegispatrimonio.dto.FornecedorUpdateDTO;
 import br.com.aegispatrimonio.mapper.FornecedorMapper;
 import br.com.aegispatrimonio.model.Fornecedor;
 import br.com.aegispatrimonio.model.StatusFornecedor;
+import br.com.aegispatrimonio.model.Usuario;
 import br.com.aegispatrimonio.repository.AtivoRepository;
 import br.com.aegispatrimonio.repository.FornecedorRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -38,6 +39,9 @@ class FornecedorServiceTest {
     @Mock
     private AtivoRepository ativoRepository;
 
+    @Mock
+    private CurrentUserProvider currentUserProvider; // Adicionado mock para CurrentUserProvider
+
     @InjectMocks
     private FornecedorService fornecedorService;
 
@@ -45,6 +49,7 @@ class FornecedorServiceTest {
     private FornecedorDTO fornecedorDTO;
     private FornecedorCreateDTO fornecedorCreateDTO;
     private FornecedorUpdateDTO fornecedorUpdateDTO;
+    private Usuario adminUser; // Adicionado para mockar o usuário
 
     @BeforeEach
     void setUp() {
@@ -57,6 +62,12 @@ class FornecedorServiceTest {
         fornecedorDTO = new FornecedorDTO(1L, "Fornecedor Teste", "11.111.111/0001-11", "Endereco", "Contato", "contato@teste.com", "123456789", "Obs", StatusFornecedor.ATIVO);
         fornecedorCreateDTO = new FornecedorCreateDTO("Fornecedor Novo", "22.222.222/0001-22", "Endereco Novo", "Contato Novo", "contato@novo.com", "987654321", "Obs Nova");
         fornecedorUpdateDTO = new FornecedorUpdateDTO("Fornecedor Update", "33.333.333/0001-33", "Endereco Update", "Contato Update", "contato@update.com", "112233445", "Obs Update", StatusFornecedor.INATIVO);
+
+        adminUser = new Usuario();
+        adminUser.setId(1L);
+        adminUser.setRole("ROLE_ADMIN");
+        adminUser.setEmail("admin@aegis.com"); // Adicionado email
+        lenient().when(currentUserProvider.getCurrentUsuario()).thenReturn(adminUser); // Mockando o usuário logado com lenient()
     }
 
     @Test

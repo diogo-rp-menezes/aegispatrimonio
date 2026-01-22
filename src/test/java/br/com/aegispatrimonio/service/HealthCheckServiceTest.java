@@ -4,29 +4,26 @@ import br.com.aegispatrimonio.dto.healthcheck.HealthCheckDTO;
 import br.com.aegispatrimonio.mapper.HealthCheckMapper;
 import br.com.aegispatrimonio.model.*;
 import br.com.aegispatrimonio.repository.*;
-import br.com.aegispatrimonio.security.CustomUserDetails;
+import br.com.aegispatrimonio.service.policy.HealthCheckAuthorizationPolicy;
+import br.com.aegispatrimonio.service.manager.HealthCheckCollectionsManager;
+import br.com.aegispatrimonio.service.updater.HealthCheckUpdater;
 import jakarta.persistence.EntityNotFoundException;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContext;
-import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.Collections;
 import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -44,15 +41,17 @@ class HealthCheckServiceTest {
     private AdaptadorRedeRepository adaptadorRedeRepository;
     @Mock
     private HealthCheckMapper healthCheckMapper;
-    
-    // CORREÇÃO: Adicionar o Mock que faltava para a nova dependência.
     @Mock
-    private FuncionarioRepository funcionarioRepository;
+    private CurrentUserProvider currentUserProvider;
+    @Mock
+    private HealthCheckAuthorizationPolicy healthCheckAuthorizationPolicy; // Adicionado mock para HealthCheckAuthorizationPolicy
+    @Mock
+    private HealthCheckUpdater healthCheckUpdater;
+    @Mock
+    private HealthCheckCollectionsManager collectionsManager;
 
     @InjectMocks
     private HealthCheckService healthCheckService;
-
-    private MockedStatic<SecurityContextHolder> mockedSecurityContextHolder;
 
     private Ativo ativo;
     private Usuario adminUser, regularUser, unauthorizedUser;
@@ -78,14 +77,14 @@ class HealthCheckServiceTest {
         adminUser.setFuncionario(adminFunc);
 
         Funcionario regularFunc = new Funcionario();
-        regularFunc.setId(2L); // Adicionado ID para o mock funcionar
+        regularFunc.setId(2L);
         regularFunc.setFiliais(Set.of(filialA));
         regularUser = new Usuario();
         regularUser.setRole("ROLE_USER");
         regularUser.setFuncionario(regularFunc);
 
         Funcionario unauthorizedFunc = new Funcionario();
-        unauthorizedFunc.setId(3L); // Adicionado ID para o mock funcionar
+        unauthorizedFunc.setId(3L);
         unauthorizedFunc.setFiliais(Set.of(filialB));
         unauthorizedUser = new Usuario();
         unauthorizedUser.setRole("ROLE_USER");
@@ -97,81 +96,81 @@ class HealthCheckServiceTest {
         detalhesHardware.setId(1L);
         detalhesHardware.setAtivo(ativo);
 
-        // Mock do SecurityContextHolder
-        Authentication authentication = Mockito.mock(Authentication.class);
-        SecurityContext securityContext = Mockito.mock(SecurityContext.class);
-        lenient().when(securityContext.getAuthentication()).thenReturn(authentication);
-        mockedSecurityContextHolder = Mockito.mockStatic(SecurityContextHolder.class);
-        mockedSecurityContextHolder.when(SecurityContextHolder::getContext).thenReturn(securityContext);
-    }
-
-    @AfterEach
-    void tearDown() {
-        mockedSecurityContextHolder.close();
-    }
-
-    private void mockUser(Usuario usuario) {
-        CustomUserDetails userDetails = new CustomUserDetails(usuario);
-        lenient().when(SecurityContextHolder.getContext().getAuthentication().getPrincipal()).thenReturn(userDetails);
+        // Mock do currentUserProvider para todos os testes
+        when(currentUserProvider.getCurrentUsuario()).thenReturn(adminUser); // Default para admin, pode ser sobrescrito nos testes específicos
     }
 
     @Test
     @DisplayName("Deve atualizar o HealthCheck com sucesso para usuário ADMIN")
     void updateHealthCheck_comAdmin_deveAtualizarComSucesso() {
-        mockUser(adminUser);
         when(ativoRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(ativo));
         when(detalheHardwareRepository.findById(1L)).thenReturn(Optional.of(detalhesHardware));
+        // Mock para a política de autorização
+        doNothing().when(healthCheckAuthorizationPolicy).assertCanUpdate(any(Usuario.class), any(Ativo.class));
 
         healthCheckService.updateHealthCheck(1L, healthCheckDTO);
 
-        verify(detalheHardwareRepository, times(1)).save(any(AtivoDetalheHardware.class));
-        verify(discoRepository, times(1)).deleteByAtivoDetalheHardwareId(anyLong());
-        verify(memoriaRepository, times(1)).deleteByAtivoDetalheHardwareId(anyLong());
-        verify(adaptadorRedeRepository, times(1)).deleteByAtivoDetalheHardwareId(anyLong());
+        verify(healthCheckUpdater, times(1)).updateScalars(eq(1L), eq(detalhesHardware), eq(healthCheckDTO), eq(false));
+        verify(collectionsManager, times(1)).replaceCollections(eq(detalhesHardware), eq(healthCheckDTO));
+        verify(healthCheckAuthorizationPolicy).assertCanUpdate(adminUser, ativo);
     }
 
     @Test
     @DisplayName("Deve atualizar o HealthCheck com sucesso para usuário autorizado da mesma filial")
     void updateHealthCheck_comUsuarioAutorizado_deveAtualizarComSucesso() {
-        mockUser(regularUser);
+        when(currentUserProvider.getCurrentUsuario()).thenReturn(regularUser);
         when(ativoRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(ativo));
-        when(funcionarioRepository.findById(regularUser.getFuncionario().getId())).thenReturn(Optional.of(regularUser.getFuncionario()));
         when(detalheHardwareRepository.findById(1L)).thenReturn(Optional.of(detalhesHardware));
+        // Mock para a política de autorização
+        doNothing().when(healthCheckAuthorizationPolicy).assertCanUpdate(any(Usuario.class), any(Ativo.class));
 
         healthCheckService.updateHealthCheck(1L, healthCheckDTO);
 
-        verify(detalheHardwareRepository, times(1)).save(any(AtivoDetalheHardware.class));
+        verify(healthCheckUpdater, times(1)).updateScalars(eq(1L), eq(detalhesHardware), eq(healthCheckDTO), eq(false));
+        verify(collectionsManager, times(1)).replaceCollections(eq(detalhesHardware), eq(healthCheckDTO));
+        verify(healthCheckAuthorizationPolicy).assertCanUpdate(regularUser, ativo);
     }
 
     @Test
     @DisplayName("Deve lançar AccessDeniedException para usuário de outra filial")
     void updateHealthCheck_comUsuarioNaoAutorizado_deveLancarExcecao() {
-        mockUser(unauthorizedUser);
+        when(currentUserProvider.getCurrentUsuario()).thenReturn(unauthorizedUser);
         when(ativoRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(ativo));
-        when(funcionarioRepository.findById(unauthorizedUser.getFuncionario().getId())).thenReturn(Optional.of(unauthorizedUser.getFuncionario()));
+        // Mock para a política de autorização lançar AccessDeniedException
+        doThrow(AccessDeniedException.class).when(healthCheckAuthorizationPolicy).assertCanUpdate(any(Usuario.class), any(Ativo.class));
 
         assertThrows(AccessDeniedException.class, () -> healthCheckService.updateHealthCheck(1L, healthCheckDTO));
-        verify(detalheHardwareRepository, never()).save(any(AtivoDetalheHardware.class));
+        verify(healthCheckUpdater, never()).updateScalars(anyLong(), any(AtivoDetalheHardware.class), any(HealthCheckDTO.class), anyBoolean());
+        verify(collectionsManager, never()).replaceCollections(any(AtivoDetalheHardware.class), any(HealthCheckDTO.class));
+        verify(healthCheckAuthorizationPolicy).assertCanUpdate(unauthorizedUser, ativo);
     }
 
     @Test
     @DisplayName("Deve lançar EntityNotFoundException quando o ativo não existir")
     void updateHealthCheck_quandoAtivoNaoEncontrado_deveLancarExcecao() {
-        mockUser(adminUser);
+        // O currentUserProvider já está mockado no BeforeEach para adminUser
         when(ativoRepository.findByIdWithDetails(99L)).thenReturn(Optional.empty());
 
         assertThrows(EntityNotFoundException.class, () -> healthCheckService.updateHealthCheck(99L, healthCheckDTO));
+        verify(healthCheckAuthorizationPolicy, never()).assertCanUpdate(any(Usuario.class), any(Ativo.class)); // Não deve chamar a política se o ativo não for encontrado
+        verify(healthCheckUpdater, never()).updateScalars(anyLong(), any(AtivoDetalheHardware.class), any(HealthCheckDTO.class), anyBoolean());
+        verify(collectionsManager, never()).replaceCollections(any(AtivoDetalheHardware.class), any(HealthCheckDTO.class));
     }
 
     @Test
     @DisplayName("Deve criar novos detalhes de hardware se não existirem")
     void updateHealthCheck_quandoDetalhesNaoExistem_deveCriarNovo() {
-        mockUser(adminUser);
+        // O currentUserProvider já está mockado no BeforeEach para adminUser
         when(ativoRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(ativo));
         when(detalheHardwareRepository.findById(1L)).thenReturn(Optional.empty());
+        when(detalheHardwareRepository.saveAndFlush(any(AtivoDetalheHardware.class))).thenReturn(detalhesHardware);
+        // Mock para a política de autorização
+        doNothing().when(healthCheckAuthorizationPolicy).assertCanUpdate(any(Usuario.class), any(Ativo.class));
 
         healthCheckService.updateHealthCheck(1L, healthCheckDTO);
 
-        verify(detalheHardwareRepository, times(1)).save(any(AtivoDetalheHardware.class));
+        verify(healthCheckUpdater, times(1)).updateScalars(eq(1L), any(AtivoDetalheHardware.class), eq(healthCheckDTO), eq(true));
+        verify(collectionsManager, times(1)).replaceCollections(any(AtivoDetalheHardware.class), eq(healthCheckDTO));
+        verify(healthCheckAuthorizationPolicy).assertCanUpdate(adminUser, ativo);
     }
 }

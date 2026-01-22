@@ -8,7 +8,6 @@ import br.com.aegispatrimonio.model.*;
 import br.com.aegispatrimonio.repository.AtivoRepository;
 import br.com.aegispatrimonio.repository.FilialRepository;
 import br.com.aegispatrimonio.repository.LocalizacaoRepository;
-import br.com.aegispatrimonio.security.CustomUserDetails;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,11 +44,14 @@ class LocalizacaoServiceTest {
     private FilialRepository filialRepository;
     @Mock
     private AtivoRepository ativoRepository;
+    @Mock
+    private CurrentUserProvider currentUserProvider; // Adicionado mock para CurrentUserProvider
 
     @InjectMocks
     private LocalizacaoService localizacaoService;
 
-    private MockedStatic<SecurityContextHolder> mockedSecurityContextHolder;
+    // Removido MockedStatic para SecurityContextHolder, pois não é mais necessário
+    // private MockedStatic<SecurityContextHolder> mockedSecurityContextHolder;
 
     private Usuario adminUser, userFilialA, userFilialB;
     private Filial filialA, filialB;
@@ -94,22 +96,25 @@ class LocalizacaoServiceTest {
         userFilialB.setRole("ROLE_USER");
         userFilialB.setFuncionario(funcB);
 
-        // --- Mock Security ---
-        Authentication authentication = Mockito.mock(Authentication.class);
-        SecurityContext securityContext = Mockito.mock(SecurityContext.class);
-        lenient().when(securityContext.getAuthentication()).thenReturn(authentication);
-        mockedSecurityContextHolder = Mockito.mockStatic(SecurityContextHolder.class);
-        mockedSecurityContextHolder.when(SecurityContextHolder::getContext).thenReturn(securityContext);
+        // Removido o mock do SecurityContextHolder
+        // Authentication authentication = Mockito.mock(Authentication.class);
+        // SecurityContext securityContext = Mockito.mock(SecurityContext.class);
+        // lenient().when(securityContext.getAuthentication()).thenReturn(authentication);
+        // mockedSecurityContextHolder = Mockito.mockStatic(SecurityContextHolder.class);
+        // mockedSecurityContextHolder.when(SecurityContextHolder::getContext).thenReturn(securityContext);
     }
 
     @AfterEach
     void tearDown() {
-        mockedSecurityContextHolder.close();
+        // Removido o fechamento do MockedStatic
+        // if (mockedSecurityContextHolder != null) {
+        //     mockedSecurityContextHolder.close();
+        // }
     }
 
     private void mockUser(Usuario usuario) {
-        CustomUserDetails userDetails = new CustomUserDetails(usuario);
-        lenient().when(SecurityContextHolder.getContext().getAuthentication().getPrincipal()).thenReturn(userDetails);
+        // Agora mockamos o currentUserProvider diretamente
+        when(currentUserProvider.getCurrentUsuario()).thenReturn(usuario);
     }
 
     // --- Testes de Listagem ---
@@ -217,7 +222,8 @@ class LocalizacaoServiceTest {
     @Test
     @DisplayName("Deletar: Deve lançar exceção se ativos estiverem associados")
     void deletar_comAtivosAssociados_deveLancarExcecao() {
-        when(localizacaoRepository.existsById(10L)).thenReturn(true);
+        mockUser(adminUser);
+        when(localizacaoRepository.findById(10L)).thenReturn(Optional.of(localizacaoA));
         when(ativoRepository.existsByLocalizacaoId(10L)).thenReturn(true);
 
         assertThrows(IllegalStateException.class, () -> localizacaoService.deletar(10L));
@@ -226,7 +232,8 @@ class LocalizacaoServiceTest {
     @Test
     @DisplayName("Deletar: Deve lançar exceção se for pai de outras localizações")
     void deletar_quandoForPai_deveLancarExcecao() {
-        when(localizacaoRepository.existsById(10L)).thenReturn(true);
+        mockUser(adminUser);
+        when(localizacaoRepository.findById(10L)).thenReturn(Optional.of(localizacaoA));
         when(ativoRepository.existsByLocalizacaoId(10L)).thenReturn(false);
         when(localizacaoRepository.existsByLocalizacaoPaiId(10L)).thenReturn(true);
 
@@ -236,7 +243,8 @@ class LocalizacaoServiceTest {
     @Test
     @DisplayName("Deletar: Deve deletar com sucesso se todas as condições forem atendidas")
     void deletar_comCondicoesValidas_deveChamarDelete() {
-        when(localizacaoRepository.existsById(10L)).thenReturn(true);
+        mockUser(adminUser);
+        when(localizacaoRepository.findById(10L)).thenReturn(Optional.of(localizacaoA));
         when(ativoRepository.existsByLocalizacaoId(10L)).thenReturn(false);
         when(localizacaoRepository.existsByLocalizacaoPaiId(10L)).thenReturn(false);
 

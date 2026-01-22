@@ -4,6 +4,7 @@ import br.com.aegispatrimonio.exception.ResourceNotFoundException;
 import br.com.aegispatrimonio.model.Ativo;
 import br.com.aegispatrimonio.model.MetodoDepreciacao;
 import br.com.aegispatrimonio.model.StatusAtivo;
+import br.com.aegispatrimonio.model.Usuario;
 import br.com.aegispatrimonio.repository.AtivoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +26,13 @@ import java.util.stream.Stream;
 public class DepreciacaoService {
 
     private final AtivoRepository ativoRepository;
+    private final CurrentUserProvider currentUserProvider; // Injetando CurrentUserProvider
+
+    // O construtor manual foi removido, pois @RequiredArgsConstructor já o gera.
+    // public DepreciacaoService(AtivoRepository ativoRepository, CurrentUserProvider currentUserProvider) {
+    //     this.ativoRepository = ativoRepository;
+    //     this.currentUserProvider = currentUserProvider;
+    // }
 
     @Transactional
     @Scheduled(cron = "0 0 2 1 * ?") // Executa no primeiro dia de cada mês às 02:00
@@ -47,7 +55,8 @@ public class DepreciacaoService {
 
     @Transactional
     public void recalcularDepreciacaoTodosAtivos() {
-        log.info("Iniciando recálculo completo da depreciação para todos os ativos.");
+        Usuario auditor = currentUserProvider.getCurrentUsuario();
+        log.info("AUDIT: Usuário {} iniciou o recálculo completo da depreciação para todos os ativos.", auditor.getEmail());
         try (Stream<Ativo> ativos = ativoRepository.streamAll()) {
             List<Ativo> ativosAtualizados = ativos
                     .peek(this::recalcularDepreciacaoTotal)
@@ -62,7 +71,9 @@ public class DepreciacaoService {
         Ativo ativo = findAtivoById(ativoId);
         recalcularDepreciacaoTotal(ativo);
         ativoRepository.save(ativo);
-        log.info("Depreciação completa recalculada para o ativo ID: {}", ativoId);
+
+        Usuario auditor = currentUserProvider.getCurrentUsuario();
+        log.info("AUDIT: Usuário {} recalculou a depreciação completa para o ativo ID: {}.", auditor.getEmail(), ativoId);
     }
 
     public BigDecimal calcularDepreciacaoMensal(Long ativoId) {

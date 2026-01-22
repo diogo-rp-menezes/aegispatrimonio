@@ -4,6 +4,7 @@ import br.com.aegispatrimonio.exception.ResourceNotFoundException;
 import br.com.aegispatrimonio.model.Ativo;
 import br.com.aegispatrimonio.model.MetodoDepreciacao;
 import br.com.aegispatrimonio.model.StatusAtivo;
+import br.com.aegispatrimonio.model.Usuario;
 import br.com.aegispatrimonio.repository.AtivoRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -30,11 +31,14 @@ class DepreciacaoServiceTest {
 
     @Mock
     private AtivoRepository ativoRepository;
+    @Mock
+    private CurrentUserProvider currentUserProvider; // Adicionado mock para CurrentUserProvider
 
     @InjectMocks
     private DepreciacaoService depreciacaoService;
 
     private Ativo ativo;
+    private Usuario adminUser; // Adicionado para mockar o usuário
 
     @BeforeEach
     void setUp() {
@@ -47,6 +51,11 @@ class DepreciacaoServiceTest {
         ativo.setDataInicioDepreciacao(LocalDate.now().minusMonths(12)); // 1 ano atrás
         ativo.setMetodoDepreciacao(MetodoDepreciacao.LINEAR);
         ativo.setDepreciacaoAcumulada(BigDecimal.ZERO);
+
+        adminUser = new Usuario();
+        adminUser.setId(1L);
+        adminUser.setRole("ROLE_ADMIN");
+        lenient().when(currentUserProvider.getCurrentUsuario()).thenReturn(adminUser); // Mockando o usuário logado (lenient para evitar UnnecessaryStubbing em testes que não usam)
     }
 
     @Test

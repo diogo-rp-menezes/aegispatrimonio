@@ -1,19 +1,29 @@
-# Multi-stage Dockerfile: build jar with Maven, then copy to a lightweight JRE image
+# Use a imagem oficial do OpenJDK para uma build otimizada
+FROM openjdk:21-jdk-slim as build
 
-# Build stage
-FROM maven:3.9.6-eclipse-temurin-21 AS build
-WORKDIR /workspace/app
-COPY pom.xml mvnw .mvn/ ./
-COPY src ./src
-# Enable Maven wrapper execution permissions
-RUN mvn -B -DskipTests package -DskipITs
-
-# Run stage
-FROM eclipse-temurin:21-jre
+# Define o diretório de trabalho dentro do contêiner
 WORKDIR /app
-# Set safe JVM defaults for containers; can be overridden at runtime
-ENV JAVA_TOOL_OPTIONS="-XX:InitialRAMPercentage=25 -XX:MaxRAMPercentage=75 -XX:MaxMetaspaceSize=256m -XX:+UseStringDeduplication -XX:+ExitOnOutOfMemoryError -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Dfile.encoding=UTF-8"
-# copy jar from build stage
-COPY --from=build /workspace/app/target/aegispatrimonio-0.0.1-SNAPSHOT.jar app.jar
+
+# Copia o arquivo pom.xml para que as dependências possam ser baixadas em cache
+COPY pom.xml .
+
+# Copia o código fonte da aplicação
+COPY src ./src
+
+# Compila a aplicação e gera o JAR executável
+RUN ./mvnw clean package -DskipTests
+
+# Imagem final para a aplicação
+FROM openjdk:21-jdk-slim
+
+# Define o diretório de trabalho
+WORKDIR /app
+
+# Copia o JAR gerado da etapa de build
+COPY --from=build /app/target/*.jar app.jar
+
+# Expõe a porta em que a aplicação Spring Boot será executada
 EXPOSE 8080
+
+# Define o comando para executar a aplicação
 ENTRYPOINT ["java", "-jar", "app.jar"]

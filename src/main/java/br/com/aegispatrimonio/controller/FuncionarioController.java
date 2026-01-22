@@ -4,10 +4,18 @@ import br.com.aegispatrimonio.dto.FuncionarioCreateDTO;
 import br.com.aegispatrimonio.dto.FuncionarioDTO;
 import br.com.aegispatrimonio.dto.FuncionarioUpdateDTO;
 import br.com.aegispatrimonio.service.FuncionarioService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.validation.annotation.Validated;
+import org.springframework.validation.annotation.Validated; // Adicionada esta importação
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,6 +26,8 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/funcionarios") // Endpoint alterado para /funcionarios
+@Tag(name = "Funcionários", description = "Gerencia o cadastro de funcionários e seus respectivos usuários")
+@SecurityRequirement(name = "bearerAuth")
 @Validated
 public class FuncionarioController {
 
@@ -27,72 +37,70 @@ public class FuncionarioController {
         this.funcionarioService = funcionarioService;
     }
 
-    /**
-     * Lista todos os funcionários cadastrados no sistema.
-     * Acesso permitido para usuários com qualquer role autenticada.
-     *
-     * @return Uma lista de FuncionarioDTO representando todos os funcionários ativos.
-     */
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @Operation(summary = "Lista todos os funcionários", description = "Retorna a lista de todos os funcionários cadastrados no sistema.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Lista retornada com sucesso", content = @Content(schema = @Schema(implementation = FuncionarioDTO.class))),
+            @ApiResponse(responseCode = "401", description = "Não autenticado", content = @Content(schema = @Schema(hidden = true))),
+            @ApiResponse(responseCode = "403", description = "Não autorizado", content = @Content(schema = @Schema(hidden = true)))
+    })
     public List<FuncionarioDTO> listarTodos() {
         return funcionarioService.listarTodos();
     }
 
-    /**
-     * Busca um funcionário específico pelo seu ID.
-     * Acesso permitido para usuários com qualquer role autenticada.
-     *
-     * @param id O ID do funcionário a ser buscado.
-     * @return O FuncionarioDTO correspondente ao ID fornecido.
-     * @throws jakarta.persistence.EntityNotFoundException se o funcionário não for encontrado.
-     */
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    public FuncionarioDTO buscarPorId(@PathVariable Long id) {
+    @Operation(summary = "Busca um funcionário por ID", description = "Retorna um funcionário específico com base no ID.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Funcionário encontrado", content = @Content(schema = @Schema(implementation = FuncionarioDTO.class))),
+            @ApiResponse(responseCode = "401", description = "Não autenticado", content = @Content(schema = @Schema(hidden = true))),
+            @ApiResponse(responseCode = "403", description = "Não autorizado", content = @Content(schema = @Schema(hidden = true))),
+            @ApiResponse(responseCode = "404", description = "Funcionário não encontrado", content = @Content(schema = @Schema(hidden = true)))
+    })
+    public FuncionarioDTO buscarPorId(@Parameter(description = "ID do funcionário a ser buscado", example = "1") @PathVariable Long id) {
         return funcionarioService.buscarPorId(id);
     }
 
-    /**
-     * Cria um novo funcionário e seu usuário de sistema.
-     * Acesso restrito a usuários com a role 'ADMIN'.
-     *
-     * @param createDTO O DTO contendo os dados para a criação.
-     * @return O FuncionarioDTO recém-criado.
-     */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('ADMIN')")
-    public FuncionarioDTO criar(@RequestBody @Valid FuncionarioCreateDTO createDTO) {
+    @Operation(summary = "Cria um novo funcionário", description = "Cria um novo funcionário e seu respectivo usuário no sistema.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "201", description = "Funcionário criado com sucesso", content = @Content(schema = @Schema(implementation = FuncionarioDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Requisição inválida", content = @Content(schema = @Schema(hidden = true))),
+            @ApiResponse(responseCode = "401", description = "Não autenticado", content = @Content(schema = @Schema(hidden = true))),
+            @ApiResponse(responseCode = "403", description = "Não autorizado", content = @Content(schema = @Schema(hidden = true)))
+    })
+    public FuncionarioDTO criar(@Valid @RequestBody FuncionarioCreateDTO createDTO) {
         return funcionarioService.criar(createDTO);
     }
 
-    /**
-     * Atualiza um funcionário existente e seu usuário de sistema.
-     * Acesso restrito a usuários com a role 'ADMIN'.
-     *
-     * @param id O ID do funcionário a ser atualizado.
-     * @param updateDTO O DTO contendo os dados para a atualização.
-     * @return O FuncionarioDTO com os dados atualizados.
-     * @throws jakarta.persistence.EntityNotFoundException se o funcionário não for encontrado.
-     */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public FuncionarioDTO atualizar(@PathVariable Long id, @RequestBody @Valid FuncionarioUpdateDTO updateDTO) {
+    @Operation(summary = "Atualiza um funcionário existente", description = "Atualiza os dados de um funcionário existente e seu respectivo usuário.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Funcionário atualizado com sucesso", content = @Content(schema = @Schema(implementation = FuncionarioDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Requisição inválida", content = @Content(schema = @Schema(hidden = true))),
+            @ApiResponse(responseCode = "401", description = "Não autenticado", content = @Content(schema = @Schema(hidden = true))),
+            @ApiResponse(responseCode = "403", description = "Não autorizado", content = @Content(schema = @Schema(hidden = true))),
+            @ApiResponse(responseCode = "404", description = "Funcionário não encontrado", content = @Content(schema = @Schema(hidden = true)))
+    })
+    public FuncionarioDTO atualizar(@Parameter(description = "ID do funcionário a ser atualizado", example = "1") @PathVariable Long id, @Valid @RequestBody FuncionarioUpdateDTO updateDTO) {
         return funcionarioService.atualizar(id, updateDTO);
     }
 
-    /**
-     * Deleta um funcionário (realiza uma exclusão lógica, marcando-o como INATIVO).
-     * Acesso restrito a usuários com a role 'ADMIN'.
-     *
-     * @param id O ID do funcionário a ser deletado.
-     * @throws jakarta.persistence.EntityNotFoundException se o funcionário não for encontrado.
-     */
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasRole('ADMIN')")
-    public void deletar(@PathVariable Long id) {
+    @Operation(summary = "Deleta um funcionário", description = "Deleta um funcionário do sistema (exclusão lógica).")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Funcionário deletado com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Não autenticado", content = @Content(schema = @Schema(hidden = true))),
+            @ApiResponse(responseCode = "403", description = "Não autorizado", content = @Content(schema = @Schema(hidden = true))),
+            @ApiResponse(responseCode = "404", description = "Funcionário não encontrado", content = @Content(schema = @Schema(hidden = true)))
+    })
+    public void deletar(@Parameter(description = "ID do funcionário a ser deletado", example = "1") @PathVariable Long id) {
         funcionarioService.deletar(id);
     }
 }

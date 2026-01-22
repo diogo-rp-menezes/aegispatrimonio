@@ -13,6 +13,8 @@ import br.com.aegispatrimonio.repository.FilialRepository;
 import br.com.aegispatrimonio.repository.FuncionarioRepository;
 import br.com.aegispatrimonio.repository.UsuarioRepository;
 import jakarta.persistence.EntityNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,20 +27,24 @@ import java.util.stream.Collectors;
 @Service
 public class FuncionarioService {
 
+    private static final Logger logger = LoggerFactory.getLogger(FuncionarioService.class);
+
     private final FuncionarioRepository funcionarioRepository;
     private final UsuarioRepository usuarioRepository;
     private final FuncionarioMapper funcionarioMapper;
     private final DepartamentoRepository departamentoRepository;
     private final FilialRepository filialRepository;
     private final PasswordEncoder passwordEncoder;
+    private final CurrentUserProvider currentUserProvider; // Injetando CurrentUserProvider
 
-    public FuncionarioService(FuncionarioRepository funcionarioRepository, UsuarioRepository usuarioRepository, FuncionarioMapper funcionarioMapper, DepartamentoRepository departamentoRepository, FilialRepository filialRepository, PasswordEncoder passwordEncoder) {
+    public FuncionarioService(FuncionarioRepository funcionarioRepository, UsuarioRepository usuarioRepository, FuncionarioMapper funcionarioMapper, DepartamentoRepository departamentoRepository, FilialRepository filialRepository, PasswordEncoder passwordEncoder, CurrentUserProvider currentUserProvider) {
         this.funcionarioRepository = funcionarioRepository;
         this.usuarioRepository = usuarioRepository;
         this.funcionarioMapper = funcionarioMapper;
         this.departamentoRepository = departamentoRepository;
         this.filialRepository = filialRepository;
         this.passwordEncoder = passwordEncoder;
+        this.currentUserProvider = currentUserProvider;
     }
 
     @Transactional(readOnly = true)
@@ -89,6 +95,10 @@ public class FuncionarioService {
         funcionario.setUsuario(usuario);
 
         Funcionario funcionarioSalvo = funcionarioRepository.save(funcionario);
+
+        Usuario auditor = currentUserProvider.getCurrentUsuario();
+        logger.info("AUDIT: Usuário {} criou o funcionário com ID {} (email: {}).", auditor.getEmail(), funcionarioSalvo.getId(), funcionarioSalvo.getUsuario().getEmail());
+
         return funcionarioMapper.toDTO(funcionarioSalvo);
     }
 
@@ -131,15 +141,22 @@ public class FuncionarioService {
         }
 
         Funcionario funcionarioAtualizado = funcionarioRepository.save(funcionario);
+
+        Usuario auditor = currentUserProvider.getCurrentUsuario();
+        logger.info("AUDIT: Usuário {} atualizou o funcionário com ID {} (email: {}).", auditor.getEmail(), funcionarioAtualizado.getId(), funcionarioAtualizado.getUsuario().getEmail());
+
         return funcionarioMapper.toDTO(funcionarioAtualizado);
     }
 
     @Transactional
     public void deletar(Long id) {
-        if (!funcionarioRepository.existsById(id)) {
-            throw new EntityNotFoundException("Funcionário não encontrado com ID: " + id);
-        }
+        Funcionario funcionario = funcionarioRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Funcionário não encontrado com ID: " + id));
+
         // A exclusão lógica é feita pela anotação @SQLDelete na entidade
         funcionarioRepository.deleteById(id);
+
+        Usuario auditor = currentUserProvider.getCurrentUsuario();
+        logger.info("AUDIT: Usuário {} deletou o funcionário com ID {} (email: {}).", auditor.getEmail(), id, funcionario.getUsuario().getEmail());
     }
 }

@@ -20,6 +20,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize; // Importar PreAuthorize
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -34,6 +35,7 @@ public class ManutencaoController {
     private final ManutencaoService manutencaoService;
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')") // Adicionado PreAuthorize
     @Operation(summary = "Criar manutenção", description = "Cria uma nova solicitação de manutenção")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "201", description = "Manutenção criada com sucesso"),
@@ -45,6 +47,7 @@ public class ManutencaoController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'USER')") // Adicionado PreAuthorize
     @Operation(summary = "Buscar manutenção por ID", description = "Recupera uma manutenção específica")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Manutenção encontrada"),
@@ -58,6 +61,7 @@ public class ManutencaoController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'USER')") // Adicionado PreAuthorize
     @Operation(summary = "Listar e filtrar manutenções", description = "Retorna manutenções paginadas com filtros dinâmicos")
     @ApiResponse(responseCode = "200", description = "Manutenções listadas com sucesso")
     public ResponseEntity<Page<ManutencaoResponseDTO>> listar(
@@ -78,6 +82,7 @@ public class ManutencaoController {
     }
 
     @PostMapping("/aprovar/{id}")
+    @PreAuthorize("hasRole('ADMIN')") // Adicionado PreAuthorize
     @Operation(summary = "Aprovar manutenção", description = "Aprova uma manutenção solicitada")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Manutenção aprovada"),
@@ -90,6 +95,7 @@ public class ManutencaoController {
     }
 
     @PostMapping("/iniciar/{id}")
+    @PreAuthorize("hasRole('ADMIN')") // Adicionado PreAuthorize
     @Operation(summary = "Iniciar manutenção", description = "Inicia a execução de uma manutenção aprovada")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Manutenção iniciada"),
@@ -103,6 +109,7 @@ public class ManutencaoController {
     }
 
     @PostMapping("/concluir/{id}")
+    @PreAuthorize("hasRole('ADMIN')") // Adicionado PreAuthorize
     @Operation(summary = "Concluir manutenção", description = "Conclui uma manutenção em andamento")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Manutenção concluída"),
@@ -116,6 +123,7 @@ public class ManutencaoController {
     }
 
     @PostMapping("/cancelar/{id}")
+    @PreAuthorize("hasRole('ADMIN')") // Adicionado PreAuthorize
     @Operation(summary = "Cancelar manutenção", description = "Cancela uma manutenção")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Manutenção cancelada"),
@@ -129,6 +137,7 @@ public class ManutencaoController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')") // Adicionado PreAuthorize
     @Operation(summary = "Deletar manutenção", description = "Remove uma manutenção do sistema")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "204", description = "Manutenção deletada"),
@@ -141,6 +150,7 @@ public class ManutencaoController {
     }
 
     @GetMapping("/custo-total")
+    @PreAuthorize("hasAnyRole('ADMIN', 'USER')") // Adicionado PreAuthorize
     @Operation(summary = "Obter custo total por ativo", description = "Calcula custo total de manutenções concluídas")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Custo calculado"),

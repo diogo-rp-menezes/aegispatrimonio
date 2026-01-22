@@ -4,9 +4,12 @@ import br.com.aegispatrimonio.dto.TipoAtivoCreateDTO;
 import br.com.aegispatrimonio.dto.TipoAtivoDTO;
 import br.com.aegispatrimonio.mapper.TipoAtivoMapper;
 import br.com.aegispatrimonio.model.TipoAtivo;
+import br.com.aegispatrimonio.model.Usuario;
 import br.com.aegispatrimonio.repository.AtivoRepository;
 import br.com.aegispatrimonio.repository.TipoAtivoRepository;
 import jakarta.persistence.EntityNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,14 +20,18 @@ import java.util.stream.Collectors;
 @Service
 public class TipoAtivoService {
 
+    private static final Logger logger = LoggerFactory.getLogger(TipoAtivoService.class);
+
     private final TipoAtivoRepository tipoAtivoRepository;
     private final TipoAtivoMapper tipoAtivoMapper;
     private final AtivoRepository ativoRepository;
+    private final CurrentUserProvider currentUserProvider; // Injetando CurrentUserProvider
 
-    public TipoAtivoService(TipoAtivoRepository tipoAtivoRepository, TipoAtivoMapper tipoAtivoMapper, AtivoRepository ativoRepository) {
+    public TipoAtivoService(TipoAtivoRepository tipoAtivoRepository, TipoAtivoMapper tipoAtivoMapper, AtivoRepository ativoRepository, CurrentUserProvider currentUserProvider) {
         this.tipoAtivoRepository = tipoAtivoRepository;
         this.tipoAtivoMapper = tipoAtivoMapper;
         this.ativoRepository = ativoRepository;
+        this.currentUserProvider = currentUserProvider;
     }
 
     @Transactional(readOnly = true)
@@ -46,6 +53,10 @@ public class TipoAtivoService {
         validarNomeUnico(tipoAtivoCreateDTO.nome(), null);
         TipoAtivo tipoAtivo = tipoAtivoMapper.toEntity(tipoAtivoCreateDTO);
         TipoAtivo tipoAtivoSalvo = tipoAtivoRepository.save(tipoAtivo);
+
+        Usuario auditor = currentUserProvider.getCurrentUsuario();
+        logger.info("AUDIT: Usuário {} criou o tipo de ativo com ID {} e nome {}.", auditor.getEmail(), tipoAtivoSalvo.getId(), tipoAtivoSalvo.getNome());
+
         return tipoAtivoMapper.toDTO(tipoAtivoSalvo);
     }
 
@@ -60,6 +71,10 @@ public class TipoAtivoService {
         // CORREÇÃO: Adicionada a linha que faltava para atualizar a categoria contábil.
         tipoAtivo.setCategoriaContabil(tipoAtivoUpdateDTO.categoriaContabil());
         TipoAtivo tipoAtivoAtualizado = tipoAtivoRepository.save(tipoAtivo);
+
+        Usuario auditor = currentUserProvider.getCurrentUsuario();
+        logger.info("AUDIT: Usuário {} atualizou o tipo de ativo com ID {} e nome {}.", auditor.getEmail(), tipoAtivoAtualizado.getId(), tipoAtivoAtualizado.getNome());
+
         return tipoAtivoMapper.toDTO(tipoAtivoAtualizado);
     }
 
@@ -73,6 +88,9 @@ public class TipoAtivoService {
         }
 
         tipoAtivoRepository.delete(tipoAtivo);
+
+        Usuario auditor = currentUserProvider.getCurrentUsuario();
+        logger.info("AUDIT: Usuário {} deletou o tipo de ativo com ID {} e nome {}.", auditor.getEmail(), id, tipoAtivo.getNome());
     }
 
     private void validarNomeUnico(String nome, Long id) {

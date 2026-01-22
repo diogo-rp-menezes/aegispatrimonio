@@ -64,4 +64,7 @@ public class Usuario {
     protected void onUpdate() {
         atualizadoEm = LocalDateTime.now();
     }
+
+                public void setUsername(String username) {
+    }
 }

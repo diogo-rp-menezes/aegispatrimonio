@@ -11,8 +11,9 @@ import br.com.aegispatrimonio.model.Usuario;
 import br.com.aegispatrimonio.repository.AtivoRepository;
 import br.com.aegispatrimonio.repository.FilialRepository;
 import br.com.aegispatrimonio.repository.LocalizacaoRepository;
-import br.com.aegispatrimonio.security.CustomUserDetails;
 import jakarta.persistence.EntityNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -26,21 +27,25 @@ import java.util.stream.Collectors;
 @Service
 public class LocalizacaoService {
 
+    private static final Logger logger = LoggerFactory.getLogger(LocalizacaoService.class);
+
     private final LocalizacaoRepository localizacaoRepository;
     private final LocalizacaoMapper localizacaoMapper;
     private final FilialRepository filialRepository;
     private final AtivoRepository ativoRepository;
+    private final CurrentUserProvider currentUserProvider; // Injetando CurrentUserProvider
 
-    public LocalizacaoService(LocalizacaoRepository localizacaoRepository, LocalizacaoMapper localizacaoMapper, FilialRepository filialRepository, AtivoRepository ativoRepository) {
+    public LocalizacaoService(LocalizacaoRepository localizacaoRepository, LocalizacaoMapper localizacaoMapper, FilialRepository filialRepository, AtivoRepository ativoRepository, CurrentUserProvider currentUserProvider) {
         this.localizacaoRepository = localizacaoRepository;
         this.localizacaoMapper = localizacaoMapper;
         this.filialRepository = filialRepository;
         this.ativoRepository = ativoRepository;
+        this.currentUserProvider = currentUserProvider;
     }
 
     private Usuario getUsuarioLogado() {
-        CustomUserDetails userDetails = (CustomUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        return userDetails.getUsuario();
+        // Removido o acesso direto a SecurityContextHolder, usando o provider injetado
+        return currentUserProvider.getCurrentUsuario();
     }
 
     private boolean isAdmin(Usuario usuario) {
@@ -120,6 +125,9 @@ public class LocalizacaoService {
         localizacao.setLocalizacaoPai(localizacaoPai);
 
         Localizacao localizacaoSalva = localizacaoRepository.save(localizacao);
+
+        logger.info("AUDIT: Usuário {} criou a localização com ID {} e nome {}. Filial: {}.", usuarioLogado.getEmail(), localizacaoSalva.getId(), localizacaoSalva.getNome(), filial.getNome());
+
         return localizacaoMapper.toDTO(localizacaoSalva);
     }
 
@@ -127,6 +135,15 @@ public class LocalizacaoService {
     public LocalizacaoDTO atualizar(Long id, LocalizacaoUpdateDTO localizacaoUpdateDTO) {
         Localizacao localizacao = localizacaoRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Localização não encontrada com ID: " + id));
+
+        // Autorização para atualização (verificar se o usuário tem acesso à filial da localização)
+        Usuario usuarioLogado = getUsuarioLogado();
+        if (!isAdmin(usuarioLogado)) {
+            Funcionario funcionarioLogado = usuarioLogado.getFuncionario();
+            if (funcionarioLogado == null || funcionarioLogado.getFiliais().stream().noneMatch(f -> f.getId().equals(localizacao.getFilial().getId()))) {
+                throw new AccessDeniedException("Usuário não tem permissão para atualizar localizações de outra filial.");
+            }
+        }
 
         Filial filial = filialRepository.findById(localizacaoUpdateDTO.filialId())
                 .orElseThrow(() -> new EntityNotFoundException("Filial não encontrada com ID: " + localizacaoUpdateDTO.filialId()));
@@ -150,13 +167,24 @@ public class LocalizacaoService {
         localizacao.setLocalizacaoPai(localizacaoPai);
 
         Localizacao localizacaoAtualizada = localizacaoRepository.save(localizacao);
+
+        logger.info("AUDIT: Usuário {} atualizou a localização com ID {} e nome {}. Filial: {}.", usuarioLogado.getEmail(), localizacaoAtualizada.getId(), localizacaoAtualizada.getNome(), filial.getNome());
+
         return localizacaoMapper.toDTO(localizacaoAtualizada);
     }
 
     @Transactional
     public void deletar(Long id) {
-        if (!localizacaoRepository.existsById(id)) {
-            throw new EntityNotFoundException("Localização não encontrada com ID: " + id);
+        Localizacao localizacao = localizacaoRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Localização não encontrada com ID: " + id));
+
+        // Autorização para deleção (verificar se o usuário tem acesso à filial da localização)
+        Usuario usuarioLogado = getUsuarioLogado();
+        if (!isAdmin(usuarioLogado)) {
+            Funcionario funcionarioLogado = usuarioLogado.getFuncionario();
+            if (funcionarioLogado == null || funcionarioLogado.getFiliais().stream().noneMatch(f -> f.getId().equals(localizacao.getFilial().getId()))) {
+                throw new AccessDeniedException("Usuário não tem permissão para deletar localizações de outra filial.");
+            }
         }
 
         if (ativoRepository.existsByLocalizacaoId(id)) {
@@ -168,6 +196,8 @@ public class LocalizacaoService {
         }
 
         localizacaoRepository.deleteById(id);
+
+        logger.info("AUDIT: Usuário {} deletou a localização com ID {} e nome {}. Filial: {}.", usuarioLogado.getEmail(), id, localizacao.getNome(), localizacao.getFilial().getNome());
     }
 
     private void validarNomeUnico(String nome, Filial filial, Localizacao localizacaoPai, Long id) {

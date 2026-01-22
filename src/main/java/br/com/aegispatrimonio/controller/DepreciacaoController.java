@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +25,7 @@ import java.math.BigDecimal;
 @RequestMapping("/depreciacao")
 @RequiredArgsConstructor
 @Tag(name = "Depreciação", description = "Operações relacionadas ao cálculo e gestão de depreciação de ativos")
+@SecurityRequirement(name = "bearerAuth") // Indica que todos os endpoints deste controller requerem JWT
 public class DepreciacaoController {
 
     private final DepreciacaoService depreciacaoService;
@@ -37,10 +39,12 @@ public class DepreciacaoController {
     @PostMapping("/recalcular-todos")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Recalcular depreciação de todos os ativos",
-               description = "Inicia o recálculo completo da depreciação para todos os ativos do sistema")
+               description = "Inicia o recálculo completo da depreciação para todos os ativos do sistema. Acesso restrito a ADMIN.")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Recálculo iniciado com sucesso",
                     content = @Content(schema = @Schema(implementation = String.class))),
+        @ApiResponse(responseCode = "401", description = "Não autenticado"),
+        @ApiResponse(responseCode = "403", description = "Sem permissão de acesso (apenas ADMIN)"),
         @ApiResponse(responseCode = "500", description = "Erro interno no processamento")
     })
     public ResponseEntity<String> recalcularDepreciacaoTodos() {
@@ -58,9 +62,11 @@ public class DepreciacaoController {
     @PostMapping("/recalcular/{ativoId}")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Recalcular depreciação de um ativo específico",
-               description = "Inicia o recálculo completo da depreciação para um ativo específico")
+               description = "Inicia o recálculo completo da depreciação para um ativo específico. Acesso restrito a ADMIN.")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Recálculo do ativo iniciado com sucesso"),
+        @ApiResponse(responseCode = "401", description = "Não autenticado"),
+        @ApiResponse(responseCode = "403", description = "Sem permissão de acesso (apenas ADMIN)"),
         @ApiResponse(responseCode = "404", description = "Ativo não encontrado"),
         @ApiResponse(responseCode = "500", description = "Erro interno no processamento")
     })
@@ -81,10 +87,12 @@ public class DepreciacaoController {
     @GetMapping("/calcular-mensal/{ativoId}")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Calcular depreciação mensal de um ativo",
-               description = "Calcula o valor mensal de depreciação para um ativo específico")
+               description = "Calcula o valor mensal de depreciação para um ativo específico. Acesso restrito a ADMIN.")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Cálculo realizado com sucesso",
                     content = @Content(schema = @Schema(implementation = BigDecimal.class))),
+        @ApiResponse(responseCode = "401", description = "Não autenticado"),
+        @ApiResponse(responseCode = "403", description = "Sem permissão de acesso (apenas ADMIN)"),
         @ApiResponse(responseCode = "404", description = "Ativo não encontrado"),
         @ApiResponse(responseCode = "400", description = "Ativo não possui dados para cálculo de depreciação")
     })

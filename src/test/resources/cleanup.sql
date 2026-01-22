@@ -1,4 +1,4 @@
-SET REFERENTIAL_INTEGRITY FALSE;
+SET FOREIGN_KEY_CHECKS = 0;
 -- Clean children first to avoid FK issues (use DELETE for H2 compatibility)
 DELETE FROM movimentacoes;
 DELETE FROM manutencoes;
@@ -15,4 +15,4 @@ DELETE FROM funcionarios;
 DELETE FROM fornecedores;
 DELETE FROM tipos_ativo;
 DELETE FROM filiais;
-SET REFERENTIAL_INTEGRITY TRUE;
+SET FOREIGN_KEY_CHECKS = 1;

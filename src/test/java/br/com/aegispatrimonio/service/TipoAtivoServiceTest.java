@@ -5,6 +5,7 @@ import br.com.aegispatrimonio.dto.TipoAtivoDTO;
 import br.com.aegispatrimonio.mapper.TipoAtivoMapper;
 import br.com.aegispatrimonio.model.CategoriaContabil;
 import br.com.aegispatrimonio.model.TipoAtivo;
+import br.com.aegispatrimonio.model.Usuario;
 import br.com.aegispatrimonio.repository.AtivoRepository;
 import br.com.aegispatrimonio.repository.TipoAtivoRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -36,12 +37,16 @@ class TipoAtivoServiceTest {
     @Mock
     private AtivoRepository ativoRepository;
 
+    @Mock
+    private CurrentUserProvider currentUserProvider; // Adicionado mock para CurrentUserProvider
+
     @InjectMocks
     private TipoAtivoService tipoAtivoService;
 
     private TipoAtivo tipoAtivo;
     private TipoAtivoDTO tipoAtivoDTO;
     private TipoAtivoCreateDTO tipoAtivoCreateDTO;
+    private Usuario adminUser; // Adicionado para mockar o usuário
 
     @BeforeEach
     void setUp() {
@@ -52,6 +57,11 @@ class TipoAtivoServiceTest {
 
         tipoAtivoDTO = new TipoAtivoDTO(1L, "Hardware", CategoriaContabil.IMOBILIZADO);
         tipoAtivoCreateDTO = new TipoAtivoCreateDTO("Software", CategoriaContabil.INTANGIVEL);
+
+        adminUser = new Usuario();
+        adminUser.setId(1L);
+        adminUser.setRole("ROLE_ADMIN");
+        lenient().when(currentUserProvider.getCurrentUsuario()).thenReturn(adminUser); // Mockando o usuário logado (lenient para evitar UnnecessaryStubbing)
     }
 
     @Test

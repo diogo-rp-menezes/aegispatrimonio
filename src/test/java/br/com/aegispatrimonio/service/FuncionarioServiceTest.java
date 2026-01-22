@@ -41,6 +41,8 @@ class FuncionarioServiceTest {
     private FilialRepository filialRepository;
     @Mock
     private PasswordEncoder passwordEncoder;
+    @Mock
+    private CurrentUserProvider currentUserProvider; // Adicionado mock para CurrentUserProvider
 
     @InjectMocks
     private FuncionarioService funcionarioService;
@@ -51,6 +53,7 @@ class FuncionarioServiceTest {
     private Filial filial;
     private Funcionario funcionario;
     private Usuario usuario;
+    private Usuario adminUser; // Adicionado para mockar o usuário
 
     @BeforeEach
     void setUp() {
@@ -71,6 +74,11 @@ class FuncionarioServiceTest {
         usuario.setEmail("original@aegis.com");
         usuario.setFuncionario(funcionario);
         funcionario.setUsuario(usuario);
+
+        adminUser = new Usuario();
+        adminUser.setId(1L);
+        adminUser.setRole("ROLE_ADMIN");
+        lenient().when(currentUserProvider.getCurrentUsuario()).thenReturn(adminUser); // Mockando o usuário logado (lenient para evitar UnnecessaryStubbing)
     }
 
     @Test
@@ -135,7 +143,7 @@ class FuncionarioServiceTest {
     @Test
     @DisplayName("Deletar: Deve chamar deleteById do repositório")
     void deletar_quandoValido_deveChamarDelete() {
-        when(funcionarioRepository.existsById(1L)).thenReturn(true);
+        when(funcionarioRepository.findById(1L)).thenReturn(Optional.of(funcionario));
         doNothing().when(funcionarioRepository).deleteById(1L);
 
         funcionarioService.deletar(1L);
@@ -146,7 +154,7 @@ class FuncionarioServiceTest {
     @Test
     @DisplayName("Deletar: Deve lançar exceção se funcionário não existe")
     void deletar_quandoNaoExiste_deveLancarExcecao() {
-        when(funcionarioRepository.existsById(99L)).thenReturn(false);
+        when(funcionarioRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(EntityNotFoundException.class, () -> funcionarioService.deletar(99L));
     }

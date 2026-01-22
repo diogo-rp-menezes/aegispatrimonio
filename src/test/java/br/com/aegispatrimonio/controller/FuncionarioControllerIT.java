@@ -11,8 +11,9 @@ import br.com.aegispatrimonio.repository.UsuarioRepository;
 import br.com.aegispatrimonio.security.CustomUserDetails;
 import br.com.aegispatrimonio.security.JwtService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.persistence.EntityManager; // Importar EntityManager
-import jakarta.persistence.PersistenceContext; // Importar PersistenceContext
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -62,7 +63,7 @@ public class FuncionarioControllerIT extends BaseIT {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    @PersistenceContext // Injetar EntityManager
+    @PersistenceContext
     private EntityManager entityManager;
 
     private String adminToken;
@@ -71,7 +72,6 @@ public class FuncionarioControllerIT extends BaseIT {
     private Departamento deptoA;
     private Funcionario funcionarioExistente;
 
-    // Contador estático para gerar IDs únicos para funcionários nos testes (não será mais usado para setId, mas mantido para referência se necessário)
     private static Long nextFuncionarioId = 1L;
 
     @BeforeEach
@@ -82,7 +82,7 @@ public class FuncionarioControllerIT extends BaseIT {
         departamentoRepository.deleteAll();
         filialRepository.deleteAll();
 
-        // Resetar auto-incremento para tabelas relevantes e limpar a tabela de junção
+        // Resetar auto-incremento para tabelas relevantes
         resetAutoIncrement();
 
         // Resetar o contador de ID para cada execução do setUp
@@ -207,39 +207,38 @@ public class FuncionarioControllerIT extends BaseIT {
     private Funcionario createFuncionarioAndUsuario(String nome, String email, String role, Departamento depto, Set<Filial> filiais) {
         Funcionario func = new Funcionario();
         func.setNome(nome);
-        func.setMatricula(nome.replaceAll("\\s+", "") + "-" + UUID.randomUUID().toString().substring(0, 8)); // Gerar matrícula única
+        func.setMatricula(nome.replaceAll("\\s+", "") + "-" + UUID.randomUUID().toString().substring(0, 8));
         func.setCargo("Analista");
         func.setDepartamento(depto);
         func.setStatus(Status.ATIVO);
-        //func.setId(nextFuncionarioId++); // REMOVIDO: Remover atribuição manual de ID
 
         Usuario user = new Usuario();
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode("password"));
         user.setRole(role);
         user.setStatus(Status.ATIVO);
-        user.setFuncionario(func); // Associar ao funcionário
-        func.setUsuario(user); // Manter a bidirecionalidade
+        user.setFuncionario(func);
+        func.setUsuario(user);
 
-        // Salvar o funcionário. Se houver cascade, o usuário também será salvo.
         Funcionario savedFunc = funcionarioRepository.save(func);
-        // Adicionar flush para garantir que o ID seja gerado e atribuído imediatamente
-        entityManager.flush(); 
+        entityManager.flush();
 
-        // Agora associar as filiais e salvar novamente o funcionário para persistir a associação ManyToMany
         savedFunc.setFiliais(filiais);
         return funcionarioRepository.save(savedFunc);
     }
 
-    // Novo método para resetar os contadores de auto-incremento e limpar tabelas de junção
     private void resetAutoIncrement() {
-        // Para MySQL, o comando é ALTER TABLE table_name AUTO_INCREMENT = 1;
-        // Certifique-se de que os nomes das tabelas estão corretos.
-        entityManager.createNativeQuery("ALTER TABLE funcionarios AUTO_INCREMENT = 1").executeUpdate();
-        entityManager.createNativeQuery("ALTER TABLE usuarios AUTO_INCREMENT = 1").executeUpdate();
-        entityManager.createNativeQuery("ALTER TABLE filiais AUTO_INCREMENT = 1").executeUpdate(); // Resetar auto-incremento para filiais
-        // Excluir explicitamente os dados da tabela de junção funcionario_filial
-        entityManager.createNativeQuery("DELETE FROM funcionario_filial").executeUpdate();
-        entityManager.flush(); // Garante que os comandos sejam executados
+        try {
+            entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 0").executeUpdate();
+            entityManager.createNativeQuery("DELETE FROM funcionario_filial").executeUpdate();
+            entityManager.createNativeQuery("DELETE FROM funcionarios").executeUpdate();
+            entityManager.createNativeQuery("DELETE FROM usuarios").executeUpdate();
+            entityManager.createNativeQuery("DELETE FROM departamentos").executeUpdate();
+            entityManager.createNativeQuery("DELETE FROM filiais").executeUpdate();
+            entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 1").executeUpdate();
+            entityManager.flush();
+        } catch (Exception e) {
+            System.out.println("Warning: Could not reset auto-increment: " + e.getMessage());
+        }
     }
 }

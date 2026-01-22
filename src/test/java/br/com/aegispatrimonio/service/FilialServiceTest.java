@@ -7,6 +7,7 @@ import br.com.aegispatrimonio.mapper.FilialMapper;
 import br.com.aegispatrimonio.model.Filial;
 import br.com.aegispatrimonio.model.Status;
 import br.com.aegispatrimonio.model.TipoFilial;
+import br.com.aegispatrimonio.model.Usuario;
 import br.com.aegispatrimonio.repository.DepartamentoRepository;
 import br.com.aegispatrimonio.repository.FilialRepository;
 import br.com.aegispatrimonio.repository.FuncionarioRepository;
@@ -37,12 +38,15 @@ class FilialServiceTest {
     private FuncionarioRepository funcionarioRepository;
     @Mock
     private FilialMapper filialMapper;
+    @Mock
+    private CurrentUserProvider currentUserProvider; // Adicionado mock para CurrentUserProvider
 
     @InjectMocks
     private FilialService filialService;
 
     private Filial matriz;
     private Filial filial;
+    private Usuario adminUser; // Adicionado para mockar o usuário
 
     @BeforeEach
     void setUp() {
@@ -59,6 +63,11 @@ class FilialServiceTest {
         filial.setCnpj("11.111.111/0001-11");
         filial.setCodigo("FL01");
         filial.setTipo(TipoFilial.FILIAL);
+
+        adminUser = new Usuario();
+        adminUser.setId(1L);
+        adminUser.setRole("ROLE_ADMIN");
+        lenient().when(currentUserProvider.getCurrentUsuario()).thenReturn(adminUser); // Mockando o usuário logado (lenient para evitar UnnecessaryStubbing)
     }
 
     @Test

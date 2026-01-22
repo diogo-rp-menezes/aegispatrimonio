@@ -482,3 +482,55 @@ GitHub: @diogo-rp-menezes
 
   O pipeline publica o relatório HTML do JaCoCo como artifact (target/site/jacoco). Abra o artifact jacoco-report-html no job do CI para visualizar os detalhes de cobertura.
 
+
+# Aegis Patrimônio
+
+## TestContainers — Configuração de Reuso de Containers
+
+Para acelerar a suíte de testes de integração, habilitamos o reuso de containers do Testcontainers no ambiente local de desenvolvimento.
+
+### Passo 1 — Arquivo de configuração
+Já incluímos no repositório o arquivo `.testcontainers.properties` na raiz do projeto com:
+
+```
+testcontainers.reuse.enable=true
+```
+
+Observações:
+- Esta configuração é voltada para ambiente local. Em CI/CD, avalie políticas de isolamento antes de ativar reuso.
+- O BaseIT já utiliza `.withReuse(true)` no container MySQL.
+
+### Passo 2 — Pré‑requisitos locais
+- Docker em execução e com suporte a volume de reuso (Ryuk habilitado por padrão).
+- Java 21 e Maven instalados.
+
+### Passo 3 — Executar a suíte de testes
+```
+mvn clean verify
+```
+
+Se o reuso estiver habilitado, execuções subsequentes serão mais rápidas, pois o container MySQL será reaproveitado entre runs.
+
+### CI/CD — Diretrizes
+- Caso o pipeline utilize runners dedicados (máquinas persistentes), é possível manter o reuso. Certifique-se de:
+  - Permitir que o processo do runner retenha o diretório do workspace entre jobs.
+  - Liberar portas/volumes ao rotacionar runners.
+- Em runners efêmeros (ambiente limpo por job), o reuso trará pouco benefício. Recomenda-se manter o padrão (sem reuso) ou configurar cache de camadas Docker.
+
+### Monitoramento de Performance pós‑correção
+- Acompanhe os tempos de `mvn test` nas execuções locais antes/depois da configuração.
+- No pipeline, compare o tempo das etapas de testes entre os últimos 5 builds.
+- Caso observe instabilidade, desative temporariamente o reuso no CI definindo `testcontainers.reuse.enable=false` via arquivo ou variável de ambiente.
+
+---
+
+## Como rodar localmente
+1. Configure variáveis no `application.properties` caso necessário.
+2. Suba o backend:
+   ```
+   mvn spring-boot:run
+   ```
+3. Testes:
+   ```
+   mvn clean verify
+   ```

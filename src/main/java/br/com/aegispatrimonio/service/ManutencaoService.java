@@ -32,12 +32,16 @@ public class ManutencaoService {
     private final AtivoRepository ativoRepository;
     private final FornecedorRepository fornecedorRepository;
     private final FuncionarioRepository funcionarioRepository;
+    private final CurrentUserProvider currentUserProvider; // Injetando CurrentUserProvider
 
     @Transactional
     public ManutencaoResponseDTO criar(ManutencaoRequestDTO request) {
-        log.info("Criando nova manutenção para ativo ID: {}", request.ativoId());
         Manutencao manutencao = convertToEntity(request);
         Manutencao savedManutencao = manutencaoRepository.save(manutencao);
+
+        Usuario auditor = currentUserProvider.getCurrentUsuario();
+        log.info("AUDIT: Usuário {} criou a manutenção com ID {} para o ativo {}.", auditor.getEmail(), savedManutencao.getId(), savedManutencao.getAtivo().getId());
+
         return convertToResponseDTO(savedManutencao);
     }
 
@@ -59,16 +63,19 @@ public class ManutencaoService {
 
     @Transactional
     public ManutencaoResponseDTO aprovar(Long id) {
-        log.info("Aprovando manutenção ID: {}", id);
         Manutencao manutencao = buscarEntidadePorId(id);
         validarStatus(manutencao, StatusManutencao.SOLICITADA, "aprovada");
         manutencao.setStatus(StatusManutencao.APROVADA);
-        return convertToResponseDTO(manutencaoRepository.save(manutencao));
+        Manutencao updatedManutencao = manutencaoRepository.save(manutencao);
+
+        Usuario auditor = currentUserProvider.getCurrentUsuario();
+        log.info("AUDIT: Usuário {} aprovou a manutenção com ID {} para o ativo {}.", auditor.getEmail(), updatedManutencao.getId(), updatedManutencao.getAtivo().getId());
+
+        return convertToResponseDTO(updatedManutencao);
     }
 
     @Transactional
     public ManutencaoResponseDTO iniciar(Long id, ManutencaoInicioDTO inicioDTO) {
-        log.info("Iniciando manutenção ID: {}", id);
         Manutencao manutencao = buscarEntidadePorId(id);
         validarStatus(manutencao, StatusManutencao.APROVADA, "iniciada");
 
@@ -85,12 +92,16 @@ public class ManutencaoService {
         manutencao.setTecnicoResponsavel(tecnico);
         manutencao.setDataInicio(LocalDate.now());
 
-        return convertToResponseDTO(manutencaoRepository.save(manutencao));
+        Manutencao updatedManutencao = manutencaoRepository.save(manutencao);
+
+        Usuario auditor = currentUserProvider.getCurrentUsuario();
+        log.info("AUDIT: Usuário {} iniciou a manutenção com ID {} para o ativo {} com técnico {}.", auditor.getEmail(), updatedManutencao.getId(), updatedManutencao.getAtivo().getId(), tecnico.getNome());
+
+        return convertToResponseDTO(updatedManutencao);
     }
 
     @Transactional
     public ManutencaoResponseDTO concluir(Long id, ManutencaoConclusaoDTO conclusaoDTO) {
-        log.info("Concluindo manutenção ID: {}", id);
         Manutencao manutencao = buscarEntidadePorId(id);
         validarStatus(manutencao, StatusManutencao.EM_ANDAMENTO, "concluída");
 
@@ -104,12 +115,16 @@ public class ManutencaoService {
         manutencao.setTempoExecucaoMinutos(conclusaoDTO.tempoExecucao());
         manutencao.setDataConclusao(LocalDate.now());
 
-        return convertToResponseDTO(manutencaoRepository.save(manutencao));
+        Manutencao updatedManutencao = manutencaoRepository.save(manutencao);
+
+        Usuario auditor = currentUserProvider.getCurrentUsuario();
+        log.info("AUDIT: Usuário {} concluiu a manutenção com ID {} para o ativo {}.", auditor.getEmail(), updatedManutencao.getId(), updatedManutencao.getAtivo().getId());
+
+        return convertToResponseDTO(updatedManutencao);
     }
 
     @Transactional
     public ManutencaoResponseDTO cancelar(Long id, ManutencaoCancelDTO cancelDTO) {
-        log.info("Cancelando manutenção ID: {}", id);
         Manutencao manutencao = buscarEntidadePorId(id);
 
         if (manutencao.getStatus() == StatusManutencao.CONCLUIDA || manutencao.getStatus() == StatusManutencao.CANCELADA) {
@@ -125,12 +140,16 @@ public class ManutencaoService {
         manutencao.setStatus(StatusManutencao.CANCELADA);
         manutencao.setObservacoes(cancelDTO.motivo());
 
-        return convertToResponseDTO(manutencaoRepository.save(manutencao));
+        Manutencao updatedManutencao = manutencaoRepository.save(manutencao);
+
+        Usuario auditor = currentUserProvider.getCurrentUsuario();
+        log.info("AUDIT: Usuário {} cancelou a manutenção com ID {} para o ativo {}. Motivo: {}.", auditor.getEmail(), updatedManutencao.getId(), updatedManutencao.getAtivo().getId(), cancelDTO.motivo());
+
+        return convertToResponseDTO(updatedManutencao);
     }
 
     @Transactional
     public void deletar(Long id) {
-        log.warn("Tentativa de deletar manutenção ID: {}", id);
         Manutencao manutencao = buscarEntidadePorId(id);
 
         if (manutencao.getStatus() != StatusManutencao.SOLICITADA) {
@@ -138,7 +157,9 @@ public class ManutencaoService {
         }
 
         manutencaoRepository.delete(manutencao);
-        log.info("Manutenção ID: {} deletada com sucesso.", id);
+
+        Usuario auditor = currentUserProvider.getCurrentUsuario();
+        log.info("AUDIT: Usuário {} deletou a manutenção com ID {} para o ativo {}.", auditor.getEmail(), id, manutencao.getAtivo().getId());
     }
 
     @Transactional(readOnly = true)

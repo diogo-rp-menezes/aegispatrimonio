@@ -9,7 +9,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @SpringBootApplication
 @EnableScheduling
 @EnableAsync
-@ComponentScan("br.com.aegispatrimonio")
+//@ComponentScan("br.com.aegispatrimonio")
 public class AegispatrimonioApplication {
 
     public static void main(String[] args) {

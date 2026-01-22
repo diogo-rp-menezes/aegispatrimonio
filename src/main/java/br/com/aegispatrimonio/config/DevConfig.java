@@ -5,6 +5,8 @@ import br.com.aegispatrimonio.repository.UsuarioRepository;
 import br.com.aegispatrimonio.security.CustomUserDetails;
 import br.com.aegispatrimonio.security.JwtService;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,6 +16,8 @@ import org.springframework.context.annotation.Profile;
 @Profile("dev") // Este bean só será ativado quando o perfil "dev" estiver ativo
 @RequiredArgsConstructor
 public class DevConfig {
+
+    private static final Logger logger = LoggerFactory.getLogger(DevConfig.class);
 
     // CORREÇÃO: Injetado UsuarioRepository em vez de PessoaRepository
     private final UsuarioRepository usuarioRepository;
@@ -28,9 +32,9 @@ public class DevConfig {
                 String token = jwtService.generateToken(new CustomUserDetails(adminUser));
 
                 // Imprime o token no console de forma bem visível
-                System.out.println("\n\n--- TOKEN DE DESENVOLVIMENTO (admin@aegis.com) ---");
-                System.out.println("Authorization: Bearer " + token);
-                System.out.println("--- COPIE O TOKEN ACIMA PARA USAR NO POSTMAN ---\n\n");
+                logger.info("\n\n--- TOKEN DE DESENVOLVIMENTO (admin@aegis.com) ---");
+                logger.info("Authorization: Bearer {}", token);
+                logger.info("--- COPIE O TOKEN ACIMA PARA USAR NO POSTMAN ---\n\n");
             });
         };
     }

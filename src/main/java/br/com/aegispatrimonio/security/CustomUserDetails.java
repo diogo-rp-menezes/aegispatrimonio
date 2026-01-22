@@ -8,6 +8,9 @@ import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Implementação de UserDetails que encapsula um objeto Usuario.
@@ -15,11 +18,26 @@ import java.util.Collections;
  */
 public class CustomUserDetails implements UserDetails {
 
-    // CORREÇÃO: Alterado de Pessoa para Usuario
     private final Usuario usuario;
+    private final Collection<? extends GrantedAuthority> authorities;
 
+    // Construtor original (para uso da aplicação real)
     public CustomUserDetails(Usuario usuario) {
         this.usuario = usuario;
+        // Garante que a role tenha exatamente um prefixo ROLE_
+        if (usuario != null && usuario.getRole() != null && !usuario.getRole().trim().isEmpty()) {
+            String role = usuario.getRole().trim();
+            String normalized = role.startsWith("ROLE_") ? role : "ROLE_" + role;
+            this.authorities = Collections.singletonList(new SimpleGrantedAuthority(normalized));
+        } else {
+            this.authorities = Collections.emptyList(); // Ou lançar exceção, dependendo da regra de negócio
+        }
+    }
+
+    // NOVO Construtor (para uso em testes e para flexibilidade futura)
+    public CustomUserDetails(Usuario usuario, Collection<? extends GrantedAuthority> authorities) {
+        this.usuario = usuario;
+        this.authorities = authorities;
     }
 
     public Usuario getUsuario() {
@@ -28,19 +46,16 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // CORREÇÃO: Busca a role do objeto Usuario
-        return Collections.singletonList(new SimpleGrantedAuthority(usuario.getRole()));
+        return authorities;
     }
 
     @Override
     public String getPassword() {
-        // CORREÇÃO: Busca a senha do objeto Usuario
         return usuario.getPassword();
     }
 
     @Override
     public String getUsername() {
-        // CORREÇÃO: Busca o email do objeto Usuario
         return usuario.getEmail();
     }
 
@@ -61,7 +76,6 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        // CORREÇÃO: Verifica o status do objeto Usuario
         return usuario.getStatus() == Status.ATIVO;
     }
 }
