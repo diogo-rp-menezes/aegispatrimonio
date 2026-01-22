@@ -1,0 +1,398 @@
+[INFO] Error stacktraces are turned on.
+[INFO] Scanning for projects...
+[INFO]
+[INFO] ---------------< br.com.aegispatrimonio:aegispatrimonio >---------------
+[INFO] Building aegispatispatrimonio 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- clean:3.3.2:clean (default-clean) @ aegispatrimonio ---
+[INFO] Deleting C:\Users\diogo\IdeaProjects\aegispatrimonio\target
+[INFO]
+[INFO] --- jacoco:0.8.13:prepare-agent (prepare-agent) @ aegispatrimonio ---
+[INFO] argLine set to -javaagent:C:\\Users\\diogo\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.13\\org.jacoco.agent-0.8.13-runtime.jar=destfile=C:\\Users\\diogo\\IdeaProjects\\aegispatrimonio\\target\\jacoco.exec,excludes=**/br/com/aegispatrimonio/dto/**
+[INFO]
+[INFO] --- resources:3.3.1:resources (default-resources) @ aegispatrimonio ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] Copying 2 resources from src\main\resources to target\classes
+[INFO]
+[INFO] --- compiler:3.13.0:compile (default-compile) @ aegispatrimonio ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 157 source files with javac [debug parameters release 21] to target\classes
+[INFO] /C:/Users/diogo/IdeaProjects/aegispatrimonio/src/main/java/br/com/aegispatrimonio/model/Funcionario.java: Some input files use or override a deprecated API.
+[INFO] /C:/Users/diogo/IdeaProjects/aegispatrimonio/src/main/java/br/com/aegispatrimonio/model/Funcionario.java: Recompile with -Xlint:deprecation for details.
+[INFO]
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ aegispatrimonio ---
+[INFO] Copying 5 resources from src\test\resources to target\test-classes
+[INFO]
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ aegispatrimonio ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 52 source files with javac [debug parameters release 21] to target\test-classes
+[INFO] /C:/Users/diogo/IdeaProjects/aegispatrimonio/src/test/java/br/com/aegispatrimonio/util/DatabaseCleaner.java: C:\Users\diogo\IdeaProjects\aegispatrimonio\src\test\java\br\com\aegispatrimonio\util\DatabaseCleaner.java uses unchecked or unsafe operations.
+[INFO] /C:/Users/diogo/IdeaProjects/aegispatrimonio/src/test/java/br/com/aegispatrimonio/util/DatabaseCleaner.java: Recompile with -Xlint:unchecked for details.
+[INFO]
+[INFO] --- surefire:3.2.5:test (default-test) @ aegispatrimonio ---
+[INFO] Surefire report directory: C:\Users\diogo\IdeaProjects\aegispatrimonio\target\surefire-reports
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO]
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running br.com.aegispatrimonio.AegispatrimonioApplicationTests
+01:46:45.453 [main] INFO org.testcontainers.images.PullPolicy -- Image pull policy will be performed by: DefaultPullPolicy()
+01:46:45.465 [main] INFO org.testcontainers.utility.ImageNameSubstitutor -- Image name substitution will be performed by: DefaultImageNameSubstitutor (composite of 'ConfigurationFileImageNameSubstitutor' and 'PrefixingImageNameSubstitutor')
+01:46:45.971 [main] INFO org.testcontainers.dockerclient.DockerClientProviderStrategy -- Loaded org.testcontainers.dockerclient.NpipeSocketClientProviderStrategy from ~/.testcontainers.properties, will try it first
+01:46:46.499 [main] INFO org.testcontainers.dockerclient.DockerClientProviderStrategy -- Found Docker environment with local Npipe socket (npipe:////./pipe/docker_engine)
+01:46:46.501 [main] INFO org.testcontainers.DockerClientFactory -- Docker host IP address is localhost
+01:46:46.530 [main] INFO org.testcontainers.DockerClientFactory -- Connected to docker:
+  Server Version: 28.5.1
+  API Version: 1.51
+  Operating System: Docker Desktop
+  Total Memory: 15865 MB
+01:46:46.550 [main] INFO org.testcontainers.DockerClientFactory -- Checking the system...
+01:46:46.552 [main] INFO org.testcontainers.DockerClientFactory -- ?? Docker server version should be at least 1.6.0
+01:46:46.719 [main] INFO tc.mysql:8.0.26 -- Creating container for image: mysql:8.0.26
+01:46:47.187 [main] INFO tc.mysql:8.0.26 -- Container mysql:8.0.26 is starting: 008ba566022fe97e3c39c02c866f6694b730adb7003df90431f5f20ddff8a41b
+01:46:47.616 [main] INFO tc.mysql:8.0.26 -- Waiting for database connection to become available at jdbc:mysql://localhost:63686/testdb using query 'SELECT 1'
+01:47:02.058 [main] INFO tc.mysql:8.0.26 -- Container mysql:8.0.26 started in PT15.3383637S
+01:47:02.058 [main] INFO tc.mysql:8.0.26 -- Container is started (JDBC URL: jdbc:mysql://localhost:63686/testdb)
+=== TESTCONTAINERS CONFIGURATION ===
+JDBC URL: jdbc:mysql://localhost:63686/testdb
+Username: test
+Password: test
+Container ID: 008ba566022fe97e3c39c02c866f6694b730adb7003df90431f5f20ddff8a41b
+Is Running: true
+================================
+01:47:02.201 [main] INFO org.springframework.boot.devtools.restart.RestartApplicationListener -- Restart disabled due to context in which it is running
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.3.0)
+2025-10-25T01:47:02.749-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.AegispatrimonioApplicationTests    : Starting AegispatrimonioApplicationTests using Java 21.0.8 with PID 3952 (started by diogo in C:\Users\diogo\IdeaProjects\aegispatrimonio)
+2025-10-25T01:47:02.751-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.AegispatrimonioApplicationTests    : The following 1 profile is active: "test"
+2025-10-25T01:47:07.442-03:00  INFO 3952 --- [aegis-patrimonio] [           main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:mysql://localhost:63686/testdb (MySQL 8.0)
+2025-10-25T01:47:07.563-03:00  INFO 3952 --- [aegis-patrimonio] [           main] o.f.c.i.s.JdbcTableSchemaHistory         : Schema history table `testdb`.`flyway_schema_history` does not exist yet
+2025-10-25T01:47:07.574-03:00  INFO 3952 --- [aegis-patrimonio] [           main] o.f.core.internal.command.DbValidate     : Successfully validated 2 migrations (execution time 00:00.054s)
+2025-10-25T01:47:07.622-03:00  INFO 3952 --- [aegis-patrimonio] [           main] o.f.c.i.s.JdbcTableSchemaHistory         : Creating Schema History table `testdb`.`flyway_schema_history` ...
+2025-10-25T01:47:07.814-03:00  INFO 3952 --- [aegis-patrimonio] [           main] o.f.core.internal.command.DbMigrate      : Current version of schema `testdb`: << Empty Schema >>
+2025-10-25T01:47:07.878-03:00  INFO 3952 --- [aegis-patrimonio] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema `testdb` to version "1 - Create Consolidated Schema"
+2025-10-25T01:47:10.403-03:00  INFO 3952 --- [aegis-patrimonio] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema `testdb` to version "2 - Insert Initial Data"
+2025-10-25T01:47:10.411-03:00  WARN 3952 --- [aegis-patrimonio] [           main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2025-10-25T01:47:10.415-03:00  WARN 3952 --- [aegis-patrimonio] [           main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2025-10-25T01:47:10.420-03:00  WARN 3952 --- [aegis-patrimonio] [           main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2025-10-25T01:47:10.426-03:00  WARN 3952 --- [aegis-patrimonio] [           main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2025-10-25T01:47:10.431-03:00  WARN 3952 --- [aegis-patrimonio] [           main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2025-10-25T01:47:10.480-03:00  INFO 3952 --- [aegis-patrimonio] [           main] o.f.core.internal.command.DbMigrate      : Successfully applied 2 migrations to schema `testdb`, now at version v2 (execution time 00:02.504s)
+2025-10-25T01:47:10.851-03:00  WARN 3952 --- [aegis-patrimonio] [           main] org.hibernate.orm.deprecation            : HHH90000021: Encountered deprecated setting [javax.persistence.validation.mode], use [jakarta.persistence.validation.mode] instead
+2025-10-25T01:47:11.629-03:00  WARN 3952 --- [aegis-patrimonio] [           main] org.hibernate.orm.deprecation            : HHH90000025: MySQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2025-10-25T01:47:16.284-03:00  WARN 3952 --- [aegis-patrimonio] [           main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with an AuthenticationProvider bean. UserDetailsService beans will not be used for username/password login. Consider removing the AuthenticationProvider bean. Alternatively, consider using the UserDetailsService in a manually instantiated DaoAuthenticationProvider.
+2025-10-25T01:47:16.587-03:00  WARN 3952 --- [aegis-patrimonio] [           main] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2025-10-25T01:47:18.473-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.AegispatrimonioApplicationTests    : Started AegispatrimonioApplicationTests in 16.3 seconds (process running for 35.366)
+WARNING: A Java agent has been loaded dynamically (C:\Users\diogo\.m2\repository\net\bytebuddy\byte-buddy-agent\1.14.16\byte-buddy-agent-1.14.16.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+Java HotSpot(TM) 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 35.11 s -- in br.com.aegispatrimonio.AegispatrimonioApplicationTests
+[INFO] Running br.com.aegispatrimonio.mapper.AtivoMapperTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.040 s -- in br.com.aegispatrimonio.mapper.AtivoMapperTest
+[INFO] Running br.com.aegispatrimonio.mapper.DepartamentoMapperTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.022 s -- in br.com.aegispatrimonio.mapper.DepartamentoMapperTest
+[INFO] Running br.com.aegispatrimonio.mapper.FilialMapperTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.033 s -- in br.com.aegispatrimonio.mapper.FilialMapperTest
+[INFO] Running br.com.aegispatrimonio.mapper.FornecedorMapperTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.036 s -- in br.com.aegispatrimonio.mapper.FornecedorMapperTest
+[INFO] Running br.com.aegispatrimonio.mapper.FuncionarioMapperTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.016 s -- in br.com.aegispatrimonio.mapper.FuncionarioMapperTest
+[INFO] Running br.com.aegispatrimonio.mapper.HealthCheckMapperTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.039 s -- in br.com.aegispatrimonio.mapper.HealthCheckMapperTest
+[INFO] Running br.com.aegispatrimonio.mapper.LocalizacaoMapperTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.032 s -- in br.com.aegispatrimonio.mapper.LocalizacaoMapperTest
+[INFO] Running br.com.aegispatrimonio.mapper.TipoAtivoMapperTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.022 s -- in br.com.aegispatrimonio.mapper.TipoAtivoMapperTest
+[INFO] Running br.com.aegispatrimonio.security.CustomPermissionEvaluatorTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.514 s -- in br.com.aegispatrimonio.security.CustomPermissionEvaluatorTest
+[INFO] Running br.com.aegispatrimonio.security.CustomUserDetailsServiceTest
+[ERROR] Tests run: 2, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.514 s <<< FAILURE! -- in br.com.aegispatrimonio.security.CustomUserDetailsServiceTest
+[ERROR] br.com.aegispatrimonio.security.CustomUserDetailsServiceTest.loadUserByUsername_deveRetornarUserDetails_quandoUsuarioExiste -- Time elapsed: 0.481 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: expected: <true> but was: <false>
+        at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+        at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+        at org.junit.jupiter.api.AssertTrue.failNotTrue(AssertTrue.java:63)
+        at org.junit.jupiter.api.AssertTrue.assertTrue(AssertTrue.java:36)
+        at org.junit.jupiter.api.AssertTrue.assertTrue(AssertTrue.java:31)
+        at org.junit.jupiter.api.Assertions.assertTrue(Assertions.java:183)
+        at br.com.aegispatrimonio.security.CustomUserDetailsServiceTest.loadUserByUsername_deveRetornarUserDetails_quandoUsuarioExiste(CustomUserDetailsServiceTest.java:54)
+        at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+        at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+        at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+[INFO] Running br.com.aegispatrimonio.security.CustomUserDetailsTest
+[ERROR] Tests run: 3, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.011 s <<< FAILURE! -- in br.com.aegispatrimonio.security.CustomUserDetailsTest
+[ERROR] br.com.aegispatrimonio.security.CustomUserDetailsTest.userDetails_deveRefletirUsuarioAtivo -- Time elapsed: 0.002 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: expected: <ROLE_USER> but was: <ROLE_ROLE_USER>
+        at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+        at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+        at org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+        at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:182)
+        at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:177)
+        at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:1145)
+        at br.com.aegispatrimonio.security.CustomUserDetailsTest.userDetails_deveRefletirUsuarioAtivo(CustomUserDetailsTest.java:36)
+        at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+        at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+        at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+[INFO] Running br.com.aegispatrimonio.security.JwtAuthFilterTest
+=== TESTCONTAINERS CONFIGURATION ===
+JDBC URL: jdbc:mysql://localhost:60748/testdb
+Username: test
+Password: test
+Container ID: 5182c612768308500ddbaa48c7590b20a36114b15edcd0175ed380597dcbd9f9
+Is Running: true
+================================
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.3.0)
+2025-10-25T01:47:37.023-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.security.JwtAuthFilterTest         : Starting JwtAuthFilterTest using Java 21.0.8 with PID 3952 (started by diogo in C:\Users\diogo\IdeaProjects\aegispatrimonio)
+2025-10-25T01:47:37.024-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.security.JwtAuthFilterTest         : The following 1 profile is active: "test"
+2025-10-25T01:47:39.142-03:00  INFO 3952 --- [aegis-patrimonio] [           main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:mysql://localhost:60748/testdb (MySQL 8.0)
+2025-10-25T01:47:39.178-03:00  INFO 3952 --- [aegis-patrimonio] [           main] o.f.c.i.s.JdbcTableSchemaHistory         : Schema history table `testdb`.`flyway_schema_history` does not exist yet
+2025-10-25T01:47:39.181-03:00  INFO 3952 --- [aegis-patrimonio] [           main] o.f.core.internal.command.DbValidate     : Successfully validated 2 migrations (execution time 00:00.018s)
+2025-10-25T01:47:39.226-03:00  INFO 3952 --- [aegis-patrimonio] [           main] o.f.c.i.s.JdbcTableSchemaHistory         : Creating Schema History table `testdb`.`flyway_schema_history` ...
+2025-10-25T01:47:39.378-03:00  INFO 3952 --- [aegis-patrimonio] [           main] o.f.core.internal.command.DbMigrate      : Current version of schema `testdb`: << Empty Schema >>
+2025-10-25T01:47:39.404-03:00  INFO 3952 --- [aegis-patrimonio] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema `testdb` to version "1 - Create Consolidated Schema"
+2025-10-25T01:47:41.605-03:00  INFO 3952 --- [aegis-patrimonio] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema `testdb` to version "2 - Insert Initial Data"
+2025-10-25T01:47:41.615-03:00  WARN 3952 --- [aegis-patrimonio] [           main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2025-10-25T01:47:41.621-03:00  WARN 3952 --- [aegis-patrimonio] [           main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2025-10-25T01:47:41.632-03:00  WARN 3952 --- [aegis-patrimonio] [           main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2025-10-25T01:47:41.639-03:00  WARN 3952 --- [aegis-patrimonio] [           main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2025-10-25T01:47:41.646-03:00  WARN 3952 --- [aegis-patrimonio] [           main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2025-10-25T01:47:41.709-03:00  INFO 3952 --- [aegis-patrimonio] [           main] o.f.core.internal.command.DbMigrate      : Successfully applied 2 migrations to schema `testdb`, now at version v2 (execution time 00:02.184s)
+2025-10-25T01:47:41.826-03:00  WARN 3952 --- [aegis-patrimonio] [           main] org.hibernate.orm.deprecation            : HHH90000021: Encountered deprecated setting [javax.persistence.validation.mode], use [jakarta.persistence.validation.mode] instead
+2025-10-25T01:47:41.882-03:00  WARN 3952 --- [aegis-patrimonio] [           main] org.hibernate.orm.deprecation            : HHH90000025: MySQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2025-10-25T01:47:42.949-03:00  WARN 3952 --- [aegis-patrimonio] [           main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with an AuthenticationProvider bean. UserDetailsService beans will not be used for username/password login. Consider removing the AuthenticationProvider bean. Alternatively, consider using the UserDetailsService in a manually instantiated DaoAuthenticationProvider.
+2025-10-25T01:47:43.086-03:00  WARN 3952 --- [aegis-patrimonio] [           main] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2025-10-25T01:47:43.970-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.security.JwtAuthFilterTest         : Started JwtAuthFilterTest in 7.024 seconds (process running for 60.863)
+2025-10-25T01:47:44.483-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.s.impl.PermissionServiceImpl       : [AUTHZ] allow=FALSE subject=admin@aegis.com roles=[ROLE_ROLE_ADMIN] resource=ATIVO action=READ targetId=null context=null
+MockHttpServletRequest:
+      HTTP Method = GET
+      Request URI = /api/v1/ativos
+       Parameters = {}
+          Headers = [Authorization:"Bearer valid-token"]
+             Body = null
+    Session Attrs = {}
+Handler:
+             Type = br.com.aegispatrimonio.controller.AtivoController
+           Method = br.com.aegispatrimonio.controller.AtivoController#listarTodos(Pageable, AtivoQueryParams)
+Async:
+    Async started = false
+     Async result = null
+Resolved Exception:
+             Type = org.springframework.security.authorization.AuthorizationDeniedException
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+FlashMap:
+       Attributes = null
+MockHttpServletResponse:
+           Status = 403
+    Error message = null
+          Headers = [Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/problem+json", X-Content-Type-Options:"nosniff", X-XSS-Protection:"0", Cache-Control:"no-cache, no-store, max-age=0, must-revalidate", Pragma:"no-cache", Expires:"0", X-Frame-Options:"DENY"]
+     Content type = application/problem+json
+             Body = {"type":"about:blank","title":"Access Denied","status":403,"detail":"Access Denied","instance":"/api/v1/ativos","correlationId":"34bebe23-89e5-4397-aa29-b13a5d8c393c"}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+[ERROR] Tests run: 4, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 24.05 s <<< FAILURE! -- in br.com.aegispatrimonio.security.JwtAuthFilterTest
+[ERROR] br.com.aegispatrimonio.security.JwtAuthFilterTest.doFilterInternal_comTokenValido_devePermitirAcesso -- Time elapsed: 0.370 s <<< FAILURE!
+java.lang.AssertionError: Status expected:<200> but was:<403>
+        at org.springframework.test.util.AssertionErrors.fail(AssertionErrors.java:59)
+        at org.springframework.test.util.AssertionErrors.assertEquals(AssertionErrors.java:122)
+        at org.springframework.test.web.servlet.result.StatusResultMatchers.lambda$matcher$9(StatusResultMatchers.java:637)
+        at org.springframework.test.web.servlet.MockMvc$1.andExpect(MockMvc.java:214)
+        at br.com.aegispatrimonio.security.JwtAuthFilterTest.doFilterInternal_comTokenValido_devePermitirAcesso(JwtAuthFilterTest.java:92)
+        at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+        at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+        at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+[INFO] Running br.com.aegispatrimonio.security.JwtServiceTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.372 s -- in br.com.aegispatrimonio.security.JwtServiceTest
+[INFO] Running br.com.aegispatrimonio.security.SecurityUtilTest
+[ERROR] Tests run: 8, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.020 s <<< FAILURE! -- in br.com.aegispatrimonio.security.SecurityUtilTest
+[ERROR] br.com.aegispatrimonio.security.SecurityUtilTest.isCurrentUserAdmin_deveRetornarTrue_paraAdmin -- Time elapsed: 0.002 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: expected: <true> but was: <false>
+        at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+        at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+        at org.junit.jupiter.api.AssertTrue.failNotTrue(AssertTrue.java:63)
+        at org.junit.jupiter.api.AssertTrue.assertTrue(AssertTrue.java:36)
+        at org.junit.jupiter.api.AssertTrue.assertTrue(AssertTrue.java:31)
+        at org.junit.jupiter.api.Assertions.assertTrue(Assertions.java:183)
+        at br.com.aegispatrimonio.security.SecurityUtilTest.isCurrentUserAdmin_deveRetornarTrue_paraAdmin(SecurityUtilTest.java:79)
+        at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+        at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+        at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+[INFO] Running br.com.aegispatrimonio.service.AtivoServiceTest
+2025-10-25T01:47:46.472-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.AtivoService               : AUDIT: Usu�rio admin@aegis.com deletou o ativo com ID 10.
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.946 s -- in br.com.aegispatrimonio.service.AtivoServiceTest
+[INFO] Running br.com.aegispatrimonio.service.DepartamentoServiceTest
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.359 s -- in br.com.aegispatrimonio.service.DepartamentoServiceTest
+[INFO] Running br.com.aegispatrimonio.service.DepreciacaoServiceTest
+2025-10-25T01:47:46.864-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.DepreciacaoService         : AUDIT: Usu�rio null recalculou a deprecia��o completa para o ativo ID: 1.
+2025-10-25T01:47:46.873-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.DepreciacaoService         : Iniciando job de c�lculo de deprecia��o mensal...
+2025-10-25T01:47:46.875-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.DepreciacaoService         : 1 ativos foram depreciados com sucesso.
+2025-10-25T01:47:46.878-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.DepreciacaoService         : Iniciando job de c�lculo de deprecia��o mensal...
+2025-10-25T01:47:46.879-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.DepreciacaoService         : Nenhum ativo eleg�vel para deprecia��o encontrado.
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.027 s -- in br.com.aegispatrimonio.service.DepreciacaoServiceTest
+[INFO] Running br.com.aegispatrimonio.service.FilialServiceTest
+2025-10-25T01:47:46.944-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.FilialService              : AUDIT: Usu�rio null atualizou a filial com ID 2 e nome Filial Atualizada.
+2025-10-25T01:47:46.976-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.FilialService              : AUDIT: Usu�rio null criou a filial com ID 2 e nome Filial.
+2025-10-25T01:47:46.989-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.FilialService              : AUDIT: Usu�rio null deletou a filial com ID 2 e nome Filial.
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.108 s -- in br.com.aegispatrimonio.service.FilialServiceTest
+[INFO] Running br.com.aegispatrimonio.service.FornecedorServiceTest
+2025-10-25T01:47:47.078-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.FornecedorService          : AUDIT: Usu�rio admin@aegis.com deletou (soft delete) o fornecedor com ID 1 e nome Fornecedor Teste. CNPJ: ****1-11.
+2025-10-25T01:47:47.105-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.FornecedorService          : AUDIT: Usu�rio admin@aegis.com atualizou o fornecedor com ID 1 e nome Fornecedor Update. CNPJ: ****1-33.
+2025-10-25T01:47:47.110-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.FornecedorService          : AUDIT: Usu�rio admin@aegis.com criou o fornecedor com ID 1 e nome Fornecedor Teste. CNPJ: ****1-11.
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.123 s -- in br.com.aegispatrimonio.service.FornecedorServiceTest
+[INFO] Running br.com.aegispatrimonio.service.FuncionarioServiceTest
+2025-10-25T01:47:47.249-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.FuncionarioService         : AUDIT: Usu�rio null atualizou o funcion�rio com ID 1 (email: email@email.com).
+2025-10-25T01:47:47.254-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.FuncionarioService         : AUDIT: Usu�rio null criou o funcion�rio com ID 1 (email: original@aegis.com).
+2025-10-25T01:47:47.266-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.FuncionarioService         : AUDIT: Usu�rio null deletou o funcion�rio com ID 1 (email: original@aegis.com).
+2025-10-25T01:47:47.270-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.FuncionarioService         : AUDIT: Usu�rio null atualizou o funcion�rio com ID 1 (email: update@aegis.com).
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.161 s -- in br.com.aegispatrimonio.service.FuncionarioServiceTest
+[INFO] Running br.com.aegispatrimonio.service.HealthCheckServiceTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.566 s -- in br.com.aegispatrimonio.service.HealthCheckServiceTest
+[INFO] Running br.com.aegispatrimonio.service.impl.PermissionServiceImplTest
+2025-10-25T01:47:47.862-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.s.impl.PermissionServiceImpl       : [AUTHZ] allow=FALSE subject=user roles=[ROLE_USER] resource=ATIVO action=UPDATE targetId=2 context=null
+2025-10-25T01:47:47.862-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.s.impl.PermissionServiceImpl       : [AUTHZ] allow=FALSE subject=user roles=[ROLE_USER] resource=ATIVO action=DELETE targetId=2 context=null
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.015 s -- in br.com.aegispatrimonio.service.impl.PermissionServiceImplTest
+[INFO] Running br.com.aegispatrimonio.service.impl.PermissionServiceMetricsTest
+2025-10-25T01:47:47.886-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.s.impl.PermissionServiceImpl       : [AUTHZ] allow=FALSE subject=user roles=[ROLE_USER] resource=ATIVO action=UPDATE targetId=1 context=null
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.021 s -- in br.com.aegispatrimonio.service.impl.PermissionServiceMetricsTest
+[INFO] Running br.com.aegispatrimonio.service.LocalizacaoServiceTest
+2025-10-25T01:47:48.006-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.LocalizacaoService         : AUDIT: Usu�rio null criou a localiza��o com ID 10 e nome Sala 101. Filial: Filial A.
+2025-10-25T01:47:48.061-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.LocalizacaoService         : AUDIT: Usu�rio null deletou a localiza��o com ID 10 e nome Sala 101. Filial: Filial A.
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.198 s -- in br.com.aegispatrimonio.service.LocalizacaoServiceTest
+[INFO] Running br.com.aegispatrimonio.service.manager.DefaultHealthCheckCollectionsManagerTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.023 s -- in br.com.aegispatrimonio.service.manager.DefaultHealthCheckCollectionsManagerTest
+[INFO] Running br.com.aegispatrimonio.service.ManutencaoServiceTest
+2025-10-25T01:47:48.136-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.ManutencaoService          : AUDIT: Usu�rio null iniciou a manuten��o com ID 100 para o ativo 1 com t�cnico Tecnico Teste.
+2025-10-25T01:47:48.143-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.ManutencaoService          : AUDIT: Usu�rio null cancelou a manuten��o com ID 100 para o ativo 1. Motivo: Motivo teste.
+2025-10-25T01:47:48.156-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.ManutencaoService          : AUDIT: Usu�rio null cancelou a manuten��o com ID 100 para o ativo 1. Motivo: Motivo teste.
+2025-10-25T01:47:48.165-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.ManutencaoService          : AUDIT: Usu�rio null concluiu a manuten��o com ID 100 para o ativo 1.
+2025-10-25T01:47:48.172-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.ManutencaoService          : AUDIT: Usu�rio null deletou a manuten��o com ID 100 para o ativo 1.
+2025-10-25T01:47:48.178-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.ManutencaoService          : AUDIT: Usu�rio null aprovou a manuten��o com ID 100 para o ativo 1.
+2025-10-25T01:47:48.187-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.ManutencaoService          : AUDIT: Usu�rio null criou a manuten��o com ID 100 para o ativo 1.
+[INFO] Tests run: 15, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.072 s -- in br.com.aegispatrimonio.service.ManutencaoServiceTest
+[INFO] Running br.com.aegispatrimonio.service.MovimentacaoServiceTest
+2025-10-25T01:47:48.194-03:00  WARN 3952 --- [aegis-patrimonio] [           main] b.c.a.service.MovimentacaoService        : Tentativa de deletar movimenta��o ID: 1
+2025-10-25T01:47:48.198-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.MovimentacaoService        : Cancelando movimenta��o ID: 1
+2025-10-25T01:47:48.201-03:00  WARN 3952 --- [aegis-patrimonio] [           main] b.c.a.service.MovimentacaoService        : Tentativa de deletar movimenta��o ID: 1
+2025-10-25T01:47:48.201-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.MovimentacaoService        : Movimenta��o ID: 1 deletada com sucesso.
+2025-10-25T01:47:48.205-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.MovimentacaoService        : Criando nova movimenta��o para o ativo ID: 1
+2025-10-25T01:47:48.208-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.MovimentacaoService        : Efetivando movimenta��o ID: 1
+2025-10-25T01:47:48.214-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.MovimentacaoService        : Criando nova movimenta��o para o ativo ID: 1
+2025-10-25T01:47:48.218-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.MovimentacaoService        : Efetivando movimenta��o ID: 1
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.029 s -- in br.com.aegispatrimonio.service.MovimentacaoServiceTest
+[INFO] Running br.com.aegispatrimonio.service.policy.DefaultHealthCheckAuthorizationPolicyTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.045 s -- in br.com.aegispatrimonio.service.policy.DefaultHealthCheckAuthorizationPolicyTest
+[INFO] Running br.com.aegispatrimonio.service.provider.SecurityContextCurrentUserProviderTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.016 s -- in br.com.aegispatrimonio.service.provider.SecurityContextCurrentUserProviderTest
+[INFO] Running br.com.aegispatrimonio.service.TipoAtivoServiceTest
+2025-10-25T01:47:48.374-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.TipoAtivoService           : AUDIT: Usu�rio null deletou o tipo de ativo com ID 1 e nome Hardware.
+2025-10-25T01:47:48.377-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.TipoAtivoService           : AUDIT: Usu�rio null criou o tipo de ativo com ID 1 e nome Hardware.
+2025-10-25T01:47:48.384-03:00  INFO 3952 --- [aegis-patrimonio] [           main] b.c.a.service.TipoAtivoService           : AUDIT: Usu�rio null atualizou o tipo de ativo com ID 1 e nome Software.
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.095 s -- in br.com.aegispatrimonio.service.TipoAtivoServiceTest
+[INFO] Running br.com.aegispatrimonio.service.updater.DefaultHealthCheckUpdaterTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.006 s -- in br.com.aegispatrimonio.service.updater.DefaultHealthCheckUpdaterTest
+[INFO]
+[INFO] Results:
+[INFO]
+[ERROR] Failures:
+[ERROR]   CustomUserDetailsServiceTest.loadUserByUsername_deveRetornarUserDetails_quandoUsuarioExiste:54 expected: <true> but was: <false>
+[ERROR]   CustomUserDetailsTest.userDetails_deveRefletirUsuarioAtivo:36 expected: <ROLE_USER> but was: <ROLE_ROLE_USER>
+[ERROR]   JwtAuthFilterTest.doFilterInternal_comTokenValido_devePermitirAcesso:92 Status expected:<200> but was:<403>
+[ERROR]   SecurityUtilTest.isCurrentUserAdmin_deveRetornarTrue_paraAdmin:79 expected: <true> but was: <false>
+[INFO]
+[ERROR] Tests run: 173, Failures: 4, Errors: 0, Skipped: 0
+[INFO]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  01:17 min
+[INFO] Finished at: 2025-10-25T01:47:49-03:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.5:test (default-test) on project aegispatrimonio: There are test failures.
+[ERROR]
+[ERROR] Please refer to C:\Users\diogo\IdeaProjects\aegispatrimonio\target\surefire-reports for the individual test results.
+[ERROR] Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+org.apache.maven.lifecycle.LifecycleExecutionException: Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.5:test (default-test) on project aegispatrimonio: There are test failures.
+Please refer to C:\Users\diogo\IdeaProjects\aegispatrimonio\target\surefire-reports for the individual test results.
+Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+    at org.apache.maven.lifecycle.internal.MojoExecutor.doExecute2 (MojoExecutor.java:333)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.doExecute (MojoExecutor.java:316)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:212)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:174)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.access$000 (MojoExecutor.java:75)
+    at org.apache.maven.lifecycle.internal.MojoExecutor$1.run (MojoExecutor.java:162)
+    at org.apache.maven.plugin.DefaultMojosExecutionStrategy.execute (DefaultMojosExecutionStrategy.java:39)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:159)
+    at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:105)
+    at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:73)
+    at org.apache.maven.lifecycle.internal.builder.singlethreaded.SingleThreadedBuilder.build (SingleThreadedBuilder.java:53)
+    at org.apache.maven.lifecycle.internal.LifecycleStarter.execute (LifecycleStarter.java:118)
+    at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:261)
+    at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:173)
+    at org.apache.maven.DefaultMaven.execute (DefaultMaven.java:101)
+    at org.apache.maven.cli.MavenCli.execute (MavenCli.java:906)
+    at org.apache.maven.cli.MavenCli.doMain (MavenCli.java:283)
+    at org.apache.maven.cli.MavenCli.main (MavenCli.java:206)
+    at jdk.internal.reflect.DirectMethodHandleAccessor.invoke (DirectMethodHandleAccessor.java:103)
+    at java.lang.reflect.Method.invoke (Method.java:580)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.launchEnhanced (Launcher.java:255)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.launch (Launcher.java:201)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.mainWithExitCode (Launcher.java:361)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.main (Launcher.java:314)
+Caused by: org.apache.maven.plugin.MojoFailureException: There are test failures.
+Please refer to C:\Users\diogo\IdeaProjects\aegispatrimonio\target\surefire-reports for the individual test results.
+Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+    at org.apache.maven.plugin.surefire.SurefireHelper.throwException (SurefireHelper.java:247)
+    at org.apache.maven.plugin.surefire.SurefireHelper.reportExecution (SurefireHelper.java:159)
+    at org.apache.maven.plugin.surefire.SurefirePlugin.handleSummary (SurefirePlugin.java:542)
+    at org.apache.maven.plugin.surefire.AbstractSurefireMojo.executeAfterPreconditionsChecked (AbstractSurefireMojo.java:1102)
+    at org.apache.maven.plugin.surefire.AbstractSurefireMojo.execute (AbstractSurefireMojo.java:910)
+    at org.apache.maven.plugin.DefaultBuildPluginManager.executeMojo (DefaultBuildPluginManager.java:126)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.doExecute2 (MojoExecutor.java:328)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.doExecute (MojoExecutor.java:316)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:212)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:174)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.access$000 (MojoExecutor.java:75)
+    at org.apache.maven.lifecycle.internal.MojoExecutor$1.run (MojoExecutor.java:162)
+    at org.apache.maven.plugin.DefaultMojosExecutionStrategy.execute (DefaultMojosExecutionStrategy.java:39)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:159)
+    at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:105)
+    at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:73)
+    at org.apache.maven.lifecycle.internal.builder.singlethreaded.SingleThreadedBuilder.build (SingleThreadedBuilder.java:53)
+    at org.apache.maven.lifecycle.internal.LifecycleStarter.execute (LifecycleStarter.java:118)
+    at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:261)
+    at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:173)
+    at org.apache.maven.DefaultMaven.execute (DefaultMaven.java:101)
+    at org.apache.maven.cli.MavenCli.execute (MavenCli.java:906)
+    at org.apache.maven.cli.MavenCli.doMain (MavenCli.java:283)
+    at org.apache.maven.cli.MavenCli.main (MavenCli.java:206)
+    at jdk.internal.reflect.DirectMethodHandleAccessor.invoke (DirectMethodHandleAccessor.java:103)
+    at java.lang.reflect.Method.invoke (Method.java:580)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.launchEnhanced (Launcher.java:255)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.launch (Launcher.java:201)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.mainWithExitCode (Launcher.java:361)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.main (Launcher.java:314)
+[ERROR]
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR]
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
