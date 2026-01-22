@@ -19,4 +19,6 @@ public interface LocalizacaoRepository extends JpaRepository<Localizacao, Long> 
 
     Optional<Localizacao> findByNomeAndFilialAndLocalizacaoPai(String nome, Filial filial, Localizacao localizacaoPai);
 
+    @org.springframework.data.jpa.repository.Query("SELECT l FROM Localizacao l WHERE l.filial.id = :#{T(br.com.aegispatrimonio.context.TenantContext).getFilialId()}")
+    List<Localizacao> findAllByCurrentTenant();
 }

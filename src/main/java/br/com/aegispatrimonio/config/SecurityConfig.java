@@ -57,7 +57,8 @@ public class SecurityConfig {
                 )
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(new TenantFilter(), JwtAuthFilter.class);
+                .addFilterBefore(new TenantFilter(), JwtAuthFilter.class)
+                .addFilterAfter(new br.com.aegispatrimonio.security.TenantAccessFilter(), JwtAuthFilter.class);
 
         return http.build();
     }
