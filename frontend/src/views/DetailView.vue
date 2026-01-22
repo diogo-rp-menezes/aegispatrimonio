@@ -2,7 +2,7 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { buscarAtivoPorId } from "../services/api";
+import { request } from "../services/api";
 
 const route = useRoute();
 const router = useRouter();
@@ -15,7 +15,7 @@ async function carregarAtivo() {
   loading.value = true;
   error.value = null;
   try {
-    ativo.value = await buscarAtivoPorId(route.params.id);
+    ativo.value = await request(`/ativos/${route.params.id}`);
   } catch (err) {
     console.error(err);
     error.value = "Erro ao carregar ativo.";

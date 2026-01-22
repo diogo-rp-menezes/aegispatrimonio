@@ -109,7 +109,7 @@
 
 <script setup>
 import { ref, reactive, onMounted, computed, defineProps, defineEmits } from 'vue';
-import axios from 'axios';
+import { request } from '../services/api';
 
 // Defina props e emits
 const props = defineProps({
@@ -120,8 +120,6 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['saved', 'cancel']);
-
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080/api';
 
 const isEdit = computed(() => !!props.ativoId);
 
@@ -141,7 +139,7 @@ const saving = ref(false);
 
 onMounted(async () => {
   if (isEdit.value) {
-    const { data } = await axios.get(`${API_BASE}/ativos/${props.ativoId}`);
+    const data = await request(`/ativos/${props.ativoId}`);
     Object.assign(form, data, {
       tipoAtivoId: data.tipoAtivoId || '',
       localizacaoId: data.localizacaoId || '',
@@ -152,12 +150,12 @@ onMounted(async () => {
 
   // Carregar listas auxiliares
   try {
-    const [tiposResp, locsResp] = await Promise.all([
-      axios.get(`${API_BASE}/tipos-ativos`).catch(() => ({ data: [] })),
-      axios.get(`${API_BASE}/localizacoes`).catch(() => ({ data: [] })),
+    const [tiposData, locsData] = await Promise.all([
+      request('/tipos-ativos').catch(() => []),
+      request('/localizacoes').catch(() => []),
     ]);
-    tipos.value = tiposResp.data;
-    localizacoes.value = locsResp.data;
+    tipos.value = tiposData;
+    localizacoes.value = locsData;
   } catch (e) {
     console.warn('Não foi possível carregar listas auxiliares', e);
   }
@@ -167,9 +165,9 @@ async function save() {
   saving.value = true;
   try {
     if (isEdit.value) {
-      await axios.put(`${API_BASE}/ativos/${props.ativoId}`, form);
+      await request(`/ativos/${props.ativoId}`, { method: 'PUT', body: form });
     } else {
-      await axios.post(`${API_BASE}/ativos`, form);
+      await request('/ativos', { method: 'POST', body: form });
     }
     emit('saved');
   } finally {
