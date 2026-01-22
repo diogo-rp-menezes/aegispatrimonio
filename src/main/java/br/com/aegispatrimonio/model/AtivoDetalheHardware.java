@@ -23,39 +23,39 @@ public class AtivoDetalheHardware {
     private Ativo ativo;
 
     // --- Workstation Info ---
-    @Column(name = "computer_name")
+    @Column(name = "nome_maquina")
     private String computerName;
 
-    @Column(name = "domain")
+    @Column(name = "dominio")
     private String domain;
 
-    @Column(name = "os_name")
+    @Column(name = "sistema_operacional")
     private String osName;
 
-    @Column(name = "os_version")
+    @Column(name = "versao_so")
     private String osVersion;
 
-    @Column(name = "os_architecture")
+    @Column(name = "arquitetura_so")
     private String osArchitecture;
 
     // --- Motherboard Info ---
-    @Column(name = "motherboard_manufacturer")
+    @Column(name = "fabricante")
     private String motherboardManufacturer;
 
-    @Column(name = "motherboard_model")
+    @Column(name = "modelo")
     private String motherboardModel;
 
-    @Column(name = "motherboard_serial_number")
+    @Column(name = "numero_serie")
     private String motherboardSerialNumber;
 
     // --- CPU Info ---
-    @Column(name = "cpu_model")
+    @Column(name = "processador")
     private String cpuModel;
 
-    @Column(name = "cpu_cores")
+    @Column(name = "processadores_fisicos")
     private Integer cpuCores;
 
-    @Column(name = "cpu_threads")
+    @Column(name = "processadores_logicos")
     private Integer cpuThreads;
 
     @Column(name = "last_updated")

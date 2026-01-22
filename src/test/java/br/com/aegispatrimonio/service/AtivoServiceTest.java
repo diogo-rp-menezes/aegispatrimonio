@@ -195,4 +195,47 @@ class AtivoServiceTest {
 
         verify(ativoRepository).delete(ativo);
     }
+
+    @Test
+    @DisplayName("Criar: Deve salvar detalhes de hardware quando informados")
+    void criar_comDetalhesHardware_deveSalvarCorretamente() {
+        // Arrange
+        br.com.aegispatrimonio.dto.AtivoDetalheHardwareDTO hardwareDTO = new br.com.aegispatrimonio.dto.AtivoDetalheHardwareDTO(
+            "PC-01", "DOMAIN", "Windows 11", "22H2", "x64",
+            "Dell", "Model X", "SN123", "i7", 8, 16
+        );
+
+        AtivoCreateDTO createDTO = new AtivoCreateDTO(
+            1L, "PC Gamer", 1L, "PAT-99", 1L, LocalDate.now(), 1L,
+            BigDecimal.valueOf(5000), 1L, "Obs", null, hardwareDTO
+        );
+
+        when(filialRepository.findById(1L)).thenReturn(Optional.of(filialA));
+        when(tipoAtivoRepository.findById(1L)).thenReturn(Optional.of(new TipoAtivo()));
+        when(fornecedorRepository.findById(1L)).thenReturn(Optional.of(new Fornecedor()));
+        when(localizacaoRepository.findById(1L)).thenReturn(Optional.of(localizacao));
+        when(funcionarioRepository.findById(1L)).thenReturn(Optional.of(adminUser.getFuncionario()));
+
+        when(ativoRepository.save(any(Ativo.class))).thenAnswer(invocation -> {
+            Ativo a = invocation.getArgument(0);
+            a.setId(99L);
+            return a;
+        });
+
+        // Mock para o retorno final (não precisa ter os detalhes para este teste passar, pois verificamos o capture)
+        when(ativoRepository.findByIdWithDetails(99L)).thenReturn(Optional.of(ativo));
+
+        // Act
+        ativoService.criar(createDTO);
+
+        // Assert
+        org.mockito.ArgumentCaptor<Ativo> ativoCaptor = org.mockito.ArgumentCaptor.forClass(Ativo.class);
+        verify(ativoRepository).save(ativoCaptor.capture());
+
+        Ativo ativoSalvo = ativoCaptor.getValue();
+        org.junit.jupiter.api.Assertions.assertNotNull(ativoSalvo.getDetalheHardware());
+        org.junit.jupiter.api.Assertions.assertEquals("PC-01", ativoSalvo.getDetalheHardware().getComputerName());
+        org.junit.jupiter.api.Assertions.assertEquals("Windows 11", ativoSalvo.getDetalheHardware().getOsName());
+        org.junit.jupiter.api.Assertions.assertEquals(ativoSalvo, ativoSalvo.getDetalheHardware().getAtivo());
+    }
 }
