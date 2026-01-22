@@ -123,6 +123,8 @@ class AtivoServiceTest {
         ativoOutraFilial.setId(11L);
         ativoOutraFilial.setFilial(filialB);
         when(ativoRepository.findByIdWithDetails(11L)).thenReturn(Optional.of(ativoOutraFilial));
+        // CORREÇÃO: Mockar o repositório de funcionários para garantir que a verificação de segurança ocorra
+        when(funcionarioRepository.findById(2L)).thenReturn(Optional.of(regularUser.getFuncionario()));
 
         assertThrows(AccessDeniedException.class, () -> ativoService.buscarPorId(11L));
     }
