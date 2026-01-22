@@ -49,6 +49,13 @@ public class LocalizacaoService {
 
     @Transactional(readOnly = true)
     public List<LocalizacaoDTO> listarTodos() {
+        // Synaptic Switching: Se um contexto de Tenant estiver ativo, filtra automaticamente
+        if (br.com.aegispatrimonio.context.TenantContext.getFilialId() != null) {
+            return localizacaoRepository.findAllByCurrentTenant().stream()
+                    .map(localizacaoMapper::toDTO)
+                    .collect(Collectors.toList());
+        }
+
         Usuario usuarioLogado = getUsuarioLogado();
         if (isAdmin(usuarioLogado)) {
             return localizacaoRepository.findAll().stream().map(localizacaoMapper::toDTO).collect(Collectors.toList());

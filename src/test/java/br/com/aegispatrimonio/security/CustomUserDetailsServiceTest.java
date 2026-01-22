@@ -42,7 +42,7 @@ class CustomUserDetailsServiceTest {
     void loadUserByUsername_deveRetornarUserDetails_quandoUsuarioExiste() {
         // Arrange
         String email = "test@aegis.com";
-        when(usuarioRepository.findByEmail(email)).thenReturn(Optional.of(testUser));
+        when(usuarioRepository.findWithDetailsByEmail(email)).thenReturn(Optional.of(testUser));
 
         // Act
         UserDetails userDetails = customUserDetailsService.loadUserByUsername(email);
@@ -60,7 +60,7 @@ class CustomUserDetailsServiceTest {
     void loadUserByUsername_deveLancarExcecao_quandoUsuarioNaoExiste() {
         // Arrange
         String email = "notfound@aegis.com";
-        when(usuarioRepository.findByEmail(email)).thenReturn(Optional.empty());
+        when(usuarioRepository.findWithDetailsByEmail(email)).thenReturn(Optional.empty());
 
         // Act & Assert
         UsernameNotFoundException exception = assertThrows(UsernameNotFoundException.class, () -> {

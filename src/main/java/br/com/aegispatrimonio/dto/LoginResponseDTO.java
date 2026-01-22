@@ -1,4 +1,6 @@
 package br.com.aegispatrimonio.dto;
 
-public record LoginResponseDTO(String token) {
+import java.util.List;
+
+public record LoginResponseDTO(String token, List<FilialSimpleDTO> filiais) {
 }

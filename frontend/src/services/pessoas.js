@@ -1,5 +1,5 @@
 // src/services/pessoas.js
-import { handleResponse } from './api';
+import { request } from './api';
 
 const BASE_URL = '/api/pessoas';
 
@@ -13,57 +13,44 @@ export const pessoaService = {
     if (filtros.page !== undefined) params.append('page', filtros.page);
     if (filtros.size !== undefined) params.append('size', filtros.size);
     
-    const response = await fetch(`${BASE_URL}?${params}`);
-    return handleResponse(response);
+    return request(`${BASE_URL}?${params}`);
   },
 
   // Buscar pessoa por ID
   async buscarPorId(id) {
-    const response = await fetch(`${BASE_URL}/${id}`);
-    return handleResponse(response);
+    return request(`${BASE_URL}/${id}`);
   },
 
   // Buscar pessoa por email
   async buscarPorEmail(email) {
-    const response = await fetch(`${BASE_URL}/email/${encodeURIComponent(email)}`);
-    return handleResponse(response);
+    return request(`${BASE_URL}/email/${encodeURIComponent(email)}`);
   },
 
   // Criar nova pessoa
   async criar(pessoaData) {
-    const response = await fetch(BASE_URL, {
+    return request(BASE_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(pessoaData),
     });
-    return handleResponse(response);
   },
 
   // Atualizar pessoa
   async atualizar(id, pessoaData) {
-    const response = await fetch(`${BASE_URL}/${id}`, {
+    return request(`${BASE_URL}/${id}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(pessoaData),
     });
-    return handleResponse(response);
   },
 
   // Deletar pessoa
   async deletar(id) {
-    const response = await fetch(`${BASE_URL}/${id}`, {
+    return request(`${BASE_URL}/${id}`, {
       method: 'DELETE',
     });
-    return handleResponse(response);
   },
 
   // Buscar estatísticas de pessoas
   async getEstatisticas() {
-    const response = await fetch(`${BASE_URL}/estatisticas`);
-    return handleResponse(response);
+    return request(`${BASE_URL}/estatisticas`);
   }
 };

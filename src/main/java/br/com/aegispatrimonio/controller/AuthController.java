@@ -1,7 +1,10 @@
 package br.com.aegispatrimonio.controller;
 
+import br.com.aegispatrimonio.dto.FilialSimpleDTO;
 import br.com.aegispatrimonio.dto.LoginRequestDTO;
 import br.com.aegispatrimonio.dto.LoginResponseDTO;
+import br.com.aegispatrimonio.model.Usuario;
+import br.com.aegispatrimonio.security.CustomUserDetails;
 import br.com.aegispatrimonio.security.CustomUserDetailsService;
 import br.com.aegispatrimonio.security.JwtService;
 import jakarta.validation.Valid;
@@ -13,6 +16,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Controller responsável pelo processo de autenticação.
@@ -51,7 +58,17 @@ public class AuthController {
         final UserDetails userDetails = userDetailsService.loadUserByUsername(loginRequest.email());
         final String token = jwtService.generateToken(userDetails);
 
+        List<FilialSimpleDTO> filiais = Collections.emptyList();
+        if (userDetails instanceof CustomUserDetails) {
+            Usuario usuario = ((CustomUserDetails) userDetails).getUsuario();
+            if (usuario.getFuncionario() != null && usuario.getFuncionario().getFiliais() != null) {
+                filiais = usuario.getFuncionario().getFiliais().stream()
+                        .map(f -> new FilialSimpleDTO(f.getId(), f.getNome()))
+                        .collect(Collectors.toList());
+            }
+        }
+
         // Retorna o token na resposta
-        return ResponseEntity.ok(new LoginResponseDTO(token));
+        return ResponseEntity.ok(new LoginResponseDTO(token, filiais));
     }
 }
