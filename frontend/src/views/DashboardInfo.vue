@@ -1,10 +1,9 @@
 <script setup>
 import { ref, onMounted } from "vue";
-import axios from 'axios';
 import { useRouter } from 'vue-router';
+import { request } from '../services/api';
 
 const router = useRouter();
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080/api/v1';
 
 const stats = ref([
   { title: "Total de Ativos", value: "...", icon: "bi-box-seam", color: "primary" },
@@ -41,7 +40,7 @@ function getStatusBadge(status) {
 
 async function fetchStats() {
   try {
-    const { data } = await axios.get(`${API_BASE}/dashboard/stats`);
+    const data = await request('/dashboard/stats');
     stats.value = [
       { title: "Total de Ativos", value: data.totalAtivos, icon: "bi-box-seam", color: "primary" },
       { title: "Em Manutenção", value: data.ativosEmManutencao, icon: "bi-tools", color: "warning" },
@@ -55,7 +54,7 @@ async function fetchStats() {
 
 async function fetchRecentAssets() {
   try {
-    const { data } = await axios.get(`${API_BASE}/ativos?size=5&sort=id,desc`);
+    const data = await request('/ativos', { params: { size: 5, sort: 'id,desc' } });
     // API returns Page<AtivoDTO>
     tableData.value = data.content.map(item => ({
       id: item.id,

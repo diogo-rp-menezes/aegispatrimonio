@@ -95,9 +95,8 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import axios from 'axios';
+import { request } from '../services/api';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080/api';
 const route = useRoute();
 const router = useRouter();
 
@@ -105,7 +104,7 @@ const ativo = ref(null);
 
 onMounted(async () => {
   try {
-    const { data } = await axios.get(`${API_BASE}/ativos/${route.params.id}`);
+    const data = await request(`/ativos/${route.params.id}`);
     ativo.value = data;
   } catch (e) {
     console.error('Erro ao carregar ativo', e);
