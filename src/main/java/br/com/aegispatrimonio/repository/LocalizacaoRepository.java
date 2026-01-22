@@ -21,4 +21,7 @@ public interface LocalizacaoRepository extends JpaRepository<Localizacao, Long> 
 
     @org.springframework.data.jpa.repository.Query("SELECT l FROM Localizacao l WHERE l.filial.id = :#{T(br.com.aegispatrimonio.context.TenantContext).getFilialId()}")
     List<Localizacao> findAllByCurrentTenant();
+
+    @org.springframework.data.jpa.repository.Query("SELECT COUNT(l) FROM Localizacao l WHERE l.filial.id = :#{T(br.com.aegispatrimonio.context.TenantContext).getFilialId()}")
+    long countByCurrentTenant();
 }
