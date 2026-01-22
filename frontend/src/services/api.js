@@ -50,7 +50,12 @@ export const request = async (endpoint, options = {}) => {
         headers['X-Filial-ID'] = filialId;
     }
 
-    const url = `${fetchConfig.baseURL}${endpoint}`;
+    let url = `${fetchConfig.baseURL}${endpoint}`;
+
+    if (options.params) {
+        const query = new URLSearchParams(options.params).toString();
+        url += `?${query}`;
+    }
 
     const response = await fetch(url, {
         ...options,
