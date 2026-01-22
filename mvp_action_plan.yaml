@@ -1,0 +1,62 @@
+audit:
+  project_name: "Aegis Patrimônio"
+  analysis_date: "2024-05-21"
+  tech_stack:
+    backend:
+      framework: "Spring Boot 3.3.0"
+      language: "Java 21"
+      persistence: "Spring Data JPA, Hibernate Envers"
+      database: "MySQL 8.0"
+      migrations: "Flyway"
+      security: "Spring Security + JWT"
+    frontend:
+      framework: "Vue.js 3"
+      build_tool: "Vite"
+      ui_lib: "Bootstrap 5"
+      state: "Pinia"
+  hotspots:
+    - id: "H1"
+      severity: "Medium"
+      description: "Duplicate exception handling logic in GlobalExceptionHandler and RestExceptionHandler."
+    - id: "H2"
+      severity: "High"
+      description: "Potential mismatch in frontend API Base URL configuration (.env verification needed)."
+    - id: "H3"
+      severity: "Low"
+      description: "README contains outdated 'In Development' items (PDF, QR Code) that are not present in codebase."
+
+plan:
+  phases:
+    - id: "phase_1"
+      name: "Foundation & Configuration"
+      priority: "P0"
+      steps:
+        - task: "Check/Create frontend/.env"
+          details: "Ensure VITE_API_BASE_URL points to http://localhost:8080/api/v1"
+        - task: "Verify Backend Config"
+          details: "Check application.properties for DB and JWT settings"
+
+    - id: "phase_2"
+      name: "Refactoring & cleanup"
+      priority: "P3"
+      steps:
+        - task: "Consolidate Exception Handlers"
+          details: "Merge GlobalExceptionHandler and RestExceptionHandler into a single class. Ensure ProblemDetail is used consistently."
+        - task: "Verify Security Exception Handling"
+          details: "Ensure SecurityConfig delegates auth errors to the consolidated handler."
+
+    - id: "phase_3"
+      name: "Core MVP Validation"
+      priority: "P0"
+      steps:
+        - task: "Verify Authentication"
+          details: "Test Login Flow: Login -> JWT -> LocalStorage -> Redirect"
+        - task: "Verify Asset CRUD"
+          details: "Test List (with filters), Create, Update, and Delete operations for 'Ativo' entity."
+
+    - id: "phase_4"
+      name: "Documentation"
+      priority: "P4"
+      steps:
+        - task: "Update README.md"
+          details: "Remove unimplemented 'In Development' features or mark them clearly as future work. Update Tech Stack versions if needed."
