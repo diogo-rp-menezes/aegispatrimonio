@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -86,4 +87,13 @@ public interface AtivoRepository extends JpaRepository<Ativo, Long> {
      */
     @Query("SELECT a FROM Ativo a WHERE a.filial.id = :#{T(br.com.aegispatrimonio.context.TenantContext).getFilialId()}")
     List<Ativo> findAllByCurrentTenant();
+
+    @Query("SELECT COUNT(a) FROM Ativo a WHERE a.filial.id = :#{T(br.com.aegispatrimonio.context.TenantContext).getFilialId()}")
+    long countByCurrentTenant();
+
+    @Query("SELECT COUNT(a) FROM Ativo a WHERE a.status = :status AND a.filial.id = :#{T(br.com.aegispatrimonio.context.TenantContext).getFilialId()}")
+    long countByStatusAndCurrentTenant(@Param("status") StatusAtivo status);
+
+    @Query("SELECT SUM(a.valorAquisicao) FROM Ativo a WHERE a.filial.id = :#{T(br.com.aegispatrimonio.context.TenantContext).getFilialId()}")
+    BigDecimal getValorTotalByCurrentTenant();
 }
