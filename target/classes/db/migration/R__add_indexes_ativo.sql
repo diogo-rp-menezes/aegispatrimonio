@@ -1,0 +1,4 @@
+-- Repeatable migration (no-op): vendor-specific versions exist under db/migration/{vendor}
+-- See:
+--   - db/migration/h2/R__add_indexes_ativo.sql
+--   - db/migration/mysql/R__add_indexes_ativo.sql

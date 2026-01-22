@@ -2,6 +2,7 @@ package br.com.aegispatrimonio.config;
 
 import br.com.aegispatrimonio.security.CustomUserDetailsService;
 import br.com.aegispatrimonio.security.JwtAuthFilter;
+import br.com.aegispatrimonio.security.TenantFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -55,7 +56,8 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new TenantFilter(), JwtAuthFilter.class);
 
         return http.build();
     }
