@@ -108,6 +108,10 @@ public class Ativo {
 
     @Column(name = "data_ultima_depreciacao")
     private LocalDate dataUltimaDepreciacao;
+
+    @Audited(targetAuditMode = RelationTargetAuditMode.NOT_AUDITED)
+    @OneToOne(mappedBy = "ativo", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private AtivoDetalheHardware detalheHardware;
     
     @PrePersist
     protected void onCreate() {

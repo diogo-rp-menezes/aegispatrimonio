@@ -15,6 +15,7 @@ public record AtivoDTO(
     StatusAtivo status,
     // CORREÇÃO: Adicionados campos para o responsável
     Long funcionarioResponsavelId,
-    String funcionarioResponsavelNome
+    String funcionarioResponsavelNome,
+    AtivoDetalheHardwareDTO detalheHardware
 ) {
 }

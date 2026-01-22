@@ -34,6 +34,8 @@ public record AtivoUpdateDTO(
 
     String observacoes,
 
-    String informacoesGarantia
+    String informacoesGarantia,
+
+    AtivoDetalheHardwareDTO detalheHardware
 ) {
 }

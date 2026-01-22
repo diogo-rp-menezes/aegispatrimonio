@@ -136,7 +136,7 @@ class AtivoServiceTest {
         localizacaoOutraFilial.setId(2L);
         localizacaoOutraFilial.setFilial(filialB);
 
-        AtivoCreateDTO createDTO = new AtivoCreateDTO(1L, "Notebook", 1L, "PAT-01", localizacaoOutraFilial.getId(), LocalDate.now(), 1L, BigDecimal.TEN, 1L, "Obs", null);
+        AtivoCreateDTO createDTO = new AtivoCreateDTO(1L, "Notebook", 1L, "PAT-01", localizacaoOutraFilial.getId(), LocalDate.now(), 1L, BigDecimal.TEN, 1L, "Obs", null, null);
 
         when(filialRepository.findById(1L)).thenReturn(Optional.of(filialA));
         when(tipoAtivoRepository.findById(1L)).thenReturn(Optional.of(new TipoAtivo()));
@@ -153,7 +153,7 @@ class AtivoServiceTest {
         responsavelOutraFilial.setId(3L);
         responsavelOutraFilial.setFiliais(Set.of(filialB));
 
-        AtivoUpdateDTO updateDTO = new AtivoUpdateDTO(1L, "Nome", "PAT-10", 1L, 1L, StatusAtivo.ATIVO, LocalDate.now(), 1L, BigDecimal.TEN, responsavelOutraFilial.getId(), "Obs", null);
+        AtivoUpdateDTO updateDTO = new AtivoUpdateDTO(1L, "Nome", "PAT-10", 1L, 1L, StatusAtivo.ATIVO, LocalDate.now(), 1L, BigDecimal.TEN, responsavelOutraFilial.getId(), "Obs", null, null);
 
         when(ativoRepository.findByIdWithDetails(10L)).thenReturn(Optional.of(ativo));
         when(filialRepository.findById(1L)).thenReturn(Optional.of(filialA));

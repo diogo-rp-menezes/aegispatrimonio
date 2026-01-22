@@ -2,7 +2,9 @@ package br.com.aegispatrimonio.mapper;
 
 import br.com.aegispatrimonio.dto.AtivoCreateDTO;
 import br.com.aegispatrimonio.dto.AtivoDTO;
+import br.com.aegispatrimonio.dto.AtivoDetalheHardwareDTO;
 import br.com.aegispatrimonio.model.Ativo;
+import br.com.aegispatrimonio.model.AtivoDetalheHardware;
 import br.com.aegispatrimonio.model.Funcionario;
 import org.springframework.stereotype.Component;
 
@@ -19,6 +21,24 @@ public class AtivoMapper {
         Long responsavelId = (responsavel != null) ? responsavel.getId() : null;
         String responsavelNome = (responsavel != null) ? responsavel.getNome() : null;
 
+        AtivoDetalheHardware hw = ativo.getDetalheHardware();
+        AtivoDetalheHardwareDTO hwDTO = null;
+        if (hw != null) {
+            hwDTO = new AtivoDetalheHardwareDTO(
+                hw.getComputerName(),
+                hw.getDomain(),
+                hw.getOsName(),
+                hw.getOsVersion(),
+                hw.getOsArchitecture(),
+                hw.getMotherboardManufacturer(),
+                hw.getMotherboardModel(),
+                hw.getMotherboardSerialNumber(),
+                hw.getCpuModel(),
+                hw.getCpuCores(),
+                hw.getCpuThreads()
+            );
+        }
+
         return new AtivoDTO(
                 ativo.getId(),
                 ativo.getNome(),
@@ -28,7 +48,8 @@ public class AtivoMapper {
                 ativo.getFilial().getNome(),
                 ativo.getStatus(),
                 responsavelId,
-                responsavelNome
+                responsavelNome,
+                hwDTO
         );
     }
 

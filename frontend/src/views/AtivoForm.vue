@@ -92,6 +92,62 @@
           />
         </div>
 
+        <!-- Detalhes de Hardware -->
+        <div class="card mt-3 mb-3">
+          <div class="card-header d-flex justify-content-between align-items-center" @click="showHardware = !showHardware" style="cursor: pointer;">
+            <h6 class="mb-0">Detalhes de Hardware (Opcional)</h6>
+            <i class="bi" :class="showHardware ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+          </div>
+          <div v-show="showHardware" class="card-body">
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Nome do Computador</label>
+                  <input v-model="form.detalheHardware.computerName" type="text" class="form-control">
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Domínio</label>
+                  <input v-model="form.detalheHardware.domain" type="text" class="form-control">
+                </div>
+                <div class="col-md-4 mb-3">
+                  <label class="form-label">SO Nome</label>
+                  <input v-model="form.detalheHardware.osName" type="text" class="form-control">
+                </div>
+                <div class="col-md-4 mb-3">
+                  <label class="form-label">SO Versão</label>
+                  <input v-model="form.detalheHardware.osVersion" type="text" class="form-control">
+                </div>
+                <div class="col-md-4 mb-3">
+                  <label class="form-label">SO Arquitetura</label>
+                  <input v-model="form.detalheHardware.osArchitecture" type="text" class="form-control">
+                </div>
+                <div class="col-md-12 mb-3">
+                  <label class="form-label">Modelo CPU</label>
+                  <input v-model="form.detalheHardware.cpuModel" type="text" class="form-control">
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Cores</label>
+                  <input v-model="form.detalheHardware.cpuCores" type="number" class="form-control">
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Threads</label>
+                  <input v-model="form.detalheHardware.cpuThreads" type="number" class="form-control">
+                </div>
+                <div class="col-md-4 mb-3">
+                  <label class="form-label">Fabricante Placa-Mãe</label>
+                  <input v-model="form.detalheHardware.motherboardManufacturer" type="text" class="form-control">
+                </div>
+                <div class="col-md-4 mb-3">
+                  <label class="form-label">Modelo Placa-Mãe</label>
+                  <input v-model="form.detalheHardware.motherboardModel" type="text" class="form-control">
+                </div>
+                <div class="col-md-4 mb-3">
+                  <label class="form-label">Serial Placa-Mãe</label>
+                  <input v-model="form.detalheHardware.motherboardSerialNumber" type="text" class="form-control">
+                </div>
+              </div>
+          </div>
+        </div>
+
         <!-- Ações -->
         <div class="d-flex justify-content-end gap-2 mt-4">
           <button type="button" class="btn btn-outline-secondary" @click="cancelar">
@@ -131,11 +187,25 @@ const form = reactive({
   status: 'ATIVO',
   valorAquisicao: '',
   dataAquisicao: '',
+  detalheHardware: {
+    computerName: '',
+    domain: '',
+    osName: '',
+    osVersion: '',
+    osArchitecture: '',
+    motherboardManufacturer: '',
+    motherboardModel: '',
+    motherboardSerialNumber: '',
+    cpuModel: '',
+    cpuCores: null,
+    cpuThreads: null
+  }
 });
 
 const tipos = ref([]);
 const localizacoes = ref([]);
 const saving = ref(false);
+const showHardware = ref(false);
 
 onMounted(async () => {
   if (isEdit.value) {
@@ -146,6 +216,23 @@ onMounted(async () => {
       valorAquisicao: data.valorAquisicao || '',
       dataAquisicao: data.dataAquisicao || '',
     });
+    if (data.detalheHardware) {
+      Object.assign(form.detalheHardware, data.detalheHardware);
+    } else if (!form.detalheHardware) {
+       form.detalheHardware = {
+        computerName: '',
+        domain: '',
+        osName: '',
+        osVersion: '',
+        osArchitecture: '',
+        motherboardManufacturer: '',
+        motherboardModel: '',
+        motherboardSerialNumber: '',
+        cpuModel: '',
+        cpuCores: null,
+        cpuThreads: null
+       };
+    }
   }
 
   // Carregar listas auxiliares

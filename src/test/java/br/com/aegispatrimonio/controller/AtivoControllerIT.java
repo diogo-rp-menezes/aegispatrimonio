@@ -78,7 +78,7 @@ class AtivoControllerIT extends BaseIT {
         @DisplayName("Deve retornar 201 Created para ADMIN com dados válidos")
         @WithMockCustomUser(role = "ROLE_ADMIN") // CORREÇÃO
         void criar_comAdmin_deveRetornarCreated() throws Exception {
-            AtivoCreateDTO createDTO = new AtivoCreateDTO(filialA.getId(), "Notebook-01", tipoAtivo.getId(), "PAT-NOTE-01", localizacao.getId(), LocalDate.now(), fornecedor.getId(), new BigDecimal("3500.50"), userA.getId(), "Em uso", "Garantia de 2 anos");
+            AtivoCreateDTO createDTO = new AtivoCreateDTO(filialA.getId(), "Notebook-01", tipoAtivo.getId(), "PAT-NOTE-01", localizacao.getId(), LocalDate.now(), fornecedor.getId(), new BigDecimal("3500.50"), userA.getId(), "Em uso", "Garantia de 2 anos", null);
 
             mockMvc.perform(post("/api/v1/ativos")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -93,7 +93,7 @@ class AtivoControllerIT extends BaseIT {
         @DisplayName("Deve retornar 403 Forbidden para USER")
         @WithMockCustomUser(role = "ROLE_USER") // CORREÇÃO
         void criar_comUser_deveRetornarForbidden() throws Exception {
-            AtivoCreateDTO createDTO = new AtivoCreateDTO(filialA.getId(), "Notebook-01", tipoAtivo.getId(), "PAT-NOTE-01", localizacao.getId(), LocalDate.now(), fornecedor.getId(), new BigDecimal("3500.50"), userA.getId(), "Em uso", "Garantia de 2 anos");
+            AtivoCreateDTO createDTO = new AtivoCreateDTO(filialA.getId(), "Notebook-01", tipoAtivo.getId(), "PAT-NOTE-01", localizacao.getId(), LocalDate.now(), fornecedor.getId(), new BigDecimal("3500.50"), userA.getId(), "Em uso", "Garantia de 2 anos", null);
 
             mockMvc.perform(post("/api/v1/ativos")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -105,7 +105,7 @@ class AtivoControllerIT extends BaseIT {
         @DisplayName("Deve retornar 400 Bad Request para dados inválidos")
         @WithMockCustomUser(role = "ROLE_ADMIN") // CORREÇÃO
         void criar_comDadosInvalidos_deveRetornarBadRequest() throws Exception {
-            AtivoCreateDTO createDTO = new AtivoCreateDTO(null, "", null, "", null, null, null, null, null, "", "");
+            AtivoCreateDTO createDTO = new AtivoCreateDTO(null, "", null, "", null, null, null, null, null, "", "", null);
 
             mockMvc.perform(post("/api/v1/ativos")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -189,7 +189,8 @@ class AtivoControllerIT extends BaseIT {
                     ativoExistente.getValorAquisicao(),
                     ativoExistente.getFuncionarioResponsavel().getId(),
                     "Obs Atualizada",
-                    ativoExistente.getInformacoesGarantia()
+                    ativoExistente.getInformacoesGarantia(),
+                    null
             );
 
             mockMvc.perform(put("/api/v1/ativos/{id}", ativoExistente.getId())
@@ -208,7 +209,7 @@ class AtivoControllerIT extends BaseIT {
                     ativoExistente.getFilial().getId(), "Nome", "Patrimonio",
                     ativoExistente.getTipoAtivo().getId(), ativoExistente.getLocalizacao().getId(),
                     StatusAtivo.ATIVO, LocalDate.now(), ativoExistente.getFornecedor().getId(),
-                    BigDecimal.TEN, ativoExistente.getFuncionarioResponsavel().getId(), "Obs", "Garantia"
+                    BigDecimal.TEN, ativoExistente.getFuncionarioResponsavel().getId(), "Obs", "Garantia", null
             );
 
             mockMvc.perform(put("/api/v1/ativos/{id}", ativoExistente.getId())
@@ -225,7 +226,7 @@ class AtivoControllerIT extends BaseIT {
                     ativoExistente.getFilial().getId(), "Nome", "Patrimonio",
                     ativoExistente.getTipoAtivo().getId(), ativoExistente.getLocalizacao().getId(),
                     StatusAtivo.ATIVO, LocalDate.now(), ativoExistente.getFornecedor().getId(),
-                    BigDecimal.TEN, ativoExistente.getFuncionarioResponsavel().getId(), "Obs", "Garantia"
+                    BigDecimal.TEN, ativoExistente.getFuncionarioResponsavel().getId(), "Obs", "Garantia", null
             );
 
             mockMvc.perform(put("/api/v1/ativos/{id}", 9999L)

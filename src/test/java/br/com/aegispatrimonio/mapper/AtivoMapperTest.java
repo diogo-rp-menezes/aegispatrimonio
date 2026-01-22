@@ -116,7 +116,7 @@ class AtivoMapperTest {
         AtivoCreateDTO createDTO = new AtivoCreateDTO(
                 1L, "Novo Ativo", 1L, "PAT-NEW", 1L, 
                 LocalDate.now(), 1L, BigDecimal.valueOf(1500.00), 1L, 
-                "Observações", "Garantia 1 ano"
+                "Observações", "Garantia 1 ano", null
         );
 
         // Act

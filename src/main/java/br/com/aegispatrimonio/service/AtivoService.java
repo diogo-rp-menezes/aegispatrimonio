@@ -2,6 +2,7 @@ package br.com.aegispatrimonio.service;
 
 import br.com.aegispatrimonio.dto.AtivoCreateDTO;
 import br.com.aegispatrimonio.dto.AtivoDTO;
+import br.com.aegispatrimonio.dto.AtivoDetalheHardwareDTO;
 import br.com.aegispatrimonio.dto.AtivoUpdateDTO;
 import br.com.aegispatrimonio.mapper.AtivoMapper;
 import br.com.aegispatrimonio.model.*;
@@ -180,6 +181,8 @@ public class AtivoService {
             ativo.setFuncionarioResponsavel(responsavel);
         }
 
+        gerenciarDetalheHardware(ativo, ativoCreateDTO.detalheHardware());
+
         Ativo ativoSalvo = ativoRepository.save(ativo);
         
         Ativo ativoCompleto = ativoRepository.findByIdWithDetails(ativoSalvo.getId())
@@ -236,6 +239,8 @@ public class AtivoService {
             ativo.setFuncionarioResponsavel(null);
         }
 
+        gerenciarDetalheHardware(ativo, ativoUpdateDTO.detalheHardware());
+
         Ativo ativoAtualizado = ativoRepository.save(ativo);
 
         boolean precisaRecalcular = !Objects.equals(valorAquisicaoOriginal, ativoUpdateDTO.valorAquisicao()) ||
@@ -283,5 +288,30 @@ public class AtivoService {
         if (!responsavelPertenceAFilial) {
             throw new IllegalArgumentException("O responsável selecionado não pertence à filial do ativo.");
         }
+    }
+
+    private void gerenciarDetalheHardware(Ativo ativo, AtivoDetalheHardwareDTO dto) {
+        if (dto == null) {
+            return;
+        }
+
+        AtivoDetalheHardware hardware = ativo.getDetalheHardware();
+        if (hardware == null) {
+            hardware = new AtivoDetalheHardware();
+            hardware.setAtivo(ativo);
+            ativo.setDetalheHardware(hardware);
+        }
+
+        hardware.setComputerName(dto.computerName());
+        hardware.setDomain(dto.domain());
+        hardware.setOsName(dto.osName());
+        hardware.setOsVersion(dto.osVersion());
+        hardware.setOsArchitecture(dto.osArchitecture());
+        hardware.setMotherboardManufacturer(dto.motherboardManufacturer());
+        hardware.setMotherboardModel(dto.motherboardModel());
+        hardware.setMotherboardSerialNumber(dto.motherboardSerialNumber());
+        hardware.setCpuModel(dto.cpuModel());
+        hardware.setCpuCores(dto.cpuCores());
+        hardware.setCpuThreads(dto.cpuThreads());
     }
 }
