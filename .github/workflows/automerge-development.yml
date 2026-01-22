@@ -1,0 +1,86 @@
+name: Auto Merge Development (Chaos Mode)
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches:
+      - development
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  automerge:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Abort if PR is closed
+        run: |
+          if [ "${{ github.event.pull_request.state }}" != "open" ]; then
+            echo "PR already closed. Exiting."
+            exit 0
+          fi
+
+      - name: Checkout development
+        uses: actions/checkout@v4
+        with:
+          ref: development
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+      - name: Fetch PR branch
+        run: |
+          git fetch origin pull/${{ github.event.pull_request.number }}/head:pr-branch
+
+      - name: Merge PR (auto-resolve conflicts, theirs wins)
+        run: |
+          git checkout development
+          git merge pr-branch --no-edit -X theirs || true
+
+      - name: Log applied PR (ledger)
+        run: |
+          echo "Applied PR #${{ github.event.pull_request.number }} - $(date -u)" >> automerge.log
+          git add -f automerge.log
+          git commit -m "ledger: applied PR #${{ github.event.pull_request.number }}" || true
+
+      - name: Force push result to development
+        run: |
+          git push origin development --force
+
+      - name: Close PR if still open
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            if (pr.state === "open") {
+              await github.rest.pulls.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                state: "closed"
+              });
+            }
+
+      - name: Delete source branch
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const ref = pr.head.ref;
+
+            if (ref.startsWith("dependabot/")) {
+              console.log("Skipping dependabot branch deletion");
+              return;
+            }
+
+            await github.rest.git.deleteRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: `heads/${ref}`
+            });
+
