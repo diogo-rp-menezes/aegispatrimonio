@@ -40,9 +40,10 @@ public class AtivoController {
             org.springframework.data.domain.Pageable pageable,
             @RequestParam(required = false) Long filialId,
             @RequestParam(required = false) Long tipoAtivoId,
-            @RequestParam(required = false) br.com.aegispatrimonio.model.StatusAtivo status
+            @RequestParam(required = false) br.com.aegispatrimonio.model.StatusAtivo status,
+            @RequestParam(required = false) String nome
     ) {
-        return ativoService.listarTodos(pageable, filialId, tipoAtivoId, status);
+        return ativoService.listarTodos(pageable, filialId, tipoAtivoId, status, nome);
     }
 
     /**

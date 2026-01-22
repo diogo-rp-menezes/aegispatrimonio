@@ -48,20 +48,24 @@ public interface AtivoRepository extends JpaRepository<Ativo, Long> {
 
     @Query("SELECT a FROM Ativo a WHERE (:filialId IS NULL OR a.filial.id = :filialId) " +
            "AND (:tipoAtivoId IS NULL OR a.tipoAtivo.id = :tipoAtivoId) " +
-           "AND (:status IS NULL OR a.status = :status)")
+           "AND (:status IS NULL OR a.status = :status) " +
+           "AND (:nome IS NULL OR LOWER(a.nome) LIKE LOWER(CONCAT('%', :nome, '%')))")
     Page<Ativo> findByFilters(@Param("filialId") Long filialId,
                               @Param("tipoAtivoId") Long tipoAtivoId,
                               @Param("status") StatusAtivo status,
+                              @Param("nome") String nome,
                               Pageable pageable);
 
     @Query("SELECT a FROM Ativo a WHERE a.filial.id IN :filialIds " +
            "AND (:filialId IS NULL OR a.filial.id = :filialId) " +
            "AND (:tipoAtivoId IS NULL OR a.tipoAtivo.id = :tipoAtivoId) " +
-           "AND (:status IS NULL OR a.status = :status)")
+           "AND (:status IS NULL OR a.status = :status) " +
+           "AND (:nome IS NULL OR LOWER(a.nome) LIKE LOWER(CONCAT('%', :nome, '%')))")
     Page<Ativo> findByFilialIdsAndFilters(@Param("filialIds") Set<Long> filialIds,
                                           @Param("filialId") Long filialId,
                                           @Param("tipoAtivoId") Long tipoAtivoId,
                                           @Param("status") StatusAtivo status,
+                                          @Param("nome") String nome,
                                           Pageable pageable);
 
     Optional<Ativo> findByNumeroPatrimonio(String numeroPatrimonio);

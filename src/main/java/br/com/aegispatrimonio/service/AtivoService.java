@@ -61,20 +61,21 @@ public class AtivoService {
     public List<AtivoDTO> listarTodos(org.springframework.data.domain.Pageable pageable,
                                       Long filialId,
                                       Long tipoAtivoId,
-                                      StatusAtivo status) {
+                                      StatusAtivo status,
+                                      String nome) {
         Usuario usuarioLogado = getUsuarioLogado();
 
         org.springframework.data.domain.Pageable effectivePageable =
                 (pageable == null) ? org.springframework.data.domain.Pageable.unpaged() : pageable;
         boolean unpaged = effectivePageable.isUnpaged();
-        boolean hasFilters = (filialId != null) || (tipoAtivoId != null) || (status != null);
+        boolean hasFilters = (filialId != null) || (tipoAtivoId != null) || (status != null) || (nome != null && !nome.isBlank());
 
         if (isAdmin(usuarioLogado)) {
             if (unpaged && !hasFilters) {
                 return ativoRepository.findAllWithDetails().stream().map(ativoMapper::toDTO).collect(Collectors.toList());
             } else {
                 return ativoRepository
-                        .findByFilters(filialId, tipoAtivoId, status, effectivePageable)
+                        .findByFilters(filialId, tipoAtivoId, status, nome, effectivePageable)
                         .map(ativoMapper::toDTO)
                         .getContent();
             }
@@ -94,7 +95,7 @@ public class AtivoService {
                 return ativoRepository.findAllWithDetails().stream().map(ativoMapper::toDTO).collect(Collectors.toList());
             } else {
                 return ativoRepository
-                        .findByFilters(filialId, tipoAtivoId, status, effectivePageable)
+                        .findByFilters(filialId, tipoAtivoId, status, nome, effectivePageable)
                         .map(ativoMapper::toDTO)
                         .getContent();
             }
@@ -112,7 +113,7 @@ public class AtivoService {
         } else {
             // Usa consulta paginada com filtros opcionais (Pageable pode ser unpaged)
             return ativoRepository
-                    .findByFilialIdsAndFilters(filiaisIds, filialId, tipoAtivoId, status, effectivePageable)
+                    .findByFilialIdsAndFilters(filiaisIds, filialId, tipoAtivoId, status, nome, effectivePageable)
                     .map(ativoMapper::toDTO)
                     .getContent();
         }
