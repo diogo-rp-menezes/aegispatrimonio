@@ -76,4 +76,10 @@ public interface AtivoRepository extends JpaRepository<Ativo, Long> {
 
     @Query("select a from Ativo a")
     Stream<Ativo> streamAll();
+
+    /**
+     * Retorna todos os ativos do contexto atual (Synaptic Switching / Tenant Isolation).
+     */
+    @Query("SELECT a FROM Ativo a WHERE a.filial.id = :#{T(br.com.aegispatrimonio.context.TenantContext).getFilialId()}")
+    List<Ativo> findAllByCurrentTenant();
 }
