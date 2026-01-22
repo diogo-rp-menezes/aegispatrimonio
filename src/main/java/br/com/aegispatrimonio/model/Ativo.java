@@ -7,6 +7,8 @@ import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.Where;
+import org.hibernate.envers.Audited;
+import org.hibernate.envers.RelationTargetAuditMode;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -20,12 +22,14 @@ import java.time.LocalDateTime;
 @Table(name = "ativos")
 @SQLDelete(sql = "UPDATE ativos SET status = 'BAIXADO' WHERE id = ?")
 @Where(clause = "status <> 'BAIXADO'")
+@Audited
 public class Ativo {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Audited(targetAuditMode = RelationTargetAuditMode.NOT_AUDITED)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "filial_id", nullable = false)
     private Filial filial;
@@ -33,6 +37,7 @@ public class Ativo {
     @Column(nullable = false)
     private String nome;
     
+    @Audited(targetAuditMode = RelationTargetAuditMode.NOT_AUDITED)
     @ManyToOne
     @JoinColumn(name = "tipo_ativo_id", nullable = false)
     private TipoAtivo tipoAtivo;
@@ -40,6 +45,7 @@ public class Ativo {
     @Column(name = "numero_patrimonio", nullable = false, unique = true)
     private String numeroPatrimonio;
     
+    @Audited(targetAuditMode = RelationTargetAuditMode.NOT_AUDITED)
     @ManyToOne
     @JoinColumn(name = "localizacao_id")
     private Localizacao localizacao;
@@ -50,6 +56,7 @@ public class Ativo {
     @Column(name = "data_aquisicao", nullable = false)
     private LocalDate dataAquisicao;
     
+    @Audited(targetAuditMode = RelationTargetAuditMode.NOT_AUDITED)
     @ManyToOne
     @JoinColumn(name = "fornecedor_id", nullable = false)
     private Fornecedor fornecedor;
@@ -77,6 +84,7 @@ public class Ativo {
     private String informacoesGarantia;
     
     // CORREÇÃO: Renomeado de pessoaResponsavel para funcionarioResponsavel
+    @Audited(targetAuditMode = RelationTargetAuditMode.NOT_AUDITED)
     @ManyToOne
     @JoinColumn(name = "funcionario_responsavel_id")
     private Funcionario funcionarioResponsavel;
