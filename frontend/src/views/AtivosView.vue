@@ -227,10 +227,9 @@
 import { ref, reactive, computed, watch, onMounted } from 'vue';
 import { useDebounceFn } from '@vueuse/core';
 import { useRouter } from 'vue-router';
-import axios from 'axios';
+import { request } from '../services/api';
 import AtivoForm from './AtivoForm.vue';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080/api';
 const PAGE_SIZE = 10;
 
 const router = useRouter();
@@ -322,7 +321,7 @@ async function fetchPage(page = 0) {
     const params = { page, size: pageInfo.size };
     if (q.value.trim()) params.nome = q.value.trim();
     
-    const { data } = await axios.get(`${API_BASE}/ativos`, { params });
+    const data = await request('/ativos', { params });
     items.value = data.content || [];
     pageInfo.page = data.number || 0;
     pageInfo.size = data.size || PAGE_SIZE;

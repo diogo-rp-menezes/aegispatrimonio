@@ -6,7 +6,7 @@ const routes = [
   { path: "/login", component: LoginView },
   { path: "/", redirect: "/dashboard" },
   { path: "/dashboard", component: DashboardInfo, meta: { requiresAuth: true } },
-  { path: "/ativos", component: () => import("../views/Dashboard.vue"), meta: { requiresAuth: true } }, // Assuming this exists or will exist
+  { path: "/ativos", component: () => import("../views/AtivosView.vue"), meta: { requiresAuth: true } },
   { path: "/ativos/novo", component: () => import("../views/AtivoForm.vue"), meta: { requiresAuth: true } },
   { path: "/ativos/:id/editar", component: () => import("../views/AtivoForm.vue"), props: true, meta: { requiresAuth: true } },
   { path: "/ativos/:id", component: () => import("../views/DetailView.vue"), props: true, meta: { requiresAuth: true } },
