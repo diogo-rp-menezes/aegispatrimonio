@@ -38,9 +38,12 @@ export const request = async (endpoint, options = {}) => {
     const filialId = localStorage.getItem('currentFilial');
 
     const headers = {
-        'Content-Type': 'application/json',
         ...options.headers,
     };
+
+    if (!headers['Content-Type'] && !(options.body instanceof FormData)) {
+        headers['Content-Type'] = 'application/json';
+    }
 
     if (token) {
         headers['Authorization'] = `Bearer ${token}`;
@@ -55,6 +58,10 @@ export const request = async (endpoint, options = {}) => {
     if (options.params) {
         const query = new URLSearchParams(options.params).toString();
         url += `?${query}`;
+    }
+
+    if (options.body && typeof options.body === 'object' && !(options.body instanceof FormData) && !(options.body instanceof URLSearchParams)) {
+        options.body = JSON.stringify(options.body);
     }
 
     const response = await fetch(url, {
