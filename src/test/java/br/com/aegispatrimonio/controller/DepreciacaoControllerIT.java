@@ -68,7 +68,7 @@ public class DepreciacaoControllerIT extends BaseIT {
     @Test
     @DisplayName("Recalcular Ativo: Deve recalcular depreciação e retornar 200 OK")
     void recalcularDepreciacaoAtivo_deveRecalcularEretornarOk() throws Exception {
-        mockMvc.perform(post("/depreciacao/recalcular/{ativoId}", ativo.getId())
+        mockMvc.perform(post("/api/v1/depreciacao/recalcular/{ativoId}", ativo.getId())
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(content().string("Recálculo de depreciação do ativo iniciado"));
@@ -86,7 +86,7 @@ public class DepreciacaoControllerIT extends BaseIT {
     void calcularDepreciacaoMensal_deveRetornarValorCorreto() throws Exception {
         BigDecimal depreciacaoMensalEsperada = new BigDecimal("100.00"); // (12000 - 2000) / 100
 
-        mockMvc.perform(get("/depreciacao/calcular-mensal/{ativoId}", ativo.getId())
+        mockMvc.perform(get("/api/v1/depreciacao/calcular-mensal/{ativoId}", ativo.getId())
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(content().string(depreciacaoMensalEsperada.setScale(10, RoundingMode.HALF_UP).toString()));

@@ -27,7 +27,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @RestController
-@RequestMapping("/manutencoes")
+@RequestMapping("/api/v1/manutencoes")
 @RequiredArgsConstructor
 @Tag(name = "Manutenções", description = "Operações relacionadas à gestão de manutenções de ativos")
 public class ManutencaoController {

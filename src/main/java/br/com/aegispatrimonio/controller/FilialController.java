@@ -29,7 +29,7 @@ import java.util.Optional;
  * Fornece endpoints para listar, buscar, criar, atualizar e deletar filiais.
  */
 @RestController
-@RequestMapping("/filiais")
+@RequestMapping("/api/v1/filiais")
 @Validated
 @Tag(name = "Filiais", description = "Gerenciamento de filiais da empresa")
 @SecurityRequirement(name = "bearerAuth") // Indica que todos os endpoints deste controller requerem JWT

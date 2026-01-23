@@ -122,6 +122,21 @@ A API retorna erros padronizados conforme **RFC 7807** (`application/problem+jso
    ./mvnw spring-boot:run
    ```
 
+### Frontend (Desenvolvimento)
+1. Acesse o diretório `frontend`:
+   ```bash
+   cd frontend
+   ```
+2. Instale as dependências:
+   ```bash
+   npm install
+   ```
+3. Inicie o servidor de desenvolvimento:
+   ```bash
+   npm run dev
+   ```
+   Acesse a aplicação em `http://localhost:5173`.
+
 ### Kubernetes
 1. Aplique os manifestos:
    ```bash

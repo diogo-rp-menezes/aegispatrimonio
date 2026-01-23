@@ -103,7 +103,7 @@ public class FuncionarioControllerIT extends BaseIT {
     @Test
     @DisplayName("ListarTodos: Deve retornar 200 e a lista de funcionários para ADMIN")
     void listarTodos_comAdmin_deveRetornarOk() throws Exception {
-        mockMvc.perform(get("/funcionarios").header("Authorization", "Bearer " + adminToken))
+        mockMvc.perform(get("/api/v1/funcionarios").header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[*].nome", hasItem("Admin")));
     }
@@ -111,7 +111,7 @@ public class FuncionarioControllerIT extends BaseIT {
     @Test
     @DisplayName("ListarTodos: Deve retornar 200 e a lista de funcionários para USER")
     void listarTodos_comUser_deveRetornarOk() throws Exception {
-        mockMvc.perform(get("/funcionarios").header("Authorization", "Bearer " + userToken))
+        mockMvc.perform(get("/api/v1/funcionarios").header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[*].nome", hasItem("Admin")));
     }
@@ -120,7 +120,7 @@ public class FuncionarioControllerIT extends BaseIT {
     @DisplayName("BuscarPorId: Deve retornar 404 Not Found para ID inexistente")
     void buscarPorId_comIdInexistente_deveRetornarNotFound() throws Exception {
         long idInexistente = 999L;
-        mockMvc.perform(get("/funcionarios/{id}", idInexistente)
+        mockMvc.perform(get("/api/v1/funcionarios/{id}", idInexistente)
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isNotFound());
     }
@@ -130,7 +130,7 @@ public class FuncionarioControllerIT extends BaseIT {
     void criar_comAdmin_deveRetornarCreated() throws Exception {
         FuncionarioCreateDTO createDTO = new FuncionarioCreateDTO("Novo Func", "M-003", "Cargo", deptoA.getId(), Set.of(filialA.getId()), "novo@aegis.com", "senha1234", "ROLE_USER");
 
-        mockMvc.perform(post("/funcionarios")
+        mockMvc.perform(post("/api/v1/funcionarios")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createDTO)))
@@ -144,7 +144,7 @@ public class FuncionarioControllerIT extends BaseIT {
     void criar_comUser_deveRetornarForbidden() throws Exception {
         FuncionarioCreateDTO createDTO = new FuncionarioCreateDTO("Novo Func", "M-003", "Cargo", deptoA.getId(), Set.of(filialA.getId()), "novo@aegis.com", "senha1234", "ROLE_USER");
 
-        mockMvc.perform(post("/funcionarios")
+        mockMvc.perform(post("/api/v1/funcionarios")
                         .header("Authorization", "Bearer " + userToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createDTO)))
@@ -156,7 +156,7 @@ public class FuncionarioControllerIT extends BaseIT {
     void criar_comDadosInvalidos_deveRetornarBadRequest() throws Exception {
         FuncionarioCreateDTO createDTO = new FuncionarioCreateDTO("Nome Valido", "M-004", "Cargo", deptoA.getId(), Set.of(filialA.getId()), "email-invalido", "senha1234", "ROLE_USER");
 
-        mockMvc.perform(post("/funcionarios")
+        mockMvc.perform(post("/api/v1/funcionarios")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createDTO)))
@@ -168,7 +168,7 @@ public class FuncionarioControllerIT extends BaseIT {
     void atualizar_comUser_deveRetornarForbidden() throws Exception {
         FuncionarioUpdateDTO updateDTO = new FuncionarioUpdateDTO("Nome Atualizado", "M-001", "Cargo Novo", deptoA.getId(), Status.ATIVO, Set.of(filialA.getId()), "user.updated@aegis.com", "newpassword", "ROLE_USER");
 
-        mockMvc.perform(put("/funcionarios/{id}", funcionarioExistente.getId())
+        mockMvc.perform(put("/api/v1/funcionarios/{id}", funcionarioExistente.getId())
                         .header("Authorization", "Bearer " + userToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateDTO)))
@@ -180,7 +180,7 @@ public class FuncionarioControllerIT extends BaseIT {
     void deletar_comAdmin_deveRetornarNoContent() throws Exception {
         Funcionario funcParaDeletar = createFuncionarioAndUsuario("Para Deletar", "deletar@aegis.com", "ROLE_USER", deptoA, new HashSet<>(Set.of(filialA)));
 
-        mockMvc.perform(delete("/funcionarios/{id}", funcParaDeletar.getId())
+        mockMvc.perform(delete("/api/v1/funcionarios/{id}", funcParaDeletar.getId())
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isNoContent());
     }

@@ -22,7 +22,7 @@ import java.math.BigDecimal;
  * Acesso restrito a usuários com a role 'ADMIN'.
  */
 @RestController
-@RequestMapping("/depreciacao")
+@RequestMapping("/api/v1/depreciacao")
 @RequiredArgsConstructor
 @Tag(name = "Depreciação", description = "Operações relacionadas ao cálculo e gestão de depreciação de ativos")
 @SecurityRequirement(name = "bearerAuth") // Indica que todos os endpoints deste controller requerem JWT

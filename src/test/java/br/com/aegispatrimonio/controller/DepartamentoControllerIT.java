@@ -80,7 +80,7 @@ public class DepartamentoControllerIT extends BaseIT {
     @Test
     @DisplayName("ListarTodos: Deve retornar 200 e todos os departamentos para ADMIN")
     void listarTodos_comAdmin_deveRetornarTodos() throws Exception {
-        mockMvc.perform(get("/departamentos").header("Authorization", "Bearer " + adminToken))
+        mockMvc.perform(get("/api/v1/departamentos").header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)));
     }
@@ -89,7 +89,7 @@ public class DepartamentoControllerIT extends BaseIT {
     @DisplayName("ListarTodos: Deve retornar 200 e apenas departamentos da sua filial para USER")
     void listarTodos_comUser_deveRetornarDepartamentosDaFilial() throws Exception {
         // Este teste depende da lógica do serviço, que deve filtrar por filial do usuário
-        mockMvc.perform(get("/departamentos").header("Authorization", "Bearer " + userToken))
+        mockMvc.perform(get("/api/v1/departamentos").header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].nome", is("TI A")));
@@ -99,7 +99,7 @@ public class DepartamentoControllerIT extends BaseIT {
     @DisplayName("BuscarPorId: Deve retornar 404 Not Found para ID inexistente")
     void buscarPorId_comIdInexistente_deveRetornarNotFound() throws Exception {
         long idInexistente = 999L;
-        mockMvc.perform(get("/departamentos/{id}", idInexistente)
+        mockMvc.perform(get("/api/v1/departamentos/{id}", idInexistente)
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isNotFound());
     }
@@ -109,7 +109,7 @@ public class DepartamentoControllerIT extends BaseIT {
     void criar_comAdmin_deveRetornarCreated() throws Exception {
         DepartamentoCreateDTO createDTO = new DepartamentoCreateDTO("Marketing", filialA.getId());
 
-        mockMvc.perform(post("/departamentos")
+        mockMvc.perform(post("/api/v1/departamentos")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createDTO)))
@@ -122,7 +122,7 @@ public class DepartamentoControllerIT extends BaseIT {
     void criar_comUser_deveRetornarForbidden() throws Exception {
         DepartamentoCreateDTO createDTO = new DepartamentoCreateDTO("Vendas", filialA.getId());
 
-        mockMvc.perform(post("/departamentos")
+        mockMvc.perform(post("/api/v1/departamentos")
                         .header("Authorization", "Bearer " + userToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createDTO)))
@@ -134,7 +134,7 @@ public class DepartamentoControllerIT extends BaseIT {
     void criar_comDadosInvalidos_deveRetornarBadRequest() throws Exception {
         DepartamentoCreateDTO createDTO = new DepartamentoCreateDTO("", filialA.getId()); // Nome em branco
 
-        mockMvc.perform(post("/departamentos")
+        mockMvc.perform(post("/api/v1/departamentos")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createDTO)))
@@ -146,7 +146,7 @@ public class DepartamentoControllerIT extends BaseIT {
     void atualizar_comUser_deveRetornarForbidden() throws Exception {
         DepartamentoUpdateDTO updateDTO = new DepartamentoUpdateDTO("TI A-Update", filialA.getId());
 
-        mockMvc.perform(put("/departamentos/{id}", deptoA.getId())
+        mockMvc.perform(put("/api/v1/departamentos/{id}", deptoA.getId())
                         .header("Authorization", "Bearer " + userToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateDTO)))
@@ -156,7 +156,7 @@ public class DepartamentoControllerIT extends BaseIT {
     @Test
     @DisplayName("Deletar: Deve retornar 403 Forbidden para USER")
     void deletar_comUser_deveRetornarForbidden() throws Exception {
-        mockMvc.perform(delete("/departamentos/{id}", deptoA.getId())
+        mockMvc.perform(delete("/api/v1/departamentos/{id}", deptoA.getId())
                         .header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isForbidden());
     }
