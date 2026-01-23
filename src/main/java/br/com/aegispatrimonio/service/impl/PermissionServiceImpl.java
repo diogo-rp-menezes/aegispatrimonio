@@ -1,5 +1,8 @@
 package br.com.aegispatrimonio.service.impl;
 
+import br.com.aegispatrimonio.model.Permission;
+import br.com.aegispatrimonio.model.Role;
+import br.com.aegispatrimonio.repository.UsuarioRepository;
 import br.com.aegispatrimonio.service.IPermissionService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
@@ -7,29 +10,30 @@ import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 public class PermissionServiceImpl implements IPermissionService {
 
     private static final Logger log = LoggerFactory.getLogger(PermissionServiceImpl.class);
+    private static final String ROLE_ADMIN_NAME = "ROLE_ADMIN";
 
-    private static final String ROLE_ADMIN = "ROLE_ADMIN";
-    private static final String ROLE_USER = "ROLE_USER";
-
+    private final UsuarioRepository usuarioRepository;
     private final MeterRegistry meterRegistry;
 
-    public PermissionServiceImpl() {
-        // Construtor padrão para testes simples; utiliza um registry simples em memória
-        this(new SimpleMeterRegistry());
-    }
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    private PermissionServiceImpl self;
 
-    public PermissionServiceImpl(MeterRegistry meterRegistry) {
+    public PermissionServiceImpl(UsuarioRepository usuarioRepository, MeterRegistry meterRegistry) {
+        this.usuarioRepository = usuarioRepository;
         this.meterRegistry = meterRegistry;
     }
 
@@ -37,44 +41,63 @@ public class PermissionServiceImpl implements IPermissionService {
     public boolean hasPermission(Authentication authentication, Object targetId, String resource, String action, Object context) {
         Timer.Sample sample = Timer.start(meterRegistry);
         boolean allowed = false;
-        String outcomeLabel;
+
         try {
             if (authentication == null || !authentication.isAuthenticated()) {
-                outcomeLabel = "deny";
+                log.debug("[AUTHZ] Deny: Unauthenticated");
                 return false;
             }
-            Set<String> roles = authentication.getAuthorities().stream()
-                    .map(GrantedAuthority::getAuthority)
-                    .collect(Collectors.toSet());
 
-            // ADMIN tem acesso total
-            if (roles.contains(ROLE_ADMIN)) {
+            String username = authentication.getName();
+            // Use 'self' to trigger cache proxy if available
+            PermissionServiceImpl effectiveSelf = (self != null) ? self : this;
+
+            Set<Permission> permissions = effectiveSelf.getUserPermissions(username);
+
+            if (effectiveSelf.hasAdminRole(username)) {
                 allowed = true;
-                outcomeLabel = "allow";
-                log.debug("[AUTHZ] allow=TRUE subject={} roles={} resource={} action={} targetId={} context={}",
-                        authentication.getName(), roles, resource, action, targetId, safeContext(context));
+                log.debug("[AUTHZ] Allow: ADMIN bypass for {} on {}/{}", username, resource, action);
                 return true;
             }
 
-            // PoC: USER tem apenas READ
-            if (roles.contains(ROLE_USER) && "READ".equalsIgnoreCase(action)) {
-                allowed = true;
-                outcomeLabel = "allow";
-                log.debug("[AUTHZ] allow=TRUE (READ by USER) subject={} roles={} resource={} action={} targetId={} context={}",
-                        authentication.getName(), roles, resource, action, targetId, safeContext(context));
-                return true;
+            // 1. Check if user has the specific Permission (Resource + Action)
+            Permission matchedPermission = permissions.stream()
+                    .filter(p -> p.getResource().equalsIgnoreCase(resource) && p.getAction().equalsIgnoreCase(action))
+                    .findFirst()
+                    .orElse(null);
+
+            if (matchedPermission == null) {
+                log.debug("[AUTHZ] Deny: No permission found for {} on {}/{}", username, resource, action);
+                return false;
             }
 
-            outcomeLabel = "deny";
-            log.info("[AUTHZ] allow=FALSE subject={} roles={} resource={} action={} targetId={} context={}",
-                    authentication.getName(), roles, resource, action, targetId, safeContext(context));
-            return false;
+            // 2. Check Context
+            if (matchedPermission.getContextKey() != null && !matchedPermission.getContextKey().isEmpty()) {
+                if (context == null) {
+                    log.warn("[AUTHZ] Deny: Context required ({}) but missing for {} on {}/{}",
+                            matchedPermission.getContextKey(), username, resource, action);
+                    return false;
+                }
+
+                if ("filialId".equalsIgnoreCase(matchedPermission.getContextKey())) {
+                    if (!effectiveSelf.hasContextAccess(username, context)) {
+                        log.debug("[AUTHZ] Deny: Context mismatch. User {} has no access to filial {}", username, context);
+                        return false;
+                    }
+                }
+            }
+
+            allowed = true;
+            return true;
+
+        } catch (Exception e) {
+            log.error("[AUTHZ] Error evaluating permission: {}", e.getMessage(), e);
+            return false; // Fail safe
         } finally {
-            // Métricas Micrometer
-            try {
+             try {
                 meterRegistry.counter(
                         "aegis_authz_total",
-                        Tags.of("outcome", (authentication == null || !authentication.isAuthenticated()) ? "deny" : (allowed ? "allow" : "deny"),
+                        Tags.of("outcome", allowed ? "allow" : "deny",
                                 "resource", nullSafe(resource),
                                 "action", nullSafe(action))
                 ).increment();
@@ -82,20 +105,60 @@ public class PermissionServiceImpl implements IPermissionService {
                         .tags("resource", nullSafe(resource), "action", nullSafe(action))
                         .register(meterRegistry));
             } catch (Exception e) {
-                // Nunca falhar a autorização por problemas de métricas
-                log.debug("[AUTHZ][METRICS] Falha ao registrar métricas: {}", e.getMessage());
+                log.debug("[AUTHZ][METRICS] Failed to record metrics", e);
             }
         }
     }
 
-    private String nullSafe(String v) {
-        return v == null ? "UNKNOWN" : v;
+    @Cacheable(value = "userPermissions", key = "#username", unless = "#result == null")
+    @Transactional(readOnly = true)
+    public Set<Permission> getUserPermissions(String username) {
+        return usuarioRepository.findWithDetailsByEmail(username)
+                .map(u -> {
+                    Set<Permission> perms = new HashSet<>();
+                    if (u.getRoles() != null) {
+                        for (Role role : u.getRoles()) {
+                            if (role.getPermissions() != null) {
+                                perms.addAll(role.getPermissions());
+                            }
+                        }
+                    }
+                    return perms;
+                })
+                .orElse(Collections.emptySet());
     }
 
-    private Object safeContext(Object context) {
-        // Garantir que não vazamos dados sensíveis (PoC simples)
-        if (context == null) return null;
-        String s = String.valueOf(context);
-        return s.length() > 128 ? s.substring(0, 128) + "..." : s;
+    @Cacheable(value = "userRoles", key = "#username", unless = "#result == false")
+    @Transactional(readOnly = true)
+    public boolean hasAdminRole(String username) {
+         return usuarioRepository.findWithDetailsByEmail(username)
+                .map(u -> u.getRoles().stream().anyMatch(r -> ROLE_ADMIN_NAME.equals(r.getName())))
+                .orElse(false);
+    }
+
+    @Cacheable(value = "userContext", key = "#username + '-' + #context", unless = "#result == false")
+    @Transactional(readOnly = true)
+    public boolean hasContextAccess(String username, Object context) {
+         return usuarioRepository.findWithDetailsByEmail(username)
+                .map(u -> {
+                    if (u.getFuncionario() == null || u.getFuncionario().getFiliais() == null) {
+                        return false;
+                    }
+                    Long filialId;
+                    try {
+                        filialId = Long.valueOf(String.valueOf(context));
+                    } catch (NumberFormatException e) {
+                        log.warn("Invalid context ID format: {}", context);
+                        return false;
+                    }
+
+                    return u.getFuncionario().getFiliais().stream()
+                            .anyMatch(f -> f.getId().equals(filialId));
+                })
+                .orElse(false);
+    }
+
+    private String nullSafe(String v) {
+        return v == null ? "UNKNOWN" : v;
     }
 }

@@ -24,14 +24,24 @@ public class CustomUserDetails implements UserDetails {
     // Construtor original (para uso da aplicação real)
     public CustomUserDetails(Usuario usuario) {
         this.usuario = usuario;
-        // Garante que a role tenha exatamente um prefixo ROLE_
-        if (usuario != null && usuario.getRole() != null && !usuario.getRole().trim().isEmpty()) {
-            String role = usuario.getRole().trim();
-            String normalized = role.startsWith("ROLE_") ? role : "ROLE_" + role;
-            this.authorities = Collections.singletonList(new SimpleGrantedAuthority(normalized));
-        } else {
-            this.authorities = Collections.emptyList(); // Ou lançar exceção, dependendo da regra de negócio
+        java.util.Set<GrantedAuthority> auths = new java.util.HashSet<>();
+
+        if (usuario != null) {
+            // New RBAC Roles
+            if (usuario.getRoles() != null && !usuario.getRoles().isEmpty()) {
+                for (br.com.aegispatrimonio.model.Role r : usuario.getRoles()) {
+                    auths.add(new SimpleGrantedAuthority(r.getName()));
+                }
+            }
+            // Legacy Fallback
+            else if (usuario.getRole() != null && !usuario.getRole().trim().isEmpty()) {
+                String role = usuario.getRole().trim();
+                String normalized = role.startsWith("ROLE_") ? role : "ROLE_" + role;
+                auths.add(new SimpleGrantedAuthority(normalized));
+            }
         }
+
+        this.authorities = auths;
     }
 
     // NOVO Construtor (para uso em testes e para flexibilidade futura)

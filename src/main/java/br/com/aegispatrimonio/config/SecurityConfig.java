@@ -1,15 +1,19 @@
 package br.com.aegispatrimonio.config;
 
+import br.com.aegispatrimonio.security.CustomMethodSecurityExpressionHandler;
 import br.com.aegispatrimonio.security.CustomUserDetailsService;
 import br.com.aegispatrimonio.security.DelegatedAccessDeniedHandler;
 import br.com.aegispatrimonio.security.DelegatedAuthenticationEntryPoint;
 import br.com.aegispatrimonio.security.JwtAuthFilter;
 import br.com.aegispatrimonio.security.TenantFilter;
+import br.com.aegispatrimonio.service.IPermissionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.PermissionEvaluator;
+import org.springframework.security.access.expression.method.MethodSecurityExpressionHandler;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -40,6 +44,8 @@ public class SecurityConfig {
     private final JwtAuthFilter jwtAuthFilter;
     private final DelegatedAuthenticationEntryPoint authEntryPoint;
     private final DelegatedAccessDeniedHandler accessDeniedHandler;
+    private final IPermissionService permissionService;
+    private final PermissionEvaluator permissionEvaluator;
 
     @Value("${app.cors.allowed-origins:http://localhost:8080,http://localhost:3000}")
     private String allowedOrigins;
@@ -103,5 +109,13 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
+    }
+
+    @Bean
+    @org.springframework.context.annotation.Primary
+    public MethodSecurityExpressionHandler methodSecurityExpressionHandler() {
+        CustomMethodSecurityExpressionHandler handler = new CustomMethodSecurityExpressionHandler(permissionService);
+        handler.setPermissionEvaluator(permissionEvaluator);
+        return handler;
     }
 }

@@ -28,8 +28,25 @@ public class CustomPermissionEvaluator implements PermissionEvaluator {
     @Override
     public boolean hasPermission(Authentication authentication, Serializable targetId, String targetType, Object permission) {
         if (permission == null) return false;
-        String action = String.valueOf(permission);
+
+        String action;
+        Object context = null;
+
+        if (permission instanceof Object[] params && params.length >= 1) {
+             action = String.valueOf(params[0]);
+             if (params.length > 1) {
+                 context = params[1];
+             }
+        } else if (permission instanceof java.util.List<?> params && !params.isEmpty()) {
+             action = String.valueOf(params.get(0));
+             if (params.size() > 1) {
+                 context = params.get(1);
+             }
+        } else {
+             action = String.valueOf(permission);
+        }
+
         String resource = targetType;
-        return permissionService.hasPermission(authentication, targetId, resource, action, null);
+        return permissionService.hasPermission(authentication, targetId, resource, action, context);
     }
 }
