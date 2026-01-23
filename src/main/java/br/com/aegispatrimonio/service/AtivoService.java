@@ -7,10 +7,8 @@ import br.com.aegispatrimonio.dto.AtivoUpdateDTO;
 import br.com.aegispatrimonio.mapper.AtivoMapper;
 import br.com.aegispatrimonio.model.*;
 import br.com.aegispatrimonio.repository.*;
-import br.com.aegispatrimonio.security.CustomUserDetails;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.stereotype.Service;
@@ -37,8 +35,9 @@ public class AtivoService {
     private final ManutencaoRepository manutencaoRepository;
     private final MovimentacaoRepository movimentacaoRepository;
     private final DepreciacaoService depreciacaoService;
+    private final CurrentUserProvider currentUserProvider;
 
-    public AtivoService(AtivoRepository ativoRepository, AtivoMapper ativoMapper, TipoAtivoRepository tipoAtivoRepository, LocalizacaoRepository localizacaoRepository, FornecedorRepository fornecedorRepository, FuncionarioRepository funcionarioRepository, FilialRepository filialRepository, ManutencaoRepository manutencaoRepository, MovimentacaoRepository movimentacaoRepository, DepreciacaoService depreciacaoService) {
+    public AtivoService(AtivoRepository ativoRepository, AtivoMapper ativoMapper, TipoAtivoRepository tipoAtivoRepository, LocalizacaoRepository localizacaoRepository, FornecedorRepository fornecedorRepository, FuncionarioRepository funcionarioRepository, FilialRepository filialRepository, ManutencaoRepository manutencaoRepository, MovimentacaoRepository movimentacaoRepository, DepreciacaoService depreciacaoService, CurrentUserProvider currentUserProvider) {
         this.ativoRepository = ativoRepository;
         this.ativoMapper = ativoMapper;
         this.tipoAtivoRepository = tipoAtivoRepository;
@@ -49,11 +48,11 @@ public class AtivoService {
         this.manutencaoRepository = manutencaoRepository;
         this.movimentacaoRepository = movimentacaoRepository;
         this.depreciacaoService = depreciacaoService;
+        this.currentUserProvider = currentUserProvider;
     }
 
     private Usuario getUsuarioLogado() {
-        CustomUserDetails userDetails = (CustomUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        return userDetails.getUsuario();
+        return currentUserProvider.getCurrentUsuario();
     }
 
     private boolean isAdmin(Usuario usuario) {
