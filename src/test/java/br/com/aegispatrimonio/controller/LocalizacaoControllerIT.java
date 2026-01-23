@@ -79,7 +79,7 @@ public class LocalizacaoControllerIT extends BaseIT {
     @Test
     @DisplayName("ListarTodos: Deve retornar 200 e todas as localizações para ADMIN")
     void listarTodos_comAdmin_deveRetornarTodas() throws Exception {
-        mockMvc.perform(get("/localizacoes").header("Authorization", "Bearer " + adminToken))
+        mockMvc.perform(get("/api/v1/localizacoes").header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)));
     }
@@ -87,7 +87,7 @@ public class LocalizacaoControllerIT extends BaseIT {
     @Test
     @DisplayName("ListarTodos: Deve retornar 200 e apenas localizações da sua filial para USER")
     void listarTodos_comUser_deveRetornarLocalizacoesDaFilial() throws Exception {
-        mockMvc.perform(get("/localizacoes").header("Authorization", "Bearer " + userToken))
+        mockMvc.perform(get("/api/v1/localizacoes").header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].nome", is("Sala 101")));
@@ -98,7 +98,7 @@ public class LocalizacaoControllerIT extends BaseIT {
     void criar_comAdmin_deveRetornarCreated() throws Exception {
         LocalizacaoCreateDTO createDTO = new LocalizacaoCreateDTO("Almoxarifado", "Piso -1", filialA.getId(), null);
 
-        mockMvc.perform(post("/localizacoes")
+        mockMvc.perform(post("/api/v1/localizacoes")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createDTO)))
@@ -110,7 +110,7 @@ public class LocalizacaoControllerIT extends BaseIT {
     @DisplayName("Deletar: Deve retornar 403 Forbidden para USER")
     void deletar_comUser_deveRetornarForbidden() throws Exception {
         Localizacao loc = localizacaoRepository.findAll().get(0);
-        mockMvc.perform(delete("/localizacoes/{id}", loc.getId())
+        mockMvc.perform(delete("/api/v1/localizacoes/{id}", loc.getId())
                         .header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isForbidden());
     }
@@ -148,7 +148,7 @@ public class LocalizacaoControllerIT extends BaseIT {
         func.setMatricula(nome.replaceAll("\\s+", "") + "-001");
         func.setCargo("Analista");
         func.setDepartamento(depto);
-        func.setFiliais(filiais);
+        func.setFiliais(new java.util.HashSet<>(filiais));
         func.setStatus(Status.ATIVO);
 
         Usuario user = new Usuario();

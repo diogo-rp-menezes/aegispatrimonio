@@ -70,6 +70,8 @@ class AtivoServiceTest {
 
     @BeforeEach
     void setUp() {
+        mockedSecurityContextHolder = Mockito.mockStatic(SecurityContextHolder.class);
+
         filialA = new Filial();
         filialA.setId(1L);
 
@@ -102,21 +104,24 @@ class AtivoServiceTest {
         ativo.setId(10L);
         ativo.setFilial(filialA);
 
-        // Mock do currentUserProvider no setUp para garantir que sempre haja um usuário
-        lenient().when(currentUserProvider.getCurrentUsuario()).thenReturn(adminUser); 
+        mockUser(adminUser);
     }
 
     @AfterEach
     void tearDown() {
-        // Se mockedSecurityContextHolder foi inicializado, feche-o.
-        // if (mockedSecurityContextHolder != null) {
-        //     mockedSecurityContextHolder.close();
-        // }
+        if (mockedSecurityContextHolder != null) {
+            mockedSecurityContextHolder.close();
+        }
     }
 
     private void mockUser(Usuario usuario) {
-        // Agora mockamos o currentUserProvider diretamente
-        lenient().when(currentUserProvider.getCurrentUsuario()).thenReturn(usuario);
+        SecurityContext securityContext = mock(SecurityContext.class);
+        Authentication authentication = mock(Authentication.class);
+        CustomUserDetails userDetails = new CustomUserDetails(usuario);
+
+        lenient().when(securityContext.getAuthentication()).thenReturn(authentication);
+        lenient().when(authentication.getPrincipal()).thenReturn(userDetails);
+        mockedSecurityContextHolder.when(SecurityContextHolder::getContext).thenReturn(securityContext);
     }
 
     @Test

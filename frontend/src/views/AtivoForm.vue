@@ -37,6 +37,21 @@
           </select>
         </div>
 
+        <!-- Fornecedor -->
+        <div class="mb-3">
+          <label for="fornecedor" class="form-label">Fornecedor *</label>
+          <select
+            id="fornecedor"
+            v-model="form.fornecedorId"
+            class="form-select"
+            required
+            aria-required="true"
+          >
+            <option value="">Selecione...</option>
+            <option v-for="f in fornecedores" :key="f.id" :value="f.id">{{ f.nome }}</option>
+          </select>
+        </div>
+
         <!-- Número Patrimônio -->
         <div class="mb-3">
           <label for="numeroPatrimonio" class="form-label">Número Patrimônio</label>
@@ -180,8 +195,10 @@ const emit = defineEmits(['saved', 'cancel']);
 const isEdit = computed(() => !!props.ativoId);
 
 const form = reactive({
+  filialId: '',
   nome: '',
   tipoAtivoId: '',
+  fornecedorId: '',
   numeroPatrimonio: '',
   localizacaoId: '',
   status: 'ATIVO',
@@ -204,6 +221,7 @@ const form = reactive({
 
 const tipos = ref([]);
 const localizacoes = ref([]);
+const fornecedores = ref([]);
 const saving = ref(false);
 const showHardware = ref(false);
 
@@ -212,9 +230,11 @@ onMounted(async () => {
     const data = await request(`/ativos/${props.ativoId}`);
     Object.assign(form, data, {
       tipoAtivoId: data.tipoAtivoId || '',
+      fornecedorId: data.fornecedorId || '',
       localizacaoId: data.localizacaoId || '',
       valorAquisicao: data.valorAquisicao || '',
       dataAquisicao: data.dataAquisicao || '',
+      filialId: data.filialId || ''
     });
     if (data.detalheHardware) {
       Object.assign(form.detalheHardware, data.detalheHardware);
@@ -233,16 +253,24 @@ onMounted(async () => {
         cpuThreads: null
        };
     }
+  } else {
+    // Inject filialId from localStorage
+    const fid = localStorage.getItem('currentFilial');
+    if (fid) {
+      form.filialId = Number(fid);
+    }
   }
 
   // Carregar listas auxiliares
   try {
-    const [tiposData, locsData] = await Promise.all([
+    const [tiposData, locsData, fornsData] = await Promise.all([
       request('/tipos-ativos').catch(() => []),
       request('/localizacoes').catch(() => []),
+      request('/fornecedores').catch(() => [])
     ]);
     tipos.value = tiposData;
     localizacoes.value = locsData;
+    fornecedores.value = fornsData;
   } catch (e) {
     console.warn('Não foi possível carregar listas auxiliares', e);
   }

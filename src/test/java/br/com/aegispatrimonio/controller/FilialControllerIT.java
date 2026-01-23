@@ -4,10 +4,7 @@ import br.com.aegispatrimonio.BaseIT;
 import br.com.aegispatrimonio.dto.FilialCreateDTO;
 import br.com.aegispatrimonio.dto.FilialUpdateDTO;
 import br.com.aegispatrimonio.model.*;
-import br.com.aegispatrimonio.repository.DepartamentoRepository;
-import br.com.aegispatrimonio.repository.FilialRepository;
-import br.com.aegispatrimonio.repository.FuncionarioRepository;
-import br.com.aegispatrimonio.repository.UsuarioRepository;
+import br.com.aegispatrimonio.repository.*;
 import br.com.aegispatrimonio.security.CustomUserDetails;
 import br.com.aegispatrimonio.security.JwtService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -49,6 +46,9 @@ class FilialControllerIT extends BaseIT {
     @Autowired
     private UsuarioRepository usuarioRepository;
 
+    @Autowired private AtivoRepository ativoRepository;
+    @Autowired private LocalizacaoRepository localizacaoRepository;
+
     @Autowired
     private JwtService jwtService;
 
@@ -58,22 +58,20 @@ class FilialControllerIT extends BaseIT {
     private String adminToken;
     private String userToken;
     private Filial filialExistente;
-
-    private static final String CNPJ_VALIDO_1 = "45543915000181";
-    private static final String CNPJ_VALIDO_2 = "17298092000130";
-    private static final String CNPJ_VALIDO_3 = "15302930000177";
-    private static final String CNPJ_VALIDO_4 = "73110356000108";
-    private static final String CNPJ_VALIDO_5 = "87353221000107";
+    private String cnpjExistente;
 
     @BeforeEach
     void setUp() {
         // Limpar repositórios para garantir um estado limpo para cada teste
+        ativoRepository.deleteAll();
+        localizacaoRepository.deleteAll();
         usuarioRepository.deleteAll();
         funcionarioRepository.deleteAll();
         departamentoRepository.deleteAll();
         filialRepository.deleteAll();
 
-        this.filialExistente = createFilial("Matriz Teste", "MTRZ", CNPJ_VALIDO_1);
+        this.cnpjExistente = generateRandomCNPJ();
+        this.filialExistente = createFilial("Matriz Teste", "MTRZ-" + UUID.randomUUID().toString().substring(0,5), cnpjExistente);
         Departamento diretoria = createDepartamento("Diretoria", filialExistente);
 
         String adminEmail = "admin.filial." + UUID.randomUUID().toString() + "@aegis.com";
@@ -88,7 +86,7 @@ class FilialControllerIT extends BaseIT {
     @Test
     @DisplayName("ListarTodos: Deve retornar 200 e a lista de filiais para ADMIN")
     void listarTodos_comAdmin_deveRetornarOk() throws Exception {
-        mockMvc.perform(get("/filiais").header("Authorization", "Bearer " + adminToken))
+        mockMvc.perform(get("/api/v1/filiais").header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].nome", is("Matriz Teste")));
     }
@@ -96,7 +94,7 @@ class FilialControllerIT extends BaseIT {
     @Test
     @DisplayName("ListarTodos: Deve retornar 200 e a lista de filiais para USER")
     void listarTodos_comUser_deveRetornarOk() throws Exception {
-        mockMvc.perform(get("/filiais").header("Authorization", "Bearer " + userToken))
+        mockMvc.perform(get("/api/v1/filiais").header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].nome", is("Matriz Teste")));
     }
@@ -105,7 +103,7 @@ class FilialControllerIT extends BaseIT {
     @DisplayName("BuscarPorId: Deve retornar 404 Not Found para ID inexistente")
     void buscarPorId_comIdInexistente_deveRetornarNotFound() throws Exception {
         long idInexistente = 999L;
-        mockMvc.perform(get("/filiais/{id}", idInexistente)
+        mockMvc.perform(get("/api/v1/filiais/{id}", idInexistente)
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isNotFound());
     }
@@ -113,9 +111,9 @@ class FilialControllerIT extends BaseIT {
     @Test
     @DisplayName("Criar: Deve retornar 201 Created para ADMIN com dados válidos")
     void criar_comAdmin_deveRetornarCreated() throws Exception {
-        FilialCreateDTO createDTO = new FilialCreateDTO("Filial RJ", "RJ-01", TipoFilial.FILIAL, CNPJ_VALIDO_2, "Endereço RJ");
+        FilialCreateDTO createDTO = new FilialCreateDTO("Filial RJ", "RJ-01", TipoFilial.FILIAL, generateRandomCNPJ(), "Endereço RJ");
 
-        mockMvc.perform(post("/filiais")
+        mockMvc.perform(post("/api/v1/filiais")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createDTO)))
@@ -126,9 +124,9 @@ class FilialControllerIT extends BaseIT {
     @Test
     @DisplayName("Criar: Deve retornar 403 Forbidden para USER")
     void criar_comUser_deveRetornarForbidden() throws Exception {
-        FilialCreateDTO createDTO = new FilialCreateDTO("Filial Proibida", "FL-P", TipoFilial.FILIAL, CNPJ_VALIDO_3, "Endereço");
+        FilialCreateDTO createDTO = new FilialCreateDTO("Filial Proibida", "FL-P", TipoFilial.FILIAL, generateRandomCNPJ(), "Endereço");
 
-        mockMvc.perform(post("/filiais")
+        mockMvc.perform(post("/api/v1/filiais")
                         .header("Authorization", "Bearer " + userToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createDTO)))
@@ -138,9 +136,9 @@ class FilialControllerIT extends BaseIT {
     @Test
     @DisplayName("Criar: Deve retornar 400 Bad Request para dados inválidos (nome em branco)")
     void criar_comDadosInvalidos_deveRetornarBadRequest() throws Exception {
-        FilialCreateDTO createDTO = new FilialCreateDTO("", "FL-BR", TipoFilial.FILIAL, CNPJ_VALIDO_4, "Endereço");
+        FilialCreateDTO createDTO = new FilialCreateDTO("", "FL-BR", TipoFilial.FILIAL, generateRandomCNPJ(), "Endereço");
 
-        mockMvc.perform(post("/filiais")
+        mockMvc.perform(post("/api/v1/filiais")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createDTO)))
@@ -150,9 +148,9 @@ class FilialControllerIT extends BaseIT {
     @Test
     @DisplayName("Atualizar: Deve retornar 200 OK para ADMIN com dados válidos")
     void atualizar_comAdmin_deveRetornarOk() throws Exception {
-        FilialUpdateDTO updateDTO = new FilialUpdateDTO("Matriz SP", "MTRZ-SP", TipoFilial.MATRIZ, CNPJ_VALIDO_1, "Novo Endereço", Status.ATIVO);
+        FilialUpdateDTO updateDTO = new FilialUpdateDTO("Matriz SP", "MTRZ-SP", TipoFilial.MATRIZ, cnpjExistente, "Novo Endereço", Status.ATIVO);
 
-        mockMvc.perform(put("/filiais/{id}", filialExistente.getId())
+        mockMvc.perform(put("/api/v1/filiais/{id}", filialExistente.getId())
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateDTO)))
@@ -163,9 +161,9 @@ class FilialControllerIT extends BaseIT {
     @Test
     @DisplayName("Atualizar: Deve retornar 400 Bad Request para dados inválidos")
     void atualizar_comDadosInvalidos_deveRetornarBadRequest() throws Exception {
-        FilialUpdateDTO updateDTO = new FilialUpdateDTO("", "MTRZ-NEW", TipoFilial.MATRIZ, CNPJ_VALIDO_1, "Endereço Novo", Status.INATIVO);
+        FilialUpdateDTO updateDTO = new FilialUpdateDTO("", "MTRZ-NEW", TipoFilial.MATRIZ, cnpjExistente, "Endereço Novo", Status.INATIVO);
 
-        mockMvc.perform(put("/filiais/{id}", filialExistente.getId())
+        mockMvc.perform(put("/api/v1/filiais/{id}", filialExistente.getId())
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateDTO)))
@@ -175,21 +173,21 @@ class FilialControllerIT extends BaseIT {
     @Test
     @DisplayName("Atualizar: Deve retornar 404 Not Found para ID inexistente")
     void atualizar_comIdInexistente_deveRetornarNotFound() throws Exception {
-        FilialUpdateDTO updateDTO = new FilialUpdateDTO("Nome Fantasma", "FANTASMA", TipoFilial.FILIAL, CNPJ_VALIDO_3, "Endereço Fantasma", Status.ATIVO);
+        FilialUpdateDTO updateDTO = new FilialUpdateDTO("Nome Fantasma", "FANTASMA", TipoFilial.FILIAL, generateRandomCNPJ(), "Endereço Fantasma", Status.ATIVO);
 
-        mockMvc.perform(put("/filiais/{id}", 999L)
+        mockMvc.perform(put("/api/v1/filiais/{id}", 999L)
                         .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON) // Adicionado
-                        .content(objectMapper.writeValueAsString(updateDTO))) // Adicionado
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateDTO)))
                 .andExpect(status().isNotFound());
     }
 
     @Test
     @DisplayName("Atualizar: Deve retornar 403 Forbidden para USER")
     void atualizar_comUser_deveRetornarForbidden() throws Exception {
-        FilialUpdateDTO updateDTO = new FilialUpdateDTO("Novo Nome", "MTRZ-NEW", TipoFilial.MATRIZ, CNPJ_VALIDO_1, "Endereço Novo", Status.INATIVO);
+        FilialUpdateDTO updateDTO = new FilialUpdateDTO("Novo Nome", "MTRZ-NEW", TipoFilial.MATRIZ, cnpjExistente, "Endereço Novo", Status.INATIVO);
 
-        mockMvc.perform(put("/filiais/{id}", filialExistente.getId())
+        mockMvc.perform(put("/api/v1/filiais/{id}", filialExistente.getId())
                         .header("Authorization", "Bearer " + userToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateDTO)))
@@ -199,9 +197,9 @@ class FilialControllerIT extends BaseIT {
     @Test
     @DisplayName("Deletar: Deve retornar 204 NoContent para ADMIN")
     void deletar_comAdmin_deveRetornarNoContent() throws Exception {
-        Filial filialParaDeletar = createFilial("Filial a Deletar", "FL-DEL", CNPJ_VALIDO_5);
+        Filial filialParaDeletar = createFilial("Filial a Deletar", "FL-DEL", generateRandomCNPJ());
 
-        mockMvc.perform(delete("/filiais/{id}", filialParaDeletar.getId())
+        mockMvc.perform(delete("/api/v1/filiais/{id}", filialParaDeletar.getId())
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isNoContent());
     }
@@ -209,12 +207,38 @@ class FilialControllerIT extends BaseIT {
     @Test
     @DisplayName("Deletar: Deve retornar 403 Forbidden para USER")
     void deletar_comUser_deveRetornarForbidden() throws Exception {
-        mockMvc.perform(delete("/filiais/{id}", filialExistente.getId())
+        mockMvc.perform(delete("/api/v1/filiais/{id}", filialExistente.getId())
                         .header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isForbidden());
     }
 
     // --- Helper Methods ---
+
+    private String generateRandomCNPJ() {
+        // Gera um CNPJ válido
+        int[] n = new int[14];
+        for (int i = 0; i < 12; i++) {
+            n[i] = (int) (Math.random() * 10);
+        }
+
+        // Digito 1
+        int sum = 0;
+        int[] weights1 = {5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2};
+        for (int i = 0; i < 12; i++) sum += n[i] * weights1[i];
+        int r = sum % 11;
+        n[12] = (r < 2) ? 0 : 11 - r;
+
+        // Digito 2
+        sum = 0;
+        int[] weights2 = {6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2};
+        for (int i = 0; i < 13; i++) sum += n[i] * weights2[i];
+        r = sum % 11;
+        n[13] = (r < 2) ? 0 : 11 - r;
+
+        StringBuilder sb = new StringBuilder();
+        for (int d : n) sb.append(d);
+        return sb.toString();
+    }
 
     private Filial createFilial(String nome, String codigo, String cnpj) {
         Filial filial = new Filial();
@@ -240,22 +264,20 @@ class FilialControllerIT extends BaseIT {
         func.setCargo("Administrador");
         func.setDepartamento(depto);
         func.setStatus(Status.ATIVO);
-        func.setId(null); // Adicionado: Explicitamente define o ID como null para forçar a geração de um novo ID
+        func.setId(null);
 
-        // Salvar o funcionário primeiro para garantir que o ID seja gerado
         Funcionario savedFunc = funcionarioRepository.save(func);
-        funcionarioRepository.flush(); // Força a sincronização com o banco de dados para garantir o ID
+        funcionarioRepository.flush();
 
         Usuario user = new Usuario();
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode("password"));
         user.setRole(role);
         user.setStatus(Status.ATIVO);
-        user.setFuncionario(savedFunc); // Associar ao funcionário já salvo
-        savedFunc.setUsuario(user); // Manter a bidirecionalidade
+        user.setFuncionario(savedFunc);
+        savedFunc.setUsuario(user);
 
-        // Agora associar as filiais e salvar novamente o funcionário para persistir a associação ManyToMany
-        savedFunc.setFiliais(filiais);
+        savedFunc.setFiliais(new java.util.HashSet<>(filiais));
         return funcionarioRepository.save(savedFunc);
     }
 }

@@ -182,6 +182,14 @@
                     >
                       <i class="bi bi-eye"></i>
                     </button>
+                    <button
+                      class="btn btn-outline-danger"
+                      @click="deleteAtivo(item.id)"
+                      :aria-label="`Excluir ${item.nome}`"
+                      title="Excluir"
+                    >
+                      <i class="bi bi-trash"></i>
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -365,6 +373,18 @@ const displayedPageNumbers = computed(() => {
 
 function goToDetail(id) {
   router.push(`/ativos/${id}`);
+}
+
+async function deleteAtivo(id) {
+  if (!confirm('Tem certeza que deseja excluir este ativo?')) return;
+
+  try {
+    await request(`/ativos/${id}`, { method: 'DELETE' });
+    fetchPage(pageInfo.page);
+  } catch (error) {
+    console.error('Erro ao excluir:', error);
+    alert('Erro ao excluir ativo.');
+  }
 }
 
 // Carregar inicialmente

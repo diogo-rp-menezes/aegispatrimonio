@@ -21,7 +21,7 @@ services:
   db:
     image: mysql:8.0
     environment:
-      MYSQL_ROOT_PASSWORD: password
+      MYSQL_ROOT_PASSWORD: Admin123
       MYSQL_DATABASE: aegis-patrimonio
     volumes:
       - db_data:/var/lib/mysql
