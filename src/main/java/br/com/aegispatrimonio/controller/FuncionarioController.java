@@ -15,7 +15,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.validation.annotation.Validated; // Adicionada esta importação
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,6 +23,7 @@ import java.util.List;
 /**
  * Controller para gerenciar as operações CRUD de Funcionários e seus respectivos Usuários.
  * Fornece endpoints para listar, buscar, criar, atualizar e deletar funcionários.
+ * Protegido por RBAC Granular.
  */
 @RestController
 @RequestMapping("/api/v1/funcionarios")
@@ -64,7 +65,7 @@ public class FuncionarioController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasPermission(null, 'FUNCIONARIO', 'CREATE', #createDTO.filiaisIds)")
     @Operation(summary = "Cria um novo funcionário", description = "Cria um novo funcionário e seu respectivo usuário no sistema.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Funcionário criado com sucesso", content = @Content(schema = @Schema(implementation = FuncionarioDTO.class))),
@@ -77,7 +78,7 @@ public class FuncionarioController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasPermission(#id, 'FUNCIONARIO', 'UPDATE', #updateDTO.filiaisIds)")
     @Operation(summary = "Atualiza um funcionário existente", description = "Atualiza os dados de um funcionário existente e seu respectivo usuário.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Funcionário atualizado com sucesso", content = @Content(schema = @Schema(implementation = FuncionarioDTO.class))),

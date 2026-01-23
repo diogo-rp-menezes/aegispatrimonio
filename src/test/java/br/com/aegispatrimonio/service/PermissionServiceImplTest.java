@@ -1,6 +1,7 @@
 package br.com.aegispatrimonio.service;
 
 import br.com.aegispatrimonio.model.*;
+import br.com.aegispatrimonio.repository.AtivoRepository;
 import br.com.aegispatrimonio.repository.UsuarioRepository;
 import br.com.aegispatrimonio.service.impl.PermissionServiceImpl;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -21,7 +22,6 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -31,6 +31,9 @@ class PermissionServiceImplTest {
     @Mock
     private UsuarioRepository usuarioRepository;
 
+    @Mock
+    private AtivoRepository ativoRepository;
+
     private PermissionServiceImpl permissionService;
     private MeterRegistry meterRegistry;
     private Usuario usuario;
@@ -39,7 +42,7 @@ class PermissionServiceImplTest {
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
-        permissionService = new PermissionServiceImpl(usuarioRepository, meterRegistry);
+        permissionService = new PermissionServiceImpl(usuarioRepository, ativoRepository, meterRegistry);
     }
 
     private void createAuthenticatedUser() {

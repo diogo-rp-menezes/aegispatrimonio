@@ -11,12 +11,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 /**
  * Controller para gerenciar as operações CRUD de Ativos.
  * Fornece endpoints para listar, buscar, criar, atualizar e deletar ativos.
- * Acesso geral requer autenticação.
+ * Acesso protegido por RBAC Granular (Aegis Shield).
  */
 @RestController
 @RequestMapping("/api/v1/ativos")
@@ -31,12 +29,13 @@ public class AtivoController {
 
     /**
      * Lista todos os ativos cadastrados no sistema.
-     * Acesso permitido para usuários com qualquer role autenticada.
+     * Se filialId for informado, verifica permissão de leitura nesse contexto.
+     * Caso contrário, o serviço filtra os ativos permitidos ao usuário.
      *
      * @return Uma lista de AtivoDTO representando todos os ativos.
      */
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("#filialId == null or hasPermission(null, 'ATIVO', 'READ', #filialId)")
     public Page<AtivoDTO> listarTodos(
             org.springframework.data.domain.Pageable pageable,
             @RequestParam(required = false) Long filialId,
@@ -49,75 +48,68 @@ public class AtivoController {
 
     /**
      * Busca um ativo específico pelo seu ID.
-     * Acesso permitido para usuários com qualquer role autenticada.
+     * Requer permissão READ no contexto da filial do ativo.
      *
      * @param id O ID do ativo a ser buscado.
      * @return O AtivoDTO correspondente ao ID fornecido.
-     * @throws jakarta.persistence.EntityNotFoundException se o ativo não for encontrado.
      */
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("@permissionService.hasAtivoPermission(authentication, #id, 'READ')")
     public AtivoDTO buscarPorId(@PathVariable Long id) {
         return ativoService.buscarPorId(id);
     }
 
     /**
      * Cria um novo ativo no sistema.
-     * Acesso restrito a usuários com a role 'ADMIN'.
+     * Requer permissão CREATE no contexto da filial informada.
      *
      * @param ativoCreateDTO O DTO contendo os dados para a criação do novo ativo.
      * @return O AtivoDTO recém-criado.
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasPermission(null, 'ATIVO', 'CREATE', #ativoCreateDTO.filialId)")
     public AtivoDTO criar(@RequestBody @Valid AtivoCreateDTO ativoCreateDTO) {
         return ativoService.criar(ativoCreateDTO);
     }
 
     /**
      * Atualiza um ativo existente.
-     * Acesso restrito a usuários com a role 'ADMIN'.
+     * Requer permissão UPDATE no contexto atual do ativo E no contexto da filial alvo.
      *
      * @param id O ID do ativo a ser atualizado.
      * @param ativoUpdateDTO O DTO contendo os dados para a atualização.
      * @return O AtivoDTO com os dados atualizados.
-     * @throws jakarta.persistence.EntityNotFoundException se o ativo não for encontrado.
      */
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionService.hasAtivoPermission(authentication, #id, 'UPDATE') and hasPermission(null, 'ATIVO', 'UPDATE', #ativoUpdateDTO.filialId)")
     public AtivoDTO atualizar(@PathVariable Long id, @RequestBody @Valid AtivoUpdateDTO ativoUpdateDTO) {
         return ativoService.atualizar(id, ativoUpdateDTO);
     }
 
     /**
      * Deleta um ativo (realiza uma exclusão lógica, marcando-o como BAIXADO).
-     * Acesso restrito a usuários com a role 'ADMIN'.
+     * Requer permissão DELETE no contexto da filial do ativo.
      *
      * @param id O ID do ativo a ser deletado.
-     * @throws jakarta.persistence.EntityNotFoundException se o ativo não for encontrado.
      */
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionService.hasAtivoPermission(authentication, #id, 'DELETE')")
     public void deletar(@PathVariable Long id) {
         ativoService.deletar(id);
     }
 
     /**
      * Atualiza o status de saúde (health check) de um ativo.
-     * Acesso permitido para usuários com qualquer role autenticada.
+     * Requer permissão UPDATE no contexto da filial do ativo.
      *
      * @param id O ID do ativo a ter seu health check atualizado.
-     * @throws jakarta.persistence.EntityNotFoundException se o ativo não for encontrado.
      */
     @PatchMapping("/{id}/health-check")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("@permissionService.hasAtivoPermission(authentication, #id, 'UPDATE')")
     public void updateHealthCheck(@PathVariable Long id, @RequestBody Object ignoredPayload) {
-        // Valida existência e autorização reutilizando as regras de acesso do serviço de ativos
-        // Se o ativo não existir ou o usuário não tiver acesso, exceções apropriadas serão lançadas
         ativoService.buscarPorId(id);
-        // No-op: payload será processado futuramente pelo serviço dedicado de health-check
     }
 }

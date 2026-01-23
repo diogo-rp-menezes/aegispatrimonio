@@ -3,11 +3,7 @@ package br.com.aegispatrimonio.service;
 import org.springframework.security.core.Authentication;
 
 /**
- * Service de autorização contextual (RBAC granular) — SPI mínima para PoC.
- * Implementação inicial concede:
- * - ADMIN: acesso total a todos os recursos/ações
- * - USER: acesso de leitura (READ) por padrão
- * Futuras extensões: verificar permissões persistidas e contexto (filialId, etc.).
+ * Service de autorização contextual (RBAC granular).
  */
 public interface IPermissionService {
 
@@ -25,4 +21,9 @@ public interface IPermissionService {
                           String resource,
                           String action,
                           Object context);
+
+    /**
+     * Verifica permissão em um Ativo específico, resolvendo o contexto (Filial) automaticamente.
+     */
+    boolean hasAtivoPermission(Authentication authentication, Long ativoId, String action);
 }

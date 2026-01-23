@@ -2,6 +2,7 @@ package br.com.aegispatrimonio.service.impl;
 
 import br.com.aegispatrimonio.model.Permission;
 import br.com.aegispatrimonio.model.Role;
+import br.com.aegispatrimonio.repository.AtivoRepository;
 import br.com.aegispatrimonio.repository.UsuarioRepository;
 import br.com.aegispatrimonio.service.IPermissionService;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -15,6 +16,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
@@ -31,20 +33,22 @@ import java.util.Set;
  *     <li>Micrometer metrics for observability (allow/deny counts, timing)</li>
  * </ul>
  */
-@Service
+@Service("permissionService")
 public class PermissionServiceImpl implements IPermissionService {
 
     private static final Logger log = LoggerFactory.getLogger(PermissionServiceImpl.class);
 
     private final UsuarioRepository usuarioRepository;
+    private final AtivoRepository ativoRepository;
     private final MeterRegistry meterRegistry;
 
     @org.springframework.beans.factory.annotation.Autowired
     @Lazy
     private PermissionServiceImpl self;
 
-    public PermissionServiceImpl(UsuarioRepository usuarioRepository, MeterRegistry meterRegistry) {
+    public PermissionServiceImpl(UsuarioRepository usuarioRepository, AtivoRepository ativoRepository, MeterRegistry meterRegistry) {
         this.usuarioRepository = usuarioRepository;
+        this.ativoRepository = ativoRepository;
         this.meterRegistry = meterRegistry;
     }
 
@@ -103,7 +107,7 @@ public class PermissionServiceImpl implements IPermissionService {
 
                 if ("filialId".equalsIgnoreCase(matchedPermission.getContextKey())) {
                     if (!effectiveSelf.hasContextAccess(username, context)) {
-                        log.debug("[AUTHZ] Deny: Context mismatch. User {} has no access to filial {}", username, context);
+                        log.debug("[AUTHZ] Deny: Context mismatch. User {} has no access to context {}", username, context);
                         return false;
                     }
                 }
@@ -130,6 +134,23 @@ public class PermissionServiceImpl implements IPermissionService {
                 log.debug("[AUTHZ][METRICS] Failed to record metrics", e);
             }
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean hasAtivoPermission(Authentication authentication, Long ativoId, String action) {
+        if (ativoId == null) return false;
+
+        // Lookup Ativo to get Filial ID
+        return ativoRepository.findById(ativoId)
+                .map(ativo -> {
+                    Long filialId = (ativo.getFilial() != null) ? ativo.getFilial().getId() : null;
+                    return hasPermission(authentication, ativoId, "ATIVO", action, filialId);
+                })
+                .orElse(false); // If Ativo not found, deny access (or let controller handle 404, but security usually comes first)
+        // If security returns false for non-existent resource, it's 403.
+        // If we want 404, we should allow access or check existence in controller.
+        // But preventing probing is safer.
     }
 
     /**
@@ -175,13 +196,14 @@ public class PermissionServiceImpl implements IPermissionService {
 
     /**
      * Checks if a user has access to a specific context (e.g., Filial ID).
-     * Cached by username and context ID.
+     * If context is a Collection, checks access to ALL elements.
+     * Cached by username and context.
      *
      * @param username The username.
-     * @param context  The context ID (usually Filial ID).
+     * @param context  The context ID or Collection of IDs.
      * @return true if user has access.
      */
-    @Cacheable(value = "userContext", key = "#username + '-' + #context", unless = "#result == false")
+    @Cacheable(value = "userContext", key = "#username + '-' + #context.toString()", unless = "#result == false")
     @Transactional(readOnly = true)
     public boolean hasContextAccess(String username, Object context) {
          return usuarioRepository.findWithDetailsByEmail(username)
@@ -189,18 +211,47 @@ public class PermissionServiceImpl implements IPermissionService {
                     if (u.getFuncionario() == null || u.getFuncionario().getFiliais() == null) {
                         return false;
                     }
-                    Long filialId;
-                    try {
-                        filialId = Long.valueOf(String.valueOf(context));
-                    } catch (NumberFormatException e) {
-                        log.warn("Invalid context ID format: {}", context);
-                        return false;
-                    }
 
-                    return u.getFuncionario().getFiliais().stream()
-                            .anyMatch(f -> f.getId().equals(filialId));
+                    Set<Long> allowedFiliais = new HashSet<>();
+                    u.getFuncionario().getFiliais().forEach(f -> allowedFiliais.add(f.getId()));
+
+                    if (context instanceof Collection<?>) {
+                        Collection<?> requestedContexts = (Collection<?>) context;
+                        if (requestedContexts.isEmpty()) return true;
+
+                        for (Object item : requestedContexts) {
+                            Long id = parseId(item);
+                            if (id == null || !allowedFiliais.contains(id)) {
+                                return false;
+                            }
+                        }
+                        return true;
+                    } else if (context instanceof Object[]) {
+                        Object[] requestedContexts = (Object[]) context;
+                        if (requestedContexts.length == 0) return true;
+
+                        for (Object item : requestedContexts) {
+                            Long id = parseId(item);
+                            if (id == null || !allowedFiliais.contains(id)) {
+                                return false;
+                            }
+                        }
+                        return true;
+                    } else {
+                        Long id = parseId(context);
+                        return id != null && allowedFiliais.contains(id);
+                    }
                 })
                 .orElse(false);
+    }
+
+    private Long parseId(Object item) {
+        try {
+            return Long.valueOf(String.valueOf(item));
+        } catch (NumberFormatException e) {
+            log.warn("Invalid context ID format: {}", item);
+            return null;
+        }
     }
 
     private String nullSafe(String v) {

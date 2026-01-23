@@ -3,6 +3,7 @@ package br.com.aegispatrimonio.service.impl;
 import br.com.aegispatrimonio.model.Permission;
 import br.com.aegispatrimonio.model.Role;
 import br.com.aegispatrimonio.model.Usuario;
+import br.com.aegispatrimonio.repository.AtivoRepository;
 import br.com.aegispatrimonio.repository.UsuarioRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -16,7 +17,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -25,13 +25,15 @@ class PermissionServiceMetricsTest {
 
     private MeterRegistry meterRegistry;
     private UsuarioRepository usuarioRepository;
+    private AtivoRepository ativoRepository;
     private PermissionServiceImpl service;
 
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
         usuarioRepository = mock(UsuarioRepository.class);
-        service = new PermissionServiceImpl(usuarioRepository, meterRegistry);
+        ativoRepository = mock(AtivoRepository.class);
+        service = new PermissionServiceImpl(usuarioRepository, ativoRepository, meterRegistry);
         ReflectionTestUtils.setField(service, "self", service);
     }
 
