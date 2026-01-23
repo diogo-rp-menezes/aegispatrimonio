@@ -15,4 +15,11 @@ DELETE FROM funcionarios;
 DELETE FROM fornecedores;
 DELETE FROM tipos_ativo;
 DELETE FROM filiais;
+
+-- RBAC Cleanup
+DELETE FROM rbac_user_role;
+DELETE FROM rbac_role_permission;
+DELETE FROM rbac_permission;
+DELETE FROM rbac_role;
+
 SET FOREIGN_KEY_CHECKS = 1;
