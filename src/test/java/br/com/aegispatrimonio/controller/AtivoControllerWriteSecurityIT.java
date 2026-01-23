@@ -4,14 +4,15 @@ import br.com.aegispatrimonio.BaseIT;
 import br.com.aegispatrimonio.model.Status;
 import br.com.aegispatrimonio.model.Usuario;
 import br.com.aegispatrimonio.security.CustomUserDetails;
+import br.com.aegispatrimonio.service.IPermissionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -20,6 +21,9 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.HashSet;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -32,6 +36,9 @@ class AtivoControllerWriteSecurityIT extends BaseIT {
 
     @Autowired
     private WebApplicationContext context;
+
+    @MockBean
+    private IPermissionService permissionService;
 
     private MockMvc mockMvc;
 
@@ -63,8 +70,6 @@ class AtivoControllerWriteSecurityIT extends BaseIT {
     }
 
     private String buildValidCreateJson() throws Exception {
-        // Monta um JSON válido para AtivoCreateDTO; os IDs referenciados podem não existir no banco,
-        // portanto esperamos 404 para ADMIN (autorização passa, domínio nega por inexistência).
         var payload = new java.util.LinkedHashMap<String, Object>();
         payload.put("filialId", 1L);
         payload.put("nome", "Notebook Dell Latitude");
@@ -102,14 +107,18 @@ class AtivoControllerWriteSecurityIT extends BaseIT {
     void postAtivo_userForbidden_adminPassesAuthorization() throws Exception {
         String json = buildValidCreateJson();
 
-        // USER deve ser 403 por @PreAuthorize (hasRole('ADMIN') && hasPermission('ATIVO','CREATE'))
+        // Configura Mock para negar USER
+        when(permissionService.hasPermission(any(), any(), eq("ATIVO"), eq("CREATE"), any())).thenReturn(false);
+
         mockMvc.perform(post("/api/v1/ativos")
                         .with(user(buildUser("ROLE_USER")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json))
                 .andExpect(status().isForbidden());
 
-        // ADMIN: autorização deve permitir; como dados referenciam IDs possivelmente inexistentes, aceitamos 4xx diferente de 403
+        // Configura Mock para permitir ADMIN
+        when(permissionService.hasPermission(any(), any(), eq("ATIVO"), eq("CREATE"), any())).thenReturn(true);
+
         mockMvc.perform(post("/api/v1/ativos")
                         .with(user(buildUser("ROLE_ADMIN")))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -128,11 +137,19 @@ class AtivoControllerWriteSecurityIT extends BaseIT {
         String json = buildValidUpdateJson();
         long inexistenteId = 999999L;
 
+        // Configura Mock para negar USER (update requires hasAtivoPermission AND hasPermission)
+        when(permissionService.hasAtivoPermission(any(), eq(inexistenteId), eq("UPDATE"))).thenReturn(false);
+        when(permissionService.hasPermission(any(), any(), eq("ATIVO"), eq("UPDATE"), any())).thenReturn(false);
+
         mockMvc.perform(put("/api/v1/ativos/{id}", inexistenteId)
                         .with(user(buildUser("ROLE_USER")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json))
                 .andExpect(status().isForbidden());
+
+        // Configura Mock para permitir ADMIN
+        when(permissionService.hasAtivoPermission(any(), eq(inexistenteId), eq("UPDATE"))).thenReturn(true);
+        when(permissionService.hasPermission(any(), any(), eq("ATIVO"), eq("UPDATE"), any())).thenReturn(true);
 
         mockMvc.perform(put("/api/v1/ativos/{id}", inexistenteId)
                         .with(user(buildUser("ROLE_ADMIN")))
@@ -151,9 +168,15 @@ class AtivoControllerWriteSecurityIT extends BaseIT {
     void deleteAtivo_userForbidden_adminPassesAuthorization() throws Exception {
         long inexistenteId = 888888L;
 
+        // Mock para negar USER
+        when(permissionService.hasAtivoPermission(any(), eq(inexistenteId), eq("DELETE"))).thenReturn(false);
+
         mockMvc.perform(delete("/api/v1/ativos/{id}", inexistenteId)
                         .with(user(buildUser("ROLE_USER"))))
                 .andExpect(status().isForbidden());
+
+        // Mock para permitir ADMIN
+        when(permissionService.hasAtivoPermission(any(), eq(inexistenteId), eq("DELETE"))).thenReturn(true);
 
         mockMvc.perform(delete("/api/v1/ativos/{id}", inexistenteId)
                         .with(user(buildUser("ROLE_ADMIN"))))

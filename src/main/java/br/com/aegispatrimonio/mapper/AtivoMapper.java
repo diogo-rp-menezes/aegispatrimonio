@@ -7,6 +7,7 @@ import br.com.aegispatrimonio.model.Ativo;
 import br.com.aegispatrimonio.model.AtivoDetalheHardware;
 import br.com.aegispatrimonio.model.Funcionario;
 import org.springframework.stereotype.Component;
+import java.time.LocalDate;
 
 @Component
 public class AtivoMapper {
@@ -39,6 +40,19 @@ public class AtivoMapper {
             );
         }
 
+        LocalDate previsaoEsgotamento = null;
+        if (ativo.getAtributos() != null && ativo.getAtributos().containsKey("previsaoEsgotamentoDisco")) {
+             try {
+                 Object val = ativo.getAtributos().get("previsaoEsgotamentoDisco");
+                 if (val != null) {
+                    String dateStr = val.toString();
+                    previsaoEsgotamento = LocalDate.parse(dateStr);
+                 }
+             } catch (Exception e) {
+                 // ignore parsing error
+             }
+        }
+
         return new AtivoDTO(
                 ativo.getId(),
                 ativo.getNome(),
@@ -52,11 +66,12 @@ public class AtivoMapper {
                 ativo.getFornecedor() != null ? ativo.getFornecedor().getId() : null,
                 ativo.getFornecedor() != null ? ativo.getFornecedor().getNome() : null,
                 ativo.getStatus(),
-                ativo.getValorAquisicao(), // Added
+                ativo.getValorAquisicao(),
                 responsavelId,
                 responsavelNome,
                 hwDTO,
-                ativo.getAtributos()
+                ativo.getAtributos(),
+                previsaoEsgotamento
         );
     }
 
@@ -73,9 +88,6 @@ public class AtivoMapper {
         ativo.setObservacoes(ativoCreateDTO.observacoes());
         ativo.setInformacoesGarantia(ativoCreateDTO.informacoesGarantia());
         ativo.setAtributos(ativoCreateDTO.atributos());
-
-        // As entidades relacionadas (Filial, TipoAtivo, Funcionario, etc.) 
-        // são buscadas e atribuídas na camada de Serviço (Service).
 
         return ativo;
     }
