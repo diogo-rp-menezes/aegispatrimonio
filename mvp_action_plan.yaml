@@ -62,6 +62,7 @@ plan:
       steps:
         - task: "Verify Authentication"
           details: "Test Login Flow: Login -> JWT -> LocalStorage -> Redirect"
+          status: "COMPLETED"
         - task: "Verify Asset CRUD"
           details: "Test List (with filters), Create, Update, and Delete operations for 'Ativo' entity."
 

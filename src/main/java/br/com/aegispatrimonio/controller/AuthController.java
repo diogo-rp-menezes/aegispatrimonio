@@ -49,10 +49,15 @@ public class AuthController {
      */
     @PostMapping("/login")
     public ResponseEntity<LoginResponseDTO> login(@RequestBody @Valid LoginRequestDTO loginRequest) {
-        // Autentica o usuário com o Spring Security
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(loginRequest.email(), loginRequest.password())
-        );
+        try {
+            // Autentica o usuário com o Spring Security
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(loginRequest.email(), loginRequest.password())
+            );
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw e;
+        }
 
         // Se a autenticação for bem-sucedida, gera o token
         final UserDetails userDetails = userDetailsService.loadUserByUsername(loginRequest.email());

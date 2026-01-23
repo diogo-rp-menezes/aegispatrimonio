@@ -55,7 +55,7 @@ public class SecurityConfig {
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/v1/auth/login", "/swagger-ui/**", "/v3/api-docs/**", "/actuator/**").permitAll() // Permitir acesso a endpoints do Actuator
+                        .requestMatchers("/api/v1/auth/**", "/swagger-ui/**", "/v3/api-docs/**", "/actuator/**").permitAll() // Permitir acesso a endpoints do Actuator
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(authenticationProvider())

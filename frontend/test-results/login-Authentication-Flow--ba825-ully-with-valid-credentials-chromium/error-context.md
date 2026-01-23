@@ -1,0 +1,61 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e7]: 
+        - generic [ref=e8]: Aegis
+      - generic [ref=e9]: Patrimônio
+      - button "" [ref=e10] [cursor=pointer]:
+        - generic [ref=e11]: 
+    - generic [ref=e12]:
+      - link " Dashboard" [ref=e14] [cursor=pointer]:
+        - /url: /dashboard
+        - generic [ref=e15]: 
+        - generic [ref=e16]: Dashboard
+      - generic [ref=e18] [cursor=pointer]:
+        - generic [ref=e19]: 
+        - generic [ref=e20]: Equipamentos
+        - generic [ref=e21]: "5"
+        - generic [ref=e22]: 
+      - link " Comodatos" [ref=e24] [cursor=pointer]:
+        - /url: /comodatos
+        - generic [ref=e25]: 
+        - generic [ref=e26]: Comodatos
+      - link " Relatórios" [ref=e28] [cursor=pointer]:
+        - /url: /relatorios
+        - generic [ref=e29]: 
+        - generic [ref=e30]: Relatórios
+      - link " Configurações" [ref=e32] [cursor=pointer]:
+        - /url: /configuracoes
+        - generic [ref=e33]: 
+        - generic [ref=e34]: Configurações
+  - generic [ref=e35]:
+    - banner [ref=e36]:
+      - generic [ref=e37]:
+        - generic [ref=e38]: 
+        - textbox "Pesquisar patrimônio..." [ref=e39]
+      - generic [ref=e40] [cursor=pointer]:
+        - generic [ref=e41]: JS
+        - generic [ref=e42]:
+          - heading "John Smith" [level=6] [ref=e43]
+          - generic [ref=e44]: Administrador
+    - main [ref=e45]:
+      - generic [ref=e47]:
+        - heading "Aegis Patrimônio" [level=2] [ref=e48]
+        - generic [ref=e49]:
+          - generic [ref=e50]:
+            - generic [ref=e51]: Email
+            - textbox "Email" [ref=e52]:
+              - /placeholder: seu@email.com
+              - text: admin@aegis.com
+          - generic [ref=e53]:
+            - generic [ref=e54]: Senha
+            - textbox "Senha" [ref=e55]:
+              - /placeholder: "********"
+              - text: "123456"
+          - alert [ref=e56]: Falha no login. Verifique suas credenciais.
+          - button "Entrar" [ref=e57] [cursor=pointer]
+```
