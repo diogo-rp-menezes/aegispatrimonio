@@ -9,8 +9,9 @@ import br.com.aegispatrimonio.dto.healthcheck.HealthCheckDTO;
 import br.com.aegispatrimonio.dto.healthcheck.MemoriaDTO;
 import br.com.aegispatrimonio.model.*;
 import br.com.aegispatrimonio.repository.*;
-import br.com.aegispatrimonio.util.WithMockCustomUser;
+import br.com.aegispatrimonio.security.CustomUserDetails;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -18,6 +19,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,6 +55,7 @@ class AtivoControllerIT extends BaseIT {
     @Autowired private FornecedorRepository fornecedorRepository;
     @Autowired private LocalizacaoRepository localizacaoRepository;
     @Autowired private FuncionarioRepository funcionarioRepository;
+    @Autowired private UsuarioRepository usuarioRepository;
 
     private Filial filialA;
     private Departamento deptoA;
@@ -57,6 +64,8 @@ class AtivoControllerIT extends BaseIT {
     private Fornecedor fornecedor;
     private Localizacao localizacao;
     private Ativo ativoExistente;
+    private Usuario usuarioUser;
+    private Usuario usuarioAdmin;
 
     @BeforeEach
     void setUp() {
@@ -67,8 +76,15 @@ class AtivoControllerIT extends BaseIT {
         this.fornecedor = createFornecedor("Dell", "11111111000111");
         this.userA = createFuncionario("User", deptoA, Set.of(filialA));
         this.ativoExistente = createAtivo("Desktop-01", "PAT-DESK-01", filialA, tipoAtivo, fornecedor, userA, localizacao);
+
+        this.usuarioUser = createUsuario(userA, "user@example.com", "ROLE_USER");
+        this.usuarioAdmin = createUsuario(null, "admin@example.com", "ROLE_ADMIN");
     }
 
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
+    }
 
     @Nested
     @DisplayName("Testes para Criar Ativo (POST /ativos)")
@@ -76,8 +92,8 @@ class AtivoControllerIT extends BaseIT {
 
         @Test
         @DisplayName("Deve retornar 201 Created para ADMIN com dados válidos")
-        @WithMockCustomUser(roles = "ADMIN")
         void criar_comAdmin_deveRetornarCreated() throws Exception {
+            mockLogin(usuarioAdmin);
             AtivoCreateDTO createDTO = new AtivoCreateDTO(filialA.getId(), "Notebook-01", tipoAtivo.getId(), "PAT-NOTE-01", localizacao.getId(), LocalDate.now(), fornecedor.getId(), new BigDecimal("3500.50"), userA.getId(), "Em uso", "Garantia de 2 anos", null);
 
             mockMvc.perform(post("/api/v1/ativos")
@@ -91,8 +107,8 @@ class AtivoControllerIT extends BaseIT {
 
         @Test
         @DisplayName("Deve retornar 403 Forbidden para USER")
-        @WithMockCustomUser(roles = "USER")
         void criar_comUser_deveRetornarForbidden() throws Exception {
+            mockLogin(usuarioUser);
             AtivoCreateDTO createDTO = new AtivoCreateDTO(filialA.getId(), "Notebook-01", tipoAtivo.getId(), "PAT-NOTE-01", localizacao.getId(), LocalDate.now(), fornecedor.getId(), new BigDecimal("3500.50"), userA.getId(), "Em uso", "Garantia de 2 anos", null);
 
             mockMvc.perform(post("/api/v1/ativos")
@@ -103,8 +119,8 @@ class AtivoControllerIT extends BaseIT {
 
         @Test
         @DisplayName("Deve retornar 400 Bad Request para dados inválidos")
-        @WithMockCustomUser(roles = "ADMIN")
         void criar_comDadosInvalidos_deveRetornarBadRequest() throws Exception {
+            mockLogin(usuarioAdmin);
             AtivoCreateDTO createDTO = new AtivoCreateDTO(null, "", null, "", null, null, null, null, null, "", "", null);
 
             mockMvc.perform(post("/api/v1/ativos")
@@ -115,13 +131,99 @@ class AtivoControllerIT extends BaseIT {
     }
 
     @Nested
+    @DisplayName("Testes para Listar Ativos com Filtros (GET /ativos)")
+    class ListarAtivosComFiltrosTests {
+
+        @Test
+        @DisplayName("Deve filtrar por Filial")
+        void filtrarPorFilial() throws Exception {
+            mockLogin(usuarioAdmin);
+
+            // Create another filial and asset
+            Filial filialB = createFilial("Filial B", "FL-B", "02000000000102");
+            createAtivo("Ativo B", "PAT-B", filialB, tipoAtivo, fornecedor, null, null);
+
+            mockMvc.perform(get("/api/v1/ativos")
+                            .param("filialId", filialA.getId().toString()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(1)))
+                    .andExpect(jsonPath("$[0].nome", is(ativoExistente.getNome())));
+        }
+
+        @Test
+        @DisplayName("Deve filtrar por Tipo de Ativo")
+        void filtrarPorTipoAtivo() throws Exception {
+            mockLogin(usuarioAdmin);
+
+            TipoAtivo outroTipo = createTipoAtivo("Outro Tipo");
+            createAtivo("Ativo Outro Tipo", "PAT-OT", filialA, outroTipo, fornecedor, userA, localizacao);
+
+            mockMvc.perform(get("/api/v1/ativos")
+                            .param("tipoAtivoId", tipoAtivo.getId().toString()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(1)))
+                    .andExpect(jsonPath("$[0].nome", is(ativoExistente.getNome())));
+        }
+
+        @Test
+        @DisplayName("Deve filtrar por Status")
+        void filtrarPorStatus() throws Exception {
+            mockLogin(usuarioAdmin);
+
+            Ativo ativoBaixado = createAtivo("Ativo Baixado", "PAT-BX", filialA, tipoAtivo, fornecedor, userA, localizacao);
+            ativoBaixado.setStatus(StatusAtivo.BAIXADO);
+            ativoRepository.save(ativoBaixado);
+
+            mockMvc.perform(get("/api/v1/ativos")
+                            .param("status", "ATIVO"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(1)))
+                    .andExpect(jsonPath("$[0].nome", is(ativoExistente.getNome())));
+        }
+
+        @Test
+        @DisplayName("Deve filtrar por Nome (parcial)")
+        void filtrarPorNome() throws Exception {
+            mockLogin(usuarioAdmin);
+
+            createAtivo("Outro Nome", "PAT-ON", filialA, tipoAtivo, fornecedor, userA, localizacao);
+
+            mockMvc.perform(get("/api/v1/ativos")
+                            .param("nome", "Desktop"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(1)))
+                    .andExpect(jsonPath("$[0].nome", is(ativoExistente.getNome())));
+        }
+
+        @Test
+        @DisplayName("Deve combinar filtros")
+        void filtrarCombinado() throws Exception {
+            mockLogin(usuarioAdmin);
+
+            // Matches Filial A but wrong Name
+            createAtivo("Outro Nome", "PAT-ON", filialA, tipoAtivo, fornecedor, userA, localizacao);
+
+            // Matches Name but wrong Filial
+            Filial filialB = createFilial("Filial B", "FL-B", "02000000000102");
+            createAtivo("Desktop-02", "PAT-DESK-02", filialB, tipoAtivo, fornecedor, null, null);
+
+            mockMvc.perform(get("/api/v1/ativos")
+                            .param("filialId", filialA.getId().toString())
+                            .param("nome", "Desktop"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(1)))
+                    .andExpect(jsonPath("$[0].nome", is(ativoExistente.getNome())));
+        }
+    }
+
+    @Nested
     @DisplayName("Testes para Listar Ativos (GET /ativos)")
     class ListarAtivosTests {
 
         @Test
         @DisplayName("Deve retornar 200 OK e uma lista de ativos para ADMIN")
-        @WithMockCustomUser(roles = "ADMIN")
         void listar_comAdmin_deveRetornarOkComLista() throws Exception {
+            mockLogin(usuarioAdmin);
             mockMvc.perform(get("/api/v1/ativos"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$", hasSize(1)))
@@ -130,8 +232,8 @@ class AtivoControllerIT extends BaseIT {
 
         @Test
         @DisplayName("Deve retornar 200 OK e uma lista de ativos para USER")
-        @WithMockCustomUser(roles = "USER")
         void listar_comUser_deveRetornarOkComLista() throws Exception {
+            mockLogin(usuarioUser);
             mockMvc.perform(get("/api/v1/ativos"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$", hasSize(1)))
@@ -152,8 +254,8 @@ class AtivoControllerIT extends BaseIT {
 
         @Test
         @DisplayName("Deve retornar 200 OK e o ativo correto para USER")
-        @WithMockCustomUser(roles = "USER")
         void buscarPorId_comUserEIdExistente_deveRetornarOk() throws Exception {
+            mockLogin(usuarioUser);
             mockMvc.perform(get("/api/v1/ativos/{id}", ativoExistente.getId()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.id", is(ativoExistente.getId().intValue())))
@@ -162,8 +264,8 @@ class AtivoControllerIT extends BaseIT {
 
         @Test
         @DisplayName("Deve retornar 404 Not Found para ID inexistente")
-        @WithMockCustomUser(roles = "USER")
         void buscarPorId_comIdInexistente_deveRetornarNotFound() throws Exception {
+            mockLogin(usuarioUser);
             mockMvc.perform(get("/api/v1/ativos/{id}", 9999L))
                     .andExpect(status().isNotFound());
         }
@@ -175,8 +277,8 @@ class AtivoControllerIT extends BaseIT {
 
         @Test
         @DisplayName("Deve retornar 200 OK para ADMIN com dados válidos")
-        @WithMockCustomUser(roles = "ADMIN")
         void atualizar_comAdmin_deveRetornarOk() throws Exception {
+            mockLogin(usuarioAdmin);
             AtivoUpdateDTO updateDTO = new AtivoUpdateDTO(
                     ativoExistente.getFilial().getId(),
                     "Nome Atualizado",
@@ -197,14 +299,13 @@ class AtivoControllerIT extends BaseIT {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(updateDTO)))
                     .andExpect(status().isOk())
-                    // CORREÇÃO FINAL: Removida a asserção que causava a falha
                     .andExpect(jsonPath("$.nome", is("Nome Atualizado")));
         }
 
         @Test
         @DisplayName("Deve retornar 403 Forbidden para USER")
-        @WithMockCustomUser(roles = "USER")
         void atualizar_comUser_deveRetornarForbidden() throws Exception {
+            mockLogin(usuarioUser);
             AtivoUpdateDTO updateDTO = new AtivoUpdateDTO(
                     ativoExistente.getFilial().getId(), "Nome", "Patrimonio",
                     ativoExistente.getTipoAtivo().getId(), ativoExistente.getLocalizacao().getId(),
@@ -220,8 +321,8 @@ class AtivoControllerIT extends BaseIT {
 
         @Test
         @DisplayName("Deve retornar 404 Not Found para ID inexistente")
-        @WithMockCustomUser(roles = "ADMIN")
         void atualizar_comIdInexistente_deveRetornarNotFound() throws Exception {
+            mockLogin(usuarioAdmin);
             AtivoUpdateDTO updateDTO = new AtivoUpdateDTO(
                     ativoExistente.getFilial().getId(), "Nome", "Patrimonio",
                     ativoExistente.getTipoAtivo().getId(), ativoExistente.getLocalizacao().getId(),
@@ -242,24 +343,24 @@ class AtivoControllerIT extends BaseIT {
 
         @Test
         @DisplayName("Deve retornar 204 No Content para ADMIN")
-        @WithMockCustomUser(roles = "ADMIN")
         void deletar_comAdmin_deveRetornarNoContent() throws Exception {
+            mockLogin(usuarioAdmin);
             mockMvc.perform(delete("/api/v1/ativos/{id}", ativoExistente.getId()))
                     .andExpect(status().isNoContent());
         }
 
         @Test
         @DisplayName("Deve retornar 403 Forbidden para USER")
-        @WithMockCustomUser(roles = "USER")
         void deletar_comUser_deveRetornarForbidden() throws Exception {
+            mockLogin(usuarioUser);
             mockMvc.perform(delete("/api/v1/ativos/{id}", ativoExistente.getId()))
                     .andExpect(status().isForbidden());
         }
 
         @Test
         @DisplayName("Deve retornar 404 Not Found para ID inexistente")
-        @WithMockCustomUser(roles = "ADMIN")
         void deletar_comIdInexistente_deveRetornarNotFound() throws Exception {
+            mockLogin(usuarioAdmin);
             mockMvc.perform(delete("/api/v1/ativos/{id}", 9999L))
                     .andExpect(status().isNotFound());
         }
@@ -271,8 +372,8 @@ class AtivoControllerIT extends BaseIT {
 
         @Test
         @DisplayName("Deve retornar 204 No Content para USER")
-        @WithMockCustomUser(roles = "USER")
         void healthCheck_comUser_deveRetornarNoContent() throws Exception {
+            mockLogin(usuarioUser);
             HealthCheckDTO healthCheckDTO = createMockHealthCheckDTO();
 
             mockMvc.perform(patch("/api/v1/ativos/{id}/health-check", ativoExistente.getId())
@@ -283,8 +384,8 @@ class AtivoControllerIT extends BaseIT {
 
         @Test
         @DisplayName("Deve retornar 404 Not Found para ID inexistente")
-        @WithMockCustomUser(roles = "USER")
         void healthCheck_comIdInexistente_deveRetornarNotFound() throws Exception {
+            mockLogin(usuarioUser);
             HealthCheckDTO healthCheckDTO = createMockHealthCheckDTO();
 
             mockMvc.perform(patch("/api/v1/ativos/{id}/health-check", 9999L)
@@ -295,6 +396,23 @@ class AtivoControllerIT extends BaseIT {
     }
 
     // --- Helper Methods ---
+
+    private Usuario createUsuario(Funcionario funcionario, String email, String role) {
+        Usuario u = new Usuario();
+        u.setEmail(email);
+        u.setPassword("password");
+        u.setRole(role);
+        u.setFuncionario(funcionario);
+        u.setStatus(Status.ATIVO);
+        return usuarioRepository.save(u);
+    }
+
+    private void mockLogin(Usuario usuario) {
+        CustomUserDetails principal = new CustomUserDetails(usuario);
+        Authentication auth = new UsernamePasswordAuthenticationToken(principal, principal.getPassword(), principal.getAuthorities());
+        SecurityContextHolder.getContext().setAuthentication(auth);
+    }
+
     private HealthCheckDTO createMockHealthCheckDTO() {
         DiscoDTO disco = new DiscoDTO("SAMSUNG EVO", "SN123", "SSD", new BigDecimal("500.0"), new BigDecimal("250.0"), 50);
         MemoriaDTO memoria = new MemoriaDTO("Corsair", "SN456", "P123", 16);

@@ -23,6 +23,7 @@ public abstract class BaseIT {
         // Disable Flyway and use Hibernate for Schema
         registry.add("spring.flyway.enabled", () -> "false");
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
+        registry.add("spring.jpa.properties.hibernate.hbm2ddl.auto", () -> "create-drop");
         registry.add("spring.jpa.show-sql", () -> "true");
 
         // Security

@@ -1,9 +1,11 @@
 package br.com.aegispatrimonio.util;
 
+import br.com.aegispatrimonio.model.Departamento;
 import br.com.aegispatrimonio.model.Filial;
 import br.com.aegispatrimonio.model.Funcionario;
 import br.com.aegispatrimonio.model.Status;
 import br.com.aegispatrimonio.model.Usuario;
+import br.com.aegispatrimonio.repository.DepartamentoRepository;
 import br.com.aegispatrimonio.repository.FilialRepository;
 import br.com.aegispatrimonio.repository.FuncionarioRepository;
 import br.com.aegispatrimonio.repository.UsuarioRepository;
@@ -34,6 +36,8 @@ public class WithMockCustomUserSecurityContextFactory implements WithSecurityCon
     private FuncionarioRepository funcionarioRepository;
     @Autowired
     private FilialRepository filialRepository;
+    @Autowired
+    private DepartamentoRepository departamentoRepository;
 
     @Override
     public SecurityContext createSecurityContext(WithMockCustomUser annotation) {
@@ -49,12 +53,19 @@ public class WithMockCustomUserSecurityContextFactory implements WithSecurityCon
             filial.setStatus(Status.ATIVO);
             filial = filialRepository.save(filial);
 
+            Departamento departamento = new Departamento();
+            departamento.setNome("Departamento Teste " + UUID.randomUUID().toString().substring(0, 4));
+            departamento.setFilial(filial);
+            departamento.setStatus(Status.ATIVO);
+            departamento = departamentoRepository.save(departamento);
+
             Funcionario funcionario = new Funcionario();
             funcionario.setNome(annotation.username());
             funcionario.setMatricula(annotation.username().replaceAll("\\s+", "") + "-" + UUID.randomUUID().toString().substring(0, 4));
             funcionario.setCargo("Cargo Teste");
             funcionario.setStatus(Status.ATIVO);
             funcionario.setFiliais(Set.of(filial));
+            funcionario.setDepartamento(departamento);
             funcionario = funcionarioRepository.save(funcionario);
 
             Usuario newUsuario = new Usuario();
