@@ -54,7 +54,8 @@ public class AtivoMapper {
                 ativo.getStatus(),
                 responsavelId,
                 responsavelNome,
-                hwDTO
+                hwDTO,
+                ativo.getAtributos()
         );
     }
 
@@ -70,6 +71,7 @@ public class AtivoMapper {
         ativo.setValorAquisicao(ativoCreateDTO.valorAquisicao());
         ativo.setObservacoes(ativoCreateDTO.observacoes());
         ativo.setInformacoesGarantia(ativoCreateDTO.informacoesGarantia());
+        ativo.setAtributos(ativoCreateDTO.atributos());
 
         // As entidades relacionadas (Filial, TipoAtivo, Funcionario, etc.) 
         // são buscadas e atribuídas na camada de Serviço (Service).

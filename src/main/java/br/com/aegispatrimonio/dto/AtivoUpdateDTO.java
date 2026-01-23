@@ -9,6 +9,7 @@ import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Map;
 
 public record AtivoUpdateDTO(
     @NotNull @Positive Long filialId,
@@ -36,6 +37,11 @@ public record AtivoUpdateDTO(
 
     String informacoesGarantia,
 
-    AtivoDetalheHardwareDTO detalheHardware
+    AtivoDetalheHardwareDTO detalheHardware,
+
+    Map<String, Object> atributos
 ) {
+    public AtivoUpdateDTO(Long filialId, String nome, String numeroPatrimonio, Long tipoAtivoId, Long localizacaoId, StatusAtivo status, LocalDate dataAquisicao, Long fornecedorId, BigDecimal valorAquisicao, Long funcionarioResponsavelId, String observacoes, String informacoesGarantia, AtivoDetalheHardwareDTO detalheHardware) {
+        this(filialId, nome, numeroPatrimonio, tipoAtivoId, localizacaoId, status, dataAquisicao, fornecedorId, valorAquisicao, funcionarioResponsavelId, observacoes, informacoesGarantia, detalheHardware, null);
+    }
 }

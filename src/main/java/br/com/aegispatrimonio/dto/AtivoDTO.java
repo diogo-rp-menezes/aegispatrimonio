@@ -1,6 +1,7 @@
 package br.com.aegispatrimonio.dto;
 
 import br.com.aegispatrimonio.model.StatusAtivo;
+import java.util.Map;
 
 /**
  * DTO para representar os dados de um Ativo na resposta de uma API.
@@ -21,6 +22,7 @@ public record AtivoDTO(
     // CORREÇÃO: Adicionados campos para o responsável
     Long funcionarioResponsavelId,
     String funcionarioResponsavelNome,
-    AtivoDetalheHardwareDTO detalheHardware
+    AtivoDetalheHardwareDTO detalheHardware,
+    Map<String, Object> atributos
 ) {
 }

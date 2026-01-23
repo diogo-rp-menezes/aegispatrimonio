@@ -70,6 +70,7 @@ public class TipoAtivoService {
         tipoAtivo.setNome(tipoAtivoUpdateDTO.nome());
         // CORREÇÃO: Adicionada a linha que faltava para atualizar a categoria contábil.
         tipoAtivo.setCategoriaContabil(tipoAtivoUpdateDTO.categoriaContabil());
+        tipoAtivo.setEsquemaAtributos(tipoAtivoUpdateDTO.esquemaAtributos());
         TipoAtivo tipoAtivoAtualizado = tipoAtivoRepository.save(tipoAtivo);
 
         Usuario auditor = currentUserProvider.getCurrentUsuario();

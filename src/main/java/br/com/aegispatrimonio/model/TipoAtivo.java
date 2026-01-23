@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -31,6 +33,10 @@ public class TipoAtivo {
     private Status status;
 
     private String icone;
+
+    @Column(name = "esquema_atributos", columnDefinition = "json")
+    @JdbcTypeCode(SqlTypes.JSON)
+    private String esquemaAtributos;
 
     @Column(name = "criado_em")
     private LocalDateTime criadoEm;

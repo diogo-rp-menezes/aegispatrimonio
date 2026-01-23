@@ -12,7 +12,7 @@ public class TipoAtivoMapper {
         if (tipoAtivo == null) {
             return null;
         }
-        return new TipoAtivoDTO(tipoAtivo.getId(), tipoAtivo.getNome(), tipoAtivo.getCategoriaContabil());
+        return new TipoAtivoDTO(tipoAtivo.getId(), tipoAtivo.getNome(), tipoAtivo.getCategoriaContabil(), tipoAtivo.getEsquemaAtributos());
     }
 
     public TipoAtivo toEntity(TipoAtivoCreateDTO tipoAtivoCreateDTO) {
@@ -22,6 +22,7 @@ public class TipoAtivoMapper {
         TipoAtivo tipoAtivo = new TipoAtivo();
         tipoAtivo.setNome(tipoAtivoCreateDTO.nome());
         tipoAtivo.setCategoriaContabil(tipoAtivoCreateDTO.categoriaContabil());
+        tipoAtivo.setEsquemaAtributos(tipoAtivoCreateDTO.esquemaAtributos());
         return tipoAtivo;
     }
 }

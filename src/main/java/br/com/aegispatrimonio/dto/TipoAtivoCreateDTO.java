@@ -7,6 +7,10 @@ import jakarta.validation.constraints.Size;
 
 public record TipoAtivoCreateDTO(
         @NotBlank @Size(max = 100) String nome,
-        @NotNull CategoriaContabil categoriaContabil
+        @NotNull CategoriaContabil categoriaContabil,
+        String esquemaAtributos
 ) {
+        public TipoAtivoCreateDTO(String nome, CategoriaContabil categoriaContabil) {
+                this(nome, categoriaContabil, null);
+        }
 }

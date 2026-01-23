@@ -150,6 +150,7 @@ public class AtivoService {
         ativo.setValorAquisicao(ativoCreateDTO.valorAquisicao());
         ativo.setObservacoes(ativoCreateDTO.observacoes());
         ativo.setInformacoesGarantia(ativoCreateDTO.informacoesGarantia());
+        ativo.setAtributos(ativoCreateDTO.atributos());
 
         Filial filial = filialRepository.findById(ativoCreateDTO.filialId())
                 .orElseThrow(() -> new EntityNotFoundException("Filial não encontrada com ID: " + ativoCreateDTO.filialId()));
@@ -204,6 +205,7 @@ public class AtivoService {
         ativo.setValorAquisicao(ativoUpdateDTO.valorAquisicao());
         ativo.setObservacoes(ativoUpdateDTO.observacoes());
         ativo.setInformacoesGarantia(ativoUpdateDTO.informacoesGarantia());
+        ativo.setAtributos(ativoUpdateDTO.atributos());
 
         Filial filial = filialRepository.findById(ativoUpdateDTO.filialId())
                 .orElseThrow(() -> new EntityNotFoundException("Filial não encontrada com ID: " + ativoUpdateDTO.filialId()));
