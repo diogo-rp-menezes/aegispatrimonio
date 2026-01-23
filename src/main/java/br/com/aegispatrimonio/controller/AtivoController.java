@@ -3,6 +3,7 @@ package br.com.aegispatrimonio.controller;
 import br.com.aegispatrimonio.dto.AtivoCreateDTO;
 import br.com.aegispatrimonio.dto.AtivoDTO;
 import br.com.aegispatrimonio.dto.AtivoUpdateDTO;
+import br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO;
 import br.com.aegispatrimonio.service.AtivoService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -102,6 +103,7 @@ public class AtivoController {
 
     /**
      * Atualiza o status de saúde (health check) de um ativo.
+     * Recebe dados completos de hardware e disco para análise preditiva.
      * Requer permissão UPDATE no contexto da filial do ativo.
      *
      * @param id O ID do ativo a ter seu health check atualizado.
@@ -109,7 +111,7 @@ public class AtivoController {
     @PatchMapping("/{id}/health-check")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("@permissionService.hasAtivoPermission(authentication, #id, 'UPDATE')")
-    public void updateHealthCheck(@PathVariable Long id, @RequestBody Object ignoredPayload) {
-        ativoService.buscarPorId(id);
+    public void updateHealthCheck(@PathVariable Long id, @RequestBody HealthCheckPayloadDTO payload) {
+        ativoService.processarHealthCheck(id, payload);
     }
 }

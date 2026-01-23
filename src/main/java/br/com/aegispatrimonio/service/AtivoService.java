@@ -4,6 +4,8 @@ import br.com.aegispatrimonio.dto.AtivoCreateDTO;
 import br.com.aegispatrimonio.dto.AtivoDTO;
 import br.com.aegispatrimonio.dto.AtivoDetalheHardwareDTO;
 import br.com.aegispatrimonio.dto.AtivoUpdateDTO;
+import br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO;
+import br.com.aegispatrimonio.dto.healthcheck.DiskInfoDTO;
 import br.com.aegispatrimonio.mapper.AtivoMapper;
 import br.com.aegispatrimonio.model.*;
 import br.com.aegispatrimonio.repository.*;
@@ -16,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -36,8 +39,10 @@ public class AtivoService {
     private final MovimentacaoRepository movimentacaoRepository;
     private final DepreciacaoService depreciacaoService;
     private final CurrentUserProvider currentUserProvider;
+    private final AtivoHealthHistoryRepository healthHistoryRepository;
+    private final PredictiveMaintenanceService predictiveMaintenanceService;
 
-    public AtivoService(AtivoRepository ativoRepository, AtivoMapper ativoMapper, TipoAtivoRepository tipoAtivoRepository, LocalizacaoRepository localizacaoRepository, FornecedorRepository fornecedorRepository, FuncionarioRepository funcionarioRepository, FilialRepository filialRepository, ManutencaoRepository manutencaoRepository, MovimentacaoRepository movimentacaoRepository, DepreciacaoService depreciacaoService, CurrentUserProvider currentUserProvider) {
+    public AtivoService(AtivoRepository ativoRepository, AtivoMapper ativoMapper, TipoAtivoRepository tipoAtivoRepository, LocalizacaoRepository localizacaoRepository, FornecedorRepository fornecedorRepository, FuncionarioRepository funcionarioRepository, FilialRepository filialRepository, ManutencaoRepository manutencaoRepository, MovimentacaoRepository movimentacaoRepository, DepreciacaoService depreciacaoService, CurrentUserProvider currentUserProvider, AtivoHealthHistoryRepository healthHistoryRepository, PredictiveMaintenanceService predictiveMaintenanceService) {
         this.ativoRepository = ativoRepository;
         this.ativoMapper = ativoMapper;
         this.tipoAtivoRepository = tipoAtivoRepository;
@@ -49,6 +54,8 @@ public class AtivoService {
         this.movimentacaoRepository = movimentacaoRepository;
         this.depreciacaoService = depreciacaoService;
         this.currentUserProvider = currentUserProvider;
+        this.healthHistoryRepository = healthHistoryRepository;
+        this.predictiveMaintenanceService = predictiveMaintenanceService;
     }
 
     private Usuario getUsuarioLogado() {
@@ -133,10 +140,104 @@ public class AtivoService {
                 if (funcionarioLogado.getFiliais().stream().noneMatch(f -> f.getId().equals(ativo.getFilial().getId()))) {
                     throw new AccessDeniedException("Você não tem permissão para acessar ativos desta filial.");
                 }
-            } // Fallback: se não encontrar o funcionário persistido (ex.: usuário mock sem registro), não bloqueia o acesso de leitura
+            }
         }
 
-        return ativoMapper.toDTO(ativo);
+        AtivoDTO dto = ativoMapper.toDTO(ativo);
+
+        // Calculate Predictive Maintenance
+        LocalDate worstPrediction = null;
+        // In a real scenario, we would iterate known disks. Here we fetch all history for the asset.
+        // For optimization, we should probably add a method to repo to get distinct components.
+        // For MVP, we assume "DISK:0" or similar. But since we don't know the serials without querying history...
+        // Let's rely on the assumption that if there is data, it is recent.
+        // Or simply query specifically for "FREE_SPACE_GB" metric.
+        // Since we don't want N+1 queries for components, let's just pick the last few records if needed.
+        // But predictExhaustionDate needs history.
+        // Let's skip complex component discovery for now and just try to find prediction if we have history.
+        // Warning: This can be expensive if history is huge.
+        // A better approach for production: Store the predicted date in the Ativo entity during the updateHealthCheck process.
+        // However, the prompt asked to follow "Shift Left" and show value.
+        // Calculating on read ensures it's always up to date with the latest algorithm.
+        // Let's leave it as null by default unless we implement a dedicated endpoint for insights.
+        // Actually, let's look at the plan. "Update AtivoDTO to include previsaoEsgotamentoDisco".
+        // It's better to calculate this during ingestion (updateHealthCheck) and store it in Ativo attributes or a new column.
+        // Since I can't easily add a column to Ativo without migration (I did create V7 for history though),
+        // I'll calculate it on read but restrict it to a specific well-known component if possible, or iterate.
+        // Since I created AtivoHealthHistoryRepository, let's use it.
+        // But without knowing the component name (Serial), it's hard.
+        // I'll modify the loop below to check distinct components if I can.
+
+        // Alternative: Calculate on write (updateHealthCheck) and store in Ativo.atributos['previsaoEsgotamento'].
+        // This is much more efficient.
+        if (ativo.getAtributos() != null && ativo.getAtributos().containsKey("previsaoEsgotamentoDisco")) {
+             try {
+                 String dateStr = (String) ativo.getAtributos().get("previsaoEsgotamentoDisco");
+                 worstPrediction = LocalDate.parse(dateStr);
+             } catch (Exception e) {
+                 // Ignore parsing error
+             }
+        }
+
+        // Create a new DTO with the prediction
+        return new AtivoDTO(
+            dto.id(), dto.nome(), dto.numeroPatrimonio(), dto.tipoAtivoId(), dto.tipoAtivo(),
+            dto.localizacaoId(), dto.localizacao(), dto.filialId(), dto.filial(),
+            dto.fornecedorId(), dto.fornecedorNome(), dto.status(), dto.valorAquisicao(),
+            dto.funcionarioResponsavelId(), dto.funcionarioResponsavelNome(),
+            dto.detalheHardware(), dto.atributos(), worstPrediction
+        );
+    }
+
+    @Transactional
+    public void processarHealthCheck(Long id, HealthCheckPayloadDTO payload) {
+        Ativo ativo = ativoRepository.findByIdWithDetails(id)
+                .orElseThrow(() -> new EntityNotFoundException("Ativo não encontrado com ID: " + id));
+
+        // Update basic hardware details
+        AtivoDetalheHardwareDTO hardwareDTO = new AtivoDetalheHardwareDTO(
+                payload.computerName(), payload.domain(), payload.osName(), payload.osVersion(),
+                payload.osArchitecture(), payload.motherboardManufacturer(), payload.motherboardModel(),
+                payload.motherboardSerialNumber(), payload.cpuModel(), payload.cpuCores(), payload.cpuThreads()
+        );
+        gerenciarDetalheHardware(ativo, hardwareDTO);
+
+        // Process Disks and History
+        if (payload.discos() != null) {
+            LocalDate worstPrediction = null;
+
+            for (DiskInfoDTO disk : payload.discos()) {
+                if (disk.freeGb() != null) {
+                    AtivoHealthHistory history = new AtivoHealthHistory();
+                    history.setAtivo(ativo);
+                    history.setComponente("DISK:" + disk.serial());
+                    history.setMetrica("FREE_SPACE_GB");
+                    history.setValor(disk.freeGb());
+                    healthHistoryRepository.save(history);
+
+                    // Calculate Prediction for this disk
+                    List<AtivoHealthHistory> diskHistory = healthHistoryRepository
+                            .findByAtivoIdAndMetricaOrderByDataRegistroAsc(id, "DISK:" + disk.serial());
+
+                    LocalDate prediction = predictiveMaintenanceService.predictExhaustionDate(diskHistory);
+                    if (prediction != null) {
+                        if (worstPrediction == null || prediction.isBefore(worstPrediction)) {
+                            worstPrediction = prediction;
+                        }
+                    }
+                }
+            }
+
+            // Store worst prediction in attributes
+            if (worstPrediction != null) {
+                if (ativo.getAtributos() == null) {
+                    ativo.setAtributos(new java.util.HashMap<>());
+                }
+                ativo.getAtributos().put("previsaoEsgotamentoDisco", worstPrediction.toString());
+            }
+        }
+
+        ativoRepository.save(ativo);
     }
 
     @Transactional
