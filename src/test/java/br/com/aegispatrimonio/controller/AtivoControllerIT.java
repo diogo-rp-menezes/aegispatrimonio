@@ -146,8 +146,8 @@ class AtivoControllerIT extends BaseIT {
             mockMvc.perform(get("/api/v1/ativos")
                             .param("filialId", filialA.getId().toString()))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(1)))
-                    .andExpect(jsonPath("$[0].nome", is(ativoExistente.getNome())));
+                    .andExpect(jsonPath("$.content", hasSize(1)))
+                    .andExpect(jsonPath("$.content[0].nome", is(ativoExistente.getNome())));
         }
 
         @Test
@@ -161,8 +161,8 @@ class AtivoControllerIT extends BaseIT {
             mockMvc.perform(get("/api/v1/ativos")
                             .param("tipoAtivoId", tipoAtivo.getId().toString()))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(1)))
-                    .andExpect(jsonPath("$[0].nome", is(ativoExistente.getNome())));
+                    .andExpect(jsonPath("$.content", hasSize(1)))
+                    .andExpect(jsonPath("$.content[0].nome", is(ativoExistente.getNome())));
         }
 
         @Test
@@ -177,8 +177,8 @@ class AtivoControllerIT extends BaseIT {
             mockMvc.perform(get("/api/v1/ativos")
                             .param("status", "ATIVO"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(1)))
-                    .andExpect(jsonPath("$[0].nome", is(ativoExistente.getNome())));
+                    .andExpect(jsonPath("$.content", hasSize(1)))
+                    .andExpect(jsonPath("$.content[0].nome", is(ativoExistente.getNome())));
         }
 
         @Test
@@ -191,8 +191,8 @@ class AtivoControllerIT extends BaseIT {
             mockMvc.perform(get("/api/v1/ativos")
                             .param("nome", "Desktop"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(1)))
-                    .andExpect(jsonPath("$[0].nome", is(ativoExistente.getNome())));
+                    .andExpect(jsonPath("$.content", hasSize(1)))
+                    .andExpect(jsonPath("$.content[0].nome", is(ativoExistente.getNome())));
         }
 
         @Test
@@ -211,8 +211,8 @@ class AtivoControllerIT extends BaseIT {
                             .param("filialId", filialA.getId().toString())
                             .param("nome", "Desktop"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(1)))
-                    .andExpect(jsonPath("$[0].nome", is(ativoExistente.getNome())));
+                    .andExpect(jsonPath("$.content", hasSize(1)))
+                    .andExpect(jsonPath("$.content[0].nome", is(ativoExistente.getNome())));
         }
     }
 
@@ -226,8 +226,8 @@ class AtivoControllerIT extends BaseIT {
             mockLogin(usuarioAdmin);
             mockMvc.perform(get("/api/v1/ativos"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(1)))
-                    .andExpect(jsonPath("$[0].nome", is(ativoExistente.getNome())));
+                    .andExpect(jsonPath("$.content", hasSize(1)))
+                    .andExpect(jsonPath("$.content[0].nome", is(ativoExistente.getNome())));
         }
 
         @Test
@@ -236,8 +236,8 @@ class AtivoControllerIT extends BaseIT {
             mockLogin(usuarioUser);
             mockMvc.perform(get("/api/v1/ativos"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(1)))
-                    .andExpect(jsonPath("$[0].nome", is(ativoExistente.getNome())));
+                    .andExpect(jsonPath("$.content", hasSize(1)))
+                    .andExpect(jsonPath("$.content[0].nome", is(ativoExistente.getNome())));
         }
 
         @Test

@@ -197,6 +197,7 @@ CREATE TABLE ativo_detalhe_hardware (
     processador VARCHAR(255),
     processadores_fisicos INT,
     processadores_logicos INT,
+    last_updated TIMESTAMP,
     FOREIGN KEY (id) REFERENCES ativos(id)
 );
 

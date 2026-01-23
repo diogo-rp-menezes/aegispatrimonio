@@ -85,7 +85,7 @@
         <button class="btn btn-outline-primary"><i class="bi bi-arrow-left-right"></i> Transferir</button>
         <button class="btn btn-outline-warning"><i class="bi bi-tools"></i> Registrar Manutenção</button>
         <button class="btn btn-outline-secondary"><i class="bi bi-file-earmark-text"></i> Gerar Relatório</button>
-        <button class="btn btn-outline-danger"><i class="bi bi-trash"></i> Baixar Item</button>
+        <button class="btn btn-outline-danger" @click="deleteAtivo"><i class="bi bi-trash"></i> Baixar Item</button>
       </div>
     </div>
   </div>
@@ -113,6 +113,19 @@ onMounted(async () => {
 
 function voltar() {
   router.push('/ativos');
+}
+
+async function deleteAtivo() {
+  if (!confirm('Tem certeza que deseja baixar este ativo? Esta ação não pode ser desfeita.')) {
+    return;
+  }
+  try {
+    await request(`/ativos/${ativo.value.id}`, { method: 'DELETE' });
+    router.push('/ativos');
+  } catch (error) {
+    console.error('Erro ao baixar ativo:', error);
+    alert('Erro ao baixar ativo.');
+  }
 }
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });

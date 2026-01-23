@@ -57,6 +57,15 @@
           </select>
         </div>
 
+        <!-- Fornecedor -->
+        <div class="mb-3">
+          <label for="fornecedor" class="form-label">Fornecedor *</label>
+          <select id="fornecedor" v-model="form.fornecedorId" class="form-select" required aria-required="true">
+            <option value="">Selecione...</option>
+            <option v-for="f in fornecedores" :key="f.id" :value="f.id">{{ f.nome }}</option>
+          </select>
+        </div>
+
         <!-- Status -->
         <div class="mb-3">
           <label for="status" class="form-label">Status</label>
@@ -184,6 +193,7 @@ const form = reactive({
   tipoAtivoId: '',
   numeroPatrimonio: '',
   localizacaoId: '',
+  fornecedorId: '',
   status: 'ATIVO',
   valorAquisicao: '',
   dataAquisicao: '',
@@ -204,6 +214,7 @@ const form = reactive({
 
 const tipos = ref([]);
 const localizacoes = ref([]);
+const fornecedores = ref([]);
 const saving = ref(false);
 const showHardware = ref(false);
 
@@ -213,6 +224,7 @@ onMounted(async () => {
     Object.assign(form, data, {
       tipoAtivoId: data.tipoAtivoId || '',
       localizacaoId: data.localizacaoId || '',
+      fornecedorId: data.fornecedorId || '',
       valorAquisicao: data.valorAquisicao || '',
       dataAquisicao: data.dataAquisicao || '',
     });
@@ -237,12 +249,14 @@ onMounted(async () => {
 
   // Carregar listas auxiliares
   try {
-    const [tiposData, locsData] = await Promise.all([
+    const [tiposData, locsData, fornData] = await Promise.all([
       request('/tipos-ativos').catch(() => []),
       request('/localizacoes').catch(() => []),
+      request('/fornecedores').catch(() => []),
     ]);
     tipos.value = tiposData;
     localizacoes.value = locsData;
+    fornecedores.value = fornData;
   } catch (e) {
     console.warn('Não foi possível carregar listas auxiliares', e);
   }
@@ -251,10 +265,20 @@ onMounted(async () => {
 async function save() {
   saving.value = true;
   try {
+    const payload = { ...form };
+
+    // Inject filialId for new assets if not present
+    if (!payload.filialId) {
+       const storedFilial = localStorage.getItem('currentFilial');
+       if (storedFilial) {
+         payload.filialId = parseInt(storedFilial, 10);
+       }
+    }
+
     if (isEdit.value) {
-      await request(`/ativos/${props.ativoId}`, { method: 'PUT', body: form });
+      await request(`/ativos/${props.ativoId}`, { method: 'PUT', body: payload });
     } else {
-      await request('/ativos', { method: 'POST', body: form });
+      await request('/ativos', { method: 'POST', body: payload });
     }
     emit('saved');
   } finally {

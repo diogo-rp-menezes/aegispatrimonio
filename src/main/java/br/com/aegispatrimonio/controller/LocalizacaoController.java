@@ -25,7 +25,7 @@ import java.util.List;
  * Fornece endpoints para listar, buscar, criar, atualizar e deletar localizações.
  */
 @RestController
-@RequestMapping("/localizacoes")
+@RequestMapping("/api/v1/localizacoes")
 @Tag(name = "Localizações", description = "Gerencia o cadastro de localizações")
 @SecurityRequirement(name = "bearerAuth")
 public class LocalizacaoController {

@@ -26,7 +26,7 @@ import java.util.List;
  * Fornece endpoints para listar, buscar, criar, atualizar e deletar fornecedores.
  */
 @RestController
-@RequestMapping("/fornecedores")
+@RequestMapping("/api/v1/fornecedores")
 @Tag(name = "Fornecedores", description = "Gerencia o cadastro de fornecedores")
 @SecurityRequirement(name = "bearerAuth")
 public class FornecedorController {

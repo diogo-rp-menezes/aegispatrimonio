@@ -15,7 +15,7 @@ import java.util.List;
  * Fornece endpoints para listar, buscar, criar, atualizar e deletar tipos de ativo.
  */
 @RestController
-@RequestMapping("/tipos-ativo")
+@RequestMapping("/api/v1/tipos-ativos")
 public class TipoAtivoController {
 
     private final TipoAtivoService tipoAtivoService;

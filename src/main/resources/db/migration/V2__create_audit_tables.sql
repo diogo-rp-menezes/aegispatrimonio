@@ -1,9 +1,12 @@
+CREATE TABLE revinfo_seq (next_val BIGINT);
+INSERT INTO revinfo_seq VALUES (1);
+
 CREATE TABLE revinfo (
-    rev INTEGER NOT NULL AUTO_INCREMENT,
-    revtstmp BIGINT,
+    id INTEGER NOT NULL,
+    timestamp BIGINT,
     username VARCHAR(255),
     filial_id BIGINT,
-    PRIMARY KEY (rev)
+    PRIMARY KEY (id)
 );
 
 CREATE TABLE ativos_aud (
@@ -34,5 +37,5 @@ CREATE TABLE ativos_aud (
     valor_contabil_atual DECIMAL(15, 2),
     data_ultima_depreciacao DATE,
     PRIMARY KEY (id, rev),
-    CONSTRAINT fk_ativos_aud_revinfo FOREIGN KEY (rev) REFERENCES revinfo (rev)
+    CONSTRAINT fk_ativos_aud_revinfo FOREIGN KEY (rev) REFERENCES revinfo (id)
 );

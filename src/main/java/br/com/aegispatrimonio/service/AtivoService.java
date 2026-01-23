@@ -11,6 +11,8 @@ import br.com.aegispatrimonio.security.CustomUserDetails;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -59,7 +61,7 @@ public class AtivoService {
     }
 
     @Transactional(readOnly = true)
-    public List<AtivoDTO> listarTodos(org.springframework.data.domain.Pageable pageable,
+    public Page<AtivoDTO> listarTodos(org.springframework.data.domain.Pageable pageable,
                                       Long filialId,
                                       Long tipoAtivoId,
                                       StatusAtivo status,
@@ -73,12 +75,12 @@ public class AtivoService {
 
         if (isAdmin(usuarioLogado)) {
             if (unpaged && !hasFilters) {
-                return ativoRepository.findAllWithDetails().stream().map(ativoMapper::toDTO).collect(Collectors.toList());
+                List<AtivoDTO> list = ativoRepository.findAllWithDetails().stream().map(ativoMapper::toDTO).collect(Collectors.toList());
+                return new PageImpl<>(list);
             } else {
                 return ativoRepository
                         .findByFilters(filialId, tipoAtivoId, status, nome, effectivePageable)
-                        .map(ativoMapper::toDTO)
-                        .getContent();
+                        .map(ativoMapper::toDTO);
             }
         }
 
@@ -87,18 +89,15 @@ public class AtivoService {
             throw new AccessDeniedException("Usuário não é um funcionário ou não está associado a nenhuma filial.");
         }
 
-        // Recarrega o funcionário do banco para garantir as filiais carregadas.
-        // Se não encontrar (ex.: em testes com usuário mockado), relaxamos para não bloquear acesso de leitura.
         Optional<Funcionario> funcionarioOpt = funcionarioRepository.findById(funcionarioPrincipal.getId());
         if (funcionarioOpt.isEmpty()) {
-            // Fallback: comportamento de leitura ampla para não falhar testes com usuário mockado sem registro persistido.
             if (unpaged && !hasFilters) {
-                return ativoRepository.findAllWithDetails().stream().map(ativoMapper::toDTO).collect(Collectors.toList());
+                List<AtivoDTO> list = ativoRepository.findAllWithDetails().stream().map(ativoMapper::toDTO).collect(Collectors.toList());
+                return new PageImpl<>(list);
             } else {
                 return ativoRepository
                         .findByFilters(filialId, tipoAtivoId, status, nome, effectivePageable)
-                        .map(ativoMapper::toDTO)
-                        .getContent();
+                        .map(ativoMapper::toDTO);
             }
         }
         Funcionario funcionarioLogado = funcionarioOpt.get();
@@ -109,14 +108,12 @@ public class AtivoService {
         Set<Long> filiaisIds = funcionarioLogado.getFiliais().stream().map(Filial::getId).collect(Collectors.toSet());
 
         if (unpaged && !hasFilters) {
-            // Mantém comportamento anterior com FETCH JOIN para evitar LazyInitializationException
-            return ativoRepository.findByFilialIdInWithDetails(filiaisIds).stream().map(ativoMapper::toDTO).collect(Collectors.toList());
+            List<AtivoDTO> list = ativoRepository.findByFilialIdInWithDetails(filiaisIds).stream().map(ativoMapper::toDTO).collect(Collectors.toList());
+            return new PageImpl<>(list);
         } else {
-            // Usa consulta paginada com filtros opcionais (Pageable pode ser unpaged)
             return ativoRepository
                     .findByFilialIdsAndFilters(filiaisIds, filialId, tipoAtivoId, status, nome, effectivePageable)
-                    .map(ativoMapper::toDTO)
-                    .getContent();
+                    .map(ativoMapper::toDTO);
         }
     }
 

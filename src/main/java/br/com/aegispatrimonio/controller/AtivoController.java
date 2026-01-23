@@ -5,6 +5,7 @@ import br.com.aegispatrimonio.dto.AtivoDTO;
 import br.com.aegispatrimonio.dto.AtivoUpdateDTO;
 import br.com.aegispatrimonio.service.AtivoService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -36,7 +37,7 @@ public class AtivoController {
      */
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    public List<AtivoDTO> listarTodos(
+    public Page<AtivoDTO> listarTodos(
             org.springframework.data.domain.Pageable pageable,
             @RequestParam(required = false) Long filialId,
             @RequestParam(required = false) Long tipoAtivoId,
