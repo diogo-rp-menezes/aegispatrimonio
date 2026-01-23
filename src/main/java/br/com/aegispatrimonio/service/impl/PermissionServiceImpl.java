@@ -23,7 +23,6 @@ import java.util.Set;
 public class PermissionServiceImpl implements IPermissionService {
 
     private static final Logger log = LoggerFactory.getLogger(PermissionServiceImpl.class);
-    private static final String ROLE_ADMIN_NAME = "ROLE_ADMIN";
 
     private final UsuarioRepository usuarioRepository;
     private final MeterRegistry meterRegistry;
@@ -53,12 +52,6 @@ public class PermissionServiceImpl implements IPermissionService {
             PermissionServiceImpl effectiveSelf = (self != null) ? self : this;
 
             Set<Permission> permissions = effectiveSelf.getUserPermissions(username);
-
-            if (effectiveSelf.hasAdminRole(username)) {
-                allowed = true;
-                log.debug("[AUTHZ] Allow: ADMIN bypass for {} on {}/{}", username, resource, action);
-                return true;
-            }
 
             // 1. Check if user has the specific Permission (Resource + Action)
             Permission matchedPermission = permissions.stream()
@@ -126,14 +119,6 @@ public class PermissionServiceImpl implements IPermissionService {
                     return perms;
                 })
                 .orElse(Collections.emptySet());
-    }
-
-    @Cacheable(value = "userRoles", key = "#username", unless = "#result == false")
-    @Transactional(readOnly = true)
-    public boolean hasAdminRole(String username) {
-         return usuarioRepository.findWithDetailsByEmail(username)
-                .map(u -> u.getRoles().stream().anyMatch(r -> ROLE_ADMIN_NAME.equals(r.getName())))
-                .orElse(false);
     }
 
     @Cacheable(value = "userContext", key = "#username + '-' + #context", unless = "#result == false")
