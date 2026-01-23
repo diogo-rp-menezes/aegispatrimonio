@@ -24,4 +24,9 @@ public class CustomMethodSecurityExpressionHandler extends DefaultMethodSecurity
         root.setDefaultRolePrefix(getDefaultRolePrefix());
         return root;
     }
+
+    @Override
+    public void setParameterNameDiscoverer(org.springframework.core.ParameterNameDiscoverer parameterNameDiscoverer) {
+        super.setParameterNameDiscoverer(parameterNameDiscoverer);
+    }
 }

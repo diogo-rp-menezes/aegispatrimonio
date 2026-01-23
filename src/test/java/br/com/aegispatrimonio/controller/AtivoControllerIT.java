@@ -38,8 +38,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import org.springframework.test.context.TestPropertySource;
+
 @AutoConfigureMockMvc
 @Transactional
+@TestPropertySource(properties = "spring.jackson.serialization.write-dates-as-timestamps=false")
 class AtivoControllerIT extends BaseIT {
 
     @Autowired
@@ -56,6 +59,8 @@ class AtivoControllerIT extends BaseIT {
     @Autowired private LocalizacaoRepository localizacaoRepository;
     @Autowired private FuncionarioRepository funcionarioRepository;
     @Autowired private UsuarioRepository usuarioRepository;
+    @Autowired private RoleRepository roleRepository;
+    @Autowired private PermissionRepository permissionRepository;
 
     private Filial filialA;
     private Departamento deptoA;
@@ -263,11 +268,11 @@ class AtivoControllerIT extends BaseIT {
         }
 
         @Test
-        @DisplayName("Deve retornar 404 Not Found para ID inexistente")
+        @DisplayName("Deve retornar 403 Forbidden para ID inexistente (Security First)")
         void buscarPorId_comIdInexistente_deveRetornarNotFound() throws Exception {
             mockLogin(usuarioUser);
             mockMvc.perform(get("/api/v1/ativos/{id}", 9999L))
-                    .andExpect(status().isNotFound());
+                    .andExpect(status().isForbidden());
         }
     }
 
@@ -303,8 +308,8 @@ class AtivoControllerIT extends BaseIT {
         }
 
         @Test
-        @DisplayName("Deve retornar 403 Forbidden para USER")
-        void atualizar_comUser_deveRetornarForbidden() throws Exception {
+        @DisplayName("Deve retornar 200 OK para USER (Granular RBAC allows UPDATE)")
+        void atualizar_comUser_deveRetornarOk() throws Exception {
             mockLogin(usuarioUser);
             AtivoUpdateDTO updateDTO = new AtivoUpdateDTO(
                     ativoExistente.getFilial().getId(), "Nome", "Patrimonio",
@@ -316,11 +321,11 @@ class AtivoControllerIT extends BaseIT {
             mockMvc.perform(put("/api/v1/ativos/{id}", ativoExistente.getId())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(updateDTO)))
-                    .andExpect(status().isForbidden());
+                    .andExpect(status().isOk());
         }
 
         @Test
-        @DisplayName("Deve retornar 404 Not Found para ID inexistente")
+        @DisplayName("Deve retornar 403 Forbidden para ID inexistente (Security First)")
         void atualizar_comIdInexistente_deveRetornarNotFound() throws Exception {
             mockLogin(usuarioAdmin);
             AtivoUpdateDTO updateDTO = new AtivoUpdateDTO(
@@ -333,7 +338,7 @@ class AtivoControllerIT extends BaseIT {
             mockMvc.perform(put("/api/v1/ativos/{id}", 9999L)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(updateDTO)))
-                    .andExpect(status().isNotFound());
+                    .andExpect(status().isForbidden());
         }
     }
 
@@ -358,11 +363,11 @@ class AtivoControllerIT extends BaseIT {
         }
 
         @Test
-        @DisplayName("Deve retornar 404 Not Found para ID inexistente")
+        @DisplayName("Deve retornar 403 Forbidden para ID inexistente (Security First)")
         void deletar_comIdInexistente_deveRetornarNotFound() throws Exception {
             mockLogin(usuarioAdmin);
             mockMvc.perform(delete("/api/v1/ativos/{id}", 9999L))
-                    .andExpect(status().isNotFound());
+                    .andExpect(status().isForbidden());
         }
     }
 
@@ -383,7 +388,7 @@ class AtivoControllerIT extends BaseIT {
         }
 
         @Test
-        @DisplayName("Deve retornar 404 Not Found para ID inexistente")
+        @DisplayName("Deve retornar 403 Forbidden para ID inexistente (Security First)")
         void healthCheck_comIdInexistente_deveRetornarNotFound() throws Exception {
             mockLogin(usuarioUser);
             HealthCheckDTO healthCheckDTO = createMockHealthCheckDTO();
@@ -391,19 +396,43 @@ class AtivoControllerIT extends BaseIT {
             mockMvc.perform(patch("/api/v1/ativos/{id}/health-check", 9999L)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(healthCheckDTO)))
-                    .andExpect(status().isNotFound());
+                    .andExpect(status().isForbidden());
         }
     }
 
     // --- Helper Methods ---
 
-    private Usuario createUsuario(Funcionario funcionario, String email, String role) {
+    private Usuario createUsuario(Funcionario funcionario, String email, String roleName) {
         Usuario u = new Usuario();
         u.setEmail(email);
         u.setPassword("password");
-        u.setRole(role);
+        u.setRole(roleName); // Legacy
         u.setFuncionario(funcionario);
         u.setStatus(Status.ATIVO);
+
+        Role rbacRole = roleRepository.findByName(roleName).orElseGet(() -> {
+            Role r = new Role();
+            r.setName(roleName);
+            return roleRepository.save(r);
+        });
+
+        // Grant READ and UPDATE permission to ROLE_USER
+        if ("ROLE_USER".equals(roleName)) {
+             Permission pRead = permissionRepository.findByResourceAndAction("ATIVO", "READ")
+                .orElseGet(() -> permissionRepository.save(new Permission(null, "ATIVO", "READ", "Read Ativo", "filialId")));
+             Permission pUpdate = permissionRepository.findByResourceAndAction("ATIVO", "UPDATE")
+                .orElseGet(() -> permissionRepository.save(new Permission(null, "ATIVO", "UPDATE", "Update Ativo", "filialId")));
+
+             if (rbacRole.getPermissions() == null) {
+                 rbacRole.setPermissions(new java.util.HashSet<>());
+             }
+             rbacRole.getPermissions().add(pRead);
+             rbacRole.getPermissions().add(pUpdate);
+             roleRepository.save(rbacRole);
+        }
+
+        u.setRoles(Set.of(rbacRole));
+
         return usuarioRepository.save(u);
     }
 
