@@ -6,6 +6,9 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
+/**
+ * Repository for managing Permission entities.
+ */
 @Repository
 public interface PermissionRepository extends JpaRepository<Permission, Long> {
     Optional<Permission> findByResourceAndAction(String resource, String action);

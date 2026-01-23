@@ -7,10 +7,10 @@ import br.com.aegispatrimonio.service.IPermissionService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +19,18 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
+/**
+ * Implementation of the Permission Service for Granular RBAC.
+ * <p>
+ * This service handles authorization logic by checking user roles and permissions persisted in the database.
+ * It supports:
+ * <ul>
+ *     <li>Role-based permissions (Resource + Action)</li>
+ *     <li>Contextual verification (e.g. Filial access)</li>
+ *     <li>Caching of user permissions and context access for performance</li>
+ *     <li>Micrometer metrics for observability (allow/deny counts, timing)</li>
+ * </ul>
+ */
 @Service
 public class PermissionServiceImpl implements IPermissionService {
 
@@ -28,7 +40,7 @@ public class PermissionServiceImpl implements IPermissionService {
     private final MeterRegistry meterRegistry;
 
     @org.springframework.beans.factory.annotation.Autowired
-    @org.springframework.context.annotation.Lazy
+    @Lazy
     private PermissionServiceImpl self;
 
     public PermissionServiceImpl(UsuarioRepository usuarioRepository, MeterRegistry meterRegistry) {
@@ -36,6 +48,16 @@ public class PermissionServiceImpl implements IPermissionService {
         this.meterRegistry = meterRegistry;
     }
 
+    /**
+     * Checks if the authenticated user has the required permission.
+     *
+     * @param authentication The current security authentication.
+     * @param targetId       The ID of the target object (optional).
+     * @param resource       The resource being accessed (e.g., 'ATIVO').
+     * @param action         The action being performed (e.g., 'READ').
+     * @param context        The context for the permission (e.g., filialId).
+     * @return true if allowed, false otherwise.
+     */
     @Override
     public boolean hasPermission(Authentication authentication, Object targetId, String resource, String action, Object context) {
         Timer.Sample sample = Timer.start(meterRegistry);
@@ -103,6 +125,13 @@ public class PermissionServiceImpl implements IPermissionService {
         }
     }
 
+    /**
+     * Retrieves all permissions for a user, aggregated from their roles.
+     * Cached by username.
+     *
+     * @param username The username (email).
+     * @return A set of permissions.
+     */
     @Cacheable(value = "userPermissions", key = "#username", unless = "#result == null")
     @Transactional(readOnly = true)
     public Set<Permission> getUserPermissions(String username) {
@@ -121,6 +150,14 @@ public class PermissionServiceImpl implements IPermissionService {
                 .orElse(Collections.emptySet());
     }
 
+    /**
+     * Checks if a user has access to a specific context (e.g., Filial ID).
+     * Cached by username and context ID.
+     *
+     * @param username The username.
+     * @param context  The context ID (usually Filial ID).
+     * @return true if user has access.
+     */
     @Cacheable(value = "userContext", key = "#username + '-' + #context", unless = "#result == false")
     @Transactional(readOnly = true)
     public boolean hasContextAccess(String username, Object context) {
