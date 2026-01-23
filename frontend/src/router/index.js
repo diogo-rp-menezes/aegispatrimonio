@@ -10,6 +10,11 @@ const routes = [
   { path: "/ativos/novo", component: () => import("../views/AtivoForm.vue"), meta: { requiresAuth: true } },
   { path: "/ativos/:id/editar", component: () => import("../views/AtivoForm.vue"), props: true, meta: { requiresAuth: true } },
   { path: "/ativos/:id", component: () => import("../views/DetailView.vue"), props: true, meta: { requiresAuth: true } },
+
+  // Fornecedores
+  { path: "/fornecedores", component: () => import("../views/fornecedores/FornecedorList.vue"), meta: { requiresAuth: true } },
+  { path: "/fornecedores/novo", component: () => import("../views/fornecedores/FornecedorForm.vue"), meta: { requiresAuth: true } },
+  { path: "/fornecedores/:id/editar", component: () => import("../views/fornecedores/FornecedorForm.vue"), props: true, meta: { requiresAuth: true } },
 ];
 
 const router = createRouter({

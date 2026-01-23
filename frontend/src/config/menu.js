@@ -17,6 +17,11 @@ export const menuItems = [
     ]
   },
   {
+    title: "Fornecedores",
+    path: "/fornecedores",
+    icon: "bi bi-people-fill"
+  },
+  {
     title: "Comodatos",
     path: "/comodatos",
     icon: "bi bi-arrow-left-right"

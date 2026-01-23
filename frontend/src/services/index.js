@@ -6,6 +6,7 @@ export { handleResponse, handleApiError, fetchConfig, authInterceptor } from './
 // Exportações de serviços
 export { pessoaService } from './pessoas';
 export { departamentoService } from './departamentos';
+export { fornecedorService } from './fornecedorService';
 
 // Você pode adicionar outros serviços aqui no futuro
 // export { ativoService } from './ativos';
