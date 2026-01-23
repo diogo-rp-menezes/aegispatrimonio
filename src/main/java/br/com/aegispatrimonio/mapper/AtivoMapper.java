@@ -52,6 +52,7 @@ public class AtivoMapper {
                 ativo.getFornecedor() != null ? ativo.getFornecedor().getId() : null,
                 ativo.getFornecedor() != null ? ativo.getFornecedor().getNome() : null,
                 ativo.getStatus(),
+                ativo.getValorAquisicao(), // Added
                 responsavelId,
                 responsavelNome,
                 hwDTO,

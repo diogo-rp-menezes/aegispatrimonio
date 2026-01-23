@@ -1,6 +1,7 @@
 package br.com.aegispatrimonio.dto;
 
 import br.com.aegispatrimonio.model.StatusAtivo;
+import java.math.BigDecimal;
 import java.util.Map;
 
 /**
@@ -19,7 +20,7 @@ public record AtivoDTO(
     Long fornecedorId,
     String fornecedorNome,
     StatusAtivo status,
-    // CORREÇÃO: Adicionados campos para o responsável
+    BigDecimal valorAquisicao, // Added
     Long funcionarioResponsavelId,
     String funcionarioResponsavelNome,
     AtivoDetalheHardwareDTO detalheHardware,

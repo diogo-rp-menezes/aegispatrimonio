@@ -9,6 +9,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.Where;
 import org.hibernate.envers.Audited;
+import org.hibernate.envers.NotAudited;
 import org.hibernate.envers.RelationTargetAuditMode;
 import org.hibernate.type.SqlTypes;
 
@@ -112,7 +113,7 @@ public class Ativo {
     @Column(name = "data_ultima_depreciacao")
     private LocalDate dataUltimaDepreciacao;
 
-    @Audited(targetAuditMode = RelationTargetAuditMode.NOT_AUDITED)
+    @NotAudited
     @OneToOne(mappedBy = "ativo", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private AtivoDetalheHardware detalheHardware;
 
