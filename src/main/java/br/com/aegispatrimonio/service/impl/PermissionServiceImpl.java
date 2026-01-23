@@ -73,6 +73,13 @@ public class PermissionServiceImpl implements IPermissionService {
             // Use 'self' to trigger cache proxy if available
             PermissionServiceImpl effectiveSelf = (self != null) ? self : this;
 
+            // 0. Admin Bypass
+            if (effectiveSelf.hasRole(username, "ROLE_ADMIN")) {
+                log.debug("[AUTHZ] Allow: Admin Bypass for {}", username);
+                allowed = true;
+                return true;
+            }
+
             Set<Permission> permissions = effectiveSelf.getUserPermissions(username);
 
             // 1. Check if user has the specific Permission (Resource + Action)
@@ -148,6 +155,22 @@ public class PermissionServiceImpl implements IPermissionService {
                     return perms;
                 })
                 .orElse(Collections.emptySet());
+    }
+
+    /**
+     * Checks if a user has a specific role.
+     * Cached by username and role name.
+     *
+     * @param username The username.
+     * @param roleName The role name to check.
+     * @return true if the user has the role.
+     */
+    @Cacheable(value = "userRoles", key = "#username + '-' + #roleName")
+    @Transactional(readOnly = true)
+    public boolean hasRole(String username, String roleName) {
+        return usuarioRepository.findWithDetailsByEmail(username)
+                .map(u -> u.getRoles() != null && u.getRoles().stream().anyMatch(r -> roleName.equals(r.getName())))
+                .orElse(false);
     }
 
     /**
