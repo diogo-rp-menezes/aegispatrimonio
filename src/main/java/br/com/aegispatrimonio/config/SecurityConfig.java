@@ -1,6 +1,8 @@
 package br.com.aegispatrimonio.config;
 
 import br.com.aegispatrimonio.security.CustomUserDetailsService;
+import br.com.aegispatrimonio.security.DelegatedAccessDeniedHandler;
+import br.com.aegispatrimonio.security.DelegatedAuthenticationEntryPoint;
 import br.com.aegispatrimonio.security.JwtAuthFilter;
 import br.com.aegispatrimonio.security.TenantFilter;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +21,6 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -36,6 +37,8 @@ public class SecurityConfig {
 
     private final CustomUserDetailsService customUserDetailsService;
     private final JwtAuthFilter jwtAuthFilter;
+    private final DelegatedAuthenticationEntryPoint authEntryPoint;
+    private final DelegatedAccessDeniedHandler accessDeniedHandler;
 
     @Value("${app.cors.allowed-origins:http://localhost:8080,http://localhost:3000}")
     private String allowedOrigins;
@@ -47,12 +50,12 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 // CORREÇÃO: Configuração explícita para tratar exceções de segurança
                 .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)) // Para falhas de autenticação (401)
-                        .accessDeniedHandler((request, response, accessDeniedException) -> response.setStatus(HttpStatus.FORBIDDEN.value())) // Para falhas de autorização (403)
+                        .authenticationEntryPoint(authEntryPoint) // Para falhas de autenticação (401)
+                        .accessDeniedHandler(accessDeniedHandler) // Para falhas de autorização (403)
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/login", "/swagger-ui/**", "/v3/api-docs/**", "/actuator/**").permitAll() // Permitir acesso a endpoints do Actuator
+                        .requestMatchers("/api/v1/auth/login", "/swagger-ui/**", "/v3/api-docs/**", "/actuator/**").permitAll() // Permitir acesso a endpoints do Actuator
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(authenticationProvider())

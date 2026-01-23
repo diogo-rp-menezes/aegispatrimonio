@@ -76,7 +76,7 @@ class AtivoControllerIT extends BaseIT {
 
         @Test
         @DisplayName("Deve retornar 201 Created para ADMIN com dados válidos")
-        @WithMockCustomUser(role = "ROLE_ADMIN") // CORREÇÃO
+        @WithMockCustomUser(roles = "ADMIN")
         void criar_comAdmin_deveRetornarCreated() throws Exception {
             AtivoCreateDTO createDTO = new AtivoCreateDTO(filialA.getId(), "Notebook-01", tipoAtivo.getId(), "PAT-NOTE-01", localizacao.getId(), LocalDate.now(), fornecedor.getId(), new BigDecimal("3500.50"), userA.getId(), "Em uso", "Garantia de 2 anos", null);
 
@@ -91,7 +91,7 @@ class AtivoControllerIT extends BaseIT {
 
         @Test
         @DisplayName("Deve retornar 403 Forbidden para USER")
-        @WithMockCustomUser(role = "ROLE_USER") // CORREÇÃO
+        @WithMockCustomUser(roles = "USER")
         void criar_comUser_deveRetornarForbidden() throws Exception {
             AtivoCreateDTO createDTO = new AtivoCreateDTO(filialA.getId(), "Notebook-01", tipoAtivo.getId(), "PAT-NOTE-01", localizacao.getId(), LocalDate.now(), fornecedor.getId(), new BigDecimal("3500.50"), userA.getId(), "Em uso", "Garantia de 2 anos", null);
 
@@ -103,7 +103,7 @@ class AtivoControllerIT extends BaseIT {
 
         @Test
         @DisplayName("Deve retornar 400 Bad Request para dados inválidos")
-        @WithMockCustomUser(role = "ROLE_ADMIN") // CORREÇÃO
+        @WithMockCustomUser(roles = "ADMIN")
         void criar_comDadosInvalidos_deveRetornarBadRequest() throws Exception {
             AtivoCreateDTO createDTO = new AtivoCreateDTO(null, "", null, "", null, null, null, null, null, "", "", null);
 
@@ -120,7 +120,7 @@ class AtivoControllerIT extends BaseIT {
 
         @Test
         @DisplayName("Deve retornar 200 OK e uma lista de ativos para ADMIN")
-        @WithMockCustomUser(role = "ROLE_ADMIN") // CORREÇÃO
+        @WithMockCustomUser(roles = "ADMIN")
         void listar_comAdmin_deveRetornarOkComLista() throws Exception {
             mockMvc.perform(get("/api/v1/ativos"))
                     .andExpect(status().isOk())
@@ -130,7 +130,7 @@ class AtivoControllerIT extends BaseIT {
 
         @Test
         @DisplayName("Deve retornar 200 OK e uma lista de ativos para USER")
-        @WithMockCustomUser(role = "ROLE_USER", funcionarioId = 1L) // CORREÇÃO
+        @WithMockCustomUser(roles = "USER")
         void listar_comUser_deveRetornarOkComLista() throws Exception {
             mockMvc.perform(get("/api/v1/ativos"))
                     .andExpect(status().isOk())
@@ -152,7 +152,7 @@ class AtivoControllerIT extends BaseIT {
 
         @Test
         @DisplayName("Deve retornar 200 OK e o ativo correto para USER")
-        @WithMockCustomUser(role = "ROLE_USER", funcionarioId = 1L) // CORREÇÃO
+        @WithMockCustomUser(roles = "USER")
         void buscarPorId_comUserEIdExistente_deveRetornarOk() throws Exception {
             mockMvc.perform(get("/api/v1/ativos/{id}", ativoExistente.getId()))
                     .andExpect(status().isOk())
@@ -162,7 +162,7 @@ class AtivoControllerIT extends BaseIT {
 
         @Test
         @DisplayName("Deve retornar 404 Not Found para ID inexistente")
-        @WithMockCustomUser(role = "ROLE_USER", funcionarioId = 1L) // CORREÇÃO
+        @WithMockCustomUser(roles = "USER")
         void buscarPorId_comIdInexistente_deveRetornarNotFound() throws Exception {
             mockMvc.perform(get("/api/v1/ativos/{id}", 9999L))
                     .andExpect(status().isNotFound());
@@ -175,7 +175,7 @@ class AtivoControllerIT extends BaseIT {
 
         @Test
         @DisplayName("Deve retornar 200 OK para ADMIN com dados válidos")
-        @WithMockCustomUser(role = "ROLE_ADMIN") // CORREÇÃO
+        @WithMockCustomUser(roles = "ADMIN")
         void atualizar_comAdmin_deveRetornarOk() throws Exception {
             AtivoUpdateDTO updateDTO = new AtivoUpdateDTO(
                     ativoExistente.getFilial().getId(),
@@ -203,7 +203,7 @@ class AtivoControllerIT extends BaseIT {
 
         @Test
         @DisplayName("Deve retornar 403 Forbidden para USER")
-        @WithMockCustomUser(role = "ROLE_USER") // CORREÇÃO
+        @WithMockCustomUser(roles = "USER")
         void atualizar_comUser_deveRetornarForbidden() throws Exception {
             AtivoUpdateDTO updateDTO = new AtivoUpdateDTO(
                     ativoExistente.getFilial().getId(), "Nome", "Patrimonio",
@@ -220,7 +220,7 @@ class AtivoControllerIT extends BaseIT {
 
         @Test
         @DisplayName("Deve retornar 404 Not Found para ID inexistente")
-        @WithMockCustomUser(role = "ROLE_ADMIN") // CORREÇÃO
+        @WithMockCustomUser(roles = "ADMIN")
         void atualizar_comIdInexistente_deveRetornarNotFound() throws Exception {
             AtivoUpdateDTO updateDTO = new AtivoUpdateDTO(
                     ativoExistente.getFilial().getId(), "Nome", "Patrimonio",
@@ -242,7 +242,7 @@ class AtivoControllerIT extends BaseIT {
 
         @Test
         @DisplayName("Deve retornar 204 No Content para ADMIN")
-        @WithMockCustomUser(role = "ROLE_ADMIN") // CORREÇÃO
+        @WithMockCustomUser(roles = "ADMIN")
         void deletar_comAdmin_deveRetornarNoContent() throws Exception {
             mockMvc.perform(delete("/api/v1/ativos/{id}", ativoExistente.getId()))
                     .andExpect(status().isNoContent());
@@ -250,7 +250,7 @@ class AtivoControllerIT extends BaseIT {
 
         @Test
         @DisplayName("Deve retornar 403 Forbidden para USER")
-        @WithMockCustomUser(role = "ROLE_USER") // CORREÇÃO
+        @WithMockCustomUser(roles = "USER")
         void deletar_comUser_deveRetornarForbidden() throws Exception {
             mockMvc.perform(delete("/api/v1/ativos/{id}", ativoExistente.getId()))
                     .andExpect(status().isForbidden());
@@ -258,7 +258,7 @@ class AtivoControllerIT extends BaseIT {
 
         @Test
         @DisplayName("Deve retornar 404 Not Found para ID inexistente")
-        @WithMockCustomUser(role = "ROLE_ADMIN") // CORREÇÃO
+        @WithMockCustomUser(roles = "ADMIN")
         void deletar_comIdInexistente_deveRetornarNotFound() throws Exception {
             mockMvc.perform(delete("/api/v1/ativos/{id}", 9999L))
                     .andExpect(status().isNotFound());
@@ -271,7 +271,7 @@ class AtivoControllerIT extends BaseIT {
 
         @Test
         @DisplayName("Deve retornar 204 No Content para USER")
-        @WithMockCustomUser(role = "ROLE_USER", funcionarioId = 1L) // CORREÇÃO
+        @WithMockCustomUser(roles = "USER")
         void healthCheck_comUser_deveRetornarNoContent() throws Exception {
             HealthCheckDTO healthCheckDTO = createMockHealthCheckDTO();
 
@@ -283,7 +283,7 @@ class AtivoControllerIT extends BaseIT {
 
         @Test
         @DisplayName("Deve retornar 404 Not Found para ID inexistente")
-        @WithMockCustomUser(role = "ROLE_USER", funcionarioId = 1L) // CORREÇÃO
+        @WithMockCustomUser(roles = "USER")
         void healthCheck_comIdInexistente_deveRetornarNotFound() throws Exception {
             HealthCheckDTO healthCheckDTO = createMockHealthCheckDTO();
 

@@ -9,16 +9,23 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import java.net.URI;
 import java.util.UUID;
 
 @ControllerAdvice
-public class GlobalExceptionHandler {
+public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(EntityNotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ProblemDetail handleEntityNotFound(EntityNotFoundException ex, HttpServletRequest request) {
+        return buildProblem(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    protected ProblemDetail handleResourceNotFound(ResourceNotFoundException ex, HttpServletRequest request) {
         return buildProblem(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage(), request);
     }
 
@@ -31,6 +38,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalStateException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ProblemDetail handleIllegalState(IllegalStateException ex, HttpServletRequest request) {
+        return buildProblem(HttpStatus.CONFLICT, "Conflict", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(ResourceConflictException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    protected ProblemDetail handleResourceConflict(ResourceConflictException ex, HttpServletRequest request) {
         return buildProblem(HttpStatus.CONFLICT, "Conflict", ex.getMessage(), request);
     }
 

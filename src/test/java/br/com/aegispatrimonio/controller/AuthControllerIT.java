@@ -70,7 +70,7 @@ public class AuthControllerIT extends BaseIT {
     void login_comCredenciaisValidas_deveRetornarToken() throws Exception {
         LoginRequestDTO loginRequest = new LoginRequestDTO("user@aegis.com", "password");
 
-        mockMvc.perform(post("/auth/login")
+        mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(loginRequest)))
                 .andExpect(status().isOk())
@@ -83,7 +83,7 @@ public class AuthControllerIT extends BaseIT {
     void login_comSenhaInvalida_deveRetornarUnauthorized() throws Exception {
         LoginRequestDTO loginRequest = new LoginRequestDTO("user@aegis.com", "wrongpassword");
 
-        mockMvc.perform(post("/auth/login")
+        mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(loginRequest)))
                 .andExpect(status().isUnauthorized());
@@ -94,7 +94,7 @@ public class AuthControllerIT extends BaseIT {
     void login_comUsuarioInexistente_deveRetornarUnauthorized() throws Exception {
         LoginRequestDTO loginRequest = new LoginRequestDTO("nonexistent@aegis.com", "password");
 
-        mockMvc.perform(post("/auth/login")
+        mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(loginRequest)))
                 .andExpect(status().isUnauthorized());

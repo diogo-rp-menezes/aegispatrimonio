@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
  * Fornece um endpoint público para que os usuários possam obter um token JWT.
  */
 @RestController
-@RequestMapping("/auth")
+@RequestMapping("/api/v1/auth")
 public class AuthController {
 
     private final AuthenticationManager authenticationManager;

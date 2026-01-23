@@ -62,7 +62,7 @@ public class TenantAccessIT extends BaseIT {
 
         // Login to get token
         LoginRequestDTO loginRequest = new LoginRequestDTO("user@test.com", "password");
-        MvcResult result = mockMvc.perform(post("/auth/login")
+        MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(loginRequest)))
                 .andExpect(status().isOk())
