@@ -55,6 +55,8 @@ class AtivoServiceTest {
     @Mock
     private DepreciacaoService depreciacaoService;
     @Mock
+    private SearchOptimizationService searchOptimizationService;
+    @Mock
     private CurrentUserProvider currentUserProvider; // Adicionado mock para CurrentUserProvider
 
     @InjectMocks
@@ -241,5 +243,45 @@ class AtivoServiceTest {
         org.junit.jupiter.api.Assertions.assertEquals("PC-01", ativoSalvo.getDetalheHardware().getComputerName());
         org.junit.jupiter.api.Assertions.assertEquals("Windows 11", ativoSalvo.getDetalheHardware().getOsName());
         org.junit.jupiter.api.Assertions.assertEquals(ativoSalvo, ativoSalvo.getDetalheHardware().getAtivo());
+    }
+
+    @Test
+    @DisplayName("ListarTodos: Deve usar busca fuzzy quando nome é fornecido")
+    void listarTodos_comBuscaFuzzy_deveRankearResultados() {
+        // Arrange
+        String query = "laptp";
+        Ativo a1 = new Ativo(); a1.setId(1L); a1.setNome("Desktop");
+        Ativo a2 = new Ativo(); a2.setId(2L); a2.setNome("Laptop");
+        Ativo a3 = new Ativo(); a3.setId(3L); a3.setNome("Lap Top");
+
+        br.com.aegispatrimonio.dto.AtivoDTO dto2 = new br.com.aegispatrimonio.dto.AtivoDTO(2L, "Laptop", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+        br.com.aegispatrimonio.dto.AtivoDTO dto3 = new br.com.aegispatrimonio.dto.AtivoDTO(3L, "Lap Top", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+
+        // Mock candidates returned by Repository
+        java.util.List<Ativo> candidates = java.util.List.of(a1, a2, a3);
+        // Mock ranked result returned by Service
+        java.util.List<Ativo> ranked = java.util.List.of(a2, a3);
+
+        mockUser(adminUser);
+
+        // When finding candidates (name is null)
+        when(ativoRepository.findByFilters(any(), any(), any(), eq(null), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(candidates));
+
+        // When ranking
+        when(searchOptimizationService.rankResults(eq(query), anyList(), any())).thenReturn((java.util.List) ranked);
+
+        when(ativoMapper.toDTO(a2)).thenReturn(dto2);
+        when(ativoMapper.toDTO(a3)).thenReturn(dto3);
+
+        // Act
+        org.springframework.data.domain.Page<br.com.aegispatrimonio.dto.AtivoDTO> result = ativoService.listarTodos(
+                org.springframework.data.domain.Pageable.ofSize(10),
+                null, null, null, query);
+
+        // Assert
+        verify(searchOptimizationService).rankResults(eq(query), anyList(), any());
+        org.junit.jupiter.api.Assertions.assertEquals(2, result.getContent().size());
+        org.junit.jupiter.api.Assertions.assertEquals("Laptop", result.getContent().get(0).nome());
     }
 }

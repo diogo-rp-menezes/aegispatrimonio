@@ -41,8 +41,9 @@ public class AtivoService {
     private final CurrentUserProvider currentUserProvider;
     private final AtivoHealthHistoryRepository healthHistoryRepository;
     private final PredictiveMaintenanceService predictiveMaintenanceService;
+    private final SearchOptimizationService searchOptimizationService;
 
-    public AtivoService(AtivoRepository ativoRepository, AtivoMapper ativoMapper, TipoAtivoRepository tipoAtivoRepository, LocalizacaoRepository localizacaoRepository, FornecedorRepository fornecedorRepository, FuncionarioRepository funcionarioRepository, FilialRepository filialRepository, ManutencaoRepository manutencaoRepository, MovimentacaoRepository movimentacaoRepository, DepreciacaoService depreciacaoService, CurrentUserProvider currentUserProvider, AtivoHealthHistoryRepository healthHistoryRepository, PredictiveMaintenanceService predictiveMaintenanceService) {
+    public AtivoService(AtivoRepository ativoRepository, AtivoMapper ativoMapper, TipoAtivoRepository tipoAtivoRepository, LocalizacaoRepository localizacaoRepository, FornecedorRepository fornecedorRepository, FuncionarioRepository funcionarioRepository, FilialRepository filialRepository, ManutencaoRepository manutencaoRepository, MovimentacaoRepository movimentacaoRepository, DepreciacaoService depreciacaoService, CurrentUserProvider currentUserProvider, AtivoHealthHistoryRepository healthHistoryRepository, PredictiveMaintenanceService predictiveMaintenanceService, SearchOptimizationService searchOptimizationService) {
         this.ativoRepository = ativoRepository;
         this.ativoMapper = ativoMapper;
         this.tipoAtivoRepository = tipoAtivoRepository;
@@ -56,6 +57,7 @@ public class AtivoService {
         this.currentUserProvider = currentUserProvider;
         this.healthHistoryRepository = healthHistoryRepository;
         this.predictiveMaintenanceService = predictiveMaintenanceService;
+        this.searchOptimizationService = searchOptimizationService;
     }
 
     private Usuario getUsuarioLogado() {
@@ -73,53 +75,67 @@ public class AtivoService {
                                       StatusAtivo status,
                                       String nome) {
         Usuario usuarioLogado = getUsuarioLogado();
-
         org.springframework.data.domain.Pageable effectivePageable =
                 (pageable == null) ? org.springframework.data.domain.Pageable.unpaged() : pageable;
+        boolean isFuzzySearch = (nome != null && !nome.isBlank());
+
+        // 1. Resolve Scope (Admin vs User Filiais)
+        Set<Long> userFiliais = null;
+        boolean isAdmin = isAdmin(usuarioLogado);
+
+        if (!isAdmin) {
+            Funcionario funcionarioPrincipal = usuarioLogado.getFuncionario();
+            if (funcionarioPrincipal == null || funcionarioPrincipal.getId() == null) {
+                throw new AccessDeniedException("Usuário não é um funcionário ou não está associado a nenhuma filial.");
+            }
+            // Fetch fresh from DB to get Lazy collections
+            Optional<Funcionario> fOpt = funcionarioRepository.findById(funcionarioPrincipal.getId());
+            if (fOpt.isPresent()) {
+                userFiliais = fOpt.get().getFiliais().stream().map(Filial::getId).collect(Collectors.toSet());
+                if (userFiliais.isEmpty()) throw new AccessDeniedException("Usuário não está associado a nenhuma filial.");
+            } else {
+                throw new AccessDeniedException("Funcionário não encontrado.");
+            }
+        }
+
+        // 2. Fuzzy Search Path (Shift Left Optimization)
+        if (isFuzzySearch) {
+            List<Ativo> candidates;
+            // Fetch candidates matching other filters, ignoring name (limited to 1000 for safety)
+            org.springframework.data.domain.Pageable limit = org.springframework.data.domain.PageRequest.of(0, 1000);
+
+            if (isAdmin) {
+                candidates = ativoRepository.findByFilters(filialId, tipoAtivoId, status, null, limit).getContent();
+            } else {
+                candidates = ativoRepository.findByFilialIdsAndFilters(userFiliais, filialId, tipoAtivoId, status, null, limit).getContent();
+            }
+
+            // Rank in memory using Levenshtein distance
+            List<Ativo> ranked = searchOptimizationService.rankResults(nome, candidates, Ativo::getNome);
+
+            // Manual Pagination
+            int start = (int) effectivePageable.getOffset();
+            int end = Math.min((start + effectivePageable.getPageSize()), ranked.size());
+            List<AtivoDTO> pageContent = (start > ranked.size()) ? List.of() :
+                    ranked.subList(start, end).stream().map(ativoMapper::toDTO).collect(Collectors.toList());
+
+            return new PageImpl<>(pageContent, effectivePageable, ranked.size());
+        }
+
+        // 3. Original Path (Strict / DB Paged)
         boolean unpaged = effectivePageable.isUnpaged();
-        boolean hasFilters = (filialId != null) || (tipoAtivoId != null) || (status != null) || (nome != null && !nome.isBlank());
+        boolean hasFilters = (filialId != null) || (tipoAtivoId != null) || (status != null);
 
-        if (isAdmin(usuarioLogado)) {
+        if (isAdmin) {
             if (unpaged && !hasFilters) {
-                List<AtivoDTO> list = ativoRepository.findAllWithDetails().stream().map(ativoMapper::toDTO).collect(Collectors.toList());
-                return new PageImpl<>(list);
-            } else {
-                return ativoRepository
-                        .findByFilters(filialId, tipoAtivoId, status, nome, effectivePageable)
-                        .map(ativoMapper::toDTO);
+                return new PageImpl<>(ativoRepository.findAllWithDetails().stream().map(ativoMapper::toDTO).collect(Collectors.toList()));
             }
-        }
-
-        Funcionario funcionarioPrincipal = usuarioLogado.getFuncionario();
-        if (funcionarioPrincipal == null || funcionarioPrincipal.getId() == null) {
-            throw new AccessDeniedException("Usuário não é um funcionário ou não está associado a nenhuma filial.");
-        }
-
-        Optional<Funcionario> funcionarioOpt = funcionarioRepository.findById(funcionarioPrincipal.getId());
-        if (funcionarioOpt.isEmpty()) {
-            if (unpaged && !hasFilters) {
-                List<AtivoDTO> list = ativoRepository.findAllWithDetails().stream().map(ativoMapper::toDTO).collect(Collectors.toList());
-                return new PageImpl<>(list);
-            } else {
-                return ativoRepository
-                        .findByFilters(filialId, tipoAtivoId, status, nome, effectivePageable)
-                        .map(ativoMapper::toDTO);
-            }
-        }
-        Funcionario funcionarioLogado = funcionarioOpt.get();
-        if (funcionarioLogado.getFiliais() == null || funcionarioLogado.getFiliais().isEmpty()) {
-            throw new AccessDeniedException("Usuário não está associado a nenhuma filial.");
-        }
-
-        Set<Long> filiaisIds = funcionarioLogado.getFiliais().stream().map(Filial::getId).collect(Collectors.toSet());
-
-        if (unpaged && !hasFilters) {
-            List<AtivoDTO> list = ativoRepository.findByFilialIdInWithDetails(filiaisIds).stream().map(ativoMapper::toDTO).collect(Collectors.toList());
-            return new PageImpl<>(list);
+            return ativoRepository.findByFilters(filialId, tipoAtivoId, status, null, effectivePageable).map(ativoMapper::toDTO);
         } else {
-            return ativoRepository
-                    .findByFilialIdsAndFilters(filiaisIds, filialId, tipoAtivoId, status, nome, effectivePageable)
-                    .map(ativoMapper::toDTO);
+            if (unpaged && !hasFilters) {
+                return new PageImpl<>(ativoRepository.findByFilialIdInWithDetails(userFiliais).stream().map(ativoMapper::toDTO).collect(Collectors.toList()));
+            }
+            return ativoRepository.findByFilialIdsAndFilters(userFiliais, filialId, tipoAtivoId, status, null, effectivePageable).map(ativoMapper::toDTO);
         }
     }
 
