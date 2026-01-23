@@ -14,10 +14,8 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException; // Importar ResponseStatusException
 
 import java.util.List;
 
@@ -38,7 +36,7 @@ public class FornecedorController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'FORNECEDOR', 'READ', null)")
     @Operation(summary = "Lista todos os fornecedores", description = "Retorna a lista de todos os fornecedores cadastrados no sistema.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Lista retornada com sucesso", content = @Content(schema = @Schema(implementation = FornecedorDTO.class))),
@@ -50,7 +48,7 @@ public class FornecedorController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, #id, 'FORNECEDOR', 'READ', null)")
     @Operation(summary = "Busca um fornecedor por ID", description = "Retorna um fornecedor específico com base no ID.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Fornecedor encontrado", content = @Content(schema = @Schema(implementation = FornecedorDTO.class))),
@@ -64,7 +62,7 @@ public class FornecedorController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'FORNECEDOR', 'CREATE', null)")
     @Operation(summary = "Cria um novo fornecedor", description = "Cria um novo fornecedor no sistema.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Fornecedor criado com sucesso", content = @Content(schema = @Schema(implementation = FornecedorDTO.class))),
@@ -77,7 +75,7 @@ public class FornecedorController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, #id, 'FORNECEDOR', 'UPDATE', null)")
     @Operation(summary = "Atualiza um fornecedor existente", description = "Atualiza os dados de um fornecedor existente no sistema.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Fornecedor atualizado com sucesso", content = @Content(schema = @Schema(implementation = FornecedorDTO.class))),
@@ -92,7 +90,7 @@ public class FornecedorController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, #id, 'FORNECEDOR', 'DELETE', null)")
     @Operation(summary = "Deleta um fornecedor", description = "Deleta um fornecedor do sistema (exclusão lógica).")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "Fornecedor deletado com sucesso"),
@@ -102,10 +100,5 @@ public class FornecedorController {
     })
     public void deletar(@Parameter(description = "ID do fornecedor a ser deletado", example = "1") @PathVariable Long id) {
         fornecedorService.deletar(id);
-    }
-
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<String> handleIllegalArgumentException(IllegalArgumentException ex) {
-        return new ResponseEntity<>(ex.getMessage(), HttpStatus.BAD_REQUEST);
     }
 }
