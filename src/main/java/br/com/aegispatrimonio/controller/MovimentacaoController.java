@@ -32,7 +32,7 @@ import java.util.Optional;
  * Fornece endpoints para criar, listar, buscar, efetivar, cancelar e deletar movimentações.
  */
 @RestController
-@RequestMapping("/movimentacoes")
+@RequestMapping("/api/v1/movimentacoes")
 @RequiredArgsConstructor
 @Tag(name = "Movimentações", description = "Operações relacionadas à gestão de movimentações de ativos")
 @SecurityRequirement(name = "bearerAuth")

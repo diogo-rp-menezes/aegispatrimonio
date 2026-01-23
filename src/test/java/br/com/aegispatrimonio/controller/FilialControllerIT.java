@@ -88,7 +88,7 @@ class FilialControllerIT extends BaseIT {
     @Test
     @DisplayName("ListarTodos: Deve retornar 200 e a lista de filiais para ADMIN")
     void listarTodos_comAdmin_deveRetornarOk() throws Exception {
-        mockMvc.perform(get("/filiais").header("Authorization", "Bearer " + adminToken))
+        mockMvc.perform(get("/api/v1/filiais").header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].nome", is("Matriz Teste")));
     }
@@ -96,7 +96,7 @@ class FilialControllerIT extends BaseIT {
     @Test
     @DisplayName("ListarTodos: Deve retornar 200 e a lista de filiais para USER")
     void listarTodos_comUser_deveRetornarOk() throws Exception {
-        mockMvc.perform(get("/filiais").header("Authorization", "Bearer " + userToken))
+        mockMvc.perform(get("/api/v1/filiais").header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].nome", is("Matriz Teste")));
     }
@@ -105,7 +105,7 @@ class FilialControllerIT extends BaseIT {
     @DisplayName("BuscarPorId: Deve retornar 404 Not Found para ID inexistente")
     void buscarPorId_comIdInexistente_deveRetornarNotFound() throws Exception {
         long idInexistente = 999L;
-        mockMvc.perform(get("/filiais/{id}", idInexistente)
+        mockMvc.perform(get("/api/v1/filiais/{id}", idInexistente)
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isNotFound());
     }
@@ -115,7 +115,7 @@ class FilialControllerIT extends BaseIT {
     void criar_comAdmin_deveRetornarCreated() throws Exception {
         FilialCreateDTO createDTO = new FilialCreateDTO("Filial RJ", "RJ-01", TipoFilial.FILIAL, CNPJ_VALIDO_2, "Endereço RJ");
 
-        mockMvc.perform(post("/filiais")
+        mockMvc.perform(post("/api/v1/filiais")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createDTO)))
@@ -128,7 +128,7 @@ class FilialControllerIT extends BaseIT {
     void criar_comUser_deveRetornarForbidden() throws Exception {
         FilialCreateDTO createDTO = new FilialCreateDTO("Filial Proibida", "FL-P", TipoFilial.FILIAL, CNPJ_VALIDO_3, "Endereço");
 
-        mockMvc.perform(post("/filiais")
+        mockMvc.perform(post("/api/v1/filiais")
                         .header("Authorization", "Bearer " + userToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createDTO)))
@@ -140,7 +140,7 @@ class FilialControllerIT extends BaseIT {
     void criar_comDadosInvalidos_deveRetornarBadRequest() throws Exception {
         FilialCreateDTO createDTO = new FilialCreateDTO("", "FL-BR", TipoFilial.FILIAL, CNPJ_VALIDO_4, "Endereço");
 
-        mockMvc.perform(post("/filiais")
+        mockMvc.perform(post("/api/v1/filiais")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createDTO)))
@@ -152,7 +152,7 @@ class FilialControllerIT extends BaseIT {
     void atualizar_comAdmin_deveRetornarOk() throws Exception {
         FilialUpdateDTO updateDTO = new FilialUpdateDTO("Matriz SP", "MTRZ-SP", TipoFilial.MATRIZ, CNPJ_VALIDO_1, "Novo Endereço", Status.ATIVO);
 
-        mockMvc.perform(put("/filiais/{id}", filialExistente.getId())
+        mockMvc.perform(put("/api/v1/filiais/{id}", filialExistente.getId())
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateDTO)))
@@ -165,7 +165,7 @@ class FilialControllerIT extends BaseIT {
     void atualizar_comDadosInvalidos_deveRetornarBadRequest() throws Exception {
         FilialUpdateDTO updateDTO = new FilialUpdateDTO("", "MTRZ-NEW", TipoFilial.MATRIZ, CNPJ_VALIDO_1, "Endereço Novo", Status.INATIVO);
 
-        mockMvc.perform(put("/filiais/{id}", filialExistente.getId())
+        mockMvc.perform(put("/api/v1/filiais/{id}", filialExistente.getId())
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateDTO)))
@@ -177,7 +177,7 @@ class FilialControllerIT extends BaseIT {
     void atualizar_comIdInexistente_deveRetornarNotFound() throws Exception {
         FilialUpdateDTO updateDTO = new FilialUpdateDTO("Nome Fantasma", "FANTASMA", TipoFilial.FILIAL, CNPJ_VALIDO_3, "Endereço Fantasma", Status.ATIVO);
 
-        mockMvc.perform(put("/filiais/{id}", 999L)
+        mockMvc.perform(put("/api/v1/filiais/{id}", 999L)
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON) // Adicionado
                         .content(objectMapper.writeValueAsString(updateDTO))) // Adicionado
@@ -189,7 +189,7 @@ class FilialControllerIT extends BaseIT {
     void atualizar_comUser_deveRetornarForbidden() throws Exception {
         FilialUpdateDTO updateDTO = new FilialUpdateDTO("Novo Nome", "MTRZ-NEW", TipoFilial.MATRIZ, CNPJ_VALIDO_1, "Endereço Novo", Status.INATIVO);
 
-        mockMvc.perform(put("/filiais/{id}", filialExistente.getId())
+        mockMvc.perform(put("/api/v1/filiais/{id}", filialExistente.getId())
                         .header("Authorization", "Bearer " + userToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateDTO)))
@@ -201,7 +201,7 @@ class FilialControllerIT extends BaseIT {
     void deletar_comAdmin_deveRetornarNoContent() throws Exception {
         Filial filialParaDeletar = createFilial("Filial a Deletar", "FL-DEL", CNPJ_VALIDO_5);
 
-        mockMvc.perform(delete("/filiais/{id}", filialParaDeletar.getId())
+        mockMvc.perform(delete("/api/v1/filiais/{id}", filialParaDeletar.getId())
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isNoContent());
     }
@@ -209,7 +209,7 @@ class FilialControllerIT extends BaseIT {
     @Test
     @DisplayName("Deletar: Deve retornar 403 Forbidden para USER")
     void deletar_comUser_deveRetornarForbidden() throws Exception {
-        mockMvc.perform(delete("/filiais/{id}", filialExistente.getId())
+        mockMvc.perform(delete("/api/v1/filiais/{id}", filialExistente.getId())
                         .header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isForbidden());
     }

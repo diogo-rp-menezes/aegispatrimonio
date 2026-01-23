@@ -74,7 +74,7 @@ public class TenantAccessIT extends BaseIT {
 
     @Test
     void access_authorizedFilial_shouldReturn200AndFilteredData() throws Exception {
-        mockMvc.perform(get("/localizacoes")
+        mockMvc.perform(get("/api/v1/localizacoes")
                         .header("Authorization", "Bearer " + userToken)
                         .header("X-Filial-ID", filialA.getId()))
                 .andExpect(status().isOk())
@@ -84,7 +84,7 @@ public class TenantAccessIT extends BaseIT {
 
     @Test
     void access_unauthorizedFilial_shouldReturn403() throws Exception {
-        mockMvc.perform(get("/localizacoes")
+        mockMvc.perform(get("/api/v1/localizacoes")
                         .header("Authorization", "Bearer " + userToken)
                         .header("X-Filial-ID", filialB.getId()))
                 .andExpect(status().isForbidden());
@@ -93,7 +93,7 @@ public class TenantAccessIT extends BaseIT {
     @Test
     void access_withoutHeader_shouldReturnAllAllowed() throws Exception {
         // Fallback behavior: returns everything user has access to (Filial A only in this case)
-        mockMvc.perform(get("/localizacoes")
+        mockMvc.perform(get("/api/v1/localizacoes")
                         .header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))

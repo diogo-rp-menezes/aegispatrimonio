@@ -103,7 +103,7 @@ class MovimentacaoControllerIT extends BaseIT {
         MovimentacaoRequestDTO request = new MovimentacaoRequestDTO(ativo.getId(), localOrigem.getId(), localDestino.getId(),
                 userOrigem.getId(), userDestino.getId(), LocalDate.now(), "Movimentação de teste", "Obs");
 
-        String responseString = mockMvc.perform(post("/movimentacoes")
+        String responseString = mockMvc.perform(post("/api/v1/movimentacoes")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -113,7 +113,7 @@ class MovimentacaoControllerIT extends BaseIT {
 
         Long movimentacaoId = objectMapper.readTree(responseString).get("id").asLong();
 
-        mockMvc.perform(post("/movimentacoes/efetivar/{id}", movimentacaoId)
+        mockMvc.perform(post("/api/v1/movimentacoes/efetivar/{id}", movimentacaoId)
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status", is("EFETIVADA")));

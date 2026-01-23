@@ -25,7 +25,7 @@ import java.util.List;
  * Fornece endpoints para listar, buscar, criar, atualizar e deletar funcionários.
  */
 @RestController
-@RequestMapping("/funcionarios") // Endpoint alterado para /funcionarios
+@RequestMapping("/api/v1/funcionarios")
 @Tag(name = "Funcionários", description = "Gerencia o cadastro de funcionários e seus respectivos usuários")
 @SecurityRequirement(name = "bearerAuth")
 @Validated

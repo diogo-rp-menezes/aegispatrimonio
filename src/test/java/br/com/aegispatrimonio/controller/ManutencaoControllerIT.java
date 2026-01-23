@@ -91,7 +91,7 @@ public class ManutencaoControllerIT extends BaseIT {
     void cicloDeVidaManutencao_deveFuncionarCorretamente() throws Exception {
         // 1. Criar
         ManutencaoRequestDTO createRequest = new ManutencaoRequestDTO(ativo.getId(), TipoManutencao.CORRETIVA, solicitante.getId(), null, null, "Não liga", null, null, null, null);
-        String responseString = mockMvc.perform(post("/manutencoes")
+        String responseString = mockMvc.perform(post("/api/v1/manutencoes")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createRequest)))
@@ -102,7 +102,7 @@ public class ManutencaoControllerIT extends BaseIT {
         Long manutencaoId = objectMapper.readTree(responseString).get("id").asLong();
 
         // 2. Aprovar
-        mockMvc.perform(post("/manutencoes/aprovar/{id}", manutencaoId)
+        mockMvc.perform(post("/api/v1/manutencoes/aprovar/{id}", manutencaoId)
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status", is("APROVADA")));
@@ -110,7 +110,7 @@ public class ManutencaoControllerIT extends BaseIT {
         // 3. Iniciar
         ManutencaoInicioDTO inicioDTO = new ManutencaoInicioDTO();
         inicioDTO.setTecnicoId(tecnico.getId());
-        mockMvc.perform(post("/manutencoes/iniciar/{id}", manutencaoId)
+        mockMvc.perform(post("/api/v1/manutencoes/iniciar/{id}", manutencaoId)
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(inicioDTO)))
@@ -123,7 +123,7 @@ public class ManutencaoControllerIT extends BaseIT {
 
         // 4. Concluir
         ManutencaoConclusaoDTO conclusaoDTO = new ManutencaoConclusaoDTO("Troca de fonte", new BigDecimal("350.00"), 120);
-        mockMvc.perform(post("/manutencoes/concluir/{id}", manutencaoId)
+        mockMvc.perform(post("/api/v1/manutencoes/concluir/{id}", manutencaoId)
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(conclusaoDTO)))

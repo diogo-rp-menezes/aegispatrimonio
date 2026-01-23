@@ -24,7 +24,7 @@ import java.util.List;
  * Fornece endpoints para listar, buscar, criar, atualizar e deletar departamentos.
  */
 @RestController
-@RequestMapping("/departamentos")
+@RequestMapping("/api/v1/departamentos")
 @Tag(name = "Departamentos", description = "Gerenciamento de departamentos")
 @SecurityRequirement(name = "bearerAuth") // Indica que todos os endpoints deste controller requerem JWT
 public class DepartamentoController {
