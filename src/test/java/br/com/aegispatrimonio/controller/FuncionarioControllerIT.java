@@ -220,11 +220,12 @@ public class FuncionarioControllerIT extends BaseIT {
         user.setFuncionario(func);
         func.setUsuario(user);
 
-        Funcionario savedFunc = funcionarioRepository.save(func);
-        entityManager.flush();
+        Funcionario savedFunc = funcionarioRepository.saveAndFlush(func);
 
         savedFunc.setFiliais(filiais);
-        return funcionarioRepository.save(savedFunc);
+        savedFunc = funcionarioRepository.saveAndFlush(savedFunc);
+        usuarioRepository.saveAndFlush(user);
+        return savedFunc;
     }
 
     private void resetAutoIncrement() {

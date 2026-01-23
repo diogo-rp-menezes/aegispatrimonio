@@ -75,7 +75,7 @@ public class TipoAtivoControllerIT extends BaseIT {
     void listarTodos_comUser_deveRetornarOk() throws Exception {
         createTipoAtivo("Cadeira Gamer");
 
-        mockMvc.perform(get("/tipos-ativo").header("Authorization", "Bearer " + userToken))
+        mockMvc.perform(get("/api/v1/tipos-ativos").header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].nome", is("Cadeira Gamer")));
     }
@@ -85,7 +85,7 @@ public class TipoAtivoControllerIT extends BaseIT {
     void criar_comAdmin_deveRetornarCreated() throws Exception {
         TipoAtivoCreateDTO createDTO = new TipoAtivoCreateDTO("Monitor Ultrawide", CategoriaContabil.IMOBILIZADO);
 
-        mockMvc.perform(post("/tipos-ativo")
+        mockMvc.perform(post("/api/v1/tipos-ativos")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createDTO)))
@@ -98,7 +98,7 @@ public class TipoAtivoControllerIT extends BaseIT {
     void criar_comUser_deveRetornarForbidden() throws Exception {
         TipoAtivoCreateDTO createDTO = new TipoAtivoCreateDTO("Monitor Proibido", CategoriaContabil.IMOBILIZADO);
 
-        mockMvc.perform(post("/tipos-ativo")
+        mockMvc.perform(post("/api/v1/tipos-ativos")
                         .header("Authorization", "Bearer " + userToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createDTO)))
@@ -110,7 +110,7 @@ public class TipoAtivoControllerIT extends BaseIT {
     void deletar_comAdmin_deveRetornarNoContent() throws Exception {
         TipoAtivo tipoAtivo = createTipoAtivo("Mesa Digitalizadora");
 
-        mockMvc.perform(delete("/tipos-ativo/{id}", tipoAtivo.getId())
+        mockMvc.perform(delete("/api/v1/tipos-ativos/{id}", tipoAtivo.getId())
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isNoContent());
     }
@@ -151,7 +151,8 @@ public class TipoAtivoControllerIT extends BaseIT {
         user.setFuncionario(func);
         func.setUsuario(user);
 
-        return funcionarioRepository.save(func);
+        usuarioRepository.saveAndFlush(user);
+        return funcionarioRepository.saveAndFlush(func);
     }
 
     private TipoAtivo createTipoAtivo(String nome) {

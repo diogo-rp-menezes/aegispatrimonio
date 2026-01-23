@@ -35,7 +35,7 @@ public class AtivoController {
      * @return Uma lista de AtivoDTO representando todos os ativos.
      */
     @GetMapping
-    @PreAuthorize("#filialId == null or hasPermission(null, 'ATIVO', 'READ', #filialId)")
+    @PreAuthorize("#filialId == null or @permissionService.hasPermission(authentication, null, 'ATIVO', 'READ', #filialId)")
     public Page<AtivoDTO> listarTodos(
             org.springframework.data.domain.Pageable pageable,
             @RequestParam(required = false) Long filialId,
@@ -68,7 +68,7 @@ public class AtivoController {
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasPermission(null, 'ATIVO', 'CREATE', #ativoCreateDTO.filialId)")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'CREATE', #ativoCreateDTO.filialId)")
     public AtivoDTO criar(@RequestBody @Valid AtivoCreateDTO ativoCreateDTO) {
         return ativoService.criar(ativoCreateDTO);
     }
@@ -82,7 +82,7 @@ public class AtivoController {
      * @return O AtivoDTO com os dados atualizados.
      */
     @PutMapping("/{id}")
-    @PreAuthorize("@permissionService.hasAtivoPermission(authentication, #id, 'UPDATE') and hasPermission(null, 'ATIVO', 'UPDATE', #ativoUpdateDTO.filialId)")
+    @PreAuthorize("@permissionService.hasAtivoPermission(authentication, #id, 'UPDATE') and @permissionService.hasPermission(authentication, null, 'ATIVO', 'UPDATE', #ativoUpdateDTO.filialId)")
     public AtivoDTO atualizar(@PathVariable Long id, @RequestBody @Valid AtivoUpdateDTO ativoUpdateDTO) {
         return ativoService.atualizar(id, ativoUpdateDTO);
     }
