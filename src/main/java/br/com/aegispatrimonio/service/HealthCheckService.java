@@ -9,6 +9,8 @@ import br.com.aegispatrimonio.repository.AtivoRepository;
 import br.com.aegispatrimonio.service.manager.HealthCheckCollectionsManager;
 import br.com.aegispatrimonio.service.policy.HealthCheckAuthorizationPolicy;
 import br.com.aegispatrimonio.service.updater.HealthCheckUpdater;
+import br.com.aegispatrimonio.service.collector.OSHIHealthCheckCollector;
+import br.com.aegispatrimonio.repository.HealthCheckHistoryRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,19 +24,32 @@ public class HealthCheckService implements IHealthCheckService { // Implementand
     private final HealthCheckAuthorizationPolicy authorizationPolicy;
     private final HealthCheckUpdater healthCheckUpdater;
     private final HealthCheckCollectionsManager collectionsManager;
+    private final OSHIHealthCheckCollector oshiCollector;
+    private final HealthCheckHistoryRepository healthCheckHistoryRepository;
 
     public HealthCheckService(AtivoRepository ativoRepository,
                               AtivoDetalheHardwareRepository detalheHardwareRepository,
                               CurrentUserProvider currentUserProvider,
                               HealthCheckAuthorizationPolicy authorizationPolicy,
                               HealthCheckUpdater healthCheckUpdater,
-                              HealthCheckCollectionsManager collectionsManager) {
+                              HealthCheckCollectionsManager collectionsManager,
+                              OSHIHealthCheckCollector oshiCollector,
+                              HealthCheckHistoryRepository healthCheckHistoryRepository) {
         this.ativoRepository = ativoRepository;
         this.detalheHardwareRepository = detalheHardwareRepository;
         this.currentUserProvider = currentUserProvider;
         this.authorizationPolicy = authorizationPolicy;
         this.healthCheckUpdater = healthCheckUpdater;
         this.collectionsManager = collectionsManager;
+        this.oshiCollector = oshiCollector;
+        this.healthCheckHistoryRepository = healthCheckHistoryRepository;
+    }
+
+    @Override
+    @Transactional
+    public void performSystemHealthCheck() {
+        var history = oshiCollector.collect();
+        healthCheckHistoryRepository.save(history);
     }
 
     @Override // Anotação de override
