@@ -53,6 +53,19 @@ function editar() {
   }
 }
 
+async function baixarAtivo() {
+  if (!ativo.value || !ativo.value.id) return;
+  if (!confirm(`Tem certeza que deseja baixar o ativo "${ativo.value.nome}"?`)) return;
+
+  try {
+    await request(`/ativos/${ativo.value.id}`, { method: 'DELETE' });
+    router.push('/ativos');
+  } catch (err) {
+    console.error("Erro ao baixar ativo", err);
+    error.value = "Erro ao baixar o ativo. Verifique se existem pendências.";
+  }
+}
+
 async function gerarTermo() {
   if (!ativo.value || !ativo.value.id) return;
 
@@ -179,6 +192,9 @@ onMounted(() => {
         </button>
         <button class="btn btn-primary me-2" @click="editar" v-if="ativo">
           <i class="bi bi-pencil"></i> Editar
+        </button>
+        <button class="btn btn-danger me-2" @click="baixarAtivo" v-if="ativo" title="Baixar Item">
+          <i class="bi bi-trash"></i> Baixar Item
         </button>
         <button class="btn btn-secondary" @click="voltar">
           <i class="bi bi-arrow-left"></i> Voltar

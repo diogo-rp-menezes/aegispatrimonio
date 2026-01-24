@@ -48,8 +48,7 @@ test.describe('Gerenciamento de Ativos', () => {
     // 2. Listar (Verify creation)
     await expect(page.locator(`text=${testName}`)).toBeVisible();
 
-    // 3. Editar (TODO: Fix race condition in test verification)
-    /*
+    // 3. Editar
     await page.locator(`tr:has-text("${testName}")`).getByTitle('Editar').click();
 
     // Wait for form to load data
@@ -59,9 +58,7 @@ test.describe('Gerenciamento de Ativos', () => {
     await page.fill('#nome', newName);
     await page.click('button:has-text("Salvar")');
 
-    // Give time for list refresh
-    await page.waitForTimeout(2000);
-
+    // Verify update
     await expect(page.locator(`text=${newName}`)).toBeVisible();
 
     // 4. Excluir (Baixar)
@@ -74,8 +71,6 @@ test.describe('Gerenciamento de Ativos', () => {
 
     // Should return to list
     await expect(page).toHaveURL(/\/ativos/);
-    await page.waitForTimeout(1000);
     await expect(page.locator(`text=${newName}`)).not.toBeVisible();
-    */
   });
 });
