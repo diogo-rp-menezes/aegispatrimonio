@@ -39,7 +39,7 @@ public class FuncionarioController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Lista todos os funcionários", description = "Retorna a lista de todos os funcionários cadastrados no sistema.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Lista retornada com sucesso", content = @Content(schema = @Schema(implementation = FuncionarioDTO.class))),

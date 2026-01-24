@@ -22,7 +22,10 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.util.Collections;
 import java.util.Set;
 
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @AutoConfigureMockMvc
@@ -266,5 +269,50 @@ public class FuncionarioControllerGranularSecurityIT extends BaseIT {
         mockMvc.perform(delete("/api/v1/funcionarios/{id}", funcionarioFilial1Id)
                 .header("Authorization", tokenUserFilial2))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldListOnlyAllowedFuncionarios() throws Exception {
+        // Create another employee in Filial 2 to check visibility
+        new TransactionTemplate(transactionManager).execute(status -> {
+            Filial f2 = filialRepository.findById(filial2Id).orElseThrow();
+            Departamento dept = departamentoRepository.findById(deptId).orElseThrow();
+
+            Funcionario f2Emp = new Funcionario();
+            f2Emp.setNome("Func Filial 2");
+            f2Emp.setMatricula("MAT-F2");
+            f2Emp.setCargo("Analista");
+            f2Emp.setDepartamento(dept);
+            f2Emp.setFiliais(Set.of(f2));
+            f2Emp.setStatus(Status.ATIVO);
+            funcionarioRepository.save(f2Emp);
+
+            entityManager.flush();
+            return null;
+        });
+
+        // Verify User 1 (Filial 1) - Should see Target (F1) but NOT F2 employee
+        mockMvc.perform(get("/api/v1/funcionarios")
+                        .header("Authorization", tokenUserFilial1))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").isNotEmpty())
+                .andExpect(jsonPath("$[*].nome").value(hasItem("Target Funcionario")))
+                .andExpect(jsonPath("$[*].nome").value(not(hasItem("Func Filial 2"))));
+
+        // Verify User 2 (Filial 2) - Should see F2 Employee but NOT Target (F1)
+        mockMvc.perform(get("/api/v1/funcionarios")
+                        .header("Authorization", tokenUserFilial2))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").isNotEmpty())
+                .andExpect(jsonPath("$[*].nome").value(hasItem("Func Filial 2")))
+                .andExpect(jsonPath("$[*].nome").value(not(hasItem("Target Funcionario"))));
+
+        // Verify Admin - Should see everyone
+        mockMvc.perform(get("/api/v1/funcionarios")
+                        .header("Authorization", tokenAdmin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").isNotEmpty())
+                .andExpect(jsonPath("$[*].nome").value(hasItem("Target Funcionario")))
+                .andExpect(jsonPath("$[*].nome").value(hasItem("Func Filial 2")));
     }
 }

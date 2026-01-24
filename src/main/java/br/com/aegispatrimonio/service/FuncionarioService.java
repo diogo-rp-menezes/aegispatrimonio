@@ -15,6 +15,8 @@ import br.com.aegispatrimonio.repository.UsuarioRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,9 +37,10 @@ public class FuncionarioService {
     private final DepartamentoRepository departamentoRepository;
     private final FilialRepository filialRepository;
     private final PasswordEncoder passwordEncoder;
-    private final CurrentUserProvider currentUserProvider; // Injetando CurrentUserProvider
+    private final CurrentUserProvider currentUserProvider;
+    private final IPermissionService permissionService;
 
-    public FuncionarioService(FuncionarioRepository funcionarioRepository, UsuarioRepository usuarioRepository, FuncionarioMapper funcionarioMapper, DepartamentoRepository departamentoRepository, FilialRepository filialRepository, PasswordEncoder passwordEncoder, CurrentUserProvider currentUserProvider) {
+    public FuncionarioService(FuncionarioRepository funcionarioRepository, UsuarioRepository usuarioRepository, FuncionarioMapper funcionarioMapper, DepartamentoRepository departamentoRepository, FilialRepository filialRepository, PasswordEncoder passwordEncoder, CurrentUserProvider currentUserProvider, IPermissionService permissionService) {
         this.funcionarioRepository = funcionarioRepository;
         this.usuarioRepository = usuarioRepository;
         this.funcionarioMapper = funcionarioMapper;
@@ -45,11 +48,35 @@ public class FuncionarioService {
         this.filialRepository = filialRepository;
         this.passwordEncoder = passwordEncoder;
         this.currentUserProvider = currentUserProvider;
+        this.permissionService = permissionService;
     }
 
     @Transactional(readOnly = true)
     public List<FuncionarioDTO> listarTodos() {
-        List<Funcionario> funcionarios = funcionarioRepository.findAll();
+        Usuario usuario = currentUserProvider.getCurrentUsuario();
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        List<Funcionario> funcionarios;
+
+        if ("ROLE_ADMIN".equals(usuario.getRole())) {
+            funcionarios = funcionarioRepository.findAll();
+        } else {
+            Funcionario funcionarioPrincipal = usuario.getFuncionario();
+            if (funcionarioPrincipal == null || funcionarioPrincipal.getFiliais() == null || funcionarioPrincipal.getFiliais().isEmpty()) {
+                return List.of();
+            }
+
+            Set<Long> allowedFiliais = funcionarioPrincipal.getFiliais().stream()
+                    .map(Filial::getId)
+                    .filter(fId -> permissionService.hasPermission(auth, null, "FUNCIONARIO", "READ", fId))
+                    .collect(Collectors.toSet());
+
+            if (allowedFiliais.isEmpty()) {
+                return List.of();
+            }
+
+            funcionarios = funcionarioRepository.findDistinctByFiliais_IdIn(allowedFiliais);
+        }
+
         return funcionarios.stream()
                 .map(funcionarioMapper::toDTO)
                 .collect(Collectors.toList());
