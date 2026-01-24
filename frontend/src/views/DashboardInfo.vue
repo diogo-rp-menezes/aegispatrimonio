@@ -2,6 +2,7 @@
 import { ref, onMounted } from "vue";
 import { useRouter } from 'vue-router';
 import { request } from '../services/api';
+import DashboardCharts from '../components/DashboardCharts.vue';
 
 const router = useRouter();
 
@@ -121,22 +122,29 @@ onMounted(async () => {
     <!-- Predictive Maintenance Section -->
     <h5 class="fw-bold mb-3"><i class="bi bi-cpu me-2"></i>Manutenção Preditiva (IA Híbrida)</h5>
     <div class="row g-3 mb-4">
-      <div v-for="stat in predictiveStats" :key="stat.title" class="col-md-4">
-        <div class="card h-100 border-0 shadow-sm">
-          <div class="card-body d-flex align-items-center">
-             <div
-              :class="`bg-${stat.color} text-white rounded-circle d-flex align-items-center justify-content-center me-3 shadow-sm`"
-              style="width: 50px; height: 50px;"
-            >
-              <i :class="`bi ${stat.icon} fs-5`"></i>
-            </div>
-            <div>
-              <h6 class="mb-1 fw-bold text-dark">{{ stat.title }}</h6>
-              <h3 class="fw-bold mb-0">{{ stat.value }} <small class="text-muted fs-6 fw-normal">ativos</small></h3>
-              <small class="text-muted">{{ stat.description }}</small>
+      <div class="col-lg-8">
+        <div class="row g-3 h-100">
+          <div v-for="stat in predictiveStats" :key="stat.title" class="col-md-6 col-xl-4">
+            <div class="card h-100 border-0 shadow-sm">
+              <div class="card-body d-flex align-items-center">
+                <div
+                  :class="`bg-${stat.color} text-white rounded-circle d-flex align-items-center justify-content-center me-3 shadow-sm`"
+                  style="width: 50px; height: 50px;"
+                >
+                  <i :class="`bi ${stat.icon} fs-5`"></i>
+                </div>
+                <div>
+                  <h6 class="mb-1 fw-bold text-dark">{{ stat.title }}</h6>
+                  <h3 class="fw-bold mb-0">{{ stat.value }} <small class="text-muted fs-6 fw-normal">ativos</small></h3>
+                  <small class="text-muted">{{ stat.description }}</small>
+                </div>
+              </div>
             </div>
           </div>
         </div>
+      </div>
+      <div class="col-lg-4">
+         <DashboardCharts :predictiveStats="predictiveStats" />
       </div>
     </div>
 
