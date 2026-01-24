@@ -2,6 +2,19 @@
 import { ref, onMounted } from "vue";
 import { useRouter } from 'vue-router';
 import { request } from '../services/api';
+import {
+  Chart as ChartJS,
+  Title,
+  Tooltip,
+  Legend,
+  BarElement,
+  CategoryScale,
+  LinearScale,
+  ArcElement
+} from 'chart.js';
+import { Bar, Doughnut } from 'vue-chartjs';
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
 
 const router = useRouter();
 
@@ -27,6 +40,10 @@ const quickActions = ref([
 const tableData = ref([]);
 const loading = ref(true);
 
+const statusChartData = ref({ labels: [], datasets: [] });
+const typeChartData = ref({ labels: [], datasets: [] });
+const chartOptions = { responsive: true, maintainAspectRatio: false };
+
 const currencyFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 function formatCurrency(v) {
   if (v == null) return 'R$ 0,00';
@@ -44,6 +61,16 @@ function getStatusBadge(status) {
   return statusMap[status] || 'secondary';
 }
 
+function getStatusColor(status) {
+  const colorMap = {
+    'ATIVO': '#198754', // success
+    'INATIVO': '#ffc107', // warning
+    'BAIXADO': '#dc3545', // danger
+    'EM_MANUTENCAO': '#fd7e14' // orange
+  };
+  return colorMap[status] || '#6c757d'; // secondary
+}
+
 async function fetchStats() {
   try {
     const data = await request('/dashboard/stats');
@@ -59,6 +86,29 @@ async function fetchStats() {
       { title: "Em Alerta (30 dias)", value: data.predicaoAlerta, icon: "bi-exclamation-circle", color: "warning", description: "Requer atenção no próximo mês" },
       { title: "Saudáveis", value: data.predicaoSegura, icon: "bi-check-circle", color: "success", description: "Sem previsão de falha próxima" },
     ];
+
+    // Chart Data Mapping
+    if (data.ativosPorStatus) {
+      statusChartData.value = {
+        labels: data.ativosPorStatus.map(item => item.label),
+        datasets: [{
+          backgroundColor: data.ativosPorStatus.map(item => getStatusColor(item.label)),
+          data: data.ativosPorStatus.map(item => item.value)
+        }]
+      };
+    }
+
+    if (data.ativosPorTipo) {
+      typeChartData.value = {
+        labels: data.ativosPorTipo.map(item => item.label),
+        datasets: [{
+          label: 'Quantidade',
+          backgroundColor: '#0d6efd',
+          data: data.ativosPorTipo.map(item => item.value)
+        }]
+      };
+    }
+
   } catch (error) {
     console.error("Erro ao carregar estatísticas:", error);
   }
@@ -112,6 +162,36 @@ onMounted(async () => {
             <div>
               <h6 class="mb-0 text-muted">{{ stat.title }}</h6>
               <h4 class="fw-bold mb-0">{{ stat.value }}</h4>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Analytics Charts Section -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-6">
+        <div class="card h-100 border-0 shadow-sm">
+          <div class="card-body">
+            <h5 class="fw-bold mb-3">Ativos por Status</h5>
+            <div style="height: 300px;">
+              <Doughnut v-if="statusChartData.labels.length" :data="statusChartData" :options="chartOptions" />
+              <div v-else class="d-flex justify-content-center align-items-center h-100 text-muted">
+                Sem dados disponíveis
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card h-100 border-0 shadow-sm">
+          <div class="card-body">
+            <h5 class="fw-bold mb-3">Ativos por Tipo</h5>
+            <div style="height: 300px;">
+              <Bar v-if="typeChartData.labels.length" :data="typeChartData" :options="chartOptions" />
+               <div v-else class="d-flex justify-content-center align-items-center h-100 text-muted">
+                Sem dados disponíveis
+              </div>
             </div>
           </div>
         </div>
