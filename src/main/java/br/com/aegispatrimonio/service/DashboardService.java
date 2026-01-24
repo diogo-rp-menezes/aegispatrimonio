@@ -1,5 +1,6 @@
 package br.com.aegispatrimonio.service;
 
+import br.com.aegispatrimonio.dto.ChartDataDTO;
 import br.com.aegispatrimonio.dto.DashboardStatsDTO;
 import br.com.aegispatrimonio.model.StatusAtivo;
 import br.com.aegispatrimonio.repository.AtivoRepository;
@@ -9,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 @Service
 public class DashboardService {
@@ -41,6 +43,9 @@ public class DashboardService {
         long predicaoAlerta = ativoRepository.countWarningPredictionsByCurrentTenant(criticalThreshold, warningThreshold);
         long predicaoSegura = ativoRepository.countSafePredictionsByCurrentTenant(warningThreshold);
 
+        List<ChartDataDTO> ativosPorStatus = ativoRepository.countByStatusGrouped();
+        List<ChartDataDTO> ativosPorTipo = ativoRepository.countByTipoAtivoGrouped();
+
         return new DashboardStatsDTO(
             totalAtivos,
             ativosEmManutencao,
@@ -48,7 +53,9 @@ public class DashboardService {
             totalLocalizacoes,
             predicaoCritica,
             predicaoAlerta,
-            predicaoSegura
+            predicaoSegura,
+            ativosPorStatus,
+            ativosPorTipo
         );
     }
 }

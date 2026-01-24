@@ -1,6 +1,7 @@
 package br.com.aegispatrimonio.repository;
 
 import br.com.aegispatrimonio.dto.AtivoNameDTO;
+import br.com.aegispatrimonio.dto.ChartDataDTO;
 import br.com.aegispatrimonio.model.Ativo;
 import br.com.aegispatrimonio.model.StatusAtivo;
 import org.springframework.data.domain.Page;
@@ -132,4 +133,14 @@ public interface AtivoRepository extends JpaRepository<Ativo, Long> {
 
     @Query("SELECT COUNT(a) FROM Ativo a WHERE a.filial.id = :#{T(br.com.aegispatrimonio.context.TenantContext).getFilialId()} AND a.previsaoEsgotamentoDisco >= :safeDate")
     long countSafePredictionsByCurrentTenant(@Param("safeDate") java.time.LocalDate safeDate);
+
+    @Query("SELECT new br.com.aegispatrimonio.dto.ChartDataDTO(a.status, COUNT(a)) " +
+           "FROM Ativo a WHERE a.filial.id = :#{T(br.com.aegispatrimonio.context.TenantContext).getFilialId()} " +
+           "GROUP BY a.status")
+    List<ChartDataDTO> countByStatusGrouped();
+
+    @Query("SELECT new br.com.aegispatrimonio.dto.ChartDataDTO(a.tipoAtivo.nome, COUNT(a)) " +
+           "FROM Ativo a WHERE a.filial.id = :#{T(br.com.aegispatrimonio.context.TenantContext).getFilialId()} " +
+           "GROUP BY a.tipoAtivo.nome")
+    List<ChartDataDTO> countByTipoAtivoGrouped();
 }

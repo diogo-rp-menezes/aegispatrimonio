@@ -1,5 +1,6 @@
 package br.com.aegispatrimonio.service;
 
+import br.com.aegispatrimonio.dto.ChartDataDTO;
 import br.com.aegispatrimonio.dto.DashboardStatsDTO;
 import br.com.aegispatrimonio.model.StatusAtivo;
 import br.com.aegispatrimonio.repository.AtivoRepository;
@@ -12,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -39,6 +41,9 @@ class DashboardServiceTest {
         when(ativoRepository.countWarningPredictionsByCurrentTenant(any(LocalDate.class), any(LocalDate.class))).thenReturn(3L);
         when(ativoRepository.countSafePredictionsByCurrentTenant(any(LocalDate.class))).thenReturn(6L);
 
+        when(ativoRepository.countByStatusGrouped()).thenReturn(List.of(new ChartDataDTO("ATIVO", 5L)));
+        when(ativoRepository.countByTipoAtivoGrouped()).thenReturn(List.of(new ChartDataDTO("Notebook", 3L)));
+
         DashboardStatsDTO stats = dashboardService.getStats();
 
         assertThat(stats.totalAtivos()).isEqualTo(10L);
@@ -48,5 +53,9 @@ class DashboardServiceTest {
         assertThat(stats.predicaoCritica()).isEqualTo(1L);
         assertThat(stats.predicaoAlerta()).isEqualTo(3L);
         assertThat(stats.predicaoSegura()).isEqualTo(6L);
+        assertThat(stats.ativosPorStatus()).hasSize(1);
+        assertThat(stats.ativosPorStatus().get(0).label()).isEqualTo("ATIVO");
+        assertThat(stats.ativosPorTipo()).hasSize(1);
+        assertThat(stats.ativosPorTipo().get(0).label()).isEqualTo("Notebook");
     }
 }
