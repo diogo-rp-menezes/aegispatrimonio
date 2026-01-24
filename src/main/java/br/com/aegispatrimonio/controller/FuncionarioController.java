@@ -51,7 +51,7 @@ public class FuncionarioController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("@permissionService.hasFuncionarioPermission(authentication, #id, 'READ')")
     @Operation(summary = "Busca um funcionário por ID", description = "Retorna um funcionário específico com base no ID.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Funcionário encontrado", content = @Content(schema = @Schema(implementation = FuncionarioDTO.class))),
@@ -65,7 +65,7 @@ public class FuncionarioController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasPermission(null, 'FUNCIONARIO', 'CREATE', #createDTO.filiaisIds)")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'FUNCIONARIO', 'CREATE', #createDTO.filiaisIds)")
     @Operation(summary = "Cria um novo funcionário", description = "Cria um novo funcionário e seu respectivo usuário no sistema.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Funcionário criado com sucesso", content = @Content(schema = @Schema(implementation = FuncionarioDTO.class))),
@@ -78,7 +78,7 @@ public class FuncionarioController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasPermission(#id, 'FUNCIONARIO', 'UPDATE', #updateDTO.filiaisIds)")
+    @PreAuthorize("@permissionService.hasFuncionarioPermission(authentication, #id, 'UPDATE') and @permissionService.hasPermission(authentication, null, 'FUNCIONARIO', 'UPDATE', #updateDTO.filiaisIds)")
     @Operation(summary = "Atualiza um funcionário existente", description = "Atualiza os dados de um funcionário existente e seu respectivo usuário.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Funcionário atualizado com sucesso", content = @Content(schema = @Schema(implementation = FuncionarioDTO.class))),
@@ -93,7 +93,7 @@ public class FuncionarioController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionService.hasFuncionarioPermission(authentication, #id, 'DELETE')")
     @Operation(summary = "Deleta um funcionário", description = "Deleta um funcionário do sistema (exclusão lógica).")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "Funcionário deletado com sucesso"),

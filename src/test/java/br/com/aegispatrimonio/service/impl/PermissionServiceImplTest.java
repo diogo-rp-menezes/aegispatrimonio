@@ -37,13 +37,16 @@ class PermissionServiceImplTest {
     private AtivoRepository ativoRepository;
 
     @Mock
+    private br.com.aegispatrimonio.repository.FuncionarioRepository funcionarioRepository;
+
+    @Mock
     private MeterRegistry meterRegistry;
 
     private PermissionServiceImpl permissionService;
 
     @BeforeEach
     void setUp() {
-        permissionService = new PermissionServiceImpl(usuarioRepository, ativoRepository, new SimpleMeterRegistry());
+        permissionService = new PermissionServiceImpl(usuarioRepository, ativoRepository, funcionarioRepository, new SimpleMeterRegistry());
         ReflectionTestUtils.setField(permissionService, "self", permissionService);
     }
 

@@ -34,6 +34,9 @@ class PermissionServiceImplTest {
     @Mock
     private AtivoRepository ativoRepository;
 
+    @Mock
+    private br.com.aegispatrimonio.repository.FuncionarioRepository funcionarioRepository;
+
     private PermissionServiceImpl permissionService;
     private MeterRegistry meterRegistry;
     private Usuario usuario;
@@ -42,7 +45,7 @@ class PermissionServiceImplTest {
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
-        permissionService = new PermissionServiceImpl(usuarioRepository, ativoRepository, meterRegistry);
+        permissionService = new PermissionServiceImpl(usuarioRepository, ativoRepository, funcionarioRepository, meterRegistry);
     }
 
     private void createAuthenticatedUser() {

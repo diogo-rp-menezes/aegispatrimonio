@@ -1,8 +1,10 @@
 package br.com.aegispatrimonio.service.impl;
 
+import br.com.aegispatrimonio.model.Filial;
 import br.com.aegispatrimonio.model.Permission;
 import br.com.aegispatrimonio.model.Role;
 import br.com.aegispatrimonio.repository.AtivoRepository;
+import br.com.aegispatrimonio.repository.FuncionarioRepository;
 import br.com.aegispatrimonio.repository.UsuarioRepository;
 import br.com.aegispatrimonio.service.IPermissionService;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -40,15 +42,17 @@ public class PermissionServiceImpl implements IPermissionService {
 
     private final UsuarioRepository usuarioRepository;
     private final AtivoRepository ativoRepository;
+    private final FuncionarioRepository funcionarioRepository;
     private final MeterRegistry meterRegistry;
 
     @org.springframework.beans.factory.annotation.Autowired
     @Lazy
     private PermissionServiceImpl self;
 
-    public PermissionServiceImpl(UsuarioRepository usuarioRepository, AtivoRepository ativoRepository, MeterRegistry meterRegistry) {
+    public PermissionServiceImpl(UsuarioRepository usuarioRepository, AtivoRepository ativoRepository, FuncionarioRepository funcionarioRepository, MeterRegistry meterRegistry) {
         this.usuarioRepository = usuarioRepository;
         this.ativoRepository = ativoRepository;
+        this.funcionarioRepository = funcionarioRepository;
         this.meterRegistry = meterRegistry;
     }
 
@@ -147,10 +151,25 @@ public class PermissionServiceImpl implements IPermissionService {
                     Long filialId = (ativo.getFilial() != null) ? ativo.getFilial().getId() : null;
                     return hasPermission(authentication, ativoId, "ATIVO", action, filialId);
                 })
-                .orElse(false); // If Ativo not found, deny access (or let controller handle 404, but security usually comes first)
-        // If security returns false for non-existent resource, it's 403.
-        // If we want 404, we should allow access or check existence in controller.
-        // But preventing probing is safer.
+                .orElse(false); // If Ativo not found, deny access
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean hasFuncionarioPermission(Authentication authentication, Long funcionarioId, String action) {
+        if (funcionarioId == null) return false;
+
+        return funcionarioRepository.findById(funcionarioId)
+                .map(funcionario -> {
+                    Set<Long> filiaisIds = new HashSet<>();
+                    if (funcionario.getFiliais() != null) {
+                        for (Filial f : funcionario.getFiliais()) {
+                            filiaisIds.add(f.getId());
+                        }
+                    }
+                    return hasPermission(authentication, funcionarioId, "FUNCIONARIO", action, filiaisIds);
+                })
+                .orElse(false);
     }
 
     /**

@@ -58,6 +58,9 @@ public class FuncionarioControllerIT extends BaseIT {
     private UsuarioRepository usuarioRepository;
 
     @Autowired
+    private br.com.aegispatrimonio.repository.RoleRepository roleRepository;
+
+    @Autowired
     private JwtService jwtService;
 
     @Autowired
@@ -81,12 +84,17 @@ public class FuncionarioControllerIT extends BaseIT {
         funcionarioRepository.deleteAll();
         departamentoRepository.deleteAll();
         filialRepository.deleteAll();
+        roleRepository.deleteAll();
 
         // Resetar auto-incremento para tabelas relevantes
         resetAutoIncrement();
 
         // Resetar o contador de ID para cada execução do setUp
         nextFuncionarioId = 1L;
+
+        // Ensure Roles exist
+        ensureRole("ROLE_ADMIN");
+        ensureRole("ROLE_USER");
 
         filialA = createFilial("Filial A", "FL-A", "01.000.000/0001-01");
         deptoA = createDepartamento("TI A", filialA);
@@ -98,6 +106,14 @@ public class FuncionarioControllerIT extends BaseIT {
         String userEmail = "user." + UUID.randomUUID().toString() + "@aegis.com";
         this.funcionarioExistente = createFuncionarioAndUsuario("User", userEmail, "ROLE_USER", deptoA, new HashSet<>(Set.of(filialA)));
         this.userToken = jwtService.generateToken(new CustomUserDetails(this.funcionarioExistente.getUsuario()));
+    }
+
+    private void ensureRole(String name) {
+        if (roleRepository.findByName(name).isEmpty()) {
+            Role r = new Role();
+            r.setName(name);
+            roleRepository.save(r);
+        }
     }
 
     @Test
@@ -117,12 +133,12 @@ public class FuncionarioControllerIT extends BaseIT {
     }
 
     @Test
-    @DisplayName("BuscarPorId: Deve retornar 404 Not Found para ID inexistente")
+    @DisplayName("BuscarPorId: Deve retornar 403 Forbidden para ID inexistente (Segurança por padrão)")
     void buscarPorId_comIdInexistente_deveRetornarNotFound() throws Exception {
         long idInexistente = 999L;
         mockMvc.perform(get("/api/v1/funcionarios/{id}", idInexistente)
                         .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -216,6 +232,9 @@ public class FuncionarioControllerIT extends BaseIT {
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode("password"));
         user.setRole(role);
+        // Link granular role
+        roleRepository.findByName(role).ifPresent(r -> user.setRoles(new HashSet<>(Collections.singletonList(r))));
+
         user.setStatus(Status.ATIVO);
         user.setFuncionario(func);
         func.setUsuario(user);
