@@ -250,26 +250,32 @@ class AtivoServiceTest {
     void listarTodos_comBuscaFuzzy_deveRankearResultados() {
         // Arrange
         String query = "laptp";
-        Ativo a1 = new Ativo(); a1.setId(1L); a1.setNome("Desktop");
-        Ativo a2 = new Ativo(); a2.setId(2L); a2.setNome("Laptop");
-        Ativo a3 = new Ativo(); a3.setId(3L); a3.setNome("Lap Top");
 
-        br.com.aegispatrimonio.dto.AtivoDTO dto2 = new br.com.aegispatrimonio.dto.AtivoDTO(2L, "Laptop", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
-        br.com.aegispatrimonio.dto.AtivoDTO dto3 = new br.com.aegispatrimonio.dto.AtivoDTO(3L, "Lap Top", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+        br.com.aegispatrimonio.dto.AtivoNameDTO n1 = new br.com.aegispatrimonio.dto.AtivoNameDTO(1L, "Desktop");
+        br.com.aegispatrimonio.dto.AtivoNameDTO n2 = new br.com.aegispatrimonio.dto.AtivoNameDTO(2L, "Laptop");
+        br.com.aegispatrimonio.dto.AtivoNameDTO n3 = new br.com.aegispatrimonio.dto.AtivoNameDTO(3L, "Lap Top");
 
         // Mock candidates returned by Repository
-        java.util.List<Ativo> candidates = java.util.List.of(a1, a2, a3);
+        java.util.List<br.com.aegispatrimonio.dto.AtivoNameDTO> candidates = java.util.List.of(n1, n2, n3);
         // Mock ranked result returned by Service
-        java.util.List<Ativo> ranked = java.util.List.of(a2, a3);
+        java.util.List<br.com.aegispatrimonio.dto.AtivoNameDTO> ranked = java.util.List.of(n2, n3);
 
         mockUser(adminUser);
 
         // When finding candidates (name is null)
-        when(ativoRepository.findByFilters(any(), any(), any(), eq(null), any(org.springframework.data.domain.Pageable.class)))
-                .thenReturn(new org.springframework.data.domain.PageImpl<>(candidates));
+        when(ativoRepository.findSimpleByFilters(any(), any(), any(), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(candidates);
 
         // When ranking
         when(searchOptimizationService.rankResults(eq(query), anyList(), any())).thenReturn((java.util.List) ranked);
+
+        // When fetching details for the page content
+        Ativo a2 = new Ativo(); a2.setId(2L); a2.setNome("Laptop");
+        Ativo a3 = new Ativo(); a3.setId(3L); a3.setNome("Lap Top");
+        when(ativoRepository.findAllByIdInWithDetails(anyList())).thenReturn(java.util.List.of(a2, a3));
+
+        br.com.aegispatrimonio.dto.AtivoDTO dto2 = new br.com.aegispatrimonio.dto.AtivoDTO(2L, "Laptop", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+        br.com.aegispatrimonio.dto.AtivoDTO dto3 = new br.com.aegispatrimonio.dto.AtivoDTO(3L, "Lap Top", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
         when(ativoMapper.toDTO(a2)).thenReturn(dto2);
         when(ativoMapper.toDTO(a3)).thenReturn(dto3);
@@ -281,6 +287,7 @@ class AtivoServiceTest {
 
         // Assert
         verify(searchOptimizationService).rankResults(eq(query), anyList(), any());
+        verify(ativoRepository).findAllByIdInWithDetails(anyList());
         org.junit.jupiter.api.Assertions.assertEquals(2, result.getContent().size());
         org.junit.jupiter.api.Assertions.assertEquals("Laptop", result.getContent().get(0).nome());
     }

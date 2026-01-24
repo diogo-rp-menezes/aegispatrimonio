@@ -1,5 +1,6 @@
 package br.com.aegispatrimonio.repository;
 
+import br.com.aegispatrimonio.dto.AtivoNameDTO;
 import br.com.aegispatrimonio.model.Ativo;
 import br.com.aegispatrimonio.model.StatusAtivo;
 import org.springframework.data.domain.Page;
@@ -68,6 +69,32 @@ public interface AtivoRepository extends JpaRepository<Ativo, Long> {
                                           @Param("status") StatusAtivo status,
                                           @Param("nome") String nome,
                                           Pageable pageable);
+
+    @Query("SELECT new br.com.aegispatrimonio.dto.AtivoNameDTO(a.id, a.nome) FROM Ativo a WHERE (:filialId IS NULL OR a.filial.id = :filialId) " +
+           "AND (:tipoAtivoId IS NULL OR a.tipoAtivo.id = :tipoAtivoId) " +
+           "AND (:status IS NULL OR a.status = :status)")
+    List<AtivoNameDTO> findSimpleByFilters(@Param("filialId") Long filialId,
+                                           @Param("tipoAtivoId") Long tipoAtivoId,
+                                           @Param("status") StatusAtivo status,
+                                           Pageable pageable);
+
+    @Query("SELECT new br.com.aegispatrimonio.dto.AtivoNameDTO(a.id, a.nome) FROM Ativo a WHERE a.filial.id IN :filialIds " +
+           "AND (:filialId IS NULL OR a.filial.id = :filialId) " +
+           "AND (:tipoAtivoId IS NULL OR a.tipoAtivo.id = :tipoAtivoId) " +
+           "AND (:status IS NULL OR a.status = :status)")
+    List<AtivoNameDTO> findSimpleByFilialIdsAndFilters(@Param("filialIds") Set<Long> filialIds,
+                                                      @Param("filialId") Long filialId,
+                                                      @Param("tipoAtivoId") Long tipoAtivoId,
+                                                      @Param("status") StatusAtivo status,
+                                                      Pageable pageable);
+
+    @Query("SELECT a FROM Ativo a " +
+           "LEFT JOIN FETCH a.filial " +
+           "LEFT JOIN FETCH a.localizacao " +
+           "LEFT JOIN FETCH a.tipoAtivo " +
+           "LEFT JOIN FETCH a.funcionarioResponsavel " +
+           "WHERE a.id IN :ids")
+    List<Ativo> findAllByIdInWithDetails(@Param("ids") List<Long> ids);
 
     Optional<Ativo> findByNumeroPatrimonio(String numeroPatrimonio);
 
