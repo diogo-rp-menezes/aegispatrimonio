@@ -49,6 +49,29 @@ function editar() {
   }
 }
 
+async function gerarTermo() {
+  if (!ativo.value || !ativo.value.id) return;
+
+  try {
+    const response = await request(`/ativos/${ativo.value.id}/termo`, {
+      responseType: 'blob'
+    });
+
+    // Create blob link to download
+    const url = window.URL.createObjectURL(new Blob([response]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `termo_responsabilidade_${ativo.value.id}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link); // cleanup
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error("Erro ao gerar termo", err);
+    error.value = "Erro ao gerar termo de responsabilidade. Verifique se há um funcionário responsável.";
+  }
+}
+
 function formatDate(dateStr) {
   if (!dateStr) return "-";
   return new Date(dateStr).toLocaleString("pt-BR");
@@ -115,6 +138,9 @@ onMounted(() => {
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h2>Detalhes do Ativo</h2>
       <div>
+        <button class="btn btn-outline-dark me-2" @click="gerarTermo" v-if="ativo && ativo.funcionarioResponsavelId" title="Gerar Termo de Responsabilidade">
+          <i class="bi bi-file-earmark-pdf"></i> Termo
+        </button>
         <button class="btn btn-primary me-2" @click="editar" v-if="ativo">
           <i class="bi bi-pencil"></i> Editar
         </button>
