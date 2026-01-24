@@ -36,4 +36,19 @@ public class RelatorioController {
                 .headers(headers)
                 .body(pdfBytes);
     }
+
+    @Operation(summary = "Gerar QR Code", description = "Gera uma imagem PNG com o QR Code identificador do ativo.")
+    @GetMapping("/{id}/qrcode")
+    @PreAuthorize("@permissionService.hasAtivoPermission(authentication, #id, 'READ')")
+    public ResponseEntity<byte[]> gerarQrCode(@PathVariable Long id) {
+        byte[] imageBytes = relatorioService.gerarQrCode(id);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.IMAGE_PNG);
+        headers.setCacheControl("max-age=3600"); // Cache for 1 hour
+
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(imageBytes);
+    }
 }

@@ -69,6 +69,14 @@ export const request = async (endpoint, options = {}) => {
         headers
     });
 
+    if (options.responseType === 'blob') {
+        if (!response.ok) {
+             const error = await response.text();
+             throw new Error(error || 'Erro na requisição');
+        }
+        return response.blob();
+    }
+
     return handleResponse(response);
 };
 

@@ -1,6 +1,6 @@
 <!-- src/views/DetailView.vue -->
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { request } from "../services/api";
 
@@ -13,6 +13,10 @@ const error = ref(null);
 
 const historico = ref([]);
 const loadingHistorico = ref(false);
+
+const showQrModal = ref(false);
+const qrCodeUrl = ref(null);
+const loadingQr = ref(false);
 
 async function carregarAtivo() {
   loading.value = true;
@@ -71,6 +75,35 @@ async function gerarTermo() {
     error.value = "Erro ao gerar termo de responsabilidade. Verifique se há um funcionário responsável.";
   }
 }
+
+async function openQrCode() {
+  showQrModal.value = true;
+  if (!qrCodeUrl.value) {
+    loadingQr.value = true;
+    try {
+      const blob = await request(`/ativos/${ativo.value.id}/qrcode`, { responseType: 'blob' });
+      qrCodeUrl.value = window.URL.createObjectURL(blob);
+    } catch (err) {
+      console.error("Erro ao carregar QR Code", err);
+    } finally {
+      loadingQr.value = false;
+    }
+  }
+}
+
+function closeQrModal() {
+  showQrModal.value = false;
+  if (qrCodeUrl.value) {
+    window.URL.revokeObjectURL(qrCodeUrl.value);
+    qrCodeUrl.value = null;
+  }
+}
+
+onUnmounted(() => {
+  if (qrCodeUrl.value) {
+    window.URL.revokeObjectURL(qrCodeUrl.value);
+  }
+});
 
 function formatDate(dateStr) {
   if (!dateStr) return "-";
@@ -140,6 +173,9 @@ onMounted(() => {
       <div>
         <button class="btn btn-outline-dark me-2" @click="gerarTermo" v-if="ativo && ativo.funcionarioResponsavelId" title="Gerar Termo de Responsabilidade">
           <i class="bi bi-file-earmark-pdf"></i> Termo
+        </button>
+        <button class="btn btn-outline-secondary me-2" @click="openQrCode" v-if="ativo" title="Ver QR Code">
+          <i class="bi bi-qr-code"></i> QR Code
         </button>
         <button class="btn btn-primary me-2" @click="editar" v-if="ativo">
           <i class="bi bi-pencil"></i> Editar
@@ -273,6 +309,29 @@ onMounted(() => {
 
     <div v-if="!loading && !ativo && !error" class="alert alert-warning">
       Nenhum ativo encontrado.
+    </div>
+
+    <!-- QR Code Modal -->
+    <div v-if="showQrModal" class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5)">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">QR Code do Ativo</h5>
+            <button type="button" class="btn-close" @click="closeQrModal"></button>
+          </div>
+          <div class="modal-body text-center">
+            <div v-if="loadingQr" class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Carregando...</span>
+            </div>
+            <img v-else-if="qrCodeUrl" :src="qrCodeUrl" alt="QR Code" class="img-fluid" style="max-height: 300px;" />
+            <div v-else class="text-danger">Erro ao carregar QR Code.</div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @click="closeQrModal">Fechar</button>
+            <a v-if="qrCodeUrl" :href="qrCodeUrl" download="qrcode.png" class="btn btn-primary">Baixar PNG</a>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>

@@ -3,6 +3,7 @@ package br.com.aegispatrimonio.service;
 import br.com.aegispatrimonio.model.Ativo;
 import br.com.aegispatrimonio.model.Funcionario;
 import br.com.aegispatrimonio.repository.AtivoRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lowagie.text.*;
 import com.lowagie.text.pdf.PdfWriter;
 import jakarta.persistence.EntityNotFoundException;
@@ -12,14 +13,38 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 public class RelatorioService {
 
     private final AtivoRepository ativoRepository;
+    private final QrCodeService qrCodeService;
+    private final ObjectMapper objectMapper;
 
-    public RelatorioService(AtivoRepository ativoRepository) {
+    public RelatorioService(AtivoRepository ativoRepository, QrCodeService qrCodeService, ObjectMapper objectMapper) {
         this.ativoRepository = ativoRepository;
+        this.qrCodeService = qrCodeService;
+        this.objectMapper = objectMapper;
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] gerarQrCode(Long ativoId) {
+        Ativo ativo = ativoRepository.findById(ativoId)
+                .orElseThrow(() -> new EntityNotFoundException("Ativo não encontrado com ID: " + ativoId));
+
+        try {
+            Map<String, Object> data = new HashMap<>();
+            data.put("id", ativo.getId());
+            data.put("patrimonio", ativo.getNumeroPatrimonio() != null ? ativo.getNumeroPatrimonio() : "");
+            data.put("nome", ativo.getNome());
+
+            String content = objectMapper.writeValueAsString(data);
+            return qrCodeService.generateQrCode(content, 300, 300);
+        } catch (Exception e) {
+            throw new RuntimeException("Erro ao gerar conteúdo do QR Code", e);
+        }
     }
 
     @Transactional(readOnly = true)
