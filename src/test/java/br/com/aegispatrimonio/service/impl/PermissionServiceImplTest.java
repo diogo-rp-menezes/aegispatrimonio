@@ -44,9 +44,12 @@ class PermissionServiceImplTest {
 
     private PermissionServiceImpl permissionService;
 
+    @Mock
+    private br.com.aegispatrimonio.service.SecurityAuditService auditService;
+
     @BeforeEach
     void setUp() {
-        permissionService = new PermissionServiceImpl(usuarioRepository, ativoRepository, funcionarioRepository, new SimpleMeterRegistry());
+        permissionService = new PermissionServiceImpl(usuarioRepository, ativoRepository, funcionarioRepository, new SimpleMeterRegistry(), auditService);
         ReflectionTestUtils.setField(permissionService, "self", permissionService);
     }
 

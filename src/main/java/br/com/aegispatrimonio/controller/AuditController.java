@@ -19,10 +19,17 @@ import java.util.List;
 public class AuditController {
 
     private final AuditService auditService;
+    private final br.com.aegispatrimonio.service.SecurityAuditService securityAuditService;
 
     @GetMapping("/ativos/{id}")
     @PreAuthorize("@permissionService.hasAtivoPermission(authentication, #id, 'READ')")
     public ResponseEntity<List<EntityRevisionDTO<AtivoDTO>>> getAtivoHistory(@PathVariable Long id) {
         return ResponseEntity.ok(auditService.getAtivoHistory(id));
+    }
+
+    @GetMapping("/logs")
+    @PreAuthorize("hasRole('ADMIN')")
+    public org.springframework.data.domain.Page<br.com.aegispatrimonio.dto.SecurityAuditLogDTO> getSecurityLogs(org.springframework.data.domain.Pageable pageable) {
+        return securityAuditService.findAll(pageable);
     }
 }

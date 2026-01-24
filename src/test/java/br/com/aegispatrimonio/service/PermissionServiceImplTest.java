@@ -42,10 +42,13 @@ class PermissionServiceImplTest {
     private Usuario usuario;
     private Authentication authentication;
 
+    @Mock
+    private br.com.aegispatrimonio.service.SecurityAuditService auditService;
+
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
-        permissionService = new PermissionServiceImpl(usuarioRepository, ativoRepository, funcionarioRepository, meterRegistry);
+        permissionService = new PermissionServiceImpl(usuarioRepository, ativoRepository, funcionarioRepository, meterRegistry, auditService);
     }
 
     private void createAuthenticatedUser() {
