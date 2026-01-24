@@ -30,7 +30,9 @@ public class FuncionarioMapper {
                 (usuario != null) ? usuario.getEmail() : null,
                 (usuario != null) ? usuario.getRole() : null,
                 (funcionario.getDepartamento() != null) ? funcionario.getDepartamento().getNome() : null,
+                (funcionario.getDepartamento() != null) ? funcionario.getDepartamento().getId() : null,
                 (funcionario.getFiliais() != null) ? funcionario.getFiliais().stream().map(Filial::getNome).collect(Collectors.toSet()) : Collections.emptySet(),
+                (funcionario.getFiliais() != null) ? funcionario.getFiliais().stream().map(Filial::getId).collect(Collectors.toSet()) : Collections.emptySet(),
                 funcionario.getStatus()
         );
     }

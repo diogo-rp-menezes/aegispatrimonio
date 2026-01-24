@@ -1,29 +1,30 @@
 // src/services/pessoas.js
 import { request } from './api';
 
-const BASE_URL = '/api/pessoas';
+const BASE_URL = '/funcionarios';
 
-export const pessoaService = {
+export const funcionarioService = {
   // Listar pessoas com filtros
   async listar(filtros = {}) {
     const params = new URLSearchParams();
     
-    if (filtros.departamentoId) params.append('departamentoId', filtros.departamentoId);
-    if (filtros.nome) params.append('nome', filtros.nome);
-    if (filtros.page !== undefined) params.append('page', filtros.page);
-    if (filtros.size !== undefined) params.append('size', filtros.size);
+    // Note: Backend might not support all these filters yet in listarTodos(),
+    // but we pass them just in case or for future implementation.
+    // Currently FuncionarioController.listarTodos() takes no arguments.
+    // Ideally backend should support filtering.
     
-    return request(`${BASE_URL}?${params}`);
+    // if (filtros.departamentoId) params.append('departamentoId', filtros.departamentoId);
+    // if (filtros.nome) params.append('nome', filtros.nome);
+    // if (filtros.page !== undefined) params.append('page', filtros.page);
+    // if (filtros.size !== undefined) params.append('size', filtros.size);
+
+    // For now, standard listing:
+    return request(BASE_URL);
   },
 
   // Buscar pessoa por ID
   async buscarPorId(id) {
     return request(`${BASE_URL}/${id}`);
-  },
-
-  // Buscar pessoa por email
-  async buscarPorEmail(email) {
-    return request(`${BASE_URL}/email/${encodeURIComponent(email)}`);
   },
 
   // Criar nova pessoa
@@ -47,10 +48,5 @@ export const pessoaService = {
     return request(`${BASE_URL}/${id}`, {
       method: 'DELETE',
     });
-  },
-
-  // Buscar estatísticas de pessoas
-  async getEstatisticas() {
-    return request(`${BASE_URL}/estatisticas`);
   }
 };

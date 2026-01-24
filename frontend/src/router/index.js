@@ -21,6 +21,12 @@ const routes = [
       { path: "fornecedores", component: () => import("../views/fornecedores/FornecedorList.vue") },
       { path: "fornecedores/novo", component: () => import("../views/fornecedores/FornecedorForm.vue") },
       { path: "fornecedores/:id/editar", component: () => import("../views/fornecedores/FornecedorForm.vue"), props: true },
+
+      // Funcionários
+      { path: "funcionarios", component: () => import("../views/pessoas/PessoasList.vue") },
+      { path: "funcionarios/novo", component: () => import("../views/pessoas/PessoaForm.vue") },
+      { path: "funcionarios/:id/editar", component: () => import("../views/pessoas/PessoaForm.vue"), props: true },
+      { path: "funcionarios/:id", component: () => import("../views/pessoas/PessoaForm.vue"), props: true },
     ]
   },
 ];

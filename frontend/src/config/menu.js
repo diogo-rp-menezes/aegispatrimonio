@@ -22,6 +22,11 @@ export const menuItems = [
     icon: "bi bi-people-fill"
   },
   {
+    title: "Funcionários",
+    path: "/funcionarios",
+    icon: "bi bi-person-badge"
+  },
+  {
     title: "Comodatos",
     path: "/comodatos",
     icon: "bi bi-arrow-left-right"
