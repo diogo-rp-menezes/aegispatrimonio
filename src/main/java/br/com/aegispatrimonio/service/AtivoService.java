@@ -221,6 +221,8 @@ public class AtivoService {
         // Process Disks and History
         if (payload.discos() != null) {
             LocalDate worstPrediction = null;
+            List<AtivoHealthHistory> historyToSave = new java.util.ArrayList<>();
+            List<String> componentsToFetch = new java.util.ArrayList<>();
 
             for (DiskInfoDTO disk : payload.discos()) {
                 if (disk.freeGb() != null) {
@@ -229,13 +231,24 @@ public class AtivoService {
                     history.setComponente("DISK:" + disk.serial());
                     history.setMetrica("FREE_SPACE_GB");
                     history.setValor(disk.freeGb());
-                    healthHistoryRepository.save(history);
+                    historyToSave.add(history);
+                    componentsToFetch.add("DISK:" + disk.serial());
+                }
+            }
 
-                    // Calculate Prediction for this disk
-                    List<AtivoHealthHistory> diskHistory = healthHistoryRepository
-                            .findByAtivoIdAndMetricaOrderByDataRegistroAsc(id, "DISK:" + disk.serial());
+            if (!historyToSave.isEmpty()) {
+                healthHistoryRepository.saveAll(historyToSave);
 
-                    LocalDate prediction = predictiveMaintenanceService.predictExhaustionDate(diskHistory);
+                // Fetch history for all components at once
+                List<AtivoHealthHistory> allHistory = healthHistoryRepository
+                        .findByAtivoIdAndComponenteInAndMetricaOrderByDataRegistroAsc(id, componentsToFetch, "FREE_SPACE_GB");
+
+                // Group by component
+                java.util.Map<String, List<AtivoHealthHistory>> historyByComponent = allHistory.stream()
+                        .collect(Collectors.groupingBy(AtivoHealthHistory::getComponente));
+
+                for (List<AtivoHealthHistory> componentHistory : historyByComponent.values()) {
+                    LocalDate prediction = predictiveMaintenanceService.predictExhaustionDate(componentHistory);
                     if (prediction != null) {
                         if (worstPrediction == null || prediction.isBefore(worstPrediction)) {
                             worstPrediction = prediction;
