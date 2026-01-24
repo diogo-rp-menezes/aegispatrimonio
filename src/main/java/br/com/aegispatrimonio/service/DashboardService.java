@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @Service
 public class DashboardService {
@@ -31,11 +32,23 @@ public class DashboardService {
             valorTotal = BigDecimal.ZERO;
         }
 
+        // Predictive Maintenance Stats
+        LocalDate now = LocalDate.now();
+        LocalDate criticalThreshold = now.plusDays(7);
+        LocalDate warningThreshold = now.plusDays(30);
+
+        long predicaoCritica = ativoRepository.countCriticalPredictionsByCurrentTenant(criticalThreshold);
+        long predicaoAlerta = ativoRepository.countWarningPredictionsByCurrentTenant(criticalThreshold, warningThreshold);
+        long predicaoSegura = ativoRepository.countSafePredictionsByCurrentTenant(warningThreshold);
+
         return new DashboardStatsDTO(
             totalAtivos,
             ativosEmManutencao,
             valorTotal,
-            totalLocalizacoes
+            totalLocalizacoes,
+            predicaoCritica,
+            predicaoAlerta,
+            predicaoSegura
         );
     }
 }

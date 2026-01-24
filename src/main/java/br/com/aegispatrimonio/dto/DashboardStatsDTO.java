@@ -6,5 +6,8 @@ public record DashboardStatsDTO(
     long totalAtivos,
     long ativosEmManutencao,
     BigDecimal valorTotal,
-    long totalLocalizacoes
+    long totalLocalizacoes,
+    long predicaoCritica,
+    long predicaoAlerta,
+    long predicaoSegura
 ) {}

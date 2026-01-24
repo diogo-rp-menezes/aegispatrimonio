@@ -123,4 +123,13 @@ public interface AtivoRepository extends JpaRepository<Ativo, Long> {
 
     @Query("SELECT SUM(a.valorAquisicao) FROM Ativo a WHERE a.filial.id = :#{T(br.com.aegispatrimonio.context.TenantContext).getFilialId()}")
     BigDecimal getValorTotalByCurrentTenant();
+
+    @Query("SELECT COUNT(a) FROM Ativo a WHERE a.filial.id = :#{T(br.com.aegispatrimonio.context.TenantContext).getFilialId()} AND a.previsaoEsgotamentoDisco < :criticalDate")
+    long countCriticalPredictionsByCurrentTenant(@Param("criticalDate") java.time.LocalDate criticalDate);
+
+    @Query("SELECT COUNT(a) FROM Ativo a WHERE a.filial.id = :#{T(br.com.aegispatrimonio.context.TenantContext).getFilialId()} AND a.previsaoEsgotamentoDisco >= :startDate AND a.previsaoEsgotamentoDisco < :endDate")
+    long countWarningPredictionsByCurrentTenant(@Param("startDate") java.time.LocalDate startDate, @Param("endDate") java.time.LocalDate endDate);
+
+    @Query("SELECT COUNT(a) FROM Ativo a WHERE a.filial.id = :#{T(br.com.aegispatrimonio.context.TenantContext).getFilialId()} AND a.previsaoEsgotamentoDisco >= :safeDate")
+    long countSafePredictionsByCurrentTenant(@Param("safeDate") java.time.LocalDate safeDate);
 }

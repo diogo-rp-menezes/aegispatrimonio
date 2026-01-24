@@ -12,6 +12,12 @@ const stats = ref([
   { title: "Locais", value: "...", icon: "bi-building", color: "info" },
 ]);
 
+const predictiveStats = ref([
+  { title: "Críticos (< 7 dias)", value: "...", icon: "bi-exclamation-triangle-fill", color: "danger", description: "Risco iminente de falha de disco" },
+  { title: "Em Alerta (30 dias)", value: "...", icon: "bi-exclamation-circle", color: "warning", description: "Requer atenção no próximo mês" },
+  { title: "Saudáveis", value: "...", icon: "bi-check-circle", color: "success", description: "Sem previsão de falha próxima" },
+]);
+
 const quickActions = ref([
   { title: "Cadastrar Ativo", icon: "bi-plus-lg", color: "primary", action: () => router.push('/ativos/novo') },
   { title: "Ver Ativos", icon: "bi-list-ul", color: "secondary", action: () => router.push('/ativos') },
@@ -46,6 +52,12 @@ async function fetchStats() {
       { title: "Em Manutenção", value: data.ativosEmManutencao, icon: "bi-tools", color: "warning" },
       { title: "Valor Total", value: formatCurrency(data.valorTotal), icon: "bi-cash-stack", color: "success" },
       { title: "Locais", value: data.totalLocalizacoes, icon: "bi-building", color: "info" },
+    ];
+
+    predictiveStats.value = [
+      { title: "Críticos (< 7 dias)", value: data.predicaoCritica, icon: "bi-exclamation-triangle-fill", color: "danger", description: "Risco iminente de falha de disco" },
+      { title: "Em Alerta (30 dias)", value: data.predicaoAlerta, icon: "bi-exclamation-circle", color: "warning", description: "Requer atenção no próximo mês" },
+      { title: "Saudáveis", value: data.predicaoSegura, icon: "bi-check-circle", color: "success", description: "Sem previsão de falha próxima" },
     ];
   } catch (error) {
     console.error("Erro ao carregar estatísticas:", error);
@@ -100,6 +112,28 @@ onMounted(async () => {
             <div>
               <h6 class="mb-0 text-muted">{{ stat.title }}</h6>
               <h4 class="fw-bold mb-0">{{ stat.value }}</h4>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Predictive Maintenance Section -->
+    <h5 class="fw-bold mb-3"><i class="bi bi-cpu me-2"></i>Manutenção Preditiva (IA Híbrida)</h5>
+    <div class="row g-3 mb-4">
+      <div v-for="stat in predictiveStats" :key="stat.title" class="col-md-4">
+        <div class="card h-100 border-0 shadow-sm">
+          <div class="card-body d-flex align-items-center">
+             <div
+              :class="`bg-${stat.color} text-white rounded-circle d-flex align-items-center justify-content-center me-3 shadow-sm`"
+              style="width: 50px; height: 50px;"
+            >
+              <i :class="`bi ${stat.icon} fs-5`"></i>
+            </div>
+            <div>
+              <h6 class="mb-1 fw-bold text-dark">{{ stat.title }}</h6>
+              <h3 class="fw-bold mb-0">{{ stat.value }} <small class="text-muted fs-6 fw-normal">ativos</small></h3>
+              <small class="text-muted">{{ stat.description }}</small>
             </div>
           </div>
         </div>
