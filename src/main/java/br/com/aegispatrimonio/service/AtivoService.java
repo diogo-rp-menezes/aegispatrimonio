@@ -2,6 +2,7 @@ package br.com.aegispatrimonio.service;
 
 import br.com.aegispatrimonio.dto.AtivoCreateDTO;
 import br.com.aegispatrimonio.dto.AtivoDTO;
+import br.com.aegispatrimonio.dto.AtivoNameDTO;
 import br.com.aegispatrimonio.dto.AtivoDetalheHardwareDTO;
 import br.com.aegispatrimonio.dto.AtivoUpdateDTO;
 import br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO;
@@ -20,9 +21,11 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -100,24 +103,39 @@ public class AtivoService {
 
         // 2. Fuzzy Search Path (Shift Left Optimization)
         if (isFuzzySearch) {
-            List<Ativo> candidates;
+            List<AtivoNameDTO> candidates;
             // Fetch candidates matching other filters, ignoring name (limited to 1000 for safety)
             org.springframework.data.domain.Pageable limit = org.springframework.data.domain.PageRequest.of(0, 1000);
 
             if (isAdmin) {
-                candidates = ativoRepository.findByFilters(filialId, tipoAtivoId, status, null, limit).getContent();
+                candidates = ativoRepository.findSimpleByFilters(filialId, tipoAtivoId, status, limit);
             } else {
-                candidates = ativoRepository.findByFilialIdsAndFilters(userFiliais, filialId, tipoAtivoId, status, null, limit).getContent();
+                candidates = ativoRepository.findSimpleByFilialIdsAndFilters(userFiliais, filialId, tipoAtivoId, status, limit);
             }
 
             // Rank in memory using Levenshtein distance
-            List<Ativo> ranked = searchOptimizationService.rankResults(nome, candidates, Ativo::getNome);
+            List<AtivoNameDTO> ranked = searchOptimizationService.rankResults(nome, candidates, AtivoNameDTO::nome);
 
             // Manual Pagination
             int start = (int) effectivePageable.getOffset();
             int end = Math.min((start + effectivePageable.getPageSize()), ranked.size());
-            List<AtivoDTO> pageContent = (start > ranked.size()) ? List.of() :
-                    ranked.subList(start, end).stream().map(ativoMapper::toDTO).collect(Collectors.toList());
+
+            if (start > ranked.size()) {
+                 return new PageImpl<>(List.of(), effectivePageable, ranked.size());
+            }
+
+            List<AtivoNameDTO> pageContentDTOs = ranked.subList(start, end);
+            List<Long> ids = pageContentDTOs.stream().map(AtivoNameDTO::id).collect(Collectors.toList());
+
+            List<Ativo> fullEntities = ativoRepository.findAllByIdInWithDetails(ids);
+
+            // Sort entities to match ranking order
+            Map<Long, Ativo> entityMap = fullEntities.stream().collect(Collectors.toMap(Ativo::getId, Function.identity()));
+            List<AtivoDTO> pageContent = ids.stream()
+                .map(entityMap::get)
+                .filter(Objects::nonNull)
+                .map(ativoMapper::toDTO)
+                .collect(Collectors.toList());
 
             return new PageImpl<>(pageContent, effectivePageable, ranked.size());
         }
