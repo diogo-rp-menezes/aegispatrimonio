@@ -8,18 +8,15 @@ export const funcionarioService = {
   async listar(filtros = {}) {
     const params = new URLSearchParams();
     
-    // Note: Backend might not support all these filters yet in listarTodos(),
-    // but we pass them just in case or for future implementation.
-    // Currently FuncionarioController.listarTodos() takes no arguments.
-    // Ideally backend should support filtering.
-    
-    // if (filtros.departamentoId) params.append('departamentoId', filtros.departamentoId);
-    // if (filtros.nome) params.append('nome', filtros.nome);
-    // if (filtros.page !== undefined) params.append('page', filtros.page);
-    // if (filtros.size !== undefined) params.append('size', filtros.size);
+    if (filtros.departamentoId) params.append('departamentoId', filtros.departamentoId);
+    if (filtros.nome) params.append('nome', filtros.nome);
+    if (filtros.page !== undefined) params.append('page', filtros.page);
+    if (filtros.size !== undefined) params.append('size', filtros.size);
 
-    // For now, standard listing:
-    return request(BASE_URL);
+    const queryString = params.toString();
+    const url = queryString ? `${BASE_URL}?${queryString}` : BASE_URL;
+
+    return request(url);
   },
 
   // Buscar pessoa por ID

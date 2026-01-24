@@ -13,8 +13,12 @@ import br.com.aegispatrimonio.repository.FilialRepository;
 import br.com.aegispatrimonio.repository.FuncionarioRepository;
 import br.com.aegispatrimonio.repository.UsuarioRepository;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.persistence.criteria.Join;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -52,17 +56,28 @@ public class FuncionarioService {
     }
 
     @Transactional(readOnly = true)
-    public List<FuncionarioDTO> listarTodos() {
+    public Page<FuncionarioDTO> listarTodos(String nome, Long departamentoId, Pageable pageable) {
         Usuario usuario = currentUserProvider.getCurrentUsuario();
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        List<Funcionario> funcionarios;
 
-        if ("ROLE_ADMIN".equals(usuario.getRole())) {
-            funcionarios = funcionarioRepository.findAll();
-        } else {
+        Specification<Funcionario> spec = Specification.where(null);
+
+        if (nome != null && !nome.trim().isEmpty()) {
+            spec = spec.and((root, query, cb) ->
+                    cb.like(cb.lower(root.get("nome")), "%" + nome.toLowerCase() + "%")
+            );
+        }
+
+        if (departamentoId != null) {
+            spec = spec.and((root, query, cb) ->
+                    cb.equal(root.get("departamento").get("id"), departamentoId)
+            );
+        }
+
+        if (!"ROLE_ADMIN".equals(usuario.getRole())) {
             Funcionario funcionarioPrincipal = usuario.getFuncionario();
             if (funcionarioPrincipal == null || funcionarioPrincipal.getFiliais() == null || funcionarioPrincipal.getFiliais().isEmpty()) {
-                return List.of();
+                return Page.empty(pageable);
             }
 
             Set<Long> allowedFiliais = funcionarioPrincipal.getFiliais().stream()
@@ -71,15 +86,18 @@ public class FuncionarioService {
                     .collect(Collectors.toSet());
 
             if (allowedFiliais.isEmpty()) {
-                return List.of();
+                return Page.empty(pageable);
             }
 
-            funcionarios = funcionarioRepository.findDistinctByFiliais_IdIn(allowedFiliais);
+            spec = spec.and((root, query, cb) -> {
+                query.distinct(true);
+                Join<Funcionario, Filial> filiaisJoin = root.join("filiais");
+                return filiaisJoin.get("id").in(allowedFiliais);
+            });
         }
 
-        return funcionarios.stream()
-                .map(funcionarioMapper::toDTO)
-                .collect(Collectors.toList());
+        return funcionarioRepository.findAll(spec, pageable)
+                .map(funcionarioMapper::toDTO);
     }
 
     @Transactional(readOnly = true)
