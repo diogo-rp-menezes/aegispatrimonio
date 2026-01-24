@@ -50,4 +50,25 @@ class SearchOptimizationServiceTest {
         // Should be filtered out by the 0.2 threshold
         assertTrue(results.isEmpty(), "Results with very low similarity should be filtered out");
     }
+
+    @Test
+    void testPerformance_ShouldBeFast() {
+        // Generate a large list of items
+        List<String> bulkAssets = java.util.stream.IntStream.range(0, 5000)
+                .mapToObj(i -> "Asset Number " + i + " - Description " + (i * 2))
+                .toList();
+
+        String target = "Asset Number 4999 - Description 9998";
+        long start = System.currentTimeMillis();
+        // Search for the exact string to ensure it comes first (Score 1.0)
+        List<String> results = service.rankResults(target, bulkAssets, s -> s);
+        long end = System.currentTimeMillis();
+
+        long duration = end - start;
+        // Assert that searching 5000 items takes less than 200ms (Java is fast)
+        // This validates the "Shift Left" claim of low latency
+        assertTrue(duration < 200, "Fuzzy search took too long: " + duration + "ms");
+        assertFalse(results.isEmpty());
+        assertEquals(target, results.get(0));
+    }
 }
