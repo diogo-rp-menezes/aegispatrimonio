@@ -39,6 +39,7 @@ const quickActions = ref([
 
 const tableData = ref([]);
 const riskyAssets = ref([]);
+const alerts = ref([]);
 const loading = ref(true);
 
 const statusChartData = ref({ labels: [], datasets: [] });
@@ -85,6 +86,24 @@ function getDaysRemaining(dateStr) {
   const today = new Date();
   const diffTime = target - today;
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+}
+
+async function fetchAlerts() {
+  try {
+    const data = await request('/alerts/recent');
+    alerts.value = data || [];
+  } catch (error) {
+    console.error("Erro ao carregar alertas:", error);
+  }
+}
+
+async function markAsRead(id) {
+  try {
+    await request(`/alerts/${id}/read`, { method: 'PATCH' });
+    alerts.value = alerts.value.filter(a => a.id !== id);
+  } catch (error) {
+    console.error("Erro ao marcar alerta como lido:", error);
+  }
 }
 
 async function fetchStats() {
@@ -177,7 +196,7 @@ function goToAssets(healthFilter) {
 
 onMounted(async () => {
   loading.value = true;
-  await Promise.all([fetchStats(), fetchRecentAssets()]);
+  await Promise.all([fetchStats(), fetchRecentAssets(), fetchAlerts()]);
   loading.value = false;
 });
 </script>
@@ -210,6 +229,29 @@ onMounted(async () => {
               <h4 class="fw-bold mb-0">{{ stat.value }}</h4>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alerts Section -->
+    <div v-if="alerts.length > 0" class="card border-0 shadow-sm mb-4 border-start border-danger border-5">
+      <div class="card-body">
+        <h5 class="fw-bold mb-3 text-danger"><i class="bi bi-bell-fill me-2"></i>Alertas do Sistema</h5>
+        <div class="list-group list-group-flush">
+            <div v-for="alert in alerts" :key="alert.id" class="list-group-item d-flex justify-content-between align-items-center px-0">
+                <div>
+                    <div class="d-flex align-items-center mb-1">
+                        <span :class="`badge bg-${alert.tipo === 'CRITICO' ? 'danger' : 'warning'} me-2`">{{ alert.tipo }}</span>
+                        <h6 class="mb-0 fw-bold">{{ alert.titulo }}</h6>
+                        <small class="text-muted ms-2">{{ formatDate(alert.dataCriacao) }}</small>
+                    </div>
+                    <p class="mb-0 text-muted small">{{ alert.mensagem }}</p>
+                    <small class="text-primary" v-if="alert.ativo && alert.ativo.nome">Ativo: {{ alert.ativo.nome }}</small>
+                </div>
+                <button class="btn btn-sm btn-outline-secondary" @click="markAsRead(alert.id)" title="Marcar como lido">
+                    <i class="bi bi-check-lg"></i>
+                </button>
+            </div>
         </div>
       </div>
     </div>

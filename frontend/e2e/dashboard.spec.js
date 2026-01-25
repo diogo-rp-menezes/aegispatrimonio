@@ -51,6 +51,21 @@ test.describe('Dashboard Analytics & SOTA Features', () => {
         await route.fulfill({ json });
     });
 
+    // 5. Mock Recent Alerts
+    await page.route('**/alerts/recent', async route => {
+        const json = [
+            {
+                id: 1,
+                tipo: 'CRITICO',
+                titulo: 'CPU High Load',
+                mensagem: 'CPU usage is above 90%',
+                dataCriacao: '2024-05-20T10:00:00',
+                ativo: { id: 101, nome: 'Server 01' }
+            }
+        ];
+        await route.fulfill({ json });
+    });
+
     // 4. Login Flow
     await page.goto('/login');
     await page.fill('#email', 'admin@aegis.com');
@@ -90,6 +105,13 @@ test.describe('Dashboard Analytics & SOTA Features', () => {
       const table = page.locator('table');
       await expect(table).toBeVisible();
       await expect(page.getByText('Dell Latitude 5420')).toBeVisible();
+  });
+
+  test('Deve exibir widget de alertas do sistema', async ({ page }) => {
+      const alertCard = page.locator('.card', { hasText: 'Alertas do Sistema' });
+      await expect(alertCard).toBeVisible();
+      await expect(alertCard.getByText('CPU High Load')).toBeVisible();
+      await expect(alertCard.getByText('Server 01')).toBeVisible();
   });
 
 });
