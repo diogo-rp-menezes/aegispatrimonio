@@ -3,11 +3,13 @@ package br.com.aegispatrimonio.service;
 import br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO;
 import br.com.aegispatrimonio.model.*;
 import br.com.aegispatrimonio.repository.AlertaRepository;
+import br.com.aegispatrimonio.repository.AtivoRepository;
 import br.com.aegispatrimonio.repository.FuncionarioRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,13 +25,16 @@ import java.util.stream.Collectors;
 public class AlertNotificationService {
 
     private final AlertaRepository alertaRepository;
+    private final AtivoRepository ativoRepository;
     private final CurrentUserProvider currentUserProvider;
     private final FuncionarioRepository funcionarioRepository;
 
     public AlertNotificationService(AlertaRepository alertaRepository,
+                                    AtivoRepository ativoRepository,
                                     CurrentUserProvider currentUserProvider,
                                     FuncionarioRepository funcionarioRepository) {
         this.alertaRepository = alertaRepository;
+        this.ativoRepository = ativoRepository;
         this.currentUserProvider = currentUserProvider;
         this.funcionarioRepository = funcionarioRepository;
     }
@@ -106,10 +111,12 @@ public class AlertNotificationService {
         return ids;
     }
 
+    @Async("taskExecutor")
     @Transactional
-    public void checkAndCreateAlerts(Ativo ativo, HealthCheckPayloadDTO payload) {
-        checkDiskPredictiveAlerts(ativo);
-        checkResourceUsageAlerts(ativo, payload);
+    public void checkAndCreateAlerts(Long ativoId, LocalDate previsaoEsgotamentoDisco, HealthCheckPayloadDTO payload) {
+        Ativo ativoRef = ativoRepository.getReferenceById(ativoId);
+        checkDiskPredictiveAlerts(ativoRef, previsaoEsgotamentoDisco);
+        checkResourceUsageAlerts(ativoRef, payload);
     }
 
     private void checkResourceUsageAlerts(Ativo ativo, HealthCheckPayloadDTO payload) {
@@ -129,22 +136,21 @@ public class AlertNotificationService {
         }
     }
 
-    private void checkDiskPredictiveAlerts(Ativo ativo) {
-        if (ativo.getPrevisaoEsgotamentoDisco() == null) {
+    private void checkDiskPredictiveAlerts(Ativo ativo, LocalDate previsaoEsgotamentoDisco) {
+        if (previsaoEsgotamentoDisco == null) {
             return;
         }
 
         LocalDate now = LocalDate.now();
-        LocalDate previsao = ativo.getPrevisaoEsgotamentoDisco();
-        long daysUntilExhaustion = ChronoUnit.DAYS.between(now, previsao);
+        long daysUntilExhaustion = ChronoUnit.DAYS.between(now, previsaoEsgotamentoDisco);
 
         // Se a previsão já passou (negativo) ou é hoje/amanhã, também é crítico
         if (daysUntilExhaustion < 7) {
             createAlertIfNotExists(ativo, TipoAlerta.CRITICO, "Risco Crítico de Falha de Disco",
-                    "A previsão de esgotamento do disco é para " + daysUntilExhaustion + " dias (" + previsao + "). Ação imediata necessária.");
+                    "A previsão de esgotamento do disco é para " + daysUntilExhaustion + " dias (" + previsaoEsgotamentoDisco + "). Ação imediata necessária.");
         } else if (daysUntilExhaustion < 30) {
             createAlertIfNotExists(ativo, TipoAlerta.WARNING, "Alerta de Capacidade de Disco",
-                    "A previsão de esgotamento do disco é para " + daysUntilExhaustion + " dias (" + previsao + "). Planeje a manutenção.");
+                    "A previsão de esgotamento do disco é para " + daysUntilExhaustion + " dias (" + previsaoEsgotamentoDisco + "). Planeje a manutenção.");
         }
     }
 

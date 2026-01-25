@@ -5,6 +5,7 @@ import br.com.aegispatrimonio.model.Alerta;
 import br.com.aegispatrimonio.model.Ativo;
 import br.com.aegispatrimonio.model.TipoAlerta;
 import br.com.aegispatrimonio.repository.AlertaRepository;
+import br.com.aegispatrimonio.repository.AtivoRepository;
 import br.com.aegispatrimonio.repository.FuncionarioRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,9 @@ class AlertNotificationServiceTest {
 
     @Mock
     private AlertaRepository alertaRepository;
+
+    @Mock
+    private AtivoRepository ativoRepository;
 
     @Mock
     private CurrentUserProvider currentUserProvider;
@@ -48,11 +52,11 @@ class AlertNotificationServiceTest {
     @Test
     void shouldCreateCriticalAlertWhenPredictionIsBelow7Days() {
         ativo.setPrevisaoEsgotamentoDisco(LocalDate.now().plusDays(5));
-
+        when(ativoRepository.getReferenceById(1L)).thenReturn(ativo);
         when(alertaRepository.findByAtivoIdAndLidoFalseAndTipo(1L, TipoAlerta.CRITICO))
                 .thenReturn(Collections.emptyList());
 
-        service.checkAndCreateAlerts(ativo, emptyPayload);
+        service.checkAndCreateAlerts(1L, ativo.getPrevisaoEsgotamentoDisco(), emptyPayload);
 
         verify(alertaRepository).save(any(Alerta.class));
     }
@@ -60,11 +64,11 @@ class AlertNotificationServiceTest {
     @Test
     void shouldCreateWarningAlertWhenPredictionIsBetween7And30Days() {
         ativo.setPrevisaoEsgotamentoDisco(LocalDate.now().plusDays(20));
-
+        when(ativoRepository.getReferenceById(1L)).thenReturn(ativo);
         when(alertaRepository.findByAtivoIdAndLidoFalseAndTipo(1L, TipoAlerta.WARNING))
                 .thenReturn(Collections.emptyList());
 
-        service.checkAndCreateAlerts(ativo, emptyPayload);
+        service.checkAndCreateAlerts(1L, ativo.getPrevisaoEsgotamentoDisco(), emptyPayload);
 
         verify(alertaRepository).save(any(Alerta.class));
     }
@@ -72,11 +76,11 @@ class AlertNotificationServiceTest {
     @Test
     void shouldNotCreateAlertIfAlreadyExists() {
         ativo.setPrevisaoEsgotamentoDisco(LocalDate.now().plusDays(5));
-
+        when(ativoRepository.getReferenceById(1L)).thenReturn(ativo);
         when(alertaRepository.findByAtivoIdAndLidoFalseAndTipo(1L, TipoAlerta.CRITICO))
                 .thenReturn(Collections.singletonList(new Alerta()));
 
-        service.checkAndCreateAlerts(ativo, emptyPayload);
+        service.checkAndCreateAlerts(1L, ativo.getPrevisaoEsgotamentoDisco(), emptyPayload);
 
         verify(alertaRepository, never()).save(any(Alerta.class));
     }
@@ -85,7 +89,7 @@ class AlertNotificationServiceTest {
     void shouldNotCreateAlertIfSafe() {
         ativo.setPrevisaoEsgotamentoDisco(LocalDate.now().plusDays(40));
 
-        service.checkAndCreateAlerts(ativo, emptyPayload);
+        service.checkAndCreateAlerts(1L, ativo.getPrevisaoEsgotamentoDisco(), emptyPayload);
 
         verify(alertaRepository, never()).save(any(Alerta.class));
     }
@@ -98,11 +102,11 @@ class AlertNotificationServiceTest {
                 16000L, 8000L, // memory safe
                 null
         );
-
+        when(ativoRepository.getReferenceById(1L)).thenReturn(ativo);
         when(alertaRepository.findByAtivoIdAndLidoFalseAndTipo(1L, TipoAlerta.CRITICO))
                 .thenReturn(Collections.emptyList());
 
-        service.checkAndCreateAlerts(ativo, highCpuPayload);
+        service.checkAndCreateAlerts(1L, null, highCpuPayload);
 
         verify(alertaRepository).save(argThat(a ->
             a.getTitulo().contains("Sobrecarga de CPU") && a.getTipo() == TipoAlerta.CRITICO
@@ -117,11 +121,11 @@ class AlertNotificationServiceTest {
                 1000L, 50L, // memory: 50/1000 = 0.05 (5%)
                 null
         );
-
+        when(ativoRepository.getReferenceById(1L)).thenReturn(ativo);
         when(alertaRepository.findByAtivoIdAndLidoFalseAndTipo(1L, TipoAlerta.CRITICO))
                 .thenReturn(Collections.emptyList());
 
-        service.checkAndCreateAlerts(ativo, lowMemPayload);
+        service.checkAndCreateAlerts(1L, null, lowMemPayload);
 
         verify(alertaRepository).save(argThat(a ->
             a.getTitulo().contains("Memória RAM") && a.getTipo() == TipoAlerta.CRITICO

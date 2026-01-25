@@ -313,7 +313,7 @@ public class AtivoService {
         ativoRepository.save(ativo);
 
         // Trigger alert check
-        alertNotificationService.checkAndCreateAlerts(ativo, payload);
+        alertNotificationService.checkAndCreateAlerts(ativo.getId(), ativo.getPrevisaoEsgotamentoDisco(), payload);
     }
 
     @Transactional
