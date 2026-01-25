@@ -2,26 +2,24 @@ package br.com.aegispatrimonio.controller;
 
 import br.com.aegispatrimonio.dto.AlertaDTO;
 import br.com.aegispatrimonio.model.Alerta;
-import br.com.aegispatrimonio.repository.AlertaRepository;
-import jakarta.persistence.EntityNotFoundException;
+import br.com.aegispatrimonio.service.AlertNotificationService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/alertas")
 public class AlertaController {
 
-    private final AlertaRepository alertaRepository;
+    private final AlertNotificationService alertService;
 
-    public AlertaController(AlertaRepository alertaRepository) {
-        this.alertaRepository = alertaRepository;
+    public AlertaController(AlertNotificationService alertService) {
+        this.alertService = alertService;
     }
 
     @GetMapping
@@ -30,29 +28,20 @@ public class AlertaController {
             @PageableDefault(sort = "dataCriacao", direction = org.springframework.data.domain.Sort.Direction.DESC) Pageable pageable,
             @RequestParam(required = false) Boolean lido) {
 
-        Page<Alerta> page;
-        if (lido == null) {
-            page = alertaRepository.findAll(pageable);
-        } else {
-            page = alertaRepository.findByLido(lido, pageable);
-        }
-
-        return page.map(this::toDTO);
+        return alertService.listarAlertas(pageable, lido).map(this::toDTO);
     }
 
-    @PutMapping("/{id}/ler")
+    @GetMapping("/recent")
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    @Transactional
-    public ResponseEntity<Void> marcarComoLido(@PathVariable Long id) {
-        Alerta alerta = alertaRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Alerta não encontrado: " + id));
+    public List<AlertaDTO> getRecentAlerts() {
+        return alertService.getRecentAlerts().stream().map(this::toDTO).toList();
+    }
 
-        if (!alerta.isLido()) {
-            alerta.setLido(true);
-            alerta.setDataLeitura(LocalDateTime.now());
-            alertaRepository.save(alerta);
-        }
-        return ResponseEntity.noContent().build();
+    @PatchMapping("/{id}/read")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    public void markAsRead(@PathVariable Long id) {
+        alertService.markAsRead(id);
     }
 
     private AlertaDTO toDTO(Alerta alerta) {

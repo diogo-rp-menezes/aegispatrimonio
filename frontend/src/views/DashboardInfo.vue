@@ -90,7 +90,7 @@ function getDaysRemaining(dateStr) {
 
 async function fetchAlerts() {
   try {
-    const data = await request('/alerts/recent');
+    const data = await request('/alertas/recent');
     alerts.value = data || [];
   } catch (error) {
     console.error("Erro ao carregar alertas:", error);
@@ -99,7 +99,7 @@ async function fetchAlerts() {
 
 async function markAsRead(id) {
   try {
-    await request(`/alerts/${id}/read`, { method: 'PATCH' });
+    await request(`/alertas/${id}/read`, { method: 'PATCH' });
     alerts.value = alerts.value.filter(a => a.id !== id);
   } catch (error) {
     console.error("Erro ao marcar alerta como lido:", error);
@@ -246,7 +246,7 @@ onMounted(async () => {
                         <small class="text-muted ms-2">{{ formatDate(alert.dataCriacao) }}</small>
                     </div>
                     <p class="mb-0 text-muted small">{{ alert.mensagem }}</p>
-                    <small class="text-primary" v-if="alert.ativo && alert.ativo.nome">Ativo: {{ alert.ativo.nome }}</small>
+                    <small class="text-primary" v-if="alert.ativoNome">Ativo: {{ alert.ativoNome }}</small>
                 </div>
                 <button class="btn btn-sm btn-outline-secondary" @click="markAsRead(alert.id)" title="Marcar como lido">
                     <i class="bi bi-check-lg"></i>

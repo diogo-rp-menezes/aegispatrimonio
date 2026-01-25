@@ -1,17 +1,13 @@
-# ⚡ Added Real-time System Alerts Widget to Dashboard
+# ⚡ Consolidação e Correção da API de Alertas
 
 ## 💡 O quê
-Adição de um widget de "Alertas do Sistema" no Dashboard principal (`DashboardInfo.vue`), consumindo a API `/api/v1/alerts/recent`.
+Unificação dos controllers `AlertController` e `AlertaController` em um único `AlertaController` (padrão `/api/v1/alertas`), implementação de RBAC na listagem de alertas e correção do frontend para usar os novos endpoints e campos DTO.
 
 ## 🎯 Porquê
-O Dashboard anterior focava apenas em métricas estáticas e preditivas (longo prazo). Faltava visibilidade para problemas *em tempo real* (ex: CPU > 90%, Disco Crítico < 7 dias) que já estavam sendo gerados pelo backend (`AlertNotificationService`), mas não eram exibidos proativamente ao usuário.
+Havia duplicação de lógica e inconsistência nos endpoints (`/alerts` vs `/alertas`), além de uma falha de segurança onde a listagem de alertas não filtrava por filial (RBAC). O frontend falhava ao exibir o nome do ativo nos alertas devido a uma incompatibilidade entre a estrutura esperada e o DTO retornado.
 
 ## 📊 Melhoria Mensurada
-- **Visibilidade:** 100% de visibilidade dos últimos 5 alertas críticos sem necessidade de navegação.
-- **Ação:** Redução de cliques para "Marcar como Lido" (direto no dashboard).
-- **Cobertura de Testes:** Novo teste E2E (`dashboard.spec.js`) validando a renderização e visibilidade do widget.
-
-## ⚙️ Detalhes Técnicos
-- **Frontend:** Vue.js 3 + Bootstrap 5 Cards.
-- **Integração:** `GET /alerts/recent` e `PATCH /alerts/{id}/read`.
-- **Estado:** Reativo com `ref([])` e atualização otimista na UI ao marcar como lido.
+- **Segurança:** Correção crítica de vazamento de dados entre filiais na listagem de alertas. O `AlertNotificationService` agora centraliza a lógica de autorização.
+- **Manutenibilidade:** Eliminação de código duplicado (`AlertController.java` removido).
+- **Correção Visual:** O Dashboard agora exibe corretamente o nome do ativo nos alertas, utilizando o campo `ativoNome` do DTO.
+- **Performance:** Uso de `@EntityGraph` no repositório para evitar problemas de N+1 queries na listagem de alertas.

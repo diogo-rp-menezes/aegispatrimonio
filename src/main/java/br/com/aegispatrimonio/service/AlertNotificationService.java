@@ -5,6 +5,8 @@ import br.com.aegispatrimonio.model.*;
 import br.com.aegispatrimonio.repository.AlertaRepository;
 import br.com.aegispatrimonio.repository.FuncionarioRepository;
 import jakarta.persistence.EntityNotFoundException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +42,25 @@ public class AlertNotificationService {
         }
         Set<Long> filialIds = getUserFiliais(user);
         return alertaRepository.findTop5ByAtivo_Filial_IdInAndLidoFalseOrderByDataCriacaoDesc(filialIds);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<Alerta> listarAlertas(Pageable pageable, Boolean lido) {
+        Usuario user = getUsuarioLogado();
+        if (isAdmin(user)) {
+            if (lido == null) {
+                return alertaRepository.findAll(pageable);
+            } else {
+                return alertaRepository.findByLido(lido, pageable);
+            }
+        } else {
+            Set<Long> filialIds = getUserFiliais(user);
+            if (lido == null) {
+                return alertaRepository.findByAtivo_Filial_IdIn(filialIds, pageable);
+            } else {
+                return alertaRepository.findByAtivo_Filial_IdInAndLido(filialIds, lido, pageable);
+            }
+        }
     }
 
     @Transactional
