@@ -31,6 +31,16 @@ test.describe('Dashboard Predictive Visualization (SOTA)', () => {
         ],
         ativosPorTipo: [
           { label: 'Notebook', value: 50 }
+        ],
+        failureTrend: [
+          { label: 'Semana 1', value: 2 },
+          { label: 'Semana 2', value: 5 },
+          { label: 'Semana 3', value: 1 },
+          { label: 'Semana 4', value: 0 },
+          { label: 'Semana 5', value: 3 },
+          { label: 'Semana 6', value: 1 },
+          { label: 'Semana 7', value: 4 },
+          { label: 'Semana 8', value: 2 }
         ]
       };
       await route.fulfill({ json });
@@ -54,10 +64,12 @@ test.describe('Dashboard Predictive Visualization (SOTA)', () => {
     // Verify the new section title
     await expect(page.getByText('Distribuição de Risco')).toBeVisible();
 
-    // Verify the presence of the 3rd chart (Doughnut)
-    // The dashboard already had 2 charts, we added a 3rd one.
+    // Verify the presence of all 4 charts (Status, Type, Trend, Risk)
     const charts = page.locator('canvas');
-    await expect(charts).toHaveCount(3);
+    await expect(charts).toHaveCount(4);
+
+    // Verify the Trend Chart title
+    await expect(page.getByText('Tendência de Falhas')).toBeVisible();
 
     // Verify the new predictive stats are displayed in cards as well
     const criticalCard = page.locator('.card', { hasText: 'Críticos (< 7 dias)' });
