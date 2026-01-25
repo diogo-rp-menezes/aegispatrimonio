@@ -6,7 +6,7 @@ WORKDIR /app/frontend
 COPY frontend/package*.json ./
 
 # Install dependencies
-RUN npm install
+RUN --mount=type=cache,target=/root/.npm npm install
 
 # Copy source code
 COPY frontend/ .
@@ -24,7 +24,7 @@ COPY .mvn .mvn
 COPY pom.xml .
 
 # Make wrapper executable (just in case) and download dependencies
-RUN chmod +x mvnw && ./mvnw dependency:go-offline
+RUN --mount=type=cache,target=/root/.m2 chmod +x mvnw && ./mvnw dependency:go-offline
 
 # Copy backend source code
 COPY src ./src
@@ -34,7 +34,7 @@ COPY src ./src
 COPY --from=frontend-build /app/frontend/dist ./src/main/resources/static
 
 # Build the application
-RUN ./mvnw clean package -DskipTests
+RUN --mount=type=cache,target=/root/.m2 ./mvnw clean package -DskipTests
 
 # Stage 3: Runtime Image
 FROM openjdk:21-jdk-slim

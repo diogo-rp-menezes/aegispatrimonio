@@ -14,7 +14,8 @@ services:
       JWT_SECRET: your_jwt_secret_key_here # Substitua por uma chave secreta forte
       APP_CORS_ALLOWED_ORIGINS: http://localhost:8080,http://localhost:3000
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - aegis-network
 
@@ -27,6 +28,11 @@ services:
       - db_data:/var/lib/mysql
     ports:
       - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - aegis-network
 
