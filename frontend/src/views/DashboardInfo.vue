@@ -42,6 +42,7 @@ const loading = ref(true);
 
 const statusChartData = ref({ labels: [], datasets: [] });
 const typeChartData = ref({ labels: [], datasets: [] });
+const predictiveChartData = ref({ labels: [], datasets: [] });
 const chartOptions = { responsive: true, maintainAspectRatio: false };
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -86,6 +87,14 @@ async function fetchStats() {
       { title: "Em Alerta (30 dias)", value: data.predicaoAlerta, icon: "bi-exclamation-circle", color: "warning", description: "Requer atenção no próximo mês", filter: "ALERTA" },
       { title: "Saudáveis", value: data.predicaoSegura, icon: "bi-check-circle", color: "success", description: "Sem previsão de falha próxima", filter: "SAUDAVEL" },
     ];
+
+    predictiveChartData.value = {
+      labels: ['Críticos', 'Em Alerta', 'Saudáveis'],
+      datasets: [{
+        backgroundColor: ['#dc3545', '#ffc107', '#198754'],
+        data: [data.predicaoCritica, data.predicaoAlerta, data.predicaoSegura]
+      }]
+    };
 
     // Chart Data Mapping
     if (data.ativosPorStatus) {
@@ -207,19 +216,36 @@ onMounted(async () => {
     <!-- Predictive Maintenance Section -->
     <h5 class="fw-bold mb-3"><i class="bi bi-cpu me-2"></i>Manutenção Preditiva (IA Híbrida)</h5>
     <div class="row g-3 mb-4">
-      <div v-for="stat in predictiveStats" :key="stat.title" class="col-md-4">
-        <div class="card h-100 border-0 shadow-sm predictive-card" @click="goToAssets(stat.filter)">
-          <div class="card-body d-flex align-items-center">
-             <div
-              :class="`bg-${stat.color} text-white rounded-circle d-flex align-items-center justify-content-center me-3 shadow-sm`"
-              style="width: 50px; height: 50px;"
-            >
-              <i :class="`bi ${stat.icon} fs-5`"></i>
+      <div class="col-md-8">
+        <div class="row g-3">
+          <div v-for="stat in predictiveStats" :key="stat.title" class="col-md-12">
+            <div class="card h-100 border-0 shadow-sm predictive-card" @click="goToAssets(stat.filter)">
+              <div class="card-body d-flex align-items-center">
+                 <div
+                  :class="`bg-${stat.color} text-white rounded-circle d-flex align-items-center justify-content-center me-3 shadow-sm`"
+                  style="width: 50px; height: 50px;"
+                >
+                  <i :class="`bi ${stat.icon} fs-5`"></i>
+                </div>
+                <div>
+                  <h6 class="mb-1 fw-bold text-dark">{{ stat.title }}</h6>
+                  <h3 class="fw-bold mb-0">{{ stat.value }} <small class="text-muted fs-6 fw-normal">ativos</small></h3>
+                  <small class="text-muted">{{ stat.description }}</small>
+                </div>
+              </div>
             </div>
-            <div>
-              <h6 class="mb-1 fw-bold text-dark">{{ stat.title }}</h6>
-              <h3 class="fw-bold mb-0">{{ stat.value }} <small class="text-muted fs-6 fw-normal">ativos</small></h3>
-              <small class="text-muted">{{ stat.description }}</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card h-100 border-0 shadow-sm">
+          <div class="card-body">
+            <h6 class="fw-bold mb-3 text-center">Distribuição de Risco</h6>
+            <div style="height: 200px;">
+              <Doughnut v-if="predictiveChartData.labels.length" :data="predictiveChartData" :options="chartOptions" />
+               <div v-else class="d-flex justify-content-center align-items-center h-100 text-muted">
+                Sem dados
+              </div>
             </div>
           </div>
         </div>

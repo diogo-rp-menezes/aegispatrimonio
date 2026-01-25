@@ -79,7 +79,7 @@ test.describe('Dashboard Analytics & SOTA Features', () => {
   test('Deve renderizar os gráficos de Analytics', async ({ page }) => {
     // Check if Canvas elements exist for Chart.js
     const charts = page.locator('canvas');
-    await expect(charts).toHaveCount(2); // Doughnut + Bar
+    await expect(charts).toHaveCount(3); // Doughnut + Bar + Doughnut (Predictive)
 
     // Verify Titles
     await expect(page.getByText('Ativos por Status')).toBeVisible();
