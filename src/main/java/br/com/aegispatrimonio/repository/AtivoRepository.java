@@ -50,7 +50,20 @@ public interface AtivoRepository extends JpaRepository<Ativo, Long> {
     // Suporte à paginação mantendo compatibilidade no controller/serviço
     Page<Ativo> findByFilialIdIn(Set<Long> filialIds, Pageable pageable);
 
-    @Query("SELECT a FROM Ativo a WHERE (:filialId IS NULL OR a.filial.id = :filialId) " +
+    @Query(value = "SELECT a FROM Ativo a " +
+           "LEFT JOIN FETCH a.filial " +
+           "LEFT JOIN FETCH a.tipoAtivo " +
+           "LEFT JOIN FETCH a.localizacao " +
+           "LEFT JOIN FETCH a.fornecedor " +
+           "LEFT JOIN FETCH a.funcionarioResponsavel " +
+           "LEFT JOIN FETCH a.detalheHardware " +
+           "WHERE (:filialId IS NULL OR a.filial.id = :filialId) " +
+           "AND (:tipoAtivoId IS NULL OR a.tipoAtivo.id = :tipoAtivoId) " +
+           "AND (:status IS NULL OR a.status = :status) " +
+           "AND (:nome IS NULL OR LOWER(a.nome) LIKE LOWER(CONCAT('%', :nome, '%'))) " +
+           "AND (:minDate IS NULL OR a.previsaoEsgotamentoDisco >= :minDate) " +
+           "AND (:maxDate IS NULL OR a.previsaoEsgotamentoDisco < :maxDate)",
+           countQuery = "SELECT COUNT(a) FROM Ativo a WHERE (:filialId IS NULL OR a.filial.id = :filialId) " +
            "AND (:tipoAtivoId IS NULL OR a.tipoAtivo.id = :tipoAtivoId) " +
            "AND (:status IS NULL OR a.status = :status) " +
            "AND (:nome IS NULL OR LOWER(a.nome) LIKE LOWER(CONCAT('%', :nome, '%'))) " +
@@ -64,7 +77,21 @@ public interface AtivoRepository extends JpaRepository<Ativo, Long> {
                               @Param("maxDate") java.time.LocalDate maxDate,
                               Pageable pageable);
 
-    @Query("SELECT a FROM Ativo a WHERE a.filial.id IN :filialIds " +
+    @Query(value = "SELECT a FROM Ativo a " +
+           "LEFT JOIN FETCH a.filial " +
+           "LEFT JOIN FETCH a.tipoAtivo " +
+           "LEFT JOIN FETCH a.localizacao " +
+           "LEFT JOIN FETCH a.fornecedor " +
+           "LEFT JOIN FETCH a.funcionarioResponsavel " +
+           "LEFT JOIN FETCH a.detalheHardware " +
+           "WHERE a.filial.id IN :filialIds " +
+           "AND (:filialId IS NULL OR a.filial.id = :filialId) " +
+           "AND (:tipoAtivoId IS NULL OR a.tipoAtivo.id = :tipoAtivoId) " +
+           "AND (:status IS NULL OR a.status = :status) " +
+           "AND (:nome IS NULL OR LOWER(a.nome) LIKE LOWER(CONCAT('%', :nome, '%'))) " +
+           "AND (:minDate IS NULL OR a.previsaoEsgotamentoDisco >= :minDate) " +
+           "AND (:maxDate IS NULL OR a.previsaoEsgotamentoDisco < :maxDate)",
+           countQuery = "SELECT COUNT(a) FROM Ativo a WHERE a.filial.id IN :filialIds " +
            "AND (:filialId IS NULL OR a.filial.id = :filialId) " +
            "AND (:tipoAtivoId IS NULL OR a.tipoAtivo.id = :tipoAtivoId) " +
            "AND (:status IS NULL OR a.status = :status) " +
