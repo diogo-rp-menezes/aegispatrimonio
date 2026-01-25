@@ -60,7 +60,7 @@ class RelatorioServiceTest {
 
     @Test
     void testGerarTermoResponsabilidade_Sucesso() {
-        when(ativoRepository.findById(1L)).thenReturn(Optional.of(ativo));
+        when(ativoRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(ativo));
 
         byte[] pdf = relatorioService.gerarTermoResponsabilidade(1L);
 
@@ -75,7 +75,7 @@ class RelatorioServiceTest {
     @Test
     void testGerarTermoResponsabilidade_SemFuncionario() {
         ativo.setFuncionarioResponsavel(null);
-        when(ativoRepository.findById(1L)).thenReturn(Optional.of(ativo));
+        when(ativoRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(ativo));
 
         assertThrows(IllegalStateException.class, () -> relatorioService.gerarTermoResponsabilidade(1L));
     }

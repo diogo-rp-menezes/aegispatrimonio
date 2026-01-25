@@ -49,7 +49,7 @@ public class RelatorioService {
 
     @Transactional(readOnly = true)
     public byte[] gerarTermoResponsabilidade(Long ativoId) {
-        Ativo ativo = ativoRepository.findById(ativoId)
+        Ativo ativo = ativoRepository.findByIdWithDetails(ativoId)
                 .orElseThrow(() -> new EntityNotFoundException("Ativo não encontrado com ID: " + ativoId));
 
         Funcionario responsavel = ativo.getFuncionarioResponsavel();
