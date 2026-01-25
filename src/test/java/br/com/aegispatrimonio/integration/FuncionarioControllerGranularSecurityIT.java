@@ -295,24 +295,24 @@ public class FuncionarioControllerGranularSecurityIT extends BaseIT {
         mockMvc.perform(get("/api/v1/funcionarios")
                         .header("Authorization", tokenUserFilial1))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").isNotEmpty())
-                .andExpect(jsonPath("$[*].nome").value(hasItem("Target Funcionario")))
-                .andExpect(jsonPath("$[*].nome").value(not(hasItem("Func Filial 2"))));
+                .andExpect(jsonPath("$.content.length()").isNotEmpty())
+                .andExpect(jsonPath("$.content[*].nome").value(hasItem("Target Funcionario")))
+                .andExpect(jsonPath("$.content[*].nome").value(not(hasItem("Func Filial 2"))));
 
         // Verify User 2 (Filial 2) - Should see F2 Employee but NOT Target (F1)
         mockMvc.perform(get("/api/v1/funcionarios")
                         .header("Authorization", tokenUserFilial2))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").isNotEmpty())
-                .andExpect(jsonPath("$[*].nome").value(hasItem("Func Filial 2")))
-                .andExpect(jsonPath("$[*].nome").value(not(hasItem("Target Funcionario"))));
+                .andExpect(jsonPath("$.content.length()").isNotEmpty())
+                .andExpect(jsonPath("$.content[*].nome").value(hasItem("Func Filial 2")))
+                .andExpect(jsonPath("$.content[*].nome").value(not(hasItem("Target Funcionario"))));
 
         // Verify Admin - Should see everyone
         mockMvc.perform(get("/api/v1/funcionarios")
                         .header("Authorization", tokenAdmin))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").isNotEmpty())
-                .andExpect(jsonPath("$[*].nome").value(hasItem("Target Funcionario")))
-                .andExpect(jsonPath("$[*].nome").value(hasItem("Func Filial 2")));
+                .andExpect(jsonPath("$.content.length()").isNotEmpty())
+                .andExpect(jsonPath("$.content[*].nome").value(hasItem("Target Funcionario")))
+                .andExpect(jsonPath("$.content[*].nome").value(hasItem("Func Filial 2")));
     }
 }
