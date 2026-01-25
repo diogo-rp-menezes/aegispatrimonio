@@ -163,6 +163,17 @@ const chartData = computed(() => {
   };
 });
 
+const visibleAttributes = computed(() => {
+  if (!ativo.value || !ativo.value.atributos) return {};
+  const attrs = {};
+  for (const [key, val] of Object.entries(ativo.value.atributos)) {
+    if (!key.startsWith('prediction_')) {
+      attrs[key] = val;
+    }
+  }
+  return attrs;
+});
+
 const chartOptions = {
   responsive: true,
   maintainAspectRatio: false,
@@ -399,13 +410,13 @@ onMounted(() => {
     </div>
 
     <!-- Technical Attributes (Adaptive Taxonomy) -->
-    <div v-if="ativo && ativo.atributos && Object.keys(ativo.atributos).length > 0" class="card shadow-sm mb-4">
+    <div v-if="ativo && Object.keys(visibleAttributes).length > 0" class="card shadow-sm mb-4">
       <div class="card-header bg-light">
         <h5 class="mb-0"><i class="bi bi-tags me-2"></i>Especificações Técnicas</h5>
       </div>
       <div class="card-body">
         <ul class="list-group list-group-flush">
-          <li v-for="(val, key) in ativo.atributos" :key="key" class="list-group-item d-flex justify-content-between align-items-center">
+          <li v-for="(val, key) in visibleAttributes" :key="key" class="list-group-item d-flex justify-content-between align-items-center">
             <span class="fw-bold">{{ key }}</span>
             <span>{{ val }}</span>
           </li>
