@@ -42,7 +42,7 @@ public class UserContextService {
         }
 
         // Fetch fresh from DB to get Lazy collections
-        return funcionarioRepository.findById(funcionarioPrincipal.getId())
+        return funcionarioRepository.findByIdWithFiliais(funcionarioPrincipal.getId())
                 .orElseThrow(() -> new AccessDeniedException("Funcionário não encontrado."));
     }
 
