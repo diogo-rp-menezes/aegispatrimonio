@@ -25,6 +25,7 @@ test.describe('Dashboard Predictive Visualization (SOTA)', () => {
         predicaoCritica: 5,
         predicaoAlerta: 10,
         predicaoSegura: 985,
+        predicaoIndeterminada: 5,
         ativosPorStatus: [
           { label: 'ATIVO', value: 100 }
         ],
@@ -61,6 +62,9 @@ test.describe('Dashboard Predictive Visualization (SOTA)', () => {
     // Verify the new predictive stats are displayed in cards as well
     const criticalCard = page.locator('.card', { hasText: 'Críticos (< 7 dias)' });
     await expect(criticalCard.locator('h3')).toHaveText('5 ativos');
+
+    const unknownCard = page.locator('.card', { hasText: 'Indeterminado' });
+    await expect(unknownCard.locator('h3')).toHaveText('5 ativos');
   });
 
 });

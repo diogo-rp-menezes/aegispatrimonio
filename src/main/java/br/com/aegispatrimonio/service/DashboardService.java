@@ -49,6 +49,7 @@ public class DashboardService {
         long predicaoCritica = ativoRepository.countCriticalPredictionsByCurrentTenant(criticalThreshold);
         long predicaoAlerta = ativoRepository.countWarningPredictionsByCurrentTenant(criticalThreshold, warningThreshold);
         long predicaoSegura = ativoRepository.countSafePredictionsByCurrentTenant(warningThreshold);
+        long predicaoIndeterminada = Math.max(0, totalAtivos - (predicaoCritica + predicaoAlerta + predicaoSegura));
 
         // Trend Analysis (Next 8 Weeks)
         LocalDate endOfTrend = now.plusWeeks(8);
@@ -82,6 +83,7 @@ public class DashboardService {
             predicaoCritica,
             predicaoAlerta,
             predicaoSegura,
+            predicaoIndeterminada,
             ativosPorStatus,
             ativosPorTipo,
             riskyAssets,

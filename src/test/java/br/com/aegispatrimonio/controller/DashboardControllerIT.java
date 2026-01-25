@@ -126,12 +126,26 @@ class DashboardControllerIT extends BaseIT {
         a2.setPrevisaoEsgotamentoDisco(LocalDate.now().plusDays(40));
         ativoRepository.save(a2);
 
+        Ativo a3 = new Ativo();
+        a3.setNome("Unknown Asset");
+        a3.setNumeroPatrimonio("P3");
+        a3.setFilial(filial);
+        a3.setTipoAtivo(tipo);
+        a3.setFornecedor(forn);
+        a3.setValorAquisicao(java.math.BigDecimal.TEN);
+        a3.setDataAquisicao(LocalDate.now());
+        a3.setStatus(StatusAtivo.ATIVO);
+        a3.setPrevisaoEsgotamentoDisco(null);
+        ativoRepository.save(a3);
+
         mockMvc.perform(get("/api/v1/dashboard/stats"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalAtivos", is(2)))
+                .andExpect(jsonPath("$.totalAtivos", is(3)))
                 .andExpect(jsonPath("$.predicaoCritica", is(1)))
                 .andExpect(jsonPath("$.predicaoAlerta", is(0)))
-                .andExpect(jsonPath("$.predicaoSegura", is(1)));
+                .andExpect(jsonPath("$.predicaoSegura", is(1)))
+                .andExpect(jsonPath("$.predicaoIndeterminada", is(1)))
+                .andExpect(jsonPath("$.failureTrend").isArray());
     }
 
     private void mockLogin(Usuario usuario) {

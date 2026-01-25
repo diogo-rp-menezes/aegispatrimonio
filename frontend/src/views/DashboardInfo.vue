@@ -101,13 +101,14 @@ async function fetchStats() {
       { title: "Críticos (< 7 dias)", value: data.predicaoCritica, icon: "bi-exclamation-triangle-fill", color: "danger", description: "Risco iminente de falha de disco", filter: "CRITICO" },
       { title: "Em Alerta (30 dias)", value: data.predicaoAlerta, icon: "bi-exclamation-circle", color: "warning", description: "Requer atenção no próximo mês", filter: "ALERTA" },
       { title: "Saudáveis", value: data.predicaoSegura, icon: "bi-check-circle", color: "success", description: "Sem previsão de falha próxima", filter: "SAUDAVEL" },
+      { title: "Indeterminado", value: data.predicaoIndeterminada || 0, icon: "bi-question-circle", color: "secondary", description: "Sem dados suficientes para previsão", filter: "" },
     ];
 
     predictiveChartData.value = {
-      labels: ['Críticos', 'Em Alerta', 'Saudáveis'],
+      labels: ['Críticos', 'Em Alerta', 'Saudáveis', 'Indeterminado'],
       datasets: [{
-        backgroundColor: ['#dc3545', '#ffc107', '#198754'],
-        data: [data.predicaoCritica, data.predicaoAlerta, data.predicaoSegura]
+        backgroundColor: ['#dc3545', '#ffc107', '#198754', '#6c757d'],
+        data: [data.predicaoCritica, data.predicaoAlerta, data.predicaoSegura, data.predicaoIndeterminada || 0]
       }]
     };
 
