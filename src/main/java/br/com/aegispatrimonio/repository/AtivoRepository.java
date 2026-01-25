@@ -33,6 +33,8 @@ public interface AtivoRepository extends JpaRepository<Ativo, Long> {
            "LEFT JOIN FETCH a.localizacao " +
            "LEFT JOIN FETCH a.tipoAtivo " +
            "LEFT JOIN FETCH a.funcionarioResponsavel " +
+           "LEFT JOIN FETCH a.detalheHardware " +
+           "LEFT JOIN FETCH a.fornecedor " +
            "WHERE a.id = :id")
     Optional<Ativo> findByIdWithDetails(@Param("id") Long id);
 
