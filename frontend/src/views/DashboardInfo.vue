@@ -82,9 +82,9 @@ async function fetchStats() {
     ];
 
     predictiveStats.value = [
-      { title: "Críticos (< 7 dias)", value: data.predicaoCritica, icon: "bi-exclamation-triangle-fill", color: "danger", description: "Risco iminente de falha de disco" },
-      { title: "Em Alerta (30 dias)", value: data.predicaoAlerta, icon: "bi-exclamation-circle", color: "warning", description: "Requer atenção no próximo mês" },
-      { title: "Saudáveis", value: data.predicaoSegura, icon: "bi-check-circle", color: "success", description: "Sem previsão de falha próxima" },
+      { title: "Críticos (< 7 dias)", value: data.predicaoCritica, icon: "bi-exclamation-triangle-fill", color: "danger", description: "Risco iminente de falha de disco", filter: "CRITICO" },
+      { title: "Em Alerta (30 dias)", value: data.predicaoAlerta, icon: "bi-exclamation-circle", color: "warning", description: "Requer atenção no próximo mês", filter: "ALERTA" },
+      { title: "Saudáveis", value: data.predicaoSegura, icon: "bi-check-circle", color: "success", description: "Sem previsão de falha próxima", filter: "SAUDAVEL" },
     ];
 
     // Chart Data Mapping
@@ -126,6 +126,12 @@ async function fetchRecentAssets() {
     }));
   } catch (error) {
     console.error("Erro ao carregar ativos recentes:", error);
+  }
+}
+
+function goToAssets(healthFilter) {
+  if (healthFilter) {
+    router.push({ path: '/ativos', query: { health: healthFilter } });
   }
 }
 
@@ -202,7 +208,7 @@ onMounted(async () => {
     <h5 class="fw-bold mb-3"><i class="bi bi-cpu me-2"></i>Manutenção Preditiva (IA Híbrida)</h5>
     <div class="row g-3 mb-4">
       <div v-for="stat in predictiveStats" :key="stat.title" class="col-md-4">
-        <div class="card h-100 border-0 shadow-sm">
+        <div class="card h-100 border-0 shadow-sm predictive-card" @click="goToAssets(stat.filter)">
           <div class="card-body d-flex align-items-center">
              <div
               :class="`bg-${stat.color} text-white rounded-circle d-flex align-items-center justify-content-center me-3 shadow-sm`"
@@ -271,10 +277,11 @@ onMounted(async () => {
 .dashboard h2 {
   font-size: 1.75rem;
 }
-.action-card {
+.action-card, .predictive-card {
   transition: transform 0.2s, box-shadow 0.2s;
+  cursor: pointer;
 }
-.action-card:hover {
+.action-card:hover, .predictive-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
 }

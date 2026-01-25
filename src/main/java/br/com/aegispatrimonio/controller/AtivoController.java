@@ -45,9 +45,10 @@ public class AtivoController {
             @RequestParam(required = false) Long filialId,
             @RequestParam(required = false) Long tipoAtivoId,
             @RequestParam(required = false) br.com.aegispatrimonio.model.StatusAtivo status,
-            @RequestParam(required = false) String nome
+            @RequestParam(required = false) String nome,
+            @RequestParam(required = false) String health
     ) {
-        return ativoService.listarTodos(pageable, filialId, tipoAtivoId, status, nome);
+        return ativoService.listarTodos(pageable, filialId, tipoAtivoId, status, nome, health);
     }
 
     /**

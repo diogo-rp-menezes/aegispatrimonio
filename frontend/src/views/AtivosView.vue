@@ -95,6 +95,17 @@
           </div>
         </div>
 
+        <!-- Indicador de Filtro de Saúde -->
+        <div v-if="healthFilter && !loading" class="card-body-modern border-bottom">
+          <div class="alert alert-warning d-flex justify-content-between align-items-center py-2 mb-0">
+             <small>
+               <i class="bi bi-heart-pulse-fill me-1"></i>
+               Filtro de Saúde: <strong>{{ healthFilter }}</strong>
+             </small>
+             <button type="button" class="btn-close btn-sm" aria-label="Close" @click="clearHealthFilter"></button>
+          </div>
+        </div>
+
         <!-- Table -->
         <div class="table-responsive" role="table" aria-describedby="table-desc">
           <div id="table-desc" class="visually-hidden">Tabela com ativos patrimoniais</div>
@@ -226,15 +237,17 @@
 <script setup>
 import { ref, reactive, computed, watch, onMounted } from 'vue';
 import { useDebounceFn } from '@vueuse/core';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { request } from '../services/api';
 import AtivoForm from './AtivoForm.vue';
 
 const PAGE_SIZE = 10;
 
 const router = useRouter();
+const route = useRoute();
 
 const q = ref('');
+const healthFilter = ref('');
 const items = ref([]);
 const loading = ref(false);
 const showForm = ref(false);
@@ -320,6 +333,7 @@ async function fetchPage(page = 0) {
   try {
     const params = { page, size: pageInfo.size };
     if (q.value.trim()) params.nome = q.value.trim();
+    if (healthFilter.value) params.health = healthFilter.value;
     
     const data = await request('/ativos', { params });
     items.value = data.content || [];
@@ -342,6 +356,12 @@ async function fetchPage(page = 0) {
 
 function limparBusca() {
   q.value = '';
+  fetchPage(0);
+}
+
+function clearHealthFilter() {
+  healthFilter.value = '';
+  router.replace({ query: {} });
   fetchPage(0);
 }
 
@@ -369,6 +389,9 @@ function goToDetail(id) {
 
 // Carregar inicialmente
 onMounted(() => {
+  if (route.query.health) {
+    healthFilter.value = route.query.health;
+  }
   fetchPage(0);
 });
 </script>

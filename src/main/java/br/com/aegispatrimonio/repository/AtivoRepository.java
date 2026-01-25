@@ -52,41 +52,57 @@ public interface AtivoRepository extends JpaRepository<Ativo, Long> {
     @Query("SELECT a FROM Ativo a WHERE (:filialId IS NULL OR a.filial.id = :filialId) " +
            "AND (:tipoAtivoId IS NULL OR a.tipoAtivo.id = :tipoAtivoId) " +
            "AND (:status IS NULL OR a.status = :status) " +
-           "AND (:nome IS NULL OR LOWER(a.nome) LIKE LOWER(CONCAT('%', :nome, '%')))")
+           "AND (:nome IS NULL OR LOWER(a.nome) LIKE LOWER(CONCAT('%', :nome, '%'))) " +
+           "AND (:minDate IS NULL OR a.previsaoEsgotamentoDisco >= :minDate) " +
+           "AND (:maxDate IS NULL OR a.previsaoEsgotamentoDisco < :maxDate)")
     Page<Ativo> findByFilters(@Param("filialId") Long filialId,
                               @Param("tipoAtivoId") Long tipoAtivoId,
                               @Param("status") StatusAtivo status,
                               @Param("nome") String nome,
+                              @Param("minDate") java.time.LocalDate minDate,
+                              @Param("maxDate") java.time.LocalDate maxDate,
                               Pageable pageable);
 
     @Query("SELECT a FROM Ativo a WHERE a.filial.id IN :filialIds " +
            "AND (:filialId IS NULL OR a.filial.id = :filialId) " +
            "AND (:tipoAtivoId IS NULL OR a.tipoAtivo.id = :tipoAtivoId) " +
            "AND (:status IS NULL OR a.status = :status) " +
-           "AND (:nome IS NULL OR LOWER(a.nome) LIKE LOWER(CONCAT('%', :nome, '%')))")
+           "AND (:nome IS NULL OR LOWER(a.nome) LIKE LOWER(CONCAT('%', :nome, '%'))) " +
+           "AND (:minDate IS NULL OR a.previsaoEsgotamentoDisco >= :minDate) " +
+           "AND (:maxDate IS NULL OR a.previsaoEsgotamentoDisco < :maxDate)")
     Page<Ativo> findByFilialIdsAndFilters(@Param("filialIds") Set<Long> filialIds,
                                           @Param("filialId") Long filialId,
                                           @Param("tipoAtivoId") Long tipoAtivoId,
                                           @Param("status") StatusAtivo status,
                                           @Param("nome") String nome,
+                                          @Param("minDate") java.time.LocalDate minDate,
+                                          @Param("maxDate") java.time.LocalDate maxDate,
                                           Pageable pageable);
 
     @Query("SELECT new br.com.aegispatrimonio.dto.AtivoNameDTO(a.id, a.nome) FROM Ativo a WHERE (:filialId IS NULL OR a.filial.id = :filialId) " +
            "AND (:tipoAtivoId IS NULL OR a.tipoAtivo.id = :tipoAtivoId) " +
-           "AND (:status IS NULL OR a.status = :status)")
+           "AND (:status IS NULL OR a.status = :status) " +
+           "AND (:minDate IS NULL OR a.previsaoEsgotamentoDisco >= :minDate) " +
+           "AND (:maxDate IS NULL OR a.previsaoEsgotamentoDisco < :maxDate)")
     List<AtivoNameDTO> findSimpleByFilters(@Param("filialId") Long filialId,
                                            @Param("tipoAtivoId") Long tipoAtivoId,
                                            @Param("status") StatusAtivo status,
+                                           @Param("minDate") java.time.LocalDate minDate,
+                                           @Param("maxDate") java.time.LocalDate maxDate,
                                            Pageable pageable);
 
     @Query("SELECT new br.com.aegispatrimonio.dto.AtivoNameDTO(a.id, a.nome) FROM Ativo a WHERE a.filial.id IN :filialIds " +
            "AND (:filialId IS NULL OR a.filial.id = :filialId) " +
            "AND (:tipoAtivoId IS NULL OR a.tipoAtivo.id = :tipoAtivoId) " +
-           "AND (:status IS NULL OR a.status = :status)")
+           "AND (:status IS NULL OR a.status = :status) " +
+           "AND (:minDate IS NULL OR a.previsaoEsgotamentoDisco >= :minDate) " +
+           "AND (:maxDate IS NULL OR a.previsaoEsgotamentoDisco < :maxDate)")
     List<AtivoNameDTO> findSimpleByFilialIdsAndFilters(@Param("filialIds") Set<Long> filialIds,
                                                       @Param("filialId") Long filialId,
                                                       @Param("tipoAtivoId") Long tipoAtivoId,
                                                       @Param("status") StatusAtivo status,
+                                                      @Param("minDate") java.time.LocalDate minDate,
+                                                      @Param("maxDate") java.time.LocalDate maxDate,
                                                       Pageable pageable);
 
     @Query("SELECT a FROM Ativo a " +

@@ -265,7 +265,7 @@ class AtivoServiceTest {
         mockUser(adminUser);
 
         // When finding candidates (name is null)
-        when(ativoRepository.findSimpleByFilters(any(), any(), any(), any(org.springframework.data.domain.Pageable.class)))
+        when(ativoRepository.findSimpleByFilters(any(), any(), any(), any(), any(), any(org.springframework.data.domain.Pageable.class)))
                 .thenReturn(candidates);
 
         // When ranking
@@ -285,7 +285,7 @@ class AtivoServiceTest {
         // Act
         org.springframework.data.domain.Page<br.com.aegispatrimonio.dto.AtivoDTO> result = ativoService.listarTodos(
                 org.springframework.data.domain.Pageable.ofSize(10),
-                null, null, null, query);
+                null, null, null, query, null);
 
         // Assert
         verify(searchOptimizationService).rankResults(eq(query), anyList(), any());
