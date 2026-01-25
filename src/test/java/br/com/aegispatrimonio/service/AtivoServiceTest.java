@@ -49,13 +49,9 @@ class AtivoServiceTest {
     @Mock
     private SearchOptimizationService searchOptimizationService;
     @Mock
-    private UserContextService userContextService; // Replaces CurrentUserProvider
+    private UserContextService userContextService;
     @Mock
     private AtivoHealthHistoryRepository healthHistoryRepository;
-    @Mock
-    private AlertNotificationService alertNotificationService;
-    @Mock
-    private PredictiveMaintenanceService predictiveMaintenanceService;
 
     @InjectMocks
     private AtivoService ativoService;
@@ -84,7 +80,6 @@ class AtivoServiceTest {
         adminUser = new Usuario();
         adminUser.setId(1L);
         adminUser.setRole("ROLE_ADMIN");
-        adminUser.setEmail("admin@aegis.com");
         adminUser.setFuncionario(adminFunc);
 
         Funcionario funcionario = new Funcionario();
@@ -217,7 +212,7 @@ class AtivoServiceTest {
             return a;
         });
 
-        // Mock para o retorno final (não precisa ter os detalhes para este teste passar, pois verificamos o capture)
+        // Mock para o retorno final
         when(ativoRepository.findByIdWithDetails(99L)).thenReturn(Optional.of(ativo));
 
         // Act
@@ -299,109 +294,6 @@ class AtivoServiceTest {
 
         org.junit.jupiter.api.Assertions.assertFalse(result.isEmpty());
         org.junit.jupiter.api.Assertions.assertEquals("DISK:0", result.get(0).componente());
-    }
-
-    @Test
-    @DisplayName("processarHealthCheck: Deve usar janela deslizante de 90 dias")
-    void processarHealthCheck_shouldUseSlidingWindow() {
-        // Arrange
-        Long ativoId = 10L;
-        br.com.aegispatrimonio.dto.healthcheck.DiskInfoDTO disk = new br.com.aegispatrimonio.dto.healthcheck.DiskInfoDTO(
-            "Model", "DISK-0", "SSD", 500.0, 200.0, 40.0
-        );
-        br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO payload = new br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO(
-            "PC-01", "DOMAIN", "OS", "1.0", "x64", "Mobo", "Model", "SN", "CPU", 4, 8,
-            null, null, null,
-            java.util.List.of(disk)
-        );
-
-        when(ativoRepository.findByIdWithDetails(ativoId)).thenReturn(Optional.of(ativo));
-
-        // Mock saveAll
-        when(healthHistoryRepository.saveAll(anyList())).thenReturn(java.util.Collections.emptyList());
-
-        // Mock findBy... with date filter
-        when(healthHistoryRepository.findByAtivoIdAndComponenteInAndMetricaAndDataRegistroAfterOrderByDataRegistroAsc(
-                eq(ativoId), anyList(), eq("FREE_SPACE_GB"), any(java.time.LocalDateTime.class)))
-            .thenReturn(java.util.Collections.emptyList());
-
-        // Act
-        ativoService.processarHealthCheck(ativoId, payload);
-
-        // Assert
-        org.mockito.ArgumentCaptor<java.time.LocalDateTime> dateCaptor = org.mockito.ArgumentCaptor.forClass(java.time.LocalDateTime.class);
-        verify(healthHistoryRepository).findByAtivoIdAndComponenteInAndMetricaAndDataRegistroAfterOrderByDataRegistroAsc(
-                eq(ativoId), anyList(), eq("FREE_SPACE_GB"), dateCaptor.capture()
-        );
-
-        java.time.LocalDateTime capturedDate = dateCaptor.getValue();
-        java.time.LocalDateTime expectedDate = java.time.LocalDateTime.now().minusDays(90);
-
-        // Allow a small margin of error (e.g., 1 minute)
-        long diff = java.time.temporal.ChronoUnit.MINUTES.between(capturedDate, expectedDate);
-        org.junit.jupiter.api.Assertions.assertTrue(Math.abs(diff) < 1, "A data de corte deve ser aproximadamente 90 dias atrás");
-    }
-
-    @Test
-    @DisplayName("processarHealthCheck: Deve pular predição se calculada recentemente")
-    void processarHealthCheck_shouldSkipPredictionIfRecentlyCalculated() {
-        // Arrange
-        Long ativoId = 10L;
-        java.util.Map<String, Object> attrs = new java.util.HashMap<>();
-        attrs.put("prediction_calculated_at", java.time.LocalDateTime.now().minusHours(1).toString());
-        ativo.setAtributos(attrs);
-
-        br.com.aegispatrimonio.dto.healthcheck.DiskInfoDTO disk = new br.com.aegispatrimonio.dto.healthcheck.DiskInfoDTO(
-            "Model", "DISK-0", "SSD", 500.0, 200.0, 40.0
-        );
-        br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO payload = new br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO(
-            "PC-01", "DOMAIN", "OS", "1.0", "x64", "Mobo", "Model", "SN", "CPU", 4, 8,
-            null, null, null,
-            java.util.List.of(disk)
-        );
-
-        when(ativoRepository.findByIdWithDetails(ativoId)).thenReturn(Optional.of(ativo));
-        when(healthHistoryRepository.saveAll(anyList())).thenReturn(java.util.Collections.emptyList());
-
-        // Act
-        ativoService.processarHealthCheck(ativoId, payload);
-
-        // Assert
-        // Verify that history fetch was skipped
-        verify(healthHistoryRepository, never()).findByAtivoIdAndComponenteInAndMetricaAndDataRegistroAfterOrderByDataRegistroAsc(
-                anyLong(), anyList(), anyString(), any(java.time.LocalDateTime.class));
-    }
-
-    @Test
-    @DisplayName("processarHealthCheck: Deve calcular se predição expirou")
-    void processarHealthCheck_shouldCalculateIfExpired() {
-        // Arrange
-        Long ativoId = 10L;
-        java.util.Map<String, Object> attrs = new java.util.HashMap<>();
-        attrs.put("prediction_calculated_at", java.time.LocalDateTime.now().minusHours(25).toString());
-        ativo.setAtributos(attrs);
-
-        br.com.aegispatrimonio.dto.healthcheck.DiskInfoDTO disk = new br.com.aegispatrimonio.dto.healthcheck.DiskInfoDTO(
-            "Model", "DISK-0", "SSD", 500.0, 200.0, 40.0
-        );
-        br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO payload = new br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO(
-            "PC-01", "DOMAIN", "OS", "1.0", "x64", "Mobo", "Model", "SN", "CPU", 4, 8,
-            null, null, null,
-            java.util.List.of(disk)
-        );
-
-        when(ativoRepository.findByIdWithDetails(ativoId)).thenReturn(Optional.of(ativo));
-        when(healthHistoryRepository.saveAll(anyList())).thenReturn(java.util.Collections.emptyList());
-        when(healthHistoryRepository.findByAtivoIdAndComponenteInAndMetricaAndDataRegistroAfterOrderByDataRegistroAsc(
-                eq(ativoId), anyList(), eq("FREE_SPACE_GB"), any(java.time.LocalDateTime.class)))
-            .thenReturn(java.util.Collections.emptyList());
-
-        // Act
-        ativoService.processarHealthCheck(ativoId, payload);
-
-        // Assert
-        verify(healthHistoryRepository).findByAtivoIdAndComponenteInAndMetricaAndDataRegistroAfterOrderByDataRegistroAsc(
-                eq(ativoId), anyList(), eq("FREE_SPACE_GB"), any(java.time.LocalDateTime.class));
     }
 
     @Test

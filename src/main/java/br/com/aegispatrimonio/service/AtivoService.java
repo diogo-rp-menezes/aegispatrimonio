@@ -6,9 +6,6 @@ import br.com.aegispatrimonio.dto.AtivoDTO;
 import br.com.aegispatrimonio.dto.AtivoNameDTO;
 import br.com.aegispatrimonio.dto.AtivoDetalheHardwareDTO;
 import br.com.aegispatrimonio.dto.AtivoUpdateDTO;
-import br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO;
-import br.com.aegispatrimonio.dto.healthcheck.DiskInfoDTO;
-import br.com.aegispatrimonio.dto.PredictionResult;
 import br.com.aegispatrimonio.mapper.AtivoMapper;
 import br.com.aegispatrimonio.model.*;
 import br.com.aegispatrimonio.repository.*;
@@ -44,12 +41,10 @@ public class AtivoService {
     private final MovimentacaoRepository movimentacaoRepository;
     private final DepreciacaoService depreciacaoService;
     private final AtivoHealthHistoryRepository healthHistoryRepository;
-    private final PredictiveMaintenanceService predictiveMaintenanceService;
     private final SearchOptimizationService searchOptimizationService;
-    private final AlertNotificationService alertNotificationService;
     private final UserContextService userContextService;
 
-    public AtivoService(AtivoRepository ativoRepository, AtivoMapper ativoMapper, TipoAtivoRepository tipoAtivoRepository, LocalizacaoRepository localizacaoRepository, FornecedorRepository fornecedorRepository, FuncionarioRepository funcionarioRepository, FilialRepository filialRepository, ManutencaoRepository manutencaoRepository, MovimentacaoRepository movimentacaoRepository, DepreciacaoService depreciacaoService, AtivoHealthHistoryRepository healthHistoryRepository, PredictiveMaintenanceService predictiveMaintenanceService, SearchOptimizationService searchOptimizationService, AlertNotificationService alertNotificationService, UserContextService userContextService) {
+    public AtivoService(AtivoRepository ativoRepository, AtivoMapper ativoMapper, TipoAtivoRepository tipoAtivoRepository, LocalizacaoRepository localizacaoRepository, FornecedorRepository fornecedorRepository, FuncionarioRepository funcionarioRepository, FilialRepository filialRepository, ManutencaoRepository manutencaoRepository, MovimentacaoRepository movimentacaoRepository, DepreciacaoService depreciacaoService, AtivoHealthHistoryRepository healthHistoryRepository, SearchOptimizationService searchOptimizationService, UserContextService userContextService) {
         this.ativoRepository = ativoRepository;
         this.ativoMapper = ativoMapper;
         this.tipoAtivoRepository = tipoAtivoRepository;
@@ -61,9 +56,7 @@ public class AtivoService {
         this.movimentacaoRepository = movimentacaoRepository;
         this.depreciacaoService = depreciacaoService;
         this.healthHistoryRepository = healthHistoryRepository;
-        this.predictiveMaintenanceService = predictiveMaintenanceService;
         this.searchOptimizationService = searchOptimizationService;
-        this.alertNotificationService = alertNotificationService;
         this.userContextService = userContextService;
     }
 
@@ -173,122 +166,6 @@ public class AtivoService {
         }
 
         return ativoMapper.toDTO(ativo);
-    }
-
-    @Transactional
-    public void processarHealthCheck(Long id, HealthCheckPayloadDTO payload) {
-        Ativo ativo = ativoRepository.findByIdWithDetails(id)
-                .orElseThrow(() -> new EntityNotFoundException("Ativo não encontrado com ID: " + id));
-
-        // Update basic hardware details
-        AtivoDetalheHardwareDTO hardwareDTO = new AtivoDetalheHardwareDTO(
-                payload.computerName(), payload.domain(), payload.osName(), payload.osVersion(),
-                payload.osArchitecture(), payload.motherboardManufacturer(), payload.motherboardModel(),
-                payload.motherboardSerialNumber(), payload.cpuModel(), payload.cpuCores(), payload.cpuThreads()
-        );
-        gerenciarDetalheHardware(ativo, hardwareDTO);
-
-        // Process Disks and History
-        List<AtivoHealthHistory> historyToSave = new java.util.ArrayList<>();
-        List<String> componentsToFetch = new java.util.ArrayList<>();
-
-        // 1. CPU Load
-        if (payload.cpuLoad() != null) {
-            AtivoHealthHistory history = new AtivoHealthHistory();
-            history.setAtivo(ativo);
-            history.setComponente("CPU");
-            history.setMetrica("CPU_LOAD_PERCENT");
-            history.setValor(payload.cpuLoad());
-            historyToSave.add(history);
-        }
-
-        // 2. Memory
-        if (payload.memoryTotal() != null && payload.memoryAvailable() != null && payload.memoryTotal() > 0) {
-            double freePercent = (double) payload.memoryAvailable() / payload.memoryTotal();
-            AtivoHealthHistory history = new AtivoHealthHistory();
-            history.setAtivo(ativo);
-            history.setComponente("RAM");
-            history.setMetrica("MEM_FREE_PERCENT");
-            history.setValor(freePercent);
-            historyToSave.add(history);
-        }
-
-        // 3. Disks
-        if (payload.discos() != null) {
-            for (DiskInfoDTO disk : payload.discos()) {
-                if (disk.freeGb() != null) {
-                    AtivoHealthHistory history = new AtivoHealthHistory();
-                    history.setAtivo(ativo);
-                    history.setComponente("DISK:" + disk.serial());
-                    history.setMetrica("FREE_SPACE_GB");
-                    history.setValor(disk.freeGb());
-                    historyToSave.add(history);
-                    componentsToFetch.add("DISK:" + disk.serial());
-                }
-            }
-        }
-
-        if (!historyToSave.isEmpty()) {
-            healthHistoryRepository.saveAll(historyToSave);
-
-            // Prediction logic only runs if there are disks involved (for now)
-            if (!componentsToFetch.isEmpty()) {
-                // Throttling: Check if prediction was calculated recently (< 24h)
-                boolean shouldRecalculate = true;
-                if (ativo.getAtributos() != null && ativo.getAtributos().containsKey("prediction_calculated_at")) {
-                    try {
-                        java.time.LocalDateTime lastCalc = java.time.LocalDateTime.parse(ativo.getAtributos().get("prediction_calculated_at").toString());
-                        if (lastCalc.plusHours(24).isAfter(java.time.LocalDateTime.now())) {
-                            shouldRecalculate = false;
-                        }
-                    } catch (Exception e) {
-                        // Ignore parse errors and recalculate
-                    }
-                }
-
-                if (shouldRecalculate) {
-                    // Fetch history for all components at once (Sliding Window: 90 days)
-                    java.time.LocalDateTime cutoffDate = java.time.LocalDateTime.now().minusDays(90);
-                    List<AtivoHealthHistory> allHistory = healthHistoryRepository
-                            .findByAtivoIdAndComponenteInAndMetricaAndDataRegistroAfterOrderByDataRegistroAsc(id, componentsToFetch, "FREE_SPACE_GB", cutoffDate);
-
-                    // Group by component
-                    java.util.Map<String, List<AtivoHealthHistory>> historyByComponent = allHistory.stream()
-                            .collect(Collectors.groupingBy(AtivoHealthHistory::getComponente));
-
-                    PredictionResult worstPredictionResult = null;
-
-                    for (List<AtivoHealthHistory> componentHistory : historyByComponent.values()) {
-                        PredictionResult prediction = predictiveMaintenanceService.predictExhaustionDate(componentHistory);
-                        if (prediction != null && prediction.exhaustionDate() != null) {
-                            if (worstPredictionResult == null ||
-                                    prediction.exhaustionDate().isBefore(worstPredictionResult.exhaustionDate())) {
-                                worstPredictionResult = prediction;
-                            }
-                        }
-                    }
-
-                    // Store worst prediction in attributes
-                    if (worstPredictionResult != null) {
-                        if (ativo.getAtributos() == null) {
-                            ativo.setAtributos(new java.util.HashMap<>());
-                        }
-                        ativo.getAtributos().put("previsaoEsgotamentoDisco", worstPredictionResult.exhaustionDate().toString());
-                        ativo.getAtributos().put("prediction_slope", worstPredictionResult.slope());
-                        ativo.getAtributos().put("prediction_intercept", worstPredictionResult.intercept());
-                        ativo.getAtributos().put("prediction_base_epoch_day", worstPredictionResult.baseEpochDay());
-                        ativo.getAtributos().put("prediction_calculated_at", java.time.LocalDateTime.now().toString());
-
-                        ativo.setPrevisaoEsgotamentoDisco(worstPredictionResult.exhaustionDate());
-                    }
-                }
-            }
-        }
-
-        ativoRepository.save(ativo);
-
-        // Trigger alert check
-        alertNotificationService.checkAndCreateAlerts(ativo.getId(), ativo.getPrevisaoEsgotamentoDisco(), payload);
     }
 
     @Transactional

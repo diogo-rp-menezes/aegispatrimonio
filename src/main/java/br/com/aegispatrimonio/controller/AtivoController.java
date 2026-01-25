@@ -6,6 +6,7 @@ import br.com.aegispatrimonio.dto.AtivoHealthHistoryDTO;
 import br.com.aegispatrimonio.dto.AtivoUpdateDTO;
 import br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO;
 import br.com.aegispatrimonio.service.AtivoService;
+import br.com.aegispatrimonio.service.IHealthCheckService;
 import br.com.aegispatrimonio.service.QRCodeService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -30,10 +31,12 @@ public class AtivoController {
 
     private final AtivoService ativoService;
     private final QRCodeService qrCodeService;
+    private final IHealthCheckService healthCheckService;
 
-    public AtivoController(AtivoService ativoService, QRCodeService qrCodeService) {
+    public AtivoController(AtivoService ativoService, QRCodeService qrCodeService, IHealthCheckService healthCheckService) {
         this.ativoService = ativoService;
         this.qrCodeService = qrCodeService;
+        this.healthCheckService = healthCheckService;
     }
 
     /**
@@ -121,7 +124,7 @@ public class AtivoController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("@permissionService.hasAtivoPermission(authentication, #id, 'UPDATE')")
     public void updateHealthCheck(@PathVariable Long id, @RequestBody HealthCheckPayloadDTO payload) {
-        ativoService.processarHealthCheck(id, payload);
+        healthCheckService.processHealthCheckPayload(id, payload);
     }
 
     /**
