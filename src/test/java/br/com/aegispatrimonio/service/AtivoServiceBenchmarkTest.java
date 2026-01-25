@@ -73,7 +73,7 @@ class AtivoServiceBenchmarkTest {
         ativo.setAtributos(new java.util.HashMap<>());
 
         when(ativoRepository.findByIdWithDetails(ativoId)).thenReturn(Optional.of(ativo));
-        when(healthHistoryRepository.findByAtivoIdAndComponenteInAndMetricaOrderByDataRegistroAsc(eq(ativoId), anyList(), eq("FREE_SPACE_GB")))
+        when(healthHistoryRepository.findByAtivoIdAndComponenteInAndMetricaAndDataRegistroAfterOrderByDataRegistroAsc(eq(ativoId), anyList(), eq("FREE_SPACE_GB"), any(java.time.LocalDateTime.class)))
                 .thenReturn(new ArrayList<>());
 
         // Act
@@ -85,7 +85,7 @@ class AtivoServiceBenchmarkTest {
         verify(healthHistoryRepository, never()).save(any(AtivoHealthHistory.class));
 
         // Verify new optimized methods are called exactly once
-        verify(healthHistoryRepository, times(1)).findByAtivoIdAndComponenteInAndMetricaOrderByDataRegistroAsc(eq(ativoId), anyList(), eq("FREE_SPACE_GB"));
+        verify(healthHistoryRepository, times(1)).findByAtivoIdAndComponenteInAndMetricaAndDataRegistroAfterOrderByDataRegistroAsc(eq(ativoId), anyList(), eq("FREE_SPACE_GB"), any(java.time.LocalDateTime.class));
         verify(healthHistoryRepository, times(1)).saveAll(anyList());
     }
 }
