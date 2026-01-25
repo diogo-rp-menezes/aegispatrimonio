@@ -1,5 +1,6 @@
 package br.com.aegispatrimonio.service;
 
+import br.com.aegispatrimonio.dto.PredictionResult;
 import br.com.aegispatrimonio.model.AtivoHealthHistory;
 import org.junit.jupiter.api.Test;
 import java.time.LocalDate;
@@ -27,11 +28,17 @@ class PredictiveMaintenanceServiceTest {
             history.add(h);
         }
 
-        LocalDate predicted = service.predictExhaustionDate(history);
+        PredictionResult result = service.predictExhaustionDate(history);
 
-        assertNotNull(predicted);
+        assertNotNull(result);
         // Should reach 0 at day 10 (start + 10 days)
-        assertEquals(start.toLocalDate().plusDays(10), predicted);
+        assertEquals(start.toLocalDate().plusDays(10), result.exhaustionDate());
+
+        // Verify parameters
+        // Slope should be approx -10
+        assertEquals(-10.0, result.slope(), 0.001);
+        // Intercept should be approx 100 (since x=0 is start date)
+        assertEquals(100.0, result.intercept(), 0.001);
     }
 
     @Test
@@ -46,8 +53,8 @@ class PredictiveMaintenanceServiceTest {
             history.add(h);
         }
 
-        LocalDate predicted = service.predictExhaustionDate(history);
-        assertNull(predicted, "Should return null for increasing trend (disk clearing up)");
+        PredictionResult result = service.predictExhaustionDate(history);
+        assertNull(result, "Should return null for increasing trend (disk clearing up)");
     }
 
     @Test
@@ -55,7 +62,7 @@ class PredictiveMaintenanceServiceTest {
         List<AtivoHealthHistory> history = new ArrayList<>();
         history.add(new AtivoHealthHistory());
 
-        LocalDate predicted = service.predictExhaustionDate(history);
-        assertNull(predicted);
+        PredictionResult result = service.predictExhaustionDate(history);
+        assertNull(result);
     }
 }

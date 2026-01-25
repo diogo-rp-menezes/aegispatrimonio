@@ -124,43 +124,37 @@ const chartData = computed(() => {
     };
   });
 
-  // Add Regression Trendline
-  if (ativo.value && ativo.value.previsaoEsgotamentoDisco && components.length > 0) {
-     const comp = components[0]; // Primary component
-     const points = healthHistory.value
-        .filter(h => h.componente === comp)
-        .map(h => ({ x: new Date(h.dataRegistro).getTime(), y: h.valor }));
+  // Add Regression Trendline (Shift Left - Backend Calculated)
+  if (ativo.value && ativo.value.atributos &&
+      ativo.value.atributos.prediction_slope &&
+      ativo.value.atributos.prediction_intercept &&
+      ativo.value.atributos.prediction_base_epoch_day) {
 
-     if (points.length >= 2) {
-         const n = points.length;
-         const sumX = points.reduce((acc, p) => acc + p.x, 0);
-         const sumY = points.reduce((acc, p) => acc + p.y, 0);
-         const sumXY = points.reduce((acc, p) => acc + p.x * p.y, 0);
-         const sumXX = points.reduce((acc, p) => acc + p.x * p.x, 0);
+     const slope = ativo.value.atributos.prediction_slope;
+     const intercept = ativo.value.atributos.prediction_intercept;
+     const baseEpochDay = ativo.value.atributos.prediction_base_epoch_day;
 
-         // Avoid division by zero
-         const denominator = n * sumXX - sumX * sumX;
-         if (denominator !== 0) {
-             const slope = (n * sumXY - sumX * sumY) / denominator;
-             const intercept = (sumY - slope * sumX) / n;
+     const trendData = uniqueDates.map(d => {
+         // Consistent date handling with Backend (LocalDate.toEpochDay)
+         // Assuming d is ISO string "YYYY-MM-DDTHH:mm:ss"
+         const datePart = d.split('T')[0]; // "YYYY-MM-DD"
+         const dateObj = new Date(datePart); // Treated as UTC
+         const daysFromEpoch = dateObj.getTime() / 86400000;
 
-             const trendData = uniqueDates.map(d => {
-                 const x = new Date(d).getTime();
-                 const y = slope * x + intercept;
-                 return y < 0 ? 0 : y; // Clamp to 0
-             });
+         const x = daysFromEpoch - baseEpochDay;
+         const y = slope * x + intercept;
+         return y < 0 ? 0 : y; // Clamp to 0
+     });
 
-             datasets.push({
-                 label: 'Tendência Estimada',
-                 data: trendData,
-                 borderColor: '#6c757d',
-                 borderDash: [5, 5],
-                 pointRadius: 0,
-                 fill: false,
-                 tension: 0
-             });
-         }
-     }
+     datasets.push({
+         label: 'Tendência Estimada (IA)',
+         data: trendData,
+         borderColor: '#6c757d',
+         borderDash: [5, 5],
+         pointRadius: 0,
+         fill: false,
+         tension: 0
+     });
   }
 
   return {

@@ -8,6 +8,7 @@ import br.com.aegispatrimonio.dto.AtivoDetalheHardwareDTO;
 import br.com.aegispatrimonio.dto.AtivoUpdateDTO;
 import br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO;
 import br.com.aegispatrimonio.dto.healthcheck.DiskInfoDTO;
+import br.com.aegispatrimonio.dto.PredictionResult;
 import br.com.aegispatrimonio.mapper.AtivoMapper;
 import br.com.aegispatrimonio.model.*;
 import br.com.aegispatrimonio.repository.*;
@@ -214,7 +215,6 @@ public class AtivoService {
 
         // Process Disks and History
         if (payload.discos() != null) {
-            LocalDate worstPrediction = null;
             List<AtivoHealthHistory> historyToSave = new java.util.ArrayList<>();
             List<String> componentsToFetch = new java.util.ArrayList<>();
 
@@ -242,23 +242,30 @@ public class AtivoService {
                 java.util.Map<String, List<AtivoHealthHistory>> historyByComponent = allHistory.stream()
                         .collect(Collectors.groupingBy(AtivoHealthHistory::getComponente));
 
+                PredictionResult worstPredictionResult = null;
+
                 for (List<AtivoHealthHistory> componentHistory : historyByComponent.values()) {
-                    LocalDate prediction = predictiveMaintenanceService.predictExhaustionDate(componentHistory);
-                    if (prediction != null) {
-                        if (worstPrediction == null || prediction.isBefore(worstPrediction)) {
-                            worstPrediction = prediction;
+                    PredictionResult prediction = predictiveMaintenanceService.predictExhaustionDate(componentHistory);
+                    if (prediction != null && prediction.exhaustionDate() != null) {
+                         if (worstPredictionResult == null ||
+                             prediction.exhaustionDate().isBefore(worstPredictionResult.exhaustionDate())) {
+                            worstPredictionResult = prediction;
                         }
                     }
                 }
-            }
 
-            // Store worst prediction in attributes
-            if (worstPrediction != null) {
-                if (ativo.getAtributos() == null) {
-                    ativo.setAtributos(new java.util.HashMap<>());
+                // Store worst prediction in attributes
+                if (worstPredictionResult != null) {
+                    if (ativo.getAtributos() == null) {
+                        ativo.setAtributos(new java.util.HashMap<>());
+                    }
+                    ativo.getAtributos().put("previsaoEsgotamentoDisco", worstPredictionResult.exhaustionDate().toString());
+                    ativo.getAtributos().put("prediction_slope", worstPredictionResult.slope());
+                    ativo.getAtributos().put("prediction_intercept", worstPredictionResult.intercept());
+                    ativo.getAtributos().put("prediction_base_epoch_day", worstPredictionResult.baseEpochDay());
+
+                    ativo.setPrevisaoEsgotamentoDisco(worstPredictionResult.exhaustionDate());
                 }
-                ativo.getAtributos().put("previsaoEsgotamentoDisco", worstPrediction.toString());
-                ativo.setPrevisaoEsgotamentoDisco(worstPrediction);
             }
         }
 
