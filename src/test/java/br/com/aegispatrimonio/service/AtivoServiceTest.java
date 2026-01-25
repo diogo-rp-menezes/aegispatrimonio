@@ -252,7 +252,7 @@ class AtivoServiceTest {
         mockUserContext(true, null); // Admin
 
         // When finding candidates (name is null)
-        when(ativoRepository.findSimpleByFilters(any(), any(), any(), any(), any(), any(org.springframework.data.domain.Pageable.class)))
+        when(ativoRepository.findSimpleByFilters(any(), any(), any(), any(), any(), any(), any(org.springframework.data.domain.Pageable.class)))
                 .thenReturn(candidates);
 
         // When ranking
@@ -402,5 +402,22 @@ class AtivoServiceTest {
         // Assert
         verify(healthHistoryRepository).findByAtivoIdAndComponenteInAndMetricaAndDataRegistroAfterOrderByDataRegistroAsc(
                 eq(ativoId), anyList(), eq("FREE_SPACE_GB"), any(java.time.LocalDateTime.class));
+    }
+
+    @Test
+    @DisplayName("ListarTodos: Deve filtrar por sem predição quando health=INDETERMINADO")
+    void listarTodos_comFiltroIndeterminado_deveFiltrarSemPredicao() {
+        // Arrange
+        mockUserContext(true, null); // Admin
+        when(ativoRepository.findByFilters(any(), any(), any(), any(), any(), any(), eq(false), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(org.springframework.data.domain.Page.empty());
+
+        // Act
+        ativoService.listarTodos(
+                org.springframework.data.domain.Pageable.ofSize(10),
+                null, null, null, null, "INDETERMINADO");
+
+        // Assert
+        verify(ativoRepository).findByFilters(any(), any(), any(), any(), isNull(), isNull(), eq(false), any());
     }
 }

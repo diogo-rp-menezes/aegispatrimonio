@@ -62,19 +62,22 @@ public interface AtivoRepository extends JpaRepository<Ativo, Long> {
            "AND (:status IS NULL OR a.status = :status) " +
            "AND (:nome IS NULL OR LOWER(a.nome) LIKE LOWER(CONCAT('%', :nome, '%'))) " +
            "AND (:minDate IS NULL OR a.previsaoEsgotamentoDisco >= :minDate) " +
-           "AND (:maxDate IS NULL OR a.previsaoEsgotamentoDisco < :maxDate)",
+           "AND (:maxDate IS NULL OR a.previsaoEsgotamentoDisco < :maxDate) " +
+           "AND (:hasPrediction IS NULL OR (:hasPrediction = true AND a.previsaoEsgotamentoDisco IS NOT NULL) OR (:hasPrediction = false AND a.previsaoEsgotamentoDisco IS NULL))",
            countQuery = "SELECT COUNT(a) FROM Ativo a WHERE (:filialId IS NULL OR a.filial.id = :filialId) " +
            "AND (:tipoAtivoId IS NULL OR a.tipoAtivo.id = :tipoAtivoId) " +
            "AND (:status IS NULL OR a.status = :status) " +
            "AND (:nome IS NULL OR LOWER(a.nome) LIKE LOWER(CONCAT('%', :nome, '%'))) " +
            "AND (:minDate IS NULL OR a.previsaoEsgotamentoDisco >= :minDate) " +
-           "AND (:maxDate IS NULL OR a.previsaoEsgotamentoDisco < :maxDate)")
+           "AND (:maxDate IS NULL OR a.previsaoEsgotamentoDisco < :maxDate) " +
+           "AND (:hasPrediction IS NULL OR (:hasPrediction = true AND a.previsaoEsgotamentoDisco IS NOT NULL) OR (:hasPrediction = false AND a.previsaoEsgotamentoDisco IS NULL))")
     Page<Ativo> findByFilters(@Param("filialId") Long filialId,
                               @Param("tipoAtivoId") Long tipoAtivoId,
                               @Param("status") StatusAtivo status,
                               @Param("nome") String nome,
                               @Param("minDate") java.time.LocalDate minDate,
                               @Param("maxDate") java.time.LocalDate maxDate,
+                              @Param("hasPrediction") Boolean hasPrediction,
                               Pageable pageable);
 
     @Query(value = "SELECT a FROM Ativo a " +
@@ -90,14 +93,16 @@ public interface AtivoRepository extends JpaRepository<Ativo, Long> {
            "AND (:status IS NULL OR a.status = :status) " +
            "AND (:nome IS NULL OR LOWER(a.nome) LIKE LOWER(CONCAT('%', :nome, '%'))) " +
            "AND (:minDate IS NULL OR a.previsaoEsgotamentoDisco >= :minDate) " +
-           "AND (:maxDate IS NULL OR a.previsaoEsgotamentoDisco < :maxDate)",
+           "AND (:maxDate IS NULL OR a.previsaoEsgotamentoDisco < :maxDate) " +
+           "AND (:hasPrediction IS NULL OR (:hasPrediction = true AND a.previsaoEsgotamentoDisco IS NOT NULL) OR (:hasPrediction = false AND a.previsaoEsgotamentoDisco IS NULL))",
            countQuery = "SELECT COUNT(a) FROM Ativo a WHERE a.filial.id IN :filialIds " +
            "AND (:filialId IS NULL OR a.filial.id = :filialId) " +
            "AND (:tipoAtivoId IS NULL OR a.tipoAtivo.id = :tipoAtivoId) " +
            "AND (:status IS NULL OR a.status = :status) " +
            "AND (:nome IS NULL OR LOWER(a.nome) LIKE LOWER(CONCAT('%', :nome, '%'))) " +
            "AND (:minDate IS NULL OR a.previsaoEsgotamentoDisco >= :minDate) " +
-           "AND (:maxDate IS NULL OR a.previsaoEsgotamentoDisco < :maxDate)")
+           "AND (:maxDate IS NULL OR a.previsaoEsgotamentoDisco < :maxDate) " +
+           "AND (:hasPrediction IS NULL OR (:hasPrediction = true AND a.previsaoEsgotamentoDisco IS NOT NULL) OR (:hasPrediction = false AND a.previsaoEsgotamentoDisco IS NULL))")
     Page<Ativo> findByFilialIdsAndFilters(@Param("filialIds") Set<Long> filialIds,
                                           @Param("filialId") Long filialId,
                                           @Param("tipoAtivoId") Long tipoAtivoId,
@@ -105,18 +110,21 @@ public interface AtivoRepository extends JpaRepository<Ativo, Long> {
                                           @Param("nome") String nome,
                                           @Param("minDate") java.time.LocalDate minDate,
                                           @Param("maxDate") java.time.LocalDate maxDate,
+                                          @Param("hasPrediction") Boolean hasPrediction,
                                           Pageable pageable);
 
     @Query("SELECT new br.com.aegispatrimonio.dto.AtivoNameDTO(a.id, a.nome) FROM Ativo a WHERE (:filialId IS NULL OR a.filial.id = :filialId) " +
            "AND (:tipoAtivoId IS NULL OR a.tipoAtivo.id = :tipoAtivoId) " +
            "AND (:status IS NULL OR a.status = :status) " +
            "AND (:minDate IS NULL OR a.previsaoEsgotamentoDisco >= :minDate) " +
-           "AND (:maxDate IS NULL OR a.previsaoEsgotamentoDisco < :maxDate)")
+           "AND (:maxDate IS NULL OR a.previsaoEsgotamentoDisco < :maxDate) " +
+           "AND (:hasPrediction IS NULL OR (:hasPrediction = true AND a.previsaoEsgotamentoDisco IS NOT NULL) OR (:hasPrediction = false AND a.previsaoEsgotamentoDisco IS NULL))")
     List<AtivoNameDTO> findSimpleByFilters(@Param("filialId") Long filialId,
                                            @Param("tipoAtivoId") Long tipoAtivoId,
                                            @Param("status") StatusAtivo status,
                                            @Param("minDate") java.time.LocalDate minDate,
                                            @Param("maxDate") java.time.LocalDate maxDate,
+                                           @Param("hasPrediction") Boolean hasPrediction,
                                            Pageable pageable);
 
     @Query("SELECT new br.com.aegispatrimonio.dto.AtivoNameDTO(a.id, a.nome) FROM Ativo a WHERE a.filial.id IN :filialIds " +
@@ -124,13 +132,15 @@ public interface AtivoRepository extends JpaRepository<Ativo, Long> {
            "AND (:tipoAtivoId IS NULL OR a.tipoAtivo.id = :tipoAtivoId) " +
            "AND (:status IS NULL OR a.status = :status) " +
            "AND (:minDate IS NULL OR a.previsaoEsgotamentoDisco >= :minDate) " +
-           "AND (:maxDate IS NULL OR a.previsaoEsgotamentoDisco < :maxDate)")
+           "AND (:maxDate IS NULL OR a.previsaoEsgotamentoDisco < :maxDate) " +
+           "AND (:hasPrediction IS NULL OR (:hasPrediction = true AND a.previsaoEsgotamentoDisco IS NOT NULL) OR (:hasPrediction = false AND a.previsaoEsgotamentoDisco IS NULL))")
     List<AtivoNameDTO> findSimpleByFilialIdsAndFilters(@Param("filialIds") Set<Long> filialIds,
                                                       @Param("filialId") Long filialId,
                                                       @Param("tipoAtivoId") Long tipoAtivoId,
                                                       @Param("status") StatusAtivo status,
                                                       @Param("minDate") java.time.LocalDate minDate,
                                                       @Param("maxDate") java.time.LocalDate maxDate,
+                                                      @Param("hasPrediction") Boolean hasPrediction,
                                                       Pageable pageable);
 
     @Query("SELECT a FROM Ativo a " +

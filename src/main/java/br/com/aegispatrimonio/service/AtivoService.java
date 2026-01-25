@@ -81,6 +81,8 @@ public class AtivoService {
         // Calculate Date Range for Predictive Health
         LocalDate minDate = null;
         LocalDate maxDate = null;
+        Boolean hasPrediction = null;
+
         if (health != null) {
             LocalDate now = LocalDate.now();
             switch (health) {
@@ -90,6 +92,7 @@ public class AtivoService {
                     maxDate = now.plusDays(30);
                 }
                 case "SAUDAVEL" -> minDate = now.plusDays(30);
+                case "INDETERMINADO" -> hasPrediction = false;
             }
         }
 
@@ -108,9 +111,9 @@ public class AtivoService {
             org.springframework.data.domain.Pageable limit = org.springframework.data.domain.PageRequest.of(0, 1000);
 
             if (isAdmin) {
-                candidates = ativoRepository.findSimpleByFilters(filialId, tipoAtivoId, status, minDate, maxDate, limit);
+                candidates = ativoRepository.findSimpleByFilters(filialId, tipoAtivoId, status, minDate, maxDate, hasPrediction, limit);
             } else {
-                candidates = ativoRepository.findSimpleByFilialIdsAndFilters(userFiliais, filialId, tipoAtivoId, status, minDate, maxDate, limit);
+                candidates = ativoRepository.findSimpleByFilialIdsAndFilters(userFiliais, filialId, tipoAtivoId, status, minDate, maxDate, hasPrediction, limit);
             }
 
             // Rank in memory using Levenshtein distance
@@ -148,12 +151,12 @@ public class AtivoService {
             if (unpaged && !hasFilters) {
                 return new PageImpl<>(ativoRepository.findAllWithDetails().stream().map(ativoMapper::toDTO).collect(Collectors.toList()));
             }
-            return ativoRepository.findByFilters(filialId, tipoAtivoId, status, null, minDate, maxDate, effectivePageable).map(ativoMapper::toDTO);
+            return ativoRepository.findByFilters(filialId, tipoAtivoId, status, null, minDate, maxDate, hasPrediction, effectivePageable).map(ativoMapper::toDTO);
         } else {
             if (unpaged && !hasFilters) {
                 return new PageImpl<>(ativoRepository.findByFilialIdInWithDetails(userFiliais).stream().map(ativoMapper::toDTO).collect(Collectors.toList()));
             }
-            return ativoRepository.findByFilialIdsAndFilters(userFiliais, filialId, tipoAtivoId, status, null, minDate, maxDate, effectivePageable).map(ativoMapper::toDTO);
+            return ativoRepository.findByFilialIdsAndFilters(userFiliais, filialId, tipoAtivoId, status, null, minDate, maxDate, hasPrediction, effectivePageable).map(ativoMapper::toDTO);
         }
     }
 

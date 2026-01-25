@@ -89,21 +89,21 @@ public class AtivoRepositoryTest extends BaseIT {
 
         // Act & Assert - Search for "Note" (should find Notebook)
         Page<Ativo> result = ativoRepository.findByFilters(
-                filial.getId(), null, null, "Note", null, null, PageRequest.of(0, 10));
+                filial.getId(), null, null, "Note", null, null, null, PageRequest.of(0, 10));
 
         assertThat(result.getContent()).hasSize(1);
         assertThat(result.getContent().get(0).getNome()).isEqualTo("Notebook Dell");
 
         // Act & Assert - Search for "lg" (should find Monitor - case insensitive)
         result = ativoRepository.findByFilters(
-                filial.getId(), null, null, "lg", null, null, PageRequest.of(0, 10));
+                filial.getId(), null, null, "lg", null, null, null, PageRequest.of(0, 10));
 
         assertThat(result.getContent()).hasSize(1);
         assertThat(result.getContent().get(0).getNome()).isEqualTo("Monitor LG");
 
         // Act & Assert - Search with multiple filiais method
         result = ativoRepository.findByFilialIdsAndFilters(
-                Collections.singleton(filial.getId()), filial.getId(), null, null, "Note", null, null, PageRequest.of(0, 10));
+                Collections.singleton(filial.getId()), filial.getId(), null, null, "Note", null, null, null, PageRequest.of(0, 10));
 
         assertThat(result.getContent()).hasSize(1);
         assertThat(result.getContent().get(0).getNome()).isEqualTo("Notebook Dell");
