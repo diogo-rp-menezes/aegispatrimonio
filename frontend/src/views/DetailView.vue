@@ -1,8 +1,29 @@
 <!-- src/views/DetailView.vue -->
 <script setup>
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, onMounted, onUnmounted, computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { request } from "../services/api";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+} from 'chart.js';
+import { Line } from 'vue-chartjs';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 const route = useRoute();
 const router = useRouter();
@@ -13,6 +34,9 @@ const error = ref(null);
 
 const historico = ref([]);
 const loadingHistorico = ref(false);
+
+const healthHistory = ref([]);
+const loadingHealth = ref(false);
 
 const showQrModal = ref(false);
 const qrCodeUrl = ref(null);
@@ -42,6 +66,68 @@ async function carregarHistorico() {
     loadingHistorico.value = false;
   }
 }
+
+async function carregarHealthHistory() {
+  loadingHealth.value = true;
+  try {
+    const data = await request(`/ativos/${route.params.id}/health-history`);
+    healthHistory.value = data || [];
+  } catch (err) {
+    console.error("Erro ao carregar histórico de saúde", err);
+  } finally {
+    loadingHealth.value = false;
+  }
+}
+
+const chartData = computed(() => {
+  if (!healthHistory.value || healthHistory.value.length === 0) {
+    return { labels: [], datasets: [] };
+  }
+
+  // Get all unique dates sorted
+  const uniqueDates = [...new Set(healthHistory.value.map(h => h.dataRegistro))].sort();
+  const formattedDates = uniqueDates.map(d => new Date(d).toLocaleString('pt-BR'));
+
+  // Group by component (Disk)
+  const components = [...new Set(healthHistory.value.map(h => h.componente))];
+
+  const datasets = components.map((comp, index) => {
+    // Colors for different lines
+    const colors = ['#0d6efd', '#dc3545', '#198754', '#ffc107', '#0dcaf0'];
+    const color = colors[index % colors.length];
+
+    // Create data array matching the unique dates
+    const data = uniqueDates.map(date => {
+      const entry = healthHistory.value.find(h => h.componente === comp && h.dataRegistro === date);
+      return entry ? entry.valor : null; // null for gaps
+    });
+
+    return {
+      label: comp,
+      backgroundColor: color,
+      borderColor: color,
+      data: data,
+      fill: false,
+      tension: 0.1
+    };
+  });
+
+  return {
+    labels: formattedDates,
+    datasets: datasets
+  };
+});
+
+const chartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    title: {
+      display: true,
+      text: 'Espaço Livre em Disco (GB) ao Longo do Tempo'
+    }
+  }
+};
 
 function voltar() {
   router.push("/ativos");
@@ -176,6 +262,7 @@ function getBadgeClass(type) {
 onMounted(() => {
   carregarAtivo();
   carregarHistorico();
+  carregarHealthHistory();
 });
 </script>
 
@@ -228,6 +315,18 @@ onMounted(() => {
       <div>
         <h5 class="alert-heading fw-bold mb-1">Análise Preditiva</h5>
         <p class="mb-0">{{ getPredictionText(ativo.previsaoEsgotamentoDisco) }}</p>
+      </div>
+    </div>
+
+    <!-- Health History Chart -->
+    <div v-if="ativo && healthHistory.length > 0" class="card shadow-sm mb-4">
+      <div class="card-header bg-light">
+        <h5 class="mb-0"><i class="bi bi-activity me-2"></i>Histórico de Saúde (Disco)</h5>
+      </div>
+      <div class="card-body">
+         <div style="height: 300px;">
+            <Line :data="chartData" :options="chartOptions" />
+         </div>
       </div>
     </div>
 

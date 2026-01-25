@@ -1,6 +1,7 @@
 package br.com.aegispatrimonio.service;
 
 import br.com.aegispatrimonio.dto.AtivoCreateDTO;
+import br.com.aegispatrimonio.dto.AtivoHealthHistoryDTO;
 import br.com.aegispatrimonio.dto.AtivoDTO;
 import br.com.aegispatrimonio.dto.AtivoNameDTO;
 import br.com.aegispatrimonio.dto.AtivoDetalheHardwareDTO;
@@ -376,6 +377,32 @@ public class AtivoService {
         }
 
         ativoRepository.delete(ativo);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AtivoHealthHistoryDTO> getHealthHistory(Long ativoId) {
+        Usuario usuarioLogado = getUsuarioLogado();
+        Ativo ativo = ativoRepository.findById(ativoId)
+                .orElseThrow(() -> new EntityNotFoundException("Ativo não encontrado com ID: " + ativoId));
+
+        if (!isAdmin(usuarioLogado)) {
+            Funcionario funcionarioPrincipal = usuarioLogado.getFuncionario();
+            if (funcionarioPrincipal == null || funcionarioPrincipal.getId() == null) {
+                throw new AccessDeniedException("Usuário não é um funcionário ou não está associado a nenhuma filial.");
+            }
+            Optional<Funcionario> funcionarioOpt = funcionarioRepository.findById(funcionarioPrincipal.getId());
+            if (funcionarioOpt.isPresent()) {
+                Funcionario funcionarioLogado = funcionarioOpt.get();
+                if (funcionarioLogado.getFiliais().stream().noneMatch(f -> f.getId().equals(ativo.getFilial().getId()))) {
+                    throw new AccessDeniedException("Você não tem permissão para acessar o histórico deste ativo.");
+                }
+            }
+        }
+
+        return healthHistoryRepository.findByAtivoIdAndMetricaOrderByDataRegistroAsc(ativoId, "FREE_SPACE_GB")
+                .stream()
+                .map(h -> new AtivoHealthHistoryDTO(h.getDataRegistro(), h.getComponente(), h.getValor(), h.getMetrica()))
+                .collect(Collectors.toList());
     }
 
     private void validarNumeroPatrimonio(String numeroPatrimonio, Long ativoId) {

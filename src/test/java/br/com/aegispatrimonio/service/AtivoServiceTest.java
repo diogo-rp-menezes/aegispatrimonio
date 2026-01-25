@@ -58,6 +58,8 @@ class AtivoServiceTest {
     private SearchOptimizationService searchOptimizationService;
     @Mock
     private CurrentUserProvider currentUserProvider; // Adicionado mock para CurrentUserProvider
+    @Mock
+    private AtivoHealthHistoryRepository healthHistoryRepository;
 
     @InjectMocks
     private AtivoService ativoService;
@@ -290,5 +292,25 @@ class AtivoServiceTest {
         verify(ativoRepository).findAllByIdInWithDetails(anyList());
         org.junit.jupiter.api.Assertions.assertEquals(2, result.getContent().size());
         org.junit.jupiter.api.Assertions.assertEquals("Laptop", result.getContent().get(0).nome());
+    }
+
+    @Test
+    @DisplayName("getHealthHistory: Deve retornar lista quando usuário tem permissão")
+    void getHealthHistory_ShouldReturnList_WhenUserHasPermission() {
+        mockUser(adminUser);
+        AtivoHealthHistory history = new AtivoHealthHistory();
+        history.setDataRegistro(java.time.LocalDateTime.now());
+        history.setComponente("DISK:0");
+        history.setValor(100.0);
+        history.setMetrica("FREE_SPACE_GB");
+
+        when(ativoRepository.findById(10L)).thenReturn(Optional.of(ativo));
+        when(healthHistoryRepository.findByAtivoIdAndMetricaOrderByDataRegistroAsc(10L, "FREE_SPACE_GB"))
+                .thenReturn(java.util.List.of(history));
+
+        java.util.List<br.com.aegispatrimonio.dto.AtivoHealthHistoryDTO> result = ativoService.getHealthHistory(10L);
+
+        org.junit.jupiter.api.Assertions.assertFalse(result.isEmpty());
+        org.junit.jupiter.api.Assertions.assertEquals("DISK:0", result.get(0).componente());
     }
 }

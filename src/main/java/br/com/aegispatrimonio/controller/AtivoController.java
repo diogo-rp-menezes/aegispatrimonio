@@ -2,6 +2,7 @@ package br.com.aegispatrimonio.controller;
 
 import br.com.aegispatrimonio.dto.AtivoCreateDTO;
 import br.com.aegispatrimonio.dto.AtivoDTO;
+import br.com.aegispatrimonio.dto.AtivoHealthHistoryDTO;
 import br.com.aegispatrimonio.dto.AtivoUpdateDTO;
 import br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO;
 import br.com.aegispatrimonio.service.AtivoService;
@@ -11,6 +12,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 /**
  * Controller para gerenciar as operações CRUD de Ativos.
@@ -113,5 +116,18 @@ public class AtivoController {
     @PreAuthorize("@permissionService.hasAtivoPermission(authentication, #id, 'UPDATE')")
     public void updateHealthCheck(@PathVariable Long id, @RequestBody HealthCheckPayloadDTO payload) {
         ativoService.processarHealthCheck(id, payload);
+    }
+
+    /**
+     * Recupera o histórico de saúde (ex: espaço em disco) do ativo.
+     * Requer permissão READ no contexto da filial do ativo.
+     *
+     * @param id O ID do ativo.
+     * @return Lista de AtivoHealthHistoryDTO.
+     */
+    @GetMapping("/{id}/health-history")
+    @PreAuthorize("@permissionService.hasAtivoPermission(authentication, #id, 'READ')")
+    public List<AtivoHealthHistoryDTO> getHealthHistory(@PathVariable Long id) {
+        return ativoService.getHealthHistory(id);
     }
 }
