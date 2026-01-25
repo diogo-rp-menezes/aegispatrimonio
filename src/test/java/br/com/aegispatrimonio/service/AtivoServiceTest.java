@@ -60,6 +60,8 @@ class AtivoServiceTest {
     private CurrentUserProvider currentUserProvider; // Adicionado mock para CurrentUserProvider
     @Mock
     private AtivoHealthHistoryRepository healthHistoryRepository;
+    @Mock
+    private AlertNotificationService alertNotificationService;
 
     @InjectMocks
     private AtivoService ativoService;
@@ -312,5 +314,45 @@ class AtivoServiceTest {
 
         org.junit.jupiter.api.Assertions.assertFalse(result.isEmpty());
         org.junit.jupiter.api.Assertions.assertEquals("DISK:0", result.get(0).componente());
+    }
+
+    @Test
+    @DisplayName("processarHealthCheck: Deve usar janela deslizante de 90 dias")
+    void processarHealthCheck_shouldUseSlidingWindow() {
+        // Arrange
+        Long ativoId = 10L;
+        br.com.aegispatrimonio.dto.healthcheck.DiskInfoDTO disk = new br.com.aegispatrimonio.dto.healthcheck.DiskInfoDTO(
+            "Model", "DISK-0", "SSD", 500.0, 200.0, 40.0
+        );
+        br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO payload = new br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO(
+            "PC-01", "DOMAIN", "OS", "1.0", "x64", "Mobo", "Model", "SN", "CPU", 4, 8,
+            java.util.List.of(disk)
+        );
+
+        when(ativoRepository.findByIdWithDetails(ativoId)).thenReturn(Optional.of(ativo));
+
+        // Mock saveAll
+        when(healthHistoryRepository.saveAll(anyList())).thenReturn(java.util.Collections.emptyList());
+
+        // Mock findBy... with date filter
+        when(healthHistoryRepository.findByAtivoIdAndComponenteInAndMetricaAndDataRegistroAfterOrderByDataRegistroAsc(
+                eq(ativoId), anyList(), eq("FREE_SPACE_GB"), any(java.time.LocalDateTime.class)))
+            .thenReturn(java.util.Collections.emptyList());
+
+        // Act
+        ativoService.processarHealthCheck(ativoId, payload);
+
+        // Assert
+        org.mockito.ArgumentCaptor<java.time.LocalDateTime> dateCaptor = org.mockito.ArgumentCaptor.forClass(java.time.LocalDateTime.class);
+        verify(healthHistoryRepository).findByAtivoIdAndComponenteInAndMetricaAndDataRegistroAfterOrderByDataRegistroAsc(
+                eq(ativoId), anyList(), eq("FREE_SPACE_GB"), dateCaptor.capture()
+        );
+
+        java.time.LocalDateTime capturedDate = dateCaptor.getValue();
+        java.time.LocalDateTime expectedDate = java.time.LocalDateTime.now().minusDays(90);
+
+        // Allow a small margin of error (e.g., 1 minute)
+        long diff = java.time.temporal.ChronoUnit.MINUTES.between(capturedDate, expectedDate);
+        org.junit.jupiter.api.Assertions.assertTrue(Math.abs(diff) < 1, "A data de corte deve ser aproximadamente 90 dias atrás");
     }
 }

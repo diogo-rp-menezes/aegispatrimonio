@@ -233,9 +233,10 @@ public class AtivoService {
             if (!historyToSave.isEmpty()) {
                 healthHistoryRepository.saveAll(historyToSave);
 
-                // Fetch history for all components at once
+                // Fetch history for all components at once (Sliding Window: 90 days)
+                java.time.LocalDateTime cutoffDate = java.time.LocalDateTime.now().minusDays(90);
                 List<AtivoHealthHistory> allHistory = healthHistoryRepository
-                        .findByAtivoIdAndComponenteInAndMetricaOrderByDataRegistroAsc(id, componentsToFetch, "FREE_SPACE_GB");
+                        .findByAtivoIdAndComponenteInAndMetricaAndDataRegistroAfterOrderByDataRegistroAsc(id, componentsToFetch, "FREE_SPACE_GB", cutoffDate);
 
                 // Group by component
                 java.util.Map<String, List<AtivoHealthHistory>> historyByComponent = allHistory.stream()
