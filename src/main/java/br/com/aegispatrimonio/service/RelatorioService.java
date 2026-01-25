@@ -20,10 +20,10 @@ import java.util.Map;
 public class RelatorioService {
 
     private final AtivoRepository ativoRepository;
-    private final QrCodeService qrCodeService;
+    private final QRCodeService qrCodeService;
     private final ObjectMapper objectMapper;
 
-    public RelatorioService(AtivoRepository ativoRepository, QrCodeService qrCodeService, ObjectMapper objectMapper) {
+    public RelatorioService(AtivoRepository ativoRepository, QRCodeService qrCodeService, ObjectMapper objectMapper) {
         this.ativoRepository = ativoRepository;
         this.qrCodeService = qrCodeService;
         this.objectMapper = objectMapper;
@@ -41,7 +41,7 @@ public class RelatorioService {
             data.put("nome", ativo.getNome());
 
             String content = objectMapper.writeValueAsString(data);
-            return qrCodeService.generateQrCode(content, 300, 300);
+            return qrCodeService.generateQRCode(content, 300, 300);
         } catch (Exception e) {
             throw new RuntimeException("Erro ao gerar conteúdo do QR Code", e);
         }

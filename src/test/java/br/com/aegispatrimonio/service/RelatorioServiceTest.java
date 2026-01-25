@@ -5,6 +5,7 @@ import br.com.aegispatrimonio.model.AtivoDetalheHardware;
 import br.com.aegispatrimonio.model.Funcionario;
 import br.com.aegispatrimonio.model.TipoAtivo;
 import br.com.aegispatrimonio.repository.AtivoRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +24,12 @@ class RelatorioServiceTest {
 
     @Mock
     private AtivoRepository ativoRepository;
+
+    @Mock
+    private QRCodeService qrCodeService;
+
+    @Mock
+    private ObjectMapper objectMapper;
 
     @InjectMocks
     private RelatorioService relatorioService;
