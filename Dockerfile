@@ -1,29 +1,50 @@
-# Use a imagem oficial do OpenJDK para uma build otimizada
-FROM openjdk:21-jdk-slim as build
+# Stage 1: Build Frontend
+FROM node:20-alpine as frontend-build
+WORKDIR /app/frontend
 
-# Define o diretório de trabalho dentro do contêiner
+# Copy dependency definitions
+COPY frontend/package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy source code
+COPY frontend/ .
+
+# Build the application
+RUN npm run build
+
+# Stage 2: Build Backend
+FROM openjdk:21-jdk-slim as backend-build
 WORKDIR /app
 
-# Copia o arquivo pom.xml para que as dependências possam ser baixadas em cache
+# Copy Maven wrapper and configuration
+COPY mvnw .
+COPY .mvn .mvn
 COPY pom.xml .
 
-# Copia o código fonte da aplicação
+# Make wrapper executable (just in case) and download dependencies
+RUN chmod +x mvnw && ./mvnw dependency:go-offline
+
+# Copy backend source code
 COPY src ./src
 
-# Compila a aplicação e gera o JAR executável
+# Copy built frontend assets to Spring Boot static resources
+# This ensures the frontend is embedded in the JAR
+COPY --from=frontend-build /app/frontend/dist ./src/main/resources/static
+
+# Build the application
 RUN ./mvnw clean package -DskipTests
 
-# Imagem final para a aplicação
+# Stage 3: Runtime Image
 FROM openjdk:21-jdk-slim
-
-# Define o diretório de trabalho
 WORKDIR /app
 
-# Copia o JAR gerado da etapa de build
-COPY --from=build /app/target/*.jar app.jar
+# Copy the built JAR from the backend stage
+COPY --from=backend-build /app/target/*.jar app.jar
 
-# Expõe a porta em que a aplicação Spring Boot será executada
+# Expose port
 EXPOSE 8080
 
-# Define o comando para executar a aplicação
+# Run the application
 ENTRYPOINT ["java", "-jar", "app.jar"]
