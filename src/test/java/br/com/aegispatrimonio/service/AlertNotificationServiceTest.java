@@ -6,7 +6,6 @@ import br.com.aegispatrimonio.model.Ativo;
 import br.com.aegispatrimonio.model.TipoAlerta;
 import br.com.aegispatrimonio.repository.AlertaRepository;
 import br.com.aegispatrimonio.repository.AtivoRepository;
-import br.com.aegispatrimonio.repository.FuncionarioRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,10 +29,7 @@ class AlertNotificationServiceTest {
     private AtivoRepository ativoRepository;
 
     @Mock
-    private CurrentUserProvider currentUserProvider;
-
-    @Mock
-    private FuncionarioRepository funcionarioRepository;
+    private UserContextService userContextService;
 
     @InjectMocks
     private AlertNotificationService service;

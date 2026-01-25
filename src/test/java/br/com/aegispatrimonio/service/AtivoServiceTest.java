@@ -5,22 +5,15 @@ import br.com.aegispatrimonio.dto.AtivoUpdateDTO;
 import br.com.aegispatrimonio.mapper.AtivoMapper;
 import br.com.aegispatrimonio.model.*;
 import br.com.aegispatrimonio.repository.*;
-import br.com.aegispatrimonio.security.CustomUserDetails;
 import jakarta.persistence.EntityNotFoundException;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockedStatic;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContext;
-import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -28,7 +21,6 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
-// CORREÇÃO: Importar todos os métodos estáticos do Mockito para resolver os erros de compilação.
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -57,18 +49,18 @@ class AtivoServiceTest {
     @Mock
     private SearchOptimizationService searchOptimizationService;
     @Mock
-    private CurrentUserProvider currentUserProvider; // Adicionado mock para CurrentUserProvider
+    private UserContextService userContextService; // Replaces CurrentUserProvider
     @Mock
     private AtivoHealthHistoryRepository healthHistoryRepository;
     @Mock
     private AlertNotificationService alertNotificationService;
+    @Mock
+    private PredictiveMaintenanceService predictiveMaintenanceService;
 
     @InjectMocks
     private AtivoService ativoService;
 
-    private MockedStatic<SecurityContextHolder> mockedSecurityContextHolder;
-
-    // Entidades de Teste
+    // Test Entities
     private Usuario adminUser, regularUser;
     private Filial filialA, filialB;
     private Ativo ativo;
@@ -92,7 +84,7 @@ class AtivoServiceTest {
         adminUser = new Usuario();
         adminUser.setId(1L);
         adminUser.setRole("ROLE_ADMIN");
-        adminUser.setEmail("admin@aegis.com"); // Adicionado email
+        adminUser.setEmail("admin@aegis.com");
         adminUser.setFuncionario(adminFunc);
 
         Funcionario funcionario = new Funcionario();
@@ -101,41 +93,34 @@ class AtivoServiceTest {
         regularUser = new Usuario();
         regularUser.setId(2L);
         regularUser.setRole("ROLE_USER");
-        regularUser.setEmail("user@aegis.com"); // Adicionado email
+        regularUser.setEmail("user@aegis.com");
         regularUser.setFuncionario(funcionario);
 
         ativo = new Ativo();
         ativo.setId(10L);
         ativo.setFilial(filialA);
-
-        // Mock do currentUserProvider no setUp para garantir que sempre haja um usuário
-        lenient().when(currentUserProvider.getCurrentUsuario()).thenReturn(adminUser); 
     }
 
-    @AfterEach
-    void tearDown() {
-        // Se mockedSecurityContextHolder foi inicializado, feche-o.
-        // if (mockedSecurityContextHolder != null) {
-        //     mockedSecurityContextHolder.close();
-        // }
-    }
-
-    private void mockUser(Usuario usuario) {
-        // Agora mockamos o currentUserProvider diretamente
-        lenient().when(currentUserProvider.getCurrentUsuario()).thenReturn(usuario);
+    private void mockUserContext(boolean isAdmin, Set<Long> filiais) {
+        lenient().when(userContextService.isAdmin()).thenReturn(isAdmin);
+        if (!isAdmin) {
+             lenient().when(userContextService.getUserFiliais()).thenReturn(filiais);
+        }
     }
 
     @Test
     @DisplayName("BuscarPorId: Usuário comum não pode acessar ativo de outra filial")
     void buscarPorId_quandoNaoAdminEOutraFilial_deveLancarExcecao() {
-        mockUser(regularUser);
+        // Arrange
+        mockUserContext(false, Set.of(1L)); // User has access only to Filial 1 (A)
+
         Ativo ativoOutraFilial = new Ativo();
         ativoOutraFilial.setId(11L);
-        ativoOutraFilial.setFilial(filialB);
-        when(ativoRepository.findByIdWithDetails(11L)).thenReturn(Optional.of(ativoOutraFilial));
-        // CORREÇÃO: Mockar o repositório de funcionários para garantir que a verificação de segurança ocorra
-        when(funcionarioRepository.findById(2L)).thenReturn(Optional.of(regularUser.getFuncionario()));
+        ativoOutraFilial.setFilial(filialB); // Filial 2 (B)
 
+        when(ativoRepository.findByIdWithDetails(11L)).thenReturn(Optional.of(ativoOutraFilial));
+
+        // Act & Assert
         assertThrows(AccessDeniedException.class, () -> ativoService.buscarPorId(11L));
     }
 
@@ -264,7 +249,7 @@ class AtivoServiceTest {
         // Mock ranked result returned by Service
         java.util.List<br.com.aegispatrimonio.dto.AtivoNameDTO> ranked = java.util.List.of(n2, n3);
 
-        mockUser(adminUser);
+        mockUserContext(true, null); // Admin
 
         // When finding candidates (name is null)
         when(ativoRepository.findSimpleByFilters(any(), any(), any(), any(), any(), any(org.springframework.data.domain.Pageable.class)))
@@ -299,7 +284,7 @@ class AtivoServiceTest {
     @Test
     @DisplayName("getHealthHistory: Deve retornar lista quando usuário tem permissão")
     void getHealthHistory_ShouldReturnList_WhenUserHasPermission() {
-        mockUser(adminUser);
+        mockUserContext(true, null); // Admin
         AtivoHealthHistory history = new AtivoHealthHistory();
         history.setDataRegistro(java.time.LocalDateTime.now());
         history.setComponente("DISK:0");

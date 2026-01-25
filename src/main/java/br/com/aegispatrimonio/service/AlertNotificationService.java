@@ -26,40 +26,35 @@ public class AlertNotificationService {
 
     private final AlertaRepository alertaRepository;
     private final AtivoRepository ativoRepository;
-    private final CurrentUserProvider currentUserProvider;
-    private final FuncionarioRepository funcionarioRepository;
+    private final UserContextService userContextService;
 
     public AlertNotificationService(AlertaRepository alertaRepository,
                                     AtivoRepository ativoRepository,
-                                    CurrentUserProvider currentUserProvider,
-                                    FuncionarioRepository funcionarioRepository) {
+                                    UserContextService userContextService) {
         this.alertaRepository = alertaRepository;
         this.ativoRepository = ativoRepository;
-        this.currentUserProvider = currentUserProvider;
-        this.funcionarioRepository = funcionarioRepository;
+        this.userContextService = userContextService;
     }
 
     @Transactional(readOnly = true)
     public List<Alerta> getRecentAlerts() {
-        Usuario user = getUsuarioLogado();
-        if (isAdmin(user)) {
+        if (userContextService.isAdmin()) {
             return alertaRepository.findTop5ByLidoFalseOrderByDataCriacaoDesc();
         }
-        Set<Long> filialIds = getUserFiliais(user);
+        Set<Long> filialIds = userContextService.getUserFiliais();
         return alertaRepository.findTop5ByAtivo_Filial_IdInAndLidoFalseOrderByDataCriacaoDesc(filialIds);
     }
 
     @Transactional(readOnly = true)
     public Page<Alerta> listarAlertas(Pageable pageable, Boolean lido) {
-        Usuario user = getUsuarioLogado();
-        if (isAdmin(user)) {
+        if (userContextService.isAdmin()) {
             if (lido == null) {
                 return alertaRepository.findAll(pageable);
             } else {
                 return alertaRepository.findByLido(lido, pageable);
             }
         } else {
-            Set<Long> filialIds = getUserFiliais(user);
+            Set<Long> filialIds = userContextService.getUserFiliais();
             if (lido == null) {
                 return alertaRepository.findByAtivo_Filial_IdIn(filialIds, pageable);
             } else {
@@ -73,9 +68,8 @@ public class AlertNotificationService {
         Alerta alerta = alertaRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Alerta não encontrado: " + id));
 
-        Usuario user = getUsuarioLogado();
-        if (!isAdmin(user)) {
-            Set<Long> filialIds = getUserFiliais(user);
+        if (!userContextService.isAdmin()) {
+            Set<Long> filialIds = userContextService.getUserFiliais();
             if (!filialIds.contains(alerta.getAtivo().getFilial().getId())) {
                 throw new AccessDeniedException("Acesso negado ao alerta desta filial.");
             }
@@ -84,31 +78,6 @@ public class AlertNotificationService {
         alerta.setLido(true);
         alerta.setDataLeitura(LocalDateTime.now());
         alertaRepository.save(alerta);
-    }
-
-    private Usuario getUsuarioLogado() {
-        return currentUserProvider.getCurrentUsuario();
-    }
-
-    private boolean isAdmin(Usuario usuario) {
-        return "ROLE_ADMIN".equals(usuario.getRole());
-    }
-
-    private Set<Long> getUserFiliais(Usuario usuario) {
-        Funcionario funcionario = usuario.getFuncionario();
-        if (funcionario == null) {
-            throw new AccessDeniedException("Usuário não vinculado a um funcionário.");
-        }
-        // Fetch to ensure loaded
-        Optional<Funcionario> fOpt = funcionarioRepository.findById(funcionario.getId());
-        if (fOpt.isEmpty()) {
-            throw new AccessDeniedException("Funcionário não encontrado.");
-        }
-        Set<Long> ids = fOpt.get().getFiliais().stream().map(Filial::getId).collect(Collectors.toSet());
-        if (ids.isEmpty()) {
-            throw new AccessDeniedException("Funcionário sem filiais vinculadas.");
-        }
-        return ids;
     }
 
     @Async("taskExecutor")

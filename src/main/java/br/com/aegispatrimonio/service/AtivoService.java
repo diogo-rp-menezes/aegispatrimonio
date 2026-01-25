@@ -43,13 +43,13 @@ public class AtivoService {
     private final ManutencaoRepository manutencaoRepository;
     private final MovimentacaoRepository movimentacaoRepository;
     private final DepreciacaoService depreciacaoService;
-    private final CurrentUserProvider currentUserProvider;
     private final AtivoHealthHistoryRepository healthHistoryRepository;
     private final PredictiveMaintenanceService predictiveMaintenanceService;
     private final SearchOptimizationService searchOptimizationService;
     private final AlertNotificationService alertNotificationService;
+    private final UserContextService userContextService;
 
-    public AtivoService(AtivoRepository ativoRepository, AtivoMapper ativoMapper, TipoAtivoRepository tipoAtivoRepository, LocalizacaoRepository localizacaoRepository, FornecedorRepository fornecedorRepository, FuncionarioRepository funcionarioRepository, FilialRepository filialRepository, ManutencaoRepository manutencaoRepository, MovimentacaoRepository movimentacaoRepository, DepreciacaoService depreciacaoService, CurrentUserProvider currentUserProvider, AtivoHealthHistoryRepository healthHistoryRepository, PredictiveMaintenanceService predictiveMaintenanceService, SearchOptimizationService searchOptimizationService, AlertNotificationService alertNotificationService) {
+    public AtivoService(AtivoRepository ativoRepository, AtivoMapper ativoMapper, TipoAtivoRepository tipoAtivoRepository, LocalizacaoRepository localizacaoRepository, FornecedorRepository fornecedorRepository, FuncionarioRepository funcionarioRepository, FilialRepository filialRepository, ManutencaoRepository manutencaoRepository, MovimentacaoRepository movimentacaoRepository, DepreciacaoService depreciacaoService, AtivoHealthHistoryRepository healthHistoryRepository, PredictiveMaintenanceService predictiveMaintenanceService, SearchOptimizationService searchOptimizationService, AlertNotificationService alertNotificationService, UserContextService userContextService) {
         this.ativoRepository = ativoRepository;
         this.ativoMapper = ativoMapper;
         this.tipoAtivoRepository = tipoAtivoRepository;
@@ -60,19 +60,11 @@ public class AtivoService {
         this.manutencaoRepository = manutencaoRepository;
         this.movimentacaoRepository = movimentacaoRepository;
         this.depreciacaoService = depreciacaoService;
-        this.currentUserProvider = currentUserProvider;
         this.healthHistoryRepository = healthHistoryRepository;
         this.predictiveMaintenanceService = predictiveMaintenanceService;
         this.searchOptimizationService = searchOptimizationService;
         this.alertNotificationService = alertNotificationService;
-    }
-
-    private Usuario getUsuarioLogado() {
-        return currentUserProvider.getCurrentUsuario();
-    }
-
-    private boolean isAdmin(Usuario usuario) {
-        return "ROLE_ADMIN".equals(usuario.getRole());
+        this.userContextService = userContextService;
     }
 
     @Transactional(readOnly = true)
@@ -82,7 +74,6 @@ public class AtivoService {
                                       StatusAtivo status,
                                       String nome,
                                       String health) {
-        Usuario usuarioLogado = getUsuarioLogado();
         org.springframework.data.domain.Pageable effectivePageable =
                 (pageable == null) ? org.springframework.data.domain.Pageable.unpaged() : pageable;
         boolean isFuzzySearch = (nome != null && !nome.isBlank());
@@ -104,21 +95,10 @@ public class AtivoService {
 
         // 1. Resolve Scope (Admin vs User Filiais)
         Set<Long> userFiliais = null;
-        boolean isAdmin = isAdmin(usuarioLogado);
+        boolean isAdmin = userContextService.isAdmin();
 
         if (!isAdmin) {
-            Funcionario funcionarioPrincipal = usuarioLogado.getFuncionario();
-            if (funcionarioPrincipal == null || funcionarioPrincipal.getId() == null) {
-                throw new AccessDeniedException("Usuário não é um funcionário ou não está associado a nenhuma filial.");
-            }
-            // Fetch fresh from DB to get Lazy collections
-            Optional<Funcionario> fOpt = funcionarioRepository.findById(funcionarioPrincipal.getId());
-            if (fOpt.isPresent()) {
-                userFiliais = fOpt.get().getFiliais().stream().map(Filial::getId).collect(Collectors.toSet());
-                if (userFiliais.isEmpty()) throw new AccessDeniedException("Usuário não está associado a nenhuma filial.");
-            } else {
-                throw new AccessDeniedException("Funcionário não encontrado.");
-            }
+            userFiliais = userContextService.getUserFiliais();
         }
 
         // 2. Fuzzy Search Path (Shift Left Optimization)
@@ -179,21 +159,13 @@ public class AtivoService {
 
     @Transactional(readOnly = true)
     public AtivoDTO buscarPorId(Long id) {
-        Usuario usuarioLogado = getUsuarioLogado();
         Ativo ativo = ativoRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new EntityNotFoundException("Ativo não encontrado com ID: " + id));
 
-        if (!isAdmin(usuarioLogado)) {
-            Funcionario funcionarioPrincipal = usuarioLogado.getFuncionario();
-            if (funcionarioPrincipal == null || funcionarioPrincipal.getId() == null) {
-                throw new AccessDeniedException("Usuário não é um funcionário ou não está associado a nenhuma filial.");
-            }
-            Optional<Funcionario> funcionarioOpt = funcionarioRepository.findById(funcionarioPrincipal.getId());
-            if (funcionarioOpt.isPresent()) {
-                Funcionario funcionarioLogado = funcionarioOpt.get();
-                if (funcionarioLogado.getFiliais().stream().noneMatch(f -> f.getId().equals(ativo.getFilial().getId()))) {
-                    throw new AccessDeniedException("Você não tem permissão para acessar ativos desta filial.");
-                }
+        if (!userContextService.isAdmin()) {
+            Set<Long> userFiliais = userContextService.getUserFiliais();
+            if (!userFiliais.contains(ativo.getFilial().getId())) {
+                throw new AccessDeniedException("Você não tem permissão para acessar ativos desta filial.");
             }
         }
 
@@ -446,21 +418,13 @@ public class AtivoService {
 
     @Transactional(readOnly = true)
     public List<AtivoHealthHistoryDTO> getHealthHistory(Long ativoId) {
-        Usuario usuarioLogado = getUsuarioLogado();
         Ativo ativo = ativoRepository.findById(ativoId)
                 .orElseThrow(() -> new EntityNotFoundException("Ativo não encontrado com ID: " + ativoId));
 
-        if (!isAdmin(usuarioLogado)) {
-            Funcionario funcionarioPrincipal = usuarioLogado.getFuncionario();
-            if (funcionarioPrincipal == null || funcionarioPrincipal.getId() == null) {
-                throw new AccessDeniedException("Usuário não é um funcionário ou não está associado a nenhuma filial.");
-            }
-            Optional<Funcionario> funcionarioOpt = funcionarioRepository.findById(funcionarioPrincipal.getId());
-            if (funcionarioOpt.isPresent()) {
-                Funcionario funcionarioLogado = funcionarioOpt.get();
-                if (funcionarioLogado.getFiliais().stream().noneMatch(f -> f.getId().equals(ativo.getFilial().getId()))) {
-                    throw new AccessDeniedException("Você não tem permissão para acessar o histórico deste ativo.");
-                }
+        if (!userContextService.isAdmin()) {
+            Set<Long> userFiliais = userContextService.getUserFiliais();
+            if (!userFiliais.contains(ativo.getFilial().getId())) {
+                throw new AccessDeniedException("Você não tem permissão para acessar o histórico deste ativo.");
             }
         }
 
