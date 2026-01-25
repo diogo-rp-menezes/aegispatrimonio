@@ -40,6 +40,7 @@ class AtivoServiceBenchmarkTest {
     @Mock private AtivoHealthHistoryRepository healthHistoryRepository;
     @Mock private PredictiveMaintenanceService predictiveMaintenanceService;
     @Mock private SearchOptimizationService searchOptimizationService;
+    @Mock private AlertNotificationService alertNotificationService;
 
     @InjectMocks
     private AtivoService ativoService;
