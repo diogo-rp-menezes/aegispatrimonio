@@ -85,7 +85,17 @@ const chartData = computed(() => {
   }
 
   // Get all unique dates sorted
-  const uniqueDates = [...new Set(healthHistory.value.map(h => h.dataRegistro))].sort();
+  let uniqueDates = [...new Set(healthHistory.value.map(h => h.dataRegistro))].sort();
+
+  // Check and add prediction date
+  if (ativo.value && ativo.value.previsaoEsgotamentoDisco) {
+      const predDate = new Date(ativo.value.previsaoEsgotamentoDisco).toISOString().split('T')[0]; // Ensure comparable format
+      const lastDate = uniqueDates.length > 0 ? uniqueDates[uniqueDates.length - 1] : '';
+      if (predDate > lastDate) {
+          uniqueDates.push(ativo.value.previsaoEsgotamentoDisco); // Add raw prediction date
+      }
+  }
+
   const formattedDates = uniqueDates.map(d => new Date(d).toLocaleString('pt-BR'));
 
   // Group by component (Disk)
@@ -97,9 +107,11 @@ const chartData = computed(() => {
     const color = colors[index % colors.length];
 
     // Create data array matching the unique dates
+    // Note: Prediction date won't match any history entry, so it gets null, which breaks the line?
+    // Chart.js handles nulls by breaking the line, which is fine for raw data.
     const data = uniqueDates.map(date => {
       const entry = healthHistory.value.find(h => h.componente === comp && h.dataRegistro === date);
-      return entry ? entry.valor : null; // null for gaps
+      return entry ? entry.valor : null;
     });
 
     return {
@@ -111,6 +123,45 @@ const chartData = computed(() => {
       tension: 0.1
     };
   });
+
+  // Add Regression Trendline
+  if (ativo.value && ativo.value.previsaoEsgotamentoDisco && components.length > 0) {
+     const comp = components[0]; // Primary component
+     const points = healthHistory.value
+        .filter(h => h.componente === comp)
+        .map(h => ({ x: new Date(h.dataRegistro).getTime(), y: h.valor }));
+
+     if (points.length >= 2) {
+         const n = points.length;
+         const sumX = points.reduce((acc, p) => acc + p.x, 0);
+         const sumY = points.reduce((acc, p) => acc + p.y, 0);
+         const sumXY = points.reduce((acc, p) => acc + p.x * p.y, 0);
+         const sumXX = points.reduce((acc, p) => acc + p.x * p.x, 0);
+
+         // Avoid division by zero
+         const denominator = n * sumXX - sumX * sumX;
+         if (denominator !== 0) {
+             const slope = (n * sumXY - sumX * sumY) / denominator;
+             const intercept = (sumY - slope * sumX) / n;
+
+             const trendData = uniqueDates.map(d => {
+                 const x = new Date(d).getTime();
+                 const y = slope * x + intercept;
+                 return y < 0 ? 0 : y; // Clamp to 0
+             });
+
+             datasets.push({
+                 label: 'Tendência Estimada',
+                 data: trendData,
+                 borderColor: '#6c757d',
+                 borderDash: [5, 5],
+                 pointRadius: 0,
+                 fill: false,
+                 tension: 0
+             });
+         }
+     }
+  }
 
   return {
     labels: formattedDates,

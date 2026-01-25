@@ -2,6 +2,7 @@ package br.com.aegispatrimonio.repository;
 
 import br.com.aegispatrimonio.dto.AtivoNameDTO;
 import br.com.aegispatrimonio.dto.ChartDataDTO;
+import br.com.aegispatrimonio.dto.RiskyAssetDTO;
 import br.com.aegispatrimonio.model.Ativo;
 import br.com.aegispatrimonio.model.StatusAtivo;
 import org.springframework.data.domain.Page;
@@ -149,6 +150,12 @@ public interface AtivoRepository extends JpaRepository<Ativo, Long> {
 
     @Query("SELECT COUNT(a) FROM Ativo a WHERE a.filial.id = :#{T(br.com.aegispatrimonio.context.TenantContext).getFilialId()} AND a.previsaoEsgotamentoDisco >= :safeDate")
     long countSafePredictionsByCurrentTenant(@Param("safeDate") java.time.LocalDate safeDate);
+
+    @Query("SELECT new br.com.aegispatrimonio.dto.RiskyAssetDTO(a.id, a.nome, a.tipoAtivo.nome, a.previsaoEsgotamentoDisco) " +
+           "FROM Ativo a WHERE a.filial.id = :#{T(br.com.aegispatrimonio.context.TenantContext).getFilialId()} " +
+           "AND a.previsaoEsgotamentoDisco IS NOT NULL " +
+           "ORDER BY a.previsaoEsgotamentoDisco ASC")
+    List<RiskyAssetDTO> findTopRiskyAssetsByCurrentTenant(Pageable pageable);
 
     @Query("SELECT new br.com.aegispatrimonio.dto.ChartDataDTO(a.status, COUNT(a)) " +
            "FROM Ativo a WHERE a.filial.id = :#{T(br.com.aegispatrimonio.context.TenantContext).getFilialId()} " +

@@ -2,9 +2,11 @@ package br.com.aegispatrimonio.service;
 
 import br.com.aegispatrimonio.dto.ChartDataDTO;
 import br.com.aegispatrimonio.dto.DashboardStatsDTO;
+import br.com.aegispatrimonio.dto.RiskyAssetDTO;
 import br.com.aegispatrimonio.model.StatusAtivo;
 import br.com.aegispatrimonio.repository.AtivoRepository;
 import br.com.aegispatrimonio.repository.LocalizacaoRepository;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,6 +47,7 @@ public class DashboardService {
 
         List<ChartDataDTO> ativosPorStatus = ativoRepository.countByStatusGrouped();
         List<ChartDataDTO> ativosPorTipo = ativoRepository.countByTipoAtivoGrouped();
+        List<RiskyAssetDTO> riskyAssets = ativoRepository.findTopRiskyAssetsByCurrentTenant(PageRequest.of(0, 5));
 
         return new DashboardStatsDTO(
             totalAtivos,
@@ -55,7 +58,8 @@ public class DashboardService {
             predicaoAlerta,
             predicaoSegura,
             ativosPorStatus,
-            ativosPorTipo
+            ativosPorTipo,
+            riskyAssets
         );
     }
 }

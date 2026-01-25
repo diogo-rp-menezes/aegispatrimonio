@@ -38,6 +38,7 @@ const quickActions = ref([
 ]);
 
 const tableData = ref([]);
+const riskyAssets = ref([]);
 const loading = ref(true);
 
 const statusChartData = ref({ labels: [], datasets: [] });
@@ -70,6 +71,19 @@ function getStatusColor(status) {
     'EM_MANUTENCAO': '#fd7e14' // orange
   };
   return colorMap[status] || '#6c757d'; // secondary
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return "-";
+  return new Date(dateStr).toLocaleDateString("pt-BR");
+}
+
+function getDaysRemaining(dateStr) {
+  if (!dateStr) return 999;
+  const target = new Date(dateStr);
+  const today = new Date();
+  const diffTime = target - today;
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 }
 
 async function fetchStats() {
@@ -116,6 +130,10 @@ async function fetchStats() {
           data: data.ativosPorTipo.map(item => item.value)
         }]
       };
+    }
+
+    if (data.riskyAssets) {
+      riskyAssets.value = data.riskyAssets;
     }
 
   } catch (error) {
@@ -259,6 +277,45 @@ onMounted(async () => {
           <i :class="`bi ${action.icon} text-${action.color} fs-1 mb-2`"></i>
           <h6 class="fw-bold">{{ action.title }}</h6>
           <!-- <button class="btn btn-sm btn-outline-primary mt-2">Acessar</button> -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabela de Riscos (Prioridade) -->
+    <div v-if="riskyAssets.length > 0" class="card border-0 shadow-sm mb-4 border-start border-danger border-5">
+      <div class="card-body">
+        <h5 class="fw-bold mb-3 text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>Ativos em Risco Crítico (Top 5)</h5>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Nome</th>
+                <th>Tipo</th>
+                <th>Previsão de Esgotamento</th>
+                <th>Dias Restantes</th>
+                <th>Ação</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="asset in riskyAssets" :key="asset.id">
+                <td>{{ asset.id }}</td>
+                <td>{{ asset.nome }}</td>
+                <td>{{ asset.tipoAtivo }}</td>
+                <td class="fw-bold text-danger">{{ formatDate(asset.previsaoEsgotamento) }}</td>
+                <td>
+                  <span :class="`badge bg-${getDaysRemaining(asset.previsaoEsgotamento) < 7 ? 'danger' : 'warning'}`">
+                    {{ getDaysRemaining(asset.previsaoEsgotamento) }} dias
+                  </span>
+                </td>
+                <td>
+                  <button class="btn btn-sm btn-outline-primary" @click="router.push(`/ativos/${asset.id}`)">
+                    Detalhes
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

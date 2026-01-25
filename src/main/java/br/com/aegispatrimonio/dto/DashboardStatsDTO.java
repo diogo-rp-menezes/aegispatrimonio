@@ -12,5 +12,6 @@ public record DashboardStatsDTO(
     long predicaoAlerta,
     long predicaoSegura,
     List<ChartDataDTO> ativosPorStatus,
-    List<ChartDataDTO> ativosPorTipo
+    List<ChartDataDTO> ativosPorTipo,
+    List<RiskyAssetDTO> riskyAssets
 ) {}
