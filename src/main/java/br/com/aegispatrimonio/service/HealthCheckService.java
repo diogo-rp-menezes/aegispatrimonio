@@ -63,7 +63,6 @@ public class HealthCheckService implements IHealthCheckService {
     }
 
     @Override
-    @Transactional
     public void performSystemHealthCheck() {
         var history = oshiCollector.collect();
         healthCheckHistoryRepository.save(history);
