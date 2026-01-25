@@ -326,6 +326,7 @@ class AtivoServiceTest {
         );
         br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO payload = new br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO(
             "PC-01", "DOMAIN", "OS", "1.0", "x64", "Mobo", "Model", "SN", "CPU", 4, 8,
+            null, null, null,
             java.util.List.of(disk)
         );
 
@@ -370,6 +371,7 @@ class AtivoServiceTest {
         );
         br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO payload = new br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO(
             "PC-01", "DOMAIN", "OS", "1.0", "x64", "Mobo", "Model", "SN", "CPU", 4, 8,
+            null, null, null,
             java.util.List.of(disk)
         );
 
@@ -399,6 +401,7 @@ class AtivoServiceTest {
         );
         br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO payload = new br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO(
             "PC-01", "DOMAIN", "OS", "1.0", "x64", "Mobo", "Model", "SN", "CPU", 4, 8,
+            null, null, null,
             java.util.List.of(disk)
         );
 

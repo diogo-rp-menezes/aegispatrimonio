@@ -214,10 +214,32 @@ public class AtivoService {
         gerenciarDetalheHardware(ativo, hardwareDTO);
 
         // Process Disks and History
-        if (payload.discos() != null) {
-            List<AtivoHealthHistory> historyToSave = new java.util.ArrayList<>();
-            List<String> componentsToFetch = new java.util.ArrayList<>();
+        List<AtivoHealthHistory> historyToSave = new java.util.ArrayList<>();
+        List<String> componentsToFetch = new java.util.ArrayList<>();
 
+        // 1. CPU Load
+        if (payload.cpuLoad() != null) {
+            AtivoHealthHistory history = new AtivoHealthHistory();
+            history.setAtivo(ativo);
+            history.setComponente("CPU");
+            history.setMetrica("CPU_LOAD_PERCENT");
+            history.setValor(payload.cpuLoad());
+            historyToSave.add(history);
+        }
+
+        // 2. Memory
+        if (payload.memoryTotal() != null && payload.memoryAvailable() != null && payload.memoryTotal() > 0) {
+            double freePercent = (double) payload.memoryAvailable() / payload.memoryTotal();
+            AtivoHealthHistory history = new AtivoHealthHistory();
+            history.setAtivo(ativo);
+            history.setComponente("RAM");
+            history.setMetrica("MEM_FREE_PERCENT");
+            history.setValor(freePercent);
+            historyToSave.add(history);
+        }
+
+        // 3. Disks
+        if (payload.discos() != null) {
             for (DiskInfoDTO disk : payload.discos()) {
                 if (disk.freeGb() != null) {
                     AtivoHealthHistory history = new AtivoHealthHistory();
@@ -229,10 +251,13 @@ public class AtivoService {
                     componentsToFetch.add("DISK:" + disk.serial());
                 }
             }
+        }
 
-            if (!historyToSave.isEmpty()) {
-                healthHistoryRepository.saveAll(historyToSave);
+        if (!historyToSave.isEmpty()) {
+            healthHistoryRepository.saveAll(historyToSave);
 
+            // Prediction logic only runs if there are disks involved (for now)
+            if (!componentsToFetch.isEmpty()) {
                 // Throttling: Check if prediction was calculated recently (< 24h)
                 boolean shouldRecalculate = true;
                 if (ativo.getAtributos() != null && ativo.getAtributos().containsKey("prediction_calculated_at")) {
@@ -288,7 +313,7 @@ public class AtivoService {
         ativoRepository.save(ativo);
 
         // Trigger alert check
-        alertNotificationService.checkAndCreateAlerts(ativo);
+        alertNotificationService.checkAndCreateAlerts(ativo, payload);
     }
 
     @Transactional

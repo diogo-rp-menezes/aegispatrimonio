@@ -9,10 +9,15 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 
 @Repository
 public interface AlertaRepository extends JpaRepository<Alerta, Long>, JpaSpecificationExecutor<Alerta> {
+
+    List<Alerta> findTop5ByLidoFalseOrderByDataCriacaoDesc();
+
+    List<Alerta> findTop5ByAtivo_Filial_IdInAndLidoFalseOrderByDataCriacaoDesc(Collection<Long> filialIds);
 
     List<Alerta> findByAtivoIdAndLidoFalseAndTipo(Long ativoId, TipoAlerta tipo);
 

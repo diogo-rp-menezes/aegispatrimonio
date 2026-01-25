@@ -65,6 +65,7 @@ class AtivoServiceBenchmarkTest {
                 "PC-TEST", "DOMAIN", "OS", "1.0", "x64",
                 "MoboMaker", "MoboModel", "MoboSN",
                 "CPU", 4, 8,
+                0.5, 16000L, 8000L, // Added CPU/Memory params
                 disks
         );
 
