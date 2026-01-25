@@ -45,8 +45,9 @@ public class AtivoService {
     private final AtivoHealthHistoryRepository healthHistoryRepository;
     private final PredictiveMaintenanceService predictiveMaintenanceService;
     private final SearchOptimizationService searchOptimizationService;
+    private final AlertNotificationService alertNotificationService;
 
-    public AtivoService(AtivoRepository ativoRepository, AtivoMapper ativoMapper, TipoAtivoRepository tipoAtivoRepository, LocalizacaoRepository localizacaoRepository, FornecedorRepository fornecedorRepository, FuncionarioRepository funcionarioRepository, FilialRepository filialRepository, ManutencaoRepository manutencaoRepository, MovimentacaoRepository movimentacaoRepository, DepreciacaoService depreciacaoService, CurrentUserProvider currentUserProvider, AtivoHealthHistoryRepository healthHistoryRepository, PredictiveMaintenanceService predictiveMaintenanceService, SearchOptimizationService searchOptimizationService) {
+    public AtivoService(AtivoRepository ativoRepository, AtivoMapper ativoMapper, TipoAtivoRepository tipoAtivoRepository, LocalizacaoRepository localizacaoRepository, FornecedorRepository fornecedorRepository, FuncionarioRepository funcionarioRepository, FilialRepository filialRepository, ManutencaoRepository manutencaoRepository, MovimentacaoRepository movimentacaoRepository, DepreciacaoService depreciacaoService, CurrentUserProvider currentUserProvider, AtivoHealthHistoryRepository healthHistoryRepository, PredictiveMaintenanceService predictiveMaintenanceService, SearchOptimizationService searchOptimizationService, AlertNotificationService alertNotificationService) {
         this.ativoRepository = ativoRepository;
         this.ativoMapper = ativoMapper;
         this.tipoAtivoRepository = tipoAtivoRepository;
@@ -61,6 +62,7 @@ public class AtivoService {
         this.healthHistoryRepository = healthHistoryRepository;
         this.predictiveMaintenanceService = predictiveMaintenanceService;
         this.searchOptimizationService = searchOptimizationService;
+        this.alertNotificationService = alertNotificationService;
     }
 
     private Usuario getUsuarioLogado() {
@@ -243,6 +245,9 @@ public class AtivoService {
         }
 
         ativoRepository.save(ativo);
+
+        // Trigger alert check
+        alertNotificationService.checkAndCreateAlerts(ativo);
     }
 
     @Transactional
