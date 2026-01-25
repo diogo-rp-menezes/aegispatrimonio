@@ -25,15 +25,16 @@ import java.util.Map;
 public class OSHIHealthCheckCollector {
 
     private final ObjectMapper objectMapper;
+    private final SystemInfo systemInfo;
 
     public OSHIHealthCheckCollector(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
+        this.systemInfo = new SystemInfo();
     }
 
     public HealthCheckHistory collect() {
-        SystemInfo si = new SystemInfo();
-        HardwareAbstractionLayer hal = si.getHardware();
-        OperatingSystem os = si.getOperatingSystem();
+        HardwareAbstractionLayer hal = systemInfo.getHardware();
+        OperatingSystem os = systemInfo.getOperatingSystem();
 
         HealthCheckHistory history = new HealthCheckHistory();
 
