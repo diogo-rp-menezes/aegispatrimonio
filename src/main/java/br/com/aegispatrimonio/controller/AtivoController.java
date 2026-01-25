@@ -6,9 +6,12 @@ import br.com.aegispatrimonio.dto.AtivoHealthHistoryDTO;
 import br.com.aegispatrimonio.dto.AtivoUpdateDTO;
 import br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO;
 import br.com.aegispatrimonio.service.AtivoService;
+import br.com.aegispatrimonio.service.QRCodeService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -26,9 +29,11 @@ import java.util.List;
 public class AtivoController {
 
     private final AtivoService ativoService;
+    private final QRCodeService qrCodeService;
 
-    public AtivoController(AtivoService ativoService) {
+    public AtivoController(AtivoService ativoService, QRCodeService qrCodeService) {
         this.ativoService = ativoService;
+        this.qrCodeService = qrCodeService;
     }
 
     /**
@@ -130,5 +135,26 @@ public class AtivoController {
     @PreAuthorize("@permissionService.hasAtivoPermission(authentication, #id, 'READ')")
     public List<AtivoHealthHistoryDTO> getHealthHistory(@PathVariable Long id) {
         return ativoService.getHealthHistory(id);
+    }
+
+    /**
+     * Gera um QR Code para o ativo especificado.
+     * Requer permissão READ no contexto do ativo.
+     *
+     * @param id O ID do ativo.
+     * @return Imagem PNG do QR Code.
+     */
+    @GetMapping(value = "/{id}/qrcode", produces = MediaType.IMAGE_PNG_VALUE)
+    @PreAuthorize("@permissionService.hasAtivoPermission(authentication, #id, 'READ')")
+    public ResponseEntity<byte[]> getQRCode(@PathVariable Long id) {
+        // Verifica existência (lança exceção se não encontrar)
+        ativoService.buscarPorId(id);
+
+        String content = "AEGIS:ASSET:" + id;
+        byte[] qrCode = qrCodeService.generateQRCode(content, 200, 200);
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.IMAGE_PNG)
+                .body(qrCode);
     }
 }
