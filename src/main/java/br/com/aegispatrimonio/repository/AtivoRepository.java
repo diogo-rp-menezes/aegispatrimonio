@@ -166,4 +166,8 @@ public interface AtivoRepository extends JpaRepository<Ativo, Long> {
            "FROM Ativo a WHERE a.filial.id = :#{T(br.com.aegispatrimonio.context.TenantContext).getFilialId()} " +
            "GROUP BY a.tipoAtivo.nome")
     List<ChartDataDTO> countByTipoAtivoGrouped();
+
+    @Query("SELECT a.previsaoEsgotamentoDisco FROM Ativo a WHERE a.filial.id = :#{T(br.com.aegispatrimonio.context.TenantContext).getFilialId()} " +
+           "AND a.previsaoEsgotamentoDisco >= :startDate AND a.previsaoEsgotamentoDisco < :endDate")
+    List<java.time.LocalDate> findPredictionsBetween(@Param("startDate") java.time.LocalDate startDate, @Param("endDate") java.time.LocalDate endDate);
 }

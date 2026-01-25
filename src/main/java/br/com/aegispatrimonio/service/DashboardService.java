@@ -12,7 +12,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class DashboardService {
@@ -45,6 +50,26 @@ public class DashboardService {
         long predicaoAlerta = ativoRepository.countWarningPredictionsByCurrentTenant(criticalThreshold, warningThreshold);
         long predicaoSegura = ativoRepository.countSafePredictionsByCurrentTenant(warningThreshold);
 
+        // Trend Analysis (Next 8 Weeks)
+        LocalDate endOfTrend = now.plusWeeks(8);
+        List<LocalDate> failureDates = ativoRepository.findPredictionsBetween(now, endOfTrend);
+
+        Map<Integer, Long> weeksMap = failureDates.stream()
+            .collect(Collectors.groupingBy(
+                date -> (int) ChronoUnit.WEEKS.between(now, date),
+                Collectors.counting()
+            ));
+
+        List<ChartDataDTO> failureTrend = new ArrayList<>();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM");
+
+        for (int i = 0; i < 8; i++) {
+             long count = weeksMap.getOrDefault(i, 0L);
+             LocalDate weekStart = now.plusWeeks(i);
+             String label = weekStart.format(formatter);
+             failureTrend.add(new ChartDataDTO(label, count));
+        }
+
         List<ChartDataDTO> ativosPorStatus = ativoRepository.countByStatusGrouped();
         List<ChartDataDTO> ativosPorTipo = ativoRepository.countByTipoAtivoGrouped();
         List<RiskyAssetDTO> riskyAssets = ativoRepository.findTopRiskyAssetsByCurrentTenant(PageRequest.of(0, 5));
@@ -59,7 +84,8 @@ public class DashboardService {
             predicaoSegura,
             ativosPorStatus,
             ativosPorTipo,
-            riskyAssets
+            riskyAssets,
+            failureTrend
         );
     }
 }
