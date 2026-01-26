@@ -42,6 +42,12 @@ export const menuItems = [
     icon: "bi bi-file-earmark-text"
   },
   {
+    title: "Saúde do Sistema",
+    path: "/system-health",
+    icon: "bi bi-cpu",
+    role: "ROLE_ADMIN"
+  },
+  {
     title: "Configurações",
     path: "/configuracoes",
     icon: "bi bi-gear"

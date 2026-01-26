@@ -30,6 +30,13 @@ const routes = [
 
       // Manutenções
       { path: "manutencoes", component: () => import("../views/ManutencoesView.vue") },
+
+      // System Health (Admin Only)
+      {
+        path: "system-health",
+        component: () => import("../views/SystemHealthView.vue"),
+        meta: { roles: ['ROLE_ADMIN'] }
+      },
     ]
   },
 ];
@@ -46,9 +53,24 @@ router.beforeEach((to, from, next) => {
 
   if (requiresAuth && !isAuthenticated) {
     next('/login');
-  } else {
-    next();
+    return;
   }
+
+  // Check Role
+  const roles = to.meta.roles;
+  if (roles && roles.length > 0) {
+    const userRolesStr = localStorage.getItem('userRoles');
+    const userRoles = userRolesStr ? JSON.parse(userRolesStr) : [];
+    const hasRole = roles.some(role => userRoles.includes(role));
+
+    if (!hasRole) {
+      // Redirect to dashboard if unauthorized
+      next('/dashboard');
+      return;
+    }
+  }
+
+  next();
 });
 
 export default router;

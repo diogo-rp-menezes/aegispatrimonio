@@ -65,6 +65,13 @@ const handleLogin = async () => {
     // Save Token
     localStorage.setItem('authToken', data.token);
 
+    // Save Roles
+    if (data.roles && data.roles.length > 0) {
+      localStorage.setItem('userRoles', JSON.stringify(data.roles));
+    } else {
+      localStorage.removeItem('userRoles');
+    }
+
     // Save Filiais
     if (data.filiais && data.filiais.length > 0) {
         localStorage.setItem('allowedFiliais', JSON.stringify(data.filiais));

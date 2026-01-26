@@ -14,7 +14,7 @@
 
     <!-- Menu -->
     <div class="sidebar-nav">
-      <div v-for="item in menuItems" :key="item.title" class="nav-item">
+      <div v-for="item in filteredMenuItems" :key="item.title" class="nav-item">
         <!-- Item com submenu -->
         <div v-if="item.submenus" class="nav-link"
              :class="{ 'submenu-open': isOpen(item) }"
@@ -53,13 +53,30 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { useRoute } from "vue-router";
 import { menuItems } from "../config/menu.js";
 
 const collapsed = ref(false);
 const openSubmenus = ref([]);
 const route = useRoute();
+const userRoles = ref([]);
+
+try {
+  const stored = localStorage.getItem('userRoles');
+  if (stored) {
+    userRoles.value = JSON.parse(stored);
+  }
+} catch (e) {
+  console.error("Error parsing user roles", e);
+}
+
+const filteredMenuItems = computed(() => {
+  return menuItems.filter(item => {
+    if (!item.role) return true;
+    return userRoles.value.includes(item.role);
+  });
+});
 
 const emit = defineEmits(['toggle']);
 
