@@ -61,7 +61,6 @@ const collapsed = ref(false);
 const openSubmenus = ref([]);
 const route = useRoute();
 
-import { defineEmits } from "vue";
 const emit = defineEmits(['toggle']);
 
 const toggleSidebar = () => {

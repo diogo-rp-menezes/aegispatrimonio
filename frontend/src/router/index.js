@@ -27,6 +27,9 @@ const routes = [
       { path: "funcionarios/novo", component: () => import("../views/pessoas/PessoaForm.vue") },
       { path: "funcionarios/:id/editar", component: () => import("../views/pessoas/PessoaForm.vue"), props: true },
       { path: "funcionarios/:id", component: () => import("../views/pessoas/PessoaForm.vue"), props: true },
+
+      // Manutenções
+      { path: "manutencoes", component: () => import("../views/ManutencoesView.vue") },
     ]
   },
 ];

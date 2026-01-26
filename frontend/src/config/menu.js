@@ -32,6 +32,11 @@ export const menuItems = [
     icon: "bi bi-arrow-left-right"
   },
   {
+    title: "Manutenções",
+    path: "/manutencoes",
+    icon: "bi bi-tools"
+  },
+  {
     title: "Relatórios",
     path: "/relatorios",
     icon: "bi bi-file-earmark-text"
