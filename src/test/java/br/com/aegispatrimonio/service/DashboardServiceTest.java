@@ -47,7 +47,7 @@ class DashboardServiceTest {
         when(ativoRepository.countByTipoAtivoGrouped()).thenReturn(List.of(new ChartDataDTO("Notebook", 3L)));
 
         RiskyAssetDTO riskyAsset = new RiskyAssetDTO(1L, "Test Asset", "Notebook", LocalDate.now());
-        when(ativoRepository.findTopRiskyAssetsByCurrentTenant(any(Pageable.class))).thenReturn(List.of(riskyAsset));
+        when(ativoRepository.findTopRiskyAssetsByCurrentTenant(any(LocalDate.class), any(Pageable.class))).thenReturn(List.of(riskyAsset));
 
         DashboardStatsDTO stats = dashboardService.getStats();
 

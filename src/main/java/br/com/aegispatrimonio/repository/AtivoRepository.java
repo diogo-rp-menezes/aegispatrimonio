@@ -193,8 +193,9 @@ public interface AtivoRepository extends JpaRepository<Ativo, Long> {
     @Query("SELECT new br.com.aegispatrimonio.dto.RiskyAssetDTO(a.id, a.nome, a.tipoAtivo.nome, a.previsaoEsgotamentoDisco) " +
            "FROM Ativo a WHERE a.filial.id = :#{T(br.com.aegispatrimonio.context.TenantContext).getFilialId()} " +
            "AND a.previsaoEsgotamentoDisco IS NOT NULL " +
+           "AND a.previsaoEsgotamentoDisco < :limitDate " +
            "ORDER BY a.previsaoEsgotamentoDisco ASC")
-    List<RiskyAssetDTO> findTopRiskyAssetsByCurrentTenant(Pageable pageable);
+    List<RiskyAssetDTO> findTopRiskyAssetsByCurrentTenant(@Param("limitDate") java.time.LocalDate limitDate, Pageable pageable);
 
     @Query("SELECT new br.com.aegispatrimonio.dto.ChartDataDTO(a.status, COUNT(a)) " +
            "FROM Ativo a WHERE a.filial.id = :#{T(br.com.aegispatrimonio.context.TenantContext).getFilialId()} " +
