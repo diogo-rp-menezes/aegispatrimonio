@@ -181,6 +181,20 @@ public class DepreciacaoService {
             return valorDepreciavel.multiply(taxa);
         }
 
+        if (ativo.getMetodoDepreciacao() == MetodoDepreciacao.SALDO_DECRESCENTE) {
+            long vidaUtil = ativo.getVidaUtilMeses();
+            long mesesDecorridos = ChronoUnit.MONTHS.between(ativo.getDataInicioDepreciacao(), dataCalculo);
+
+            if (mesesDecorridos < 0 || mesesDecorridos >= vidaUtil) {
+                return BigDecimal.ZERO;
+            }
+
+            BigDecimal taxa = BigDecimal.valueOf(2).divide(BigDecimal.valueOf(vidaUtil), 10, RoundingMode.HALF_UP);
+            BigDecimal fatorDecaimento = BigDecimal.ONE.subtract(taxa).pow((int) mesesDecorridos);
+
+            return valorDepreciavel.multiply(fatorDecaimento).multiply(taxa);
+        }
+
         // Padrão: MetodoDepreciacao.LINEAR
         return valorDepreciavel.divide(BigDecimal.valueOf(ativo.getVidaUtilMeses()), 10, RoundingMode.HALF_UP);
     }
