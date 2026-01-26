@@ -3,6 +3,7 @@ package br.com.aegispatrimonio.service;
 import br.com.aegispatrimonio.dto.healthcheck.DiskInfoDTO;
 import br.com.aegispatrimonio.dto.healthcheck.HealthCheckDTO;
 import br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO;
+import br.com.aegispatrimonio.dto.healthcheck.SystemHealthDTO;
 import br.com.aegispatrimonio.dto.PredictionResult;
 import br.com.aegispatrimonio.model.Ativo;
 import br.com.aegispatrimonio.model.AtivoDetalheHardware;
@@ -19,7 +20,11 @@ import br.com.aegispatrimonio.service.updater.HealthCheckUpdater;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -84,6 +89,41 @@ public class HealthCheckService implements IHealthCheckService {
         healthCheckUpdater.updateScalars(ativo.getId(), detalhes, healthCheckDTO, createdNow);
 
         collectionsManager.replaceCollections(detalhes, healthCheckDTO);
+    }
+
+    @Override
+    public SystemHealthDTO getLatestSystemHealth() {
+        return healthCheckHistoryRepository.findTopByOrderByCreatedAtDesc()
+                .map(this::mapToDTO)
+                .orElse(null);
+    }
+
+    @Override
+    public Page<SystemHealthDTO> getSystemHealthHistory(Pageable pageable) {
+        return healthCheckHistoryRepository.findByOrderByCreatedAtDesc(pageable)
+                .map(this::mapToDTO);
+    }
+
+    @Override
+    public List<SystemHealthDTO> getRecentSystemAlerts() {
+        LocalDateTime cutoff = LocalDateTime.now().minusHours(24);
+        BigDecimal cpuLimit = new BigDecimal("0.90");
+        BigDecimal memLimit = new BigDecimal("0.10");
+        return healthCheckHistoryRepository.findByCreatedAtAfterAndCpuUsageGreaterThanOrCreatedAtAfterAndMemFreePercentLessThanOrderByCreatedAtDesc(
+                cutoff, cpuLimit, cutoff, memLimit
+        ).stream().map(this::mapToDTO).collect(Collectors.toList());
+    }
+
+    private SystemHealthDTO mapToDTO(br.com.aegispatrimonio.model.HealthCheckHistory h) {
+        return new SystemHealthDTO(
+                h.getId(),
+                h.getCreatedAt(),
+                h.getHost(),
+                h.getCpuUsage(),
+                h.getMemFreePercent(),
+                h.getDisks(),
+                h.getNets()
+        );
     }
 
     @Override
