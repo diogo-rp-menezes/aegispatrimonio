@@ -1,5 +1,6 @@
 package br.com.aegispatrimonio.service;
 
+import br.com.aegispatrimonio.dto.healthcheck.DiskInfoDTO;
 import br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO;
 import br.com.aegispatrimonio.model.*;
 import br.com.aegispatrimonio.repository.AlertaRepository;
@@ -101,6 +102,18 @@ public class AlertNotificationService {
             if (freePercent < 0.10) {
                 createAlertIfNotExists(ativo, TipoAlerta.CRITICO, "Memória RAM Crítica",
                         "Memória livre está abaixo de 10% (" + String.format("%.1f", freePercent * 100) + "%). Risco de travamento.");
+            }
+        }
+
+        // Disk Check (< 10% free)
+        if (payload.discos() != null) {
+            for (DiskInfoDTO disk : payload.discos()) {
+                if (disk.freePercent() != null && disk.freePercent() < 0.10) {
+                    String diskName = disk.model() != null ? disk.model() : (disk.serial() != null ? disk.serial() : "Desconhecido");
+                    createAlertIfNotExists(ativo, TipoAlerta.CRITICO, "Espaço em Disco Crítico",
+                            "O disco " + diskName + " está com menos de 10% de espaço livre (" +
+                            String.format("%.1f", disk.freePercent() * 100) + "%). Risco de parada.");
+                }
             }
         }
     }

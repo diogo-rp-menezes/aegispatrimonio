@@ -1,5 +1,6 @@
 package br.com.aegispatrimonio.service;
 
+import br.com.aegispatrimonio.dto.healthcheck.DiskInfoDTO;
 import br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO;
 import br.com.aegispatrimonio.model.Alerta;
 import br.com.aegispatrimonio.model.Ativo;
@@ -125,6 +126,28 @@ class AlertNotificationServiceTest {
 
         verify(alertaRepository).save(argThat(a ->
             a.getTitulo().contains("Memória RAM") && a.getTipo() == TipoAlerta.CRITICO
+        ));
+    }
+
+    @Test
+    void shouldCreateCriticalAlertWhenDiskSpaceIsLow() {
+        DiskInfoDTO lowSpaceDisk = new DiskInfoDTO("SSD", "SN123", "NVMe", 500.0, 40.0, 0.08); // 8% free
+        HealthCheckPayloadDTO lowDiskPayload = new HealthCheckPayloadDTO(
+                null, null, null, null, null, null, null, null, null, null, null,
+                0.10, // cpu safe
+                16000L, 8000L, // memory safe
+                Collections.singletonList(lowSpaceDisk)
+        );
+        when(ativoRepository.getReferenceById(1L)).thenReturn(ativo);
+        when(alertaRepository.findByAtivoIdAndLidoFalseAndTipo(1L, TipoAlerta.CRITICO))
+                .thenReturn(Collections.emptyList());
+
+        service.checkAndCreateAlerts(1L, null, lowDiskPayload);
+
+        verify(alertaRepository).save(argThat(a ->
+            a.getTitulo().contains("Espaço em Disco Crítico") &&
+            a.getMensagem().contains("SSD") &&
+            a.getTipo() == TipoAlerta.CRITICO
         ));
     }
 }
