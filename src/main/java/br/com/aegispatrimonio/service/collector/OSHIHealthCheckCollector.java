@@ -26,10 +26,12 @@ public class OSHIHealthCheckCollector {
 
     private final ObjectMapper objectMapper;
     private final SystemInfo systemInfo;
+    private long[] prevTicks;
 
     public OSHIHealthCheckCollector(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
         this.systemInfo = new SystemInfo();
+        this.prevTicks = this.systemInfo.getHardware().getProcessor().getSystemCpuLoadTicks();
     }
 
     public HealthCheckHistory collect() {
@@ -47,7 +49,8 @@ public class OSHIHealthCheckCollector {
 
         // CPU Usage
         CentralProcessor processor = hal.getProcessor();
-        double cpuLoad = processor.getSystemCpuLoad(1000);
+        double cpuLoad = processor.getSystemCpuLoadBetweenTicks(prevTicks);
+        prevTicks = processor.getSystemCpuLoadTicks();
         if (Double.isNaN(cpuLoad)) {
             cpuLoad = 0.0;
         }
