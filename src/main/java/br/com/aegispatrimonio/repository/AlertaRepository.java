@@ -21,6 +21,8 @@ public interface AlertaRepository extends JpaRepository<Alerta, Long>, JpaSpecif
 
     List<Alerta> findByAtivoIdAndLidoFalseAndTipo(Long ativoId, TipoAlerta tipo);
 
+    List<Alerta> findByAtivoIdAndLidoFalse(Long ativoId);
+
     @EntityGraph(attributePaths = "ativo")
     Page<Alerta> findByAtivo_Filial_IdIn(Collection<Long> filialIds, Pageable pageable);
 
