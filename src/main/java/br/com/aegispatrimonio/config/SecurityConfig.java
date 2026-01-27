@@ -6,6 +6,8 @@ import br.com.aegispatrimonio.security.DelegatedAccessDeniedHandler;
 import br.com.aegispatrimonio.security.DelegatedAuthenticationEntryPoint;
 import br.com.aegispatrimonio.security.JwtAuthFilter;
 import br.com.aegispatrimonio.security.TenantFilter;
+import br.com.aegispatrimonio.security.oauth2.CustomOAuth2UserService;
+import br.com.aegispatrimonio.security.oauth2.OAuth2AuthenticationSuccessHandler;
 import br.com.aegispatrimonio.service.IPermissionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -46,6 +48,8 @@ public class SecurityConfig {
     private final DelegatedAccessDeniedHandler accessDeniedHandler;
     private final IPermissionService permissionService;
     private final PermissionEvaluator permissionEvaluator;
+    private final CustomOAuth2UserService customOAuth2UserService;
+    private final OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
 
     @Value("${app.cors.allowed-origins:http://localhost:8080,http://localhost:3000}")
     private String allowedOrigins;
@@ -72,6 +76,12 @@ public class SecurityConfig {
                         .requestMatchers(new AntPathRequestMatcher("/error/**")).permitAll()
                         // Allow everything else (SPA routing + Static Resources)
                         .anyRequest().permitAll()
+                )
+                .oauth2Login(oauth2 -> oauth2
+                        .userInfoEndpoint(userInfo -> userInfo
+                                .userService(customOAuth2UserService)
+                        )
+                        .successHandler(oAuth2AuthenticationSuccessHandler)
                 )
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)

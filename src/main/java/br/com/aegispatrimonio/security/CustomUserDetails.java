@@ -5,21 +5,35 @@ import br.com.aegispatrimonio.model.Usuario;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
  * Implementação de UserDetails que encapsula um objeto Usuario.
  * É usado pelo Spring Security para realizar a autenticação e autorização.
+ * Também implementa OAuth2User para suportar autenticação social.
  */
-public class CustomUserDetails implements UserDetails {
+public class CustomUserDetails implements UserDetails, OAuth2User {
 
     private final Usuario usuario;
     private final Collection<? extends GrantedAuthority> authorities;
+    private Map<String, Object> attributes;
+
+    public static CustomUserDetails create(Usuario usuario, Map<String, Object> attributes) {
+        CustomUserDetails userDetails = new CustomUserDetails(usuario);
+        userDetails.setAttributes(attributes);
+        return userDetails;
+    }
+
+    public void setAttributes(Map<String, Object> attributes) {
+        this.attributes = attributes;
+    }
 
     // Construtor original (para uso da aplicação real)
     public CustomUserDetails(Usuario usuario) {
@@ -87,5 +101,15 @@ public class CustomUserDetails implements UserDetails {
     @Override
     public boolean isEnabled() {
         return usuario.getStatus() == Status.ATIVO;
+    }
+
+    @Override
+    public Map<String, Object> getAttributes() {
+        return attributes;
+    }
+
+    @Override
+    public String getName() {
+        return String.valueOf(usuario.getId());
     }
 }
