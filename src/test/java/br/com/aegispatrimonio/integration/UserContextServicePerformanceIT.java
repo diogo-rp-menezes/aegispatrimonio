@@ -8,11 +8,15 @@ import br.com.aegispatrimonio.service.UserContextService;
 import jakarta.persistence.EntityManager;
 import org.hibernate.Session;
 import org.hibernate.stat.Statistics;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.Set;
 
@@ -47,6 +51,10 @@ public class UserContextServicePerformanceIT extends BaseIT {
 
     @BeforeEach
     void setUp() {
+        // Setup Request Context for @RequestScope bean
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+
         // Create Filial
         Filial filial = new Filial();
         filial.setNome("Matriz Teste");
@@ -86,6 +94,11 @@ public class UserContextServicePerformanceIT extends BaseIT {
 
         entityManager.flush();
         entityManager.clear();
+    }
+
+    @AfterEach
+    void tearDown() {
+        RequestContextHolder.resetRequestAttributes();
     }
 
     @Test
