@@ -37,6 +37,28 @@ const routes = [
         component: () => import("../views/SystemHealthView.vue"),
         meta: { roles: ['ROLE_ADMIN'] }
       },
+
+      // Admin - RBAC
+      {
+        path: "admin/roles",
+        component: () => import("../views/admin/RoleList.vue"),
+        meta: { roles: ['ROLE_ADMIN'] }
+      },
+      {
+        path: "admin/roles/novo",
+        component: () => import("../views/admin/RoleForm.vue"),
+        meta: { roles: ['ROLE_ADMIN'] }
+      },
+      {
+        path: "admin/roles/:id/editar",
+        component: () => import("../views/admin/RoleForm.vue"),
+        meta: { roles: ['ROLE_ADMIN'] }
+      },
+      {
+        path: "admin/permissions",
+        component: () => import("../views/admin/PermissionList.vue"),
+        meta: { roles: ['ROLE_ADMIN'] }
+      },
     ]
   },
 ];

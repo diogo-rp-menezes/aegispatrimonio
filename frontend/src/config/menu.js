@@ -48,6 +48,16 @@ export const menuItems = [
     role: "ROLE_ADMIN"
   },
   {
+    title: "Administração",
+    path: "/admin",
+    icon: "bi bi-shield-lock",
+    role: "ROLE_ADMIN",
+    submenus: [
+      { title: "Perfis de Acesso", path: "/admin/roles" },
+      { title: "Permissões", path: "/admin/permissions" }
+    ]
+  },
+  {
     title: "Configurações",
     path: "/configuracoes",
     icon: "bi bi-gear"
