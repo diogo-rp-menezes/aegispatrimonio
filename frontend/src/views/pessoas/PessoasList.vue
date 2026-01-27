@@ -34,16 +34,10 @@ async function carregarPessoas() {
   error.value = null;
   try {
     const data = await funcionarioService.listar(filtros.value);
-    // Backend ListarTodos returns List<FuncionarioDTO>, no pagination meta info yet
-    // If backend implements pagination, we need to adapt.
-    // For now assuming it returns simple array.
-    if (Array.isArray(data)) {
-        pessoas.value = data;
-        totalPages.value = 1;
-    } else {
-        pessoas.value = data.content || data;
-        totalPages.value = data.totalPages || 1;
-    }
+
+    // Backend returns a paginated response (Page<FuncionarioDTO>)
+    pessoas.value = data.content || [];
+    totalPages.value = data.totalPages || 0;
   } catch (err) {
     console.error('Erro ao carregar pessoas:', err);
     error.value = err.message || "Erro ao carregar pessoas";
