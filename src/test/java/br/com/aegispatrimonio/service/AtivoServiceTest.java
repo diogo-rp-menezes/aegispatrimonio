@@ -150,7 +150,7 @@ class AtivoServiceTest {
         when(tipoAtivoRepository.findById(1L)).thenReturn(Optional.of(new TipoAtivo()));
         when(fornecedorRepository.findById(1L)).thenReturn(Optional.of(new Fornecedor()));
         when(localizacaoRepository.findById(1L)).thenReturn(Optional.of(localizacao));
-        when(funcionarioRepository.findById(3L)).thenReturn(Optional.of(responsavelOutraFilial));
+        when(funcionarioRepository.findByIdWithFiliais(3L)).thenReturn(Optional.of(responsavelOutraFilial));
 
         assertThrows(IllegalArgumentException.class, () -> ativoService.atualizar(10L, updateDTO));
     }
@@ -204,7 +204,7 @@ class AtivoServiceTest {
         when(tipoAtivoRepository.findById(1L)).thenReturn(Optional.of(new TipoAtivo()));
         when(fornecedorRepository.findById(1L)).thenReturn(Optional.of(new Fornecedor()));
         when(localizacaoRepository.findById(1L)).thenReturn(Optional.of(localizacao));
-        when(funcionarioRepository.findById(1L)).thenReturn(Optional.of(adminUser.getFuncionario()));
+        when(funcionarioRepository.findByIdWithFiliais(1L)).thenReturn(Optional.of(adminUser.getFuncionario()));
 
         when(ativoRepository.save(any(Ativo.class))).thenAnswer(invocation -> {
             Ativo a = invocation.getArgument(0);
