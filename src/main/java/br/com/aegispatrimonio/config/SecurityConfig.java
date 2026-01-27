@@ -63,11 +63,15 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(new AntPathRequestMatcher("/api/v1/auth/**")).permitAll()
+                        // Protected API
+                        .requestMatchers(new AntPathRequestMatcher("/api/**")).authenticated()
+                        // Public/System
                         .requestMatchers(new AntPathRequestMatcher("/swagger-ui/**")).permitAll()
                         .requestMatchers(new AntPathRequestMatcher("/v3/api-docs/**")).permitAll()
                         .requestMatchers(new AntPathRequestMatcher("/actuator/**")).permitAll()
                         .requestMatchers(new AntPathRequestMatcher("/error/**")).permitAll()
-                        .anyRequest().authenticated()
+                        // Allow everything else (SPA routing + Static Resources)
+                        .anyRequest().permitAll()
                 )
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
