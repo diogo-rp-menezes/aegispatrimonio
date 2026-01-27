@@ -109,11 +109,16 @@ public class AlertNotificationService {
         // Disk Check (< 10% free)
         if (payload.discos() != null) {
             for (DiskInfoDTO disk : payload.discos()) {
-                if (disk.freePercent() != null && disk.freePercent() < 0.10) {
+                Double freePercent = disk.freePercent();
+                if (freePercent == null && disk.totalGb() != null && disk.freeGb() != null && disk.totalGb() > 0) {
+                    freePercent = disk.freeGb() / disk.totalGb();
+                }
+
+                if (freePercent != null && freePercent < 0.10) {
                     String diskName = disk.model() != null ? disk.model() : (disk.serial() != null ? disk.serial() : "Desconhecido");
                     createAlertIfNotExists(ativo, TipoAlerta.CRITICO, "Espaço em Disco Crítico",
                             "O disco " + diskName + " está com menos de 10% de espaço livre (" +
-                            String.format("%.1f", disk.freePercent() * 100) + "%). Risco de parada.", existingAlerts);
+                            String.format("%.1f", freePercent * 100) + "%). Risco de parada.", existingAlerts);
                 }
             }
         }

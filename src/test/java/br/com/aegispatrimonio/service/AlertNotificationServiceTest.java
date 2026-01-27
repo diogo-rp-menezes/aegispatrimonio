@@ -169,4 +169,27 @@ class AlertNotificationServiceTest {
             a.getTipo() == TipoAlerta.CRITICO
         ));
     }
+
+    @Test
+    void shouldCreateCriticalAlertWhenDiskSpaceIsLowCalculated() {
+        // 500GB total, 40GB free = 8% free (Critical < 10%)
+        // freePercent is NULL to simulate "dumb" agent
+        DiskInfoDTO lowSpaceDisk = new DiskInfoDTO("SSD", "SN123", "NVMe", 500.0, 40.0, null);
+        HealthCheckPayloadDTO lowDiskPayload = new HealthCheckPayloadDTO(
+                null, null, null, null, null, null, null, null, null, null, null,
+                0.10, // cpu safe
+                16000L, 8000L, // memory safe
+                Collections.singletonList(lowSpaceDisk)
+        );
+        when(ativoRepository.getReferenceById(1L)).thenReturn(ativo);
+        when(alertaRepository.findByAtivoIdAndLidoFalse(1L)).thenReturn(new ArrayList<>());
+
+        service.checkAndCreateAlerts(1L, null, lowDiskPayload);
+
+        verify(alertaRepository).save(argThat(a ->
+            a.getTitulo().contains("Espaço em Disco Crítico") &&
+            a.getMensagem().contains("SSD") &&
+            a.getTipo() == TipoAlerta.CRITICO
+        ));
+    }
 }
