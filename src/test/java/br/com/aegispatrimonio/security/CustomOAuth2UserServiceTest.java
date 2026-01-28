@@ -1,5 +1,6 @@
 package br.com.aegispatrimonio.security;
 
+import br.com.aegispatrimonio.security.oauth2.CustomOAuth2UserService;
 import br.com.aegispatrimonio.model.Status;
 import br.com.aegispatrimonio.model.Usuario;
 import br.com.aegispatrimonio.repository.UsuarioRepository;

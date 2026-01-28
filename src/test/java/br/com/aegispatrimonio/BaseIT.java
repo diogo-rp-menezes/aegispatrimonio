@@ -31,5 +31,8 @@ public abstract class BaseIT {
         // Security
         registry.add("jwt.secret", () -> "c2VjdXJlLXNlY3JldC1leGFtcGxlLXNlZWt0ZXN0LXNlY3JldA==");
         registry.add("jwt.expiration", () -> "28800000");
+
+        // Application
+        registry.add("app.frontend-url", () -> "http://localhost:5173");
     }
 }
