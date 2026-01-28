@@ -46,6 +46,8 @@ public class SecurityConfig {
     private final DelegatedAccessDeniedHandler accessDeniedHandler;
     private final IPermissionService permissionService;
     private final PermissionEvaluator permissionEvaluator;
+    private final br.com.aegispatrimonio.security.CustomOAuth2UserService oAuth2UserService;
+    private final br.com.aegispatrimonio.security.OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
 
     @Value("${app.cors.allowed-origins:http://localhost:8080,http://localhost:3000}")
     private String allowedOrigins;
@@ -72,6 +74,12 @@ public class SecurityConfig {
                         .requestMatchers(new AntPathRequestMatcher("/error/**")).permitAll()
                         // Allow everything else (SPA routing + Static Resources)
                         .anyRequest().permitAll()
+                )
+                .oauth2Login(oauth2 -> oauth2
+                        .userInfoEndpoint(userInfo -> userInfo
+                                .userService(oAuth2UserService)
+                        )
+                        .successHandler(oAuth2AuthenticationSuccessHandler)
                 )
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)

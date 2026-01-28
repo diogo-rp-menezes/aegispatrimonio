@@ -12,7 +12,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -64,6 +66,18 @@ public class AuthController {
         final UserDetails userDetails = userDetailsService.loadUserByUsername(loginRequest.email());
         final String token = jwtService.generateToken(userDetails);
 
+        return ResponseEntity.ok(buildResponse(userDetails, token));
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<LoginResponseDTO> me(@AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(401).build();
+        }
+        return ResponseEntity.ok(buildResponse(userDetails, ""));
+    }
+
+    private LoginResponseDTO buildResponse(UserDetails userDetails, String token) {
         List<FilialSimpleDTO> filiais = Collections.emptyList();
         if (userDetails instanceof CustomUserDetails) {
             Usuario usuario = ((CustomUserDetails) userDetails).getUsuario();
@@ -78,7 +92,6 @@ public class AuthController {
                 .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.toList());
 
-        // Retorna o token na resposta
-        return ResponseEntity.ok(new LoginResponseDTO(token, filiais, roles));
+        return new LoginResponseDTO(token, filiais, roles);
     }
 }
