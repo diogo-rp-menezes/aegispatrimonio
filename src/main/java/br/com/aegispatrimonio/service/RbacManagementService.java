@@ -32,7 +32,7 @@ public class RbacManagementService {
 
     @Transactional(readOnly = true)
     public List<RoleDTO> listarRoles() {
-        return roleRepository.findAll().stream()
+        return roleRepository.findAllWithPermissions().stream()
                 .map(rbacMapper::toRoleDTO)
                 .collect(Collectors.toList());
     }
