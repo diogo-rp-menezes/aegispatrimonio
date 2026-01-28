@@ -128,13 +128,16 @@ class HealthCheckServiceTest {
                 50.0, 16000L, 8000L, List.of(disk)
         );
 
+        when(currentUserProvider.getCurrentUsuario()).thenReturn(adminUser);
         when(ativoRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(ativo));
         when(ativoHealthHistoryRepository.saveAll(anyList())).thenReturn(Collections.emptyList());
+        doNothing().when(healthCheckAuthorizationPolicy).assertCanUpdate(any(Usuario.class), any(Ativo.class));
 
         // Act
         healthCheckService.processHealthCheckPayload(1L, payload);
 
         // Assert
+        verify(healthCheckAuthorizationPolicy).assertCanUpdate(adminUser, ativo);
         verify(ativoRepository).save(ativo);
         verify(ativoHealthHistoryRepository).saveAll(anyList());
         // Verify alert notification
@@ -160,13 +163,16 @@ class HealthCheckServiceTest {
                 null, null, null, List.of(disk)
         );
 
+        when(currentUserProvider.getCurrentUsuario()).thenReturn(adminUser);
         when(ativoRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(ativo));
         when(ativoHealthHistoryRepository.saveAll(anyList())).thenReturn(Collections.emptyList());
+        doNothing().when(healthCheckAuthorizationPolicy).assertCanUpdate(any(Usuario.class), any(Ativo.class));
 
         // Act
         healthCheckService.processHealthCheckPayload(1L, payload);
 
         // Assert
+        verify(healthCheckAuthorizationPolicy).assertCanUpdate(adminUser, ativo);
         // Should NOT fetch history for prediction
         verify(ativoHealthHistoryRepository, never()).findByAtivoIdAndComponenteInAndMetricaAndDataRegistroAfterOrderByDataRegistroAsc(
                 anyLong(), anyList(), anyString(), any(LocalDateTime.class));
@@ -186,16 +192,19 @@ class HealthCheckServiceTest {
                 null, null, null, List.of(disk)
         );
 
+        when(currentUserProvider.getCurrentUsuario()).thenReturn(adminUser);
         when(ativoRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(ativo));
         when(ativoHealthHistoryRepository.saveAll(anyList())).thenReturn(Collections.emptyList());
         when(ativoHealthHistoryRepository.findByAtivoIdAndComponenteInAndMetricaAndDataRegistroAfterOrderByDataRegistroAsc(
                 eq(1L), anyList(), eq("FREE_SPACE_GB"), any(LocalDateTime.class)))
                 .thenReturn(Collections.emptyList());
+        doNothing().when(healthCheckAuthorizationPolicy).assertCanUpdate(any(Usuario.class), any(Ativo.class));
 
         // Act
         healthCheckService.processHealthCheckPayload(1L, payload);
 
         // Assert
+        verify(healthCheckAuthorizationPolicy).assertCanUpdate(adminUser, ativo);
         verify(ativoHealthHistoryRepository).findByAtivoIdAndComponenteInAndMetricaAndDataRegistroAfterOrderByDataRegistroAsc(
                 eq(1L), anyList(), eq("FREE_SPACE_GB"), any(LocalDateTime.class));
     }

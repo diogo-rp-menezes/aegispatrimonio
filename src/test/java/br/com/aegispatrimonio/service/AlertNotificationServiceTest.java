@@ -1,5 +1,6 @@
 package br.com.aegispatrimonio.service;
 
+import br.com.aegispatrimonio.dto.healthcheck.DiskInfoDTO;
 import br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO;
 import br.com.aegispatrimonio.model.Alerta;
 import br.com.aegispatrimonio.model.Ativo;
@@ -14,7 +15,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -49,8 +52,8 @@ class AlertNotificationServiceTest {
     void shouldCreateCriticalAlertWhenPredictionIsBelow7Days() {
         ativo.setPrevisaoEsgotamentoDisco(LocalDate.now().plusDays(5));
         when(ativoRepository.getReferenceById(1L)).thenReturn(ativo);
-        when(alertaRepository.findByAtivoIdAndLidoFalseAndTipo(1L, TipoAlerta.CRITICO))
-                .thenReturn(Collections.emptyList());
+        // Changed to findByAtivoIdAndLidoFalse
+        when(alertaRepository.findByAtivoIdAndLidoFalse(1L)).thenReturn(new ArrayList<>());
 
         service.checkAndCreateAlerts(1L, ativo.getPrevisaoEsgotamentoDisco(), emptyPayload);
 
@@ -61,8 +64,7 @@ class AlertNotificationServiceTest {
     void shouldCreateWarningAlertWhenPredictionIsBetween7And30Days() {
         ativo.setPrevisaoEsgotamentoDisco(LocalDate.now().plusDays(20));
         when(ativoRepository.getReferenceById(1L)).thenReturn(ativo);
-        when(alertaRepository.findByAtivoIdAndLidoFalseAndTipo(1L, TipoAlerta.WARNING))
-                .thenReturn(Collections.emptyList());
+        when(alertaRepository.findByAtivoIdAndLidoFalse(1L)).thenReturn(new ArrayList<>());
 
         service.checkAndCreateAlerts(1L, ativo.getPrevisaoEsgotamentoDisco(), emptyPayload);
 
@@ -73,8 +75,13 @@ class AlertNotificationServiceTest {
     void shouldNotCreateAlertIfAlreadyExists() {
         ativo.setPrevisaoEsgotamentoDisco(LocalDate.now().plusDays(5));
         when(ativoRepository.getReferenceById(1L)).thenReturn(ativo);
-        when(alertaRepository.findByAtivoIdAndLidoFalseAndTipo(1L, TipoAlerta.CRITICO))
-                .thenReturn(Collections.singletonList(new Alerta()));
+
+        Alerta existingAlert = new Alerta();
+        existingAlert.setTipo(TipoAlerta.CRITICO);
+        List<Alerta> existingList = new ArrayList<>();
+        existingList.add(existingAlert);
+
+        when(alertaRepository.findByAtivoIdAndLidoFalse(1L)).thenReturn(existingList);
 
         service.checkAndCreateAlerts(1L, ativo.getPrevisaoEsgotamentoDisco(), emptyPayload);
 
@@ -84,6 +91,22 @@ class AlertNotificationServiceTest {
     @Test
     void shouldNotCreateAlertIfSafe() {
         ativo.setPrevisaoEsgotamentoDisco(LocalDate.now().plusDays(40));
+
+        // Note: findByAtivoIdAndLidoFalse is called even if safe?
+        // checkAndCreateAlerts calls findBy... first.
+        // So we might need to mock it if we don't want NPE, or it might be called.
+        // But since checkDiskPredictiveAlerts returns early if > 30 days, maybe save is not called.
+        // But checkResourceUsageAlerts is also called.
+        // Let's check logic:
+        // checkAndCreateAlerts calls:
+        //   getReferenceById
+        //   findByAtivoIdAndLidoFalse
+        //   checkDiskPredictiveAlerts
+        //   checkResourceUsageAlerts
+        // So we definitely need to mock findByAtivoIdAndLidoFalse.
+
+        when(ativoRepository.getReferenceById(1L)).thenReturn(ativo); // Need this for getReferenceById
+        when(alertaRepository.findByAtivoIdAndLidoFalse(1L)).thenReturn(new ArrayList<>());
 
         service.checkAndCreateAlerts(1L, ativo.getPrevisaoEsgotamentoDisco(), emptyPayload);
 
@@ -99,8 +122,7 @@ class AlertNotificationServiceTest {
                 null
         );
         when(ativoRepository.getReferenceById(1L)).thenReturn(ativo);
-        when(alertaRepository.findByAtivoIdAndLidoFalseAndTipo(1L, TipoAlerta.CRITICO))
-                .thenReturn(Collections.emptyList());
+        when(alertaRepository.findByAtivoIdAndLidoFalse(1L)).thenReturn(new ArrayList<>());
 
         service.checkAndCreateAlerts(1L, null, highCpuPayload);
 
@@ -118,13 +140,56 @@ class AlertNotificationServiceTest {
                 null
         );
         when(ativoRepository.getReferenceById(1L)).thenReturn(ativo);
-        when(alertaRepository.findByAtivoIdAndLidoFalseAndTipo(1L, TipoAlerta.CRITICO))
-                .thenReturn(Collections.emptyList());
+        when(alertaRepository.findByAtivoIdAndLidoFalse(1L)).thenReturn(new ArrayList<>());
 
         service.checkAndCreateAlerts(1L, null, lowMemPayload);
 
         verify(alertaRepository).save(argThat(a ->
             a.getTitulo().contains("Memória RAM") && a.getTipo() == TipoAlerta.CRITICO
+        ));
+    }
+
+    @Test
+    void shouldCreateCriticalAlertWhenDiskSpaceIsLow() {
+        DiskInfoDTO lowSpaceDisk = new DiskInfoDTO("SSD", "SN123", "NVMe", 500.0, 40.0, 0.08); // 8% free
+        HealthCheckPayloadDTO lowDiskPayload = new HealthCheckPayloadDTO(
+                null, null, null, null, null, null, null, null, null, null, null,
+                0.10, // cpu safe
+                16000L, 8000L, // memory safe
+                Collections.singletonList(lowSpaceDisk)
+        );
+        when(ativoRepository.getReferenceById(1L)).thenReturn(ativo);
+        when(alertaRepository.findByAtivoIdAndLidoFalse(1L)).thenReturn(new ArrayList<>());
+
+        service.checkAndCreateAlerts(1L, null, lowDiskPayload);
+
+        verify(alertaRepository).save(argThat(a ->
+            a.getTitulo().contains("Espaço em Disco Crítico") &&
+            a.getMensagem().contains("SSD") &&
+            a.getTipo() == TipoAlerta.CRITICO
+        ));
+    }
+
+    @Test
+    void shouldCreateCriticalAlertWhenDiskSpaceIsLowCalculated() {
+        // 500GB total, 40GB free = 8% free (Critical < 10%)
+        // freePercent is NULL to simulate "dumb" agent
+        DiskInfoDTO lowSpaceDisk = new DiskInfoDTO("SSD", "SN123", "NVMe", 500.0, 40.0, null);
+        HealthCheckPayloadDTO lowDiskPayload = new HealthCheckPayloadDTO(
+                null, null, null, null, null, null, null, null, null, null, null,
+                0.10, // cpu safe
+                16000L, 8000L, // memory safe
+                Collections.singletonList(lowSpaceDisk)
+        );
+        when(ativoRepository.getReferenceById(1L)).thenReturn(ativo);
+        when(alertaRepository.findByAtivoIdAndLidoFalse(1L)).thenReturn(new ArrayList<>());
+
+        service.checkAndCreateAlerts(1L, null, lowDiskPayload);
+
+        verify(alertaRepository).save(argThat(a ->
+            a.getTitulo().contains("Espaço em Disco Crítico") &&
+            a.getMensagem().contains("SSD") &&
+            a.getTipo() == TipoAlerta.CRITICO
         ));
     }
 }

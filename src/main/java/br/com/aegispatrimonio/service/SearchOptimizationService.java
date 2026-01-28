@@ -39,8 +39,10 @@ public class SearchOptimizationService {
             m = right.length();
         }
 
-        int[] p = new int[n + 1]; // 'previous' cost array
-        int[] d = new int[n + 1]; // current cost array
+        Buffers buffers = BUFFERS.get();
+        buffers.ensureCapacity(n + 1);
+        int[] p = buffers.p;
+        int[] d = buffers.d;
         int[] _d; // placeholder
 
         for (int i = 0; i <= n; i++) {
@@ -76,10 +78,18 @@ public class SearchOptimizationService {
         if (left == null || right == null) return 0.0;
         if (left.equals(right)) return 1.0;
 
-        int distance = calculateLevenshteinDistance(left, right);
         int maxLength = Math.max(left.length(), right.length());
-
         if (maxLength == 0) return 1.0;
+
+        // Optimization: If length difference is too large, it's impossible to reach > 0.2 score
+        // Score = 1.0 - (dist / maxLen) > 0.2  =>  dist < 0.8 * maxLen
+        // Since dist >= abs(len(left) - len(right)), if diff >= 0.8 * maxLen, we can skip
+        int lengthDiff = Math.abs(left.length() - right.length());
+        if ((double) lengthDiff / maxLength >= 0.8) {
+            return 0.0;
+        }
+
+        int distance = calculateLevenshteinDistance(left, right);
 
         return 1.0 - ((double) distance / maxLength);
     }
@@ -112,4 +122,19 @@ public class SearchOptimizationService {
     }
 
     private record ItemWithScore<T>(T item, double score) {}
+
+    private static class Buffers {
+        int[] p = new int[128];
+        int[] d = new int[128];
+
+        void ensureCapacity(int size) {
+            if (p.length < size) {
+                int newSize = Math.max(p.length * 2, size);
+                p = new int[newSize];
+                d = new int[newSize];
+            }
+        }
+    }
+
+    private static final ThreadLocal<Buffers> BUFFERS = ThreadLocal.withInitial(Buffers::new);
 }

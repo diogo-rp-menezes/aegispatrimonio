@@ -124,9 +124,14 @@ public class DepreciacaoService {
         if (mesesParaDepreciar < 0) mesesParaDepreciar = 0;
 
         BigDecimal depreciacaoTotal = BigDecimal.ZERO;
-        for (int i = 0; i < mesesParaDepreciar; i++) {
-            LocalDate dataCalculo = ativo.getDataInicioDepreciacao().plusMonths(i);
-            depreciacaoTotal = depreciacaoTotal.add(calcularValorDepreciacaoMensal(ativo, dataCalculo));
+        if (ativo.getMetodoDepreciacao() == MetodoDepreciacao.LINEAR) {
+            BigDecimal depreciacaoMensal = calcularValorDepreciacaoMensal(ativo, ativo.getDataInicioDepreciacao());
+            depreciacaoTotal = depreciacaoMensal.multiply(BigDecimal.valueOf(mesesParaDepreciar));
+        } else {
+            for (int i = 0; i < mesesParaDepreciar; i++) {
+                LocalDate dataCalculo = ativo.getDataInicioDepreciacao().plusMonths(i);
+                depreciacaoTotal = depreciacaoTotal.add(calcularValorDepreciacaoMensal(ativo, dataCalculo));
+            }
         }
 
         BigDecimal valorDepreciavel = ativo.getValorAquisicao().subtract(ativo.getValorResidual());
@@ -174,6 +179,20 @@ public class DepreciacaoService {
             long digitoAtual = vidaUtil - mesesDecorridos;
             BigDecimal taxa = BigDecimal.valueOf(digitoAtual).divide(BigDecimal.valueOf(somaDigitos), 10, RoundingMode.HALF_UP);
             return valorDepreciavel.multiply(taxa);
+        }
+
+        if (ativo.getMetodoDepreciacao() == MetodoDepreciacao.SALDO_DECRESCENTE) {
+            long vidaUtil = ativo.getVidaUtilMeses();
+            long mesesDecorridos = ChronoUnit.MONTHS.between(ativo.getDataInicioDepreciacao(), dataCalculo);
+
+            if (mesesDecorridos < 0 || mesesDecorridos >= vidaUtil) {
+                return BigDecimal.ZERO;
+            }
+
+            BigDecimal taxa = BigDecimal.valueOf(2).divide(BigDecimal.valueOf(vidaUtil), 10, RoundingMode.HALF_UP);
+            BigDecimal fatorDecaimento = BigDecimal.ONE.subtract(taxa).pow((int) mesesDecorridos);
+
+            return valorDepreciavel.multiply(fatorDecaimento).multiply(taxa);
         }
 
         // Padrão: MetodoDepreciacao.LINEAR

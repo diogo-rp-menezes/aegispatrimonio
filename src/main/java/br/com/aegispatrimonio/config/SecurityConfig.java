@@ -46,6 +46,8 @@ public class SecurityConfig {
     private final DelegatedAccessDeniedHandler accessDeniedHandler;
     private final IPermissionService permissionService;
     private final PermissionEvaluator permissionEvaluator;
+    private final br.com.aegispatrimonio.security.CustomOAuth2UserService oAuth2UserService;
+    private final br.com.aegispatrimonio.security.OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
 
     @Value("${app.cors.allowed-origins:http://localhost:8080,http://localhost:3000}")
     private String allowedOrigins;
@@ -63,11 +65,21 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(new AntPathRequestMatcher("/api/v1/auth/**")).permitAll()
+                        // Protected API
+                        .requestMatchers(new AntPathRequestMatcher("/api/**")).authenticated()
+                        // Public/System
                         .requestMatchers(new AntPathRequestMatcher("/swagger-ui/**")).permitAll()
                         .requestMatchers(new AntPathRequestMatcher("/v3/api-docs/**")).permitAll()
                         .requestMatchers(new AntPathRequestMatcher("/actuator/**")).permitAll()
                         .requestMatchers(new AntPathRequestMatcher("/error/**")).permitAll()
-                        .anyRequest().authenticated()
+                        // Allow everything else (SPA routing + Static Resources)
+                        .anyRequest().permitAll()
+                )
+                .oauth2Login(oauth2 -> oauth2
+                        .userInfoEndpoint(userInfo -> userInfo
+                                .userService(oAuth2UserService)
+                        )
+                        .successHandler(oAuth2AuthenticationSuccessHandler)
                 )
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)

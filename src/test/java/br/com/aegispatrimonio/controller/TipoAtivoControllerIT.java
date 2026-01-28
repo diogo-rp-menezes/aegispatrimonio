@@ -151,7 +151,8 @@ public class TipoAtivoControllerIT extends BaseIT {
         user.setFuncionario(func);
         func.setUsuario(user);
 
-        return funcionarioRepository.save(func);
+        usuarioRepository.saveAndFlush(user);
+        return funcionarioRepository.saveAndFlush(func);
     }
 
     private TipoAtivo createTipoAtivo(String nome) {
