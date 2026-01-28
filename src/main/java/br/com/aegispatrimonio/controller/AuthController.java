@@ -14,6 +14,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -93,5 +94,26 @@ public class AuthController {
                 .collect(Collectors.toList());
 
         return new LoginResponseDTO(token, filiais, roles);
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<LoginResponseDTO> me(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(401).build();
+        }
+
+        List<FilialSimpleDTO> filiais = Collections.emptyList();
+        Usuario usuario = userDetails.getUsuario();
+        if (usuario.getFuncionario() != null && usuario.getFuncionario().getFiliais() != null) {
+            filiais = usuario.getFuncionario().getFiliais().stream()
+                    .map(f -> new FilialSimpleDTO(f.getId(), f.getNome()))
+                    .collect(Collectors.toList());
+        }
+
+        List<String> roles = userDetails.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(new LoginResponseDTO(null, filiais, roles));
     }
 }

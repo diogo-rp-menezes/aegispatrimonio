@@ -41,6 +41,20 @@
           </a>
         </div>
       </form>
+
+      <div class="mt-4">
+        <div class="d-flex align-items-center mb-3">
+          <hr class="flex-grow-1" />
+          <span class="mx-2 text-muted small">ou continue com</span>
+          <hr class="flex-grow-1" />
+        </div>
+        <a :href="googleLoginUrl" class="btn btn-outline-danger w-100 mb-2">
+          <i class="bi bi-google me-2"></i> Google
+        </a>
+        <a :href="githubLoginUrl" class="btn btn-outline-dark w-100">
+          <i class="bi bi-github me-2"></i> GitHub
+        </a>
+      </div>
     </div>
   </div>
 </template>
@@ -50,12 +64,56 @@ import { ref, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { fetchConfig, handleResponse, request } from '../services/api';
 
+// Calculate Backend URL (remove /api/v1 suffix if present to get root)
+const backendOrigin = fetchConfig.baseURL.includes('/api')
+    ? fetchConfig.baseURL.split('/api')[0]
+    : fetchConfig.baseURL; // If empty (proxy) or root, keeps as is.
+
+// OAuth2 Endpoints (Standard Spring Security)
+const googleLoginUrl = `${backendOrigin}/oauth2/authorization/google`;
+const githubLoginUrl = `${backendOrigin}/oauth2/authorization/github`;
+
 const email = ref('');
 const password = ref('');
 const error = ref('');
 const loading = ref(false);
 const router = useRouter();
 const route = useRoute();
+
+onMounted(async () => {
+    // Check for token in URL (OAuth2 redirect)
+    const token = route.query.token;
+    if (token) {
+        localStorage.setItem('authToken', token);
+        loading.value = true;
+        try {
+            // Fetch user context
+            const data = await request('/auth/me');
+             // Save Roles
+            if (data.roles && data.roles.length > 0) {
+              localStorage.setItem('userRoles', JSON.stringify(data.roles));
+            } else {
+              localStorage.removeItem('userRoles');
+            }
+
+            // Save Filiais
+            if (data.filiais && data.filiais.length > 0) {
+                localStorage.setItem('allowedFiliais', JSON.stringify(data.filiais));
+                localStorage.setItem('currentFilial', data.filiais[0].id);
+            } else {
+                localStorage.removeItem('allowedFiliais');
+                localStorage.removeItem('currentFilial');
+            }
+            router.push('/dashboard');
+        } catch (e) {
+            console.error("Failed to fetch user context", e);
+            error.value = "Falha na autenticação via provedor externo.";
+            localStorage.removeItem('authToken');
+        } finally {
+            loading.value = false;
+        }
+    }
+});
 
 const handleLogin = async () => {
   loading.value = true;

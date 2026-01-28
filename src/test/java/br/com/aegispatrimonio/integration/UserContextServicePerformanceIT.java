@@ -51,9 +51,7 @@ public class UserContextServicePerformanceIT extends BaseIT {
 
     @BeforeEach
     void setUp() {
-        // Setup Request Context for @RequestScope bean
-        MockHttpServletRequest request = new MockHttpServletRequest();
-        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
 
         // Create Filial
         Filial filial = new Filial();
