@@ -10,4 +10,8 @@ import java.util.List;
 public interface AtivoHealthHistoryRepository extends JpaRepository<AtivoHealthHistory, Long> {
 
     List<AtivoHealthHistory> findByAtivoIdAndMetricaOrderByDataRegistroAsc(Long ativoId, String metrica);
+
+    List<AtivoHealthHistory> findByAtivoIdAndComponenteInAndMetricaOrderByDataRegistroAsc(Long ativoId, List<String> componentes, String metrica);
+
+    List<AtivoHealthHistory> findByAtivoIdAndComponenteInAndMetricaAndDataRegistroAfterOrderByDataRegistroAsc(Long ativoId, List<String> componentes, String metrica, java.time.LocalDateTime dataRegistro);
 }

@@ -1,0 +1,28 @@
+.git
+.gitignore
+.idea
+.vscode
+target/
+build/
+bin/
+*.log
+*.tmp
+*.bak
+*.swp
+.DS_Store
+Thumbs.db
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+frontend/npm-debug.log*
+
+# Backend
+.mvn/wrapper/maven-wrapper.jar
+!mvnw
+!pom.xml
+test-results/
+playwright-report/

@@ -8,7 +8,6 @@ import br.com.aegispatrimonio.repository.AtivoRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -24,14 +23,20 @@ class RelatorioServiceTest {
     @Mock
     private AtivoRepository ativoRepository;
 
-    @InjectMocks
+    @Mock
+    private QRCodeService qrCodeService;
+
     private RelatorioService relatorioService;
 
     private Ativo ativo;
     private Funcionario funcionario;
+    private final String FRONTEND_URL = "http://test-frontend";
 
     @BeforeEach
     void setUp() {
+        // Manual instantiation to inject scalar value
+        relatorioService = new RelatorioService(ativoRepository, qrCodeService, FRONTEND_URL);
+
         funcionario = new Funcionario();
         funcionario.setNome("João da Silva");
 
@@ -52,8 +57,21 @@ class RelatorioServiceTest {
     }
 
     @Test
+    void testGerarQrCode_Sucesso() {
+        when(ativoRepository.existsById(1L)).thenReturn(true);
+        when(qrCodeService.generateQRCode(anyString(), anyInt(), anyInt())).thenReturn(new byte[]{1, 2, 3});
+
+        byte[] result = relatorioService.gerarQrCode(1L);
+
+        assertNotNull(result);
+        verify(ativoRepository).existsById(1L);
+        // Verify the URL format
+        verify(qrCodeService).generateQRCode(eq(FRONTEND_URL + "/ativos/1"), eq(300), eq(300));
+    }
+
+    @Test
     void testGerarTermoResponsabilidade_Sucesso() {
-        when(ativoRepository.findById(1L)).thenReturn(Optional.of(ativo));
+        when(ativoRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(ativo));
 
         byte[] pdf = relatorioService.gerarTermoResponsabilidade(1L);
 
@@ -68,7 +86,7 @@ class RelatorioServiceTest {
     @Test
     void testGerarTermoResponsabilidade_SemFuncionario() {
         ativo.setFuncionarioResponsavel(null);
-        when(ativoRepository.findById(1L)).thenReturn(Optional.of(ativo));
+        when(ativoRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(ativo));
 
         assertThrows(IllegalStateException.class, () -> relatorioService.gerarTermoResponsabilidade(1L));
     }

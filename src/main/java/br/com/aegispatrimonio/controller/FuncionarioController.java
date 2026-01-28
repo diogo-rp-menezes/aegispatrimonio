@@ -13,12 +13,12 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 /**
  * Controller para gerenciar as operações CRUD de Funcionários e seus respectivos Usuários.
@@ -42,12 +42,15 @@ public class FuncionarioController {
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Lista todos os funcionários", description = "Retorna a lista de todos os funcionários cadastrados no sistema.")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Lista retornada com sucesso", content = @Content(schema = @Schema(implementation = FuncionarioDTO.class))),
+            @ApiResponse(responseCode = "200", description = "Lista retornada com sucesso", content = @Content(schema = @Schema(implementation = Page.class))),
             @ApiResponse(responseCode = "401", description = "Não autenticado", content = @Content(schema = @Schema(hidden = true))),
             @ApiResponse(responseCode = "403", description = "Não autorizado", content = @Content(schema = @Schema(hidden = true)))
     })
-    public List<FuncionarioDTO> listarTodos() {
-        return funcionarioService.listarTodos();
+    public Page<FuncionarioDTO> listarTodos(
+            @Parameter(description = "Nome para filtro") @RequestParam(required = false) String nome,
+            @Parameter(description = "ID do departamento para filtro") @RequestParam(required = false) Long departamentoId,
+            @Parameter(hidden = true) Pageable pageable) {
+        return funcionarioService.listarTodos(nome, departamentoId, pageable);
     }
 
     @GetMapping("/{id}")
@@ -78,7 +81,7 @@ public class FuncionarioController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("@permissionService.hasFuncionarioPermission(authentication, #id, 'UPDATE') and @permissionService.hasPermission(authentication, null, 'FUNCIONARIO', 'UPDATE', #updateDTO.filiaisIds)")
+    @PreAuthorize("@permissionService.hasPermission(authentication, #id, 'FUNCIONARIO', 'UPDATE', #updateDTO.filiaisIds)")
     @Operation(summary = "Atualiza um funcionário existente", description = "Atualiza os dados de um funcionário existente e seu respectivo usuário.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Funcionário atualizado com sucesso", content = @Content(schema = @Schema(implementation = FuncionarioDTO.class))),

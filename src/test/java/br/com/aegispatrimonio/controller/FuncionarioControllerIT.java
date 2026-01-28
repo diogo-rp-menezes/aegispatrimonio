@@ -61,6 +61,9 @@ public class FuncionarioControllerIT extends BaseIT {
     private br.com.aegispatrimonio.repository.RoleRepository roleRepository;
 
     @Autowired
+    private br.com.aegispatrimonio.repository.PermissionRepository permissionRepository;
+
+    @Autowired
     private JwtService jwtService;
 
     @Autowired
@@ -85,6 +88,7 @@ public class FuncionarioControllerIT extends BaseIT {
         departamentoRepository.deleteAll();
         filialRepository.deleteAll();
         roleRepository.deleteAll();
+        permissionRepository.deleteAll();
 
         // Resetar auto-incremento para tabelas relevantes
         resetAutoIncrement();
@@ -95,6 +99,7 @@ public class FuncionarioControllerIT extends BaseIT {
         // Ensure Roles exist
         ensureRole("ROLE_ADMIN");
         ensureRole("ROLE_USER");
+        ensurePermission("FUNCIONARIO", "READ", "ROLE_USER");
 
         filialA = createFilial("Filial A", "FL-A", "01.000.000/0001-01");
         deptoA = createDepartamento("TI A", filialA);
@@ -116,12 +121,30 @@ public class FuncionarioControllerIT extends BaseIT {
         }
     }
 
+    private void ensurePermission(String resource, String action, String roleName) {
+        Role role = roleRepository.findByName(roleName).orElseThrow();
+
+        Permission permission = permissionRepository.findByResourceAndAction(resource, action)
+                .orElseGet(() -> {
+                    Permission p = new Permission();
+                    p.setResource(resource);
+                    p.setAction(action);
+                    p.setDescription("Auto generated for test");
+                    return permissionRepository.save(p);
+                });
+
+        if (role.getPermissions().stream().noneMatch(p -> p.getId().equals(permission.getId()))) {
+            role.getPermissions().add(permission);
+            roleRepository.save(role);
+        }
+    }
+
     @Test
     @DisplayName("ListarTodos: Deve retornar 200 e a lista de funcionários para ADMIN")
     void listarTodos_comAdmin_deveRetornarOk() throws Exception {
         mockMvc.perform(get("/api/v1/funcionarios").header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].nome", hasItem("Admin")));
+                .andExpect(jsonPath("$.content[*].nome", hasItem("Admin")));
     }
 
     @Test
@@ -129,7 +152,19 @@ public class FuncionarioControllerIT extends BaseIT {
     void listarTodos_comUser_deveRetornarOk() throws Exception {
         mockMvc.perform(get("/api/v1/funcionarios").header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].nome", hasItem("Admin")));
+                // Admin user is also in Filial A, so User (in Filial A) can see Admin
+                .andExpect(jsonPath("$.content[*].nome", hasItem("Admin")));
+    }
+
+    @Test
+    @DisplayName("ListarTodos: Deve filtrar por nome")
+    void listarTodos_comFiltroNome_deveRetornarApenasCorrespondente() throws Exception {
+        mockMvc.perform(get("/api/v1/funcionarios")
+                        .param("nome", "Admin")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].nome", hasItem("Admin")))
+                .andExpect(jsonPath("$.totalElements", is(1)));
     }
 
     @Test
@@ -239,11 +274,12 @@ public class FuncionarioControllerIT extends BaseIT {
         user.setFuncionario(func);
         func.setUsuario(user);
 
-        Funcionario savedFunc = funcionarioRepository.save(func);
-        entityManager.flush();
+        Funcionario savedFunc = funcionarioRepository.saveAndFlush(func);
 
         savedFunc.setFiliais(filiais);
-        return funcionarioRepository.save(savedFunc);
+        savedFunc = funcionarioRepository.saveAndFlush(savedFunc);
+        usuarioRepository.saveAndFlush(user);
+        return savedFunc;
     }
 
     private void resetAutoIncrement() {

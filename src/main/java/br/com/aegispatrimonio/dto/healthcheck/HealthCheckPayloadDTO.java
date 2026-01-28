@@ -16,5 +16,8 @@ public record HealthCheckPayloadDTO(
     String cpuModel,
     Integer cpuCores,
     Integer cpuThreads,
+    Double cpuLoad,
+    Long memoryTotal,
+    Long memoryAvailable,
     List<DiskInfoDTO> discos
 ) {}

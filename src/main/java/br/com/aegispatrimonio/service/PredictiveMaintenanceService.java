@@ -1,10 +1,10 @@
 package br.com.aegispatrimonio.service;
 
+import br.com.aegispatrimonio.dto.PredictionResult;
 import br.com.aegispatrimonio.model.AtivoHealthHistory;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 /**
@@ -19,9 +19,9 @@ public class PredictiveMaintenanceService {
      * Useful for disk usage forecasting.
      *
      * @param history List of historical data points, ordered by date.
-     * @return LocalDate of predicted exhaustion, or null if slope is positive/flat or insufficient data.
+     * @return PredictionResult containing exhaustion date and model parameters, or null if slope is positive/flat or insufficient data.
      */
-    public LocalDate predictExhaustionDate(List<AtivoHealthHistory> history) {
+    public PredictionResult predictExhaustionDate(List<AtivoHealthHistory> history) {
         if (history == null || history.size() < 2) {
             return null; // Not enough data points
         }
@@ -64,9 +64,10 @@ public class PredictiveMaintenanceService {
         double daysToZero = -alpha / beta;
 
         if (daysToZero <= 0) {
-             return null; // Already exhausted in the past
+             return null; // Already exhausted in the past (before first record)
         }
 
-        return LocalDate.ofEpochDay(firstDay + (long) daysToZero);
+        LocalDate exhaustionDate = LocalDate.ofEpochDay(firstDay + (long) daysToZero);
+        return new PredictionResult(exhaustionDate, beta, alpha, firstDay);
     }
 }

@@ -40,6 +40,8 @@ public class AtivoAdaptiveIT extends BaseIT {
     @Autowired private FilialRepository filialRepository;
     @Autowired private FornecedorRepository fornecedorRepository;
     @Autowired private UsuarioRepository usuarioRepository;
+    @Autowired private RoleRepository roleRepository;
+    @Autowired private PermissionRepository permissionRepository;
 
     private Usuario usuarioAdmin;
     private Filial filial;
@@ -112,12 +114,38 @@ public class AtivoAdaptiveIT extends BaseIT {
         return fornecedorRepository.save(f);
     }
 
-    private Usuario createUsuario(String email, String role) {
+    private Usuario createUsuario(String email, String roleName) {
         Usuario u = new Usuario();
         u.setEmail(email);
         u.setPassword("password");
-        u.setRole(role);
+        u.setRole(roleName);
         u.setStatus(Status.ATIVO);
+
+        Role rbacRole = roleRepository.findByName(roleName).orElseGet(() -> {
+            Role r = new Role();
+            r.setName(roleName);
+            return roleRepository.save(r);
+        });
+
+        // Grant CREATE permission for Admin explicitly if needed by Granular RBAC
+        // Assuming Admin bypass or has all permissions. If not, we might need to add it.
+        // For now, let's just assign the Role.
+        // Ideally, PermissionService should allow ROLE_ADMIN to bypass.
+        // If not, we need to add permissions.
+        if ("ROLE_ADMIN".equals(roleName)) {
+             // Ensure ADMIN has ATIVO:CREATE
+             Permission pCreate = permissionRepository.findByResourceAndAction("ATIVO", "CREATE")
+                .orElseGet(() -> permissionRepository.save(new Permission(null, "ATIVO", "CREATE", "Create Ativo", "filialId")));
+
+             if (rbacRole.getPermissions() == null) {
+                 rbacRole.setPermissions(new java.util.HashSet<>());
+             }
+             rbacRole.getPermissions().add(pCreate);
+             rbacRole = roleRepository.save(rbacRole);
+        }
+
+        u.setRoles(java.util.Set.of(rbacRole));
+
         return usuarioRepository.save(u);
     }
 

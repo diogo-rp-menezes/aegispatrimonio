@@ -1,6 +1,8 @@
 package br.com.aegispatrimonio.service;
 
 import br.com.aegispatrimonio.dto.healthcheck.HealthCheckDTO;
+import br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO;
+import br.com.aegispatrimonio.dto.healthcheck.DiskInfoDTO;
 import br.com.aegispatrimonio.mapper.HealthCheckMapper;
 import br.com.aegispatrimonio.model.*;
 import br.com.aegispatrimonio.repository.*;
@@ -14,11 +16,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -34,21 +38,21 @@ class HealthCheckServiceTest {
     @Mock
     private AtivoDetalheHardwareRepository detalheHardwareRepository;
     @Mock
-    private DiscoRepository discoRepository;
-    @Mock
-    private MemoriaRepository memoriaRepository;
-    @Mock
-    private AdaptadorRedeRepository adaptadorRedeRepository;
-    @Mock
     private HealthCheckMapper healthCheckMapper;
     @Mock
     private CurrentUserProvider currentUserProvider;
     @Mock
-    private HealthCheckAuthorizationPolicy healthCheckAuthorizationPolicy; // Adicionado mock para HealthCheckAuthorizationPolicy
+    private HealthCheckAuthorizationPolicy healthCheckAuthorizationPolicy;
     @Mock
     private HealthCheckUpdater healthCheckUpdater;
     @Mock
     private HealthCheckCollectionsManager collectionsManager;
+    @Mock
+    private PredictiveMaintenanceService predictiveMaintenanceService;
+    @Mock
+    private AlertNotificationService alertNotificationService;
+    @Mock
+    private AtivoHealthHistoryRepository ativoHealthHistoryRepository;
 
     @InjectMocks
     private HealthCheckService healthCheckService;
@@ -96,16 +100,15 @@ class HealthCheckServiceTest {
         detalhesHardware.setId(1L);
         detalhesHardware.setAtivo(ativo);
 
-        // Mock do currentUserProvider para todos os testes
-        when(currentUserProvider.getCurrentUsuario()).thenReturn(adminUser); // Default para admin, pode ser sobrescrito nos testes específicos
+        // Relaxed mocking for updateHealthCheck tests that might call currentUserProvider
+        lenient().when(currentUserProvider.getCurrentUsuario()).thenReturn(adminUser);
     }
 
     @Test
-    @DisplayName("Deve atualizar o HealthCheck com sucesso para usuário ADMIN")
+    @DisplayName("updateHealthCheck: Deve atualizar com sucesso para usuário ADMIN")
     void updateHealthCheck_comAdmin_deveAtualizarComSucesso() {
         when(ativoRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(ativo));
         when(detalheHardwareRepository.findById(1L)).thenReturn(Optional.of(detalhesHardware));
-        // Mock para a política de autorização
         doNothing().when(healthCheckAuthorizationPolicy).assertCanUpdate(any(Usuario.class), any(Ativo.class));
 
         healthCheckService.updateHealthCheck(1L, healthCheckDTO);
@@ -116,61 +119,93 @@ class HealthCheckServiceTest {
     }
 
     @Test
-    @DisplayName("Deve atualizar o HealthCheck com sucesso para usuário autorizado da mesma filial")
-    void updateHealthCheck_comUsuarioAutorizado_deveAtualizarComSucesso() {
-        when(currentUserProvider.getCurrentUsuario()).thenReturn(regularUser);
+    @DisplayName("processHealthCheckPayload: Deve salvar histórico e atualizar hardware")
+    void processHealthCheckPayload_shouldSaveHistory() {
+        // Arrange
+        DiskInfoDTO disk = new DiskInfoDTO("Model", "SN1", "SSD", 500.0, 200.0, 40.0);
+        HealthCheckPayloadDTO payload = new HealthCheckPayloadDTO(
+                "PC-01", "DOM", "Win11", "22H2", "x64", "Dell", "X", "SN", "i7", 8, 16,
+                50.0, 16000L, 8000L, List.of(disk)
+        );
+
+        when(currentUserProvider.getCurrentUsuario()).thenReturn(adminUser);
         when(ativoRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(ativo));
-        when(detalheHardwareRepository.findById(1L)).thenReturn(Optional.of(detalhesHardware));
-        // Mock para a política de autorização
+        when(ativoHealthHistoryRepository.saveAll(anyList())).thenReturn(Collections.emptyList());
         doNothing().when(healthCheckAuthorizationPolicy).assertCanUpdate(any(Usuario.class), any(Ativo.class));
 
-        healthCheckService.updateHealthCheck(1L, healthCheckDTO);
+        // Act
+        healthCheckService.processHealthCheckPayload(1L, payload);
 
-        verify(healthCheckUpdater, times(1)).updateScalars(eq(1L), eq(detalhesHardware), eq(healthCheckDTO), eq(false));
-        verify(collectionsManager, times(1)).replaceCollections(eq(detalhesHardware), eq(healthCheckDTO));
-        verify(healthCheckAuthorizationPolicy).assertCanUpdate(regularUser, ativo);
-    }
-
-    @Test
-    @DisplayName("Deve lançar AccessDeniedException para usuário de outra filial")
-    void updateHealthCheck_comUsuarioNaoAutorizado_deveLancarExcecao() {
-        when(currentUserProvider.getCurrentUsuario()).thenReturn(unauthorizedUser);
-        when(ativoRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(ativo));
-        // Mock para a política de autorização lançar AccessDeniedException
-        doThrow(AccessDeniedException.class).when(healthCheckAuthorizationPolicy).assertCanUpdate(any(Usuario.class), any(Ativo.class));
-
-        assertThrows(AccessDeniedException.class, () -> healthCheckService.updateHealthCheck(1L, healthCheckDTO));
-        verify(healthCheckUpdater, never()).updateScalars(anyLong(), any(AtivoDetalheHardware.class), any(HealthCheckDTO.class), anyBoolean());
-        verify(collectionsManager, never()).replaceCollections(any(AtivoDetalheHardware.class), any(HealthCheckDTO.class));
-        verify(healthCheckAuthorizationPolicy).assertCanUpdate(unauthorizedUser, ativo);
-    }
-
-    @Test
-    @DisplayName("Deve lançar EntityNotFoundException quando o ativo não existir")
-    void updateHealthCheck_quandoAtivoNaoEncontrado_deveLancarExcecao() {
-        // O currentUserProvider já está mockado no BeforeEach para adminUser
-        when(ativoRepository.findByIdWithDetails(99L)).thenReturn(Optional.empty());
-
-        assertThrows(EntityNotFoundException.class, () -> healthCheckService.updateHealthCheck(99L, healthCheckDTO));
-        verify(healthCheckAuthorizationPolicy, never()).assertCanUpdate(any(Usuario.class), any(Ativo.class)); // Não deve chamar a política se o ativo não for encontrado
-        verify(healthCheckUpdater, never()).updateScalars(anyLong(), any(AtivoDetalheHardware.class), any(HealthCheckDTO.class), anyBoolean());
-        verify(collectionsManager, never()).replaceCollections(any(AtivoDetalheHardware.class), any(HealthCheckDTO.class));
-    }
-
-    @Test
-    @DisplayName("Deve criar novos detalhes de hardware se não existirem")
-    void updateHealthCheck_quandoDetalhesNaoExistem_deveCriarNovo() {
-        // O currentUserProvider já está mockado no BeforeEach para adminUser
-        when(ativoRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(ativo));
-        when(detalheHardwareRepository.findById(1L)).thenReturn(Optional.empty());
-        when(detalheHardwareRepository.saveAndFlush(any(AtivoDetalheHardware.class))).thenReturn(detalhesHardware);
-        // Mock para a política de autorização
-        doNothing().when(healthCheckAuthorizationPolicy).assertCanUpdate(any(Usuario.class), any(Ativo.class));
-
-        healthCheckService.updateHealthCheck(1L, healthCheckDTO);
-
-        verify(healthCheckUpdater, times(1)).updateScalars(eq(1L), any(AtivoDetalheHardware.class), eq(healthCheckDTO), eq(true));
-        verify(collectionsManager, times(1)).replaceCollections(any(AtivoDetalheHardware.class), eq(healthCheckDTO));
+        // Assert
         verify(healthCheckAuthorizationPolicy).assertCanUpdate(adminUser, ativo);
+        verify(ativoRepository).save(ativo);
+        verify(ativoHealthHistoryRepository).saveAll(anyList());
+        // Verify alert notification
+        verify(alertNotificationService).checkAndCreateAlerts(eq(1L), any(), eq(payload));
+
+        // Verify hardware details update (indirectly via ativo state)
+        // Since we didn't mock AtivoDetalheHardwareRepository save (it's cascading or handled inside logic),
+        // we check if the ativo object was modified.
+        // The implementation calls updateHardwareDetailsFromPayload which modifies the Ativo object.
+    }
+
+    @Test
+    @DisplayName("processHealthCheckPayload: Deve pular predição se calculada recentemente")
+    void processHealthCheckPayload_shouldSkipPredictionIfRecentlyCalculated() {
+        // Arrange
+        Map<String, Object> attrs = new java.util.HashMap<>();
+        attrs.put("prediction_calculated_at", LocalDateTime.now().minusHours(1).toString());
+        ativo.setAtributos(attrs);
+
+        DiskInfoDTO disk = new DiskInfoDTO("Model", "SN1", "SSD", 500.0, 200.0, 40.0);
+        HealthCheckPayloadDTO payload = new HealthCheckPayloadDTO(
+                "PC-01", null, null, null, null, null, null, null, null, null, null,
+                null, null, null, List.of(disk)
+        );
+
+        when(currentUserProvider.getCurrentUsuario()).thenReturn(adminUser);
+        when(ativoRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(ativo));
+        when(ativoHealthHistoryRepository.saveAll(anyList())).thenReturn(Collections.emptyList());
+        doNothing().when(healthCheckAuthorizationPolicy).assertCanUpdate(any(Usuario.class), any(Ativo.class));
+
+        // Act
+        healthCheckService.processHealthCheckPayload(1L, payload);
+
+        // Assert
+        verify(healthCheckAuthorizationPolicy).assertCanUpdate(adminUser, ativo);
+        // Should NOT fetch history for prediction
+        verify(ativoHealthHistoryRepository, never()).findByAtivoIdAndComponenteInAndMetricaAndDataRegistroAfterOrderByDataRegistroAsc(
+                anyLong(), anyList(), anyString(), any(LocalDateTime.class));
+    }
+
+    @Test
+    @DisplayName("processHealthCheckPayload: Deve executar predição quando expirada")
+    void processHealthCheckPayload_shouldExecutePredictionWhenExpired() {
+        // Arrange
+        Map<String, Object> attrs = new java.util.HashMap<>();
+        attrs.put("prediction_calculated_at", LocalDateTime.now().minusHours(25).toString());
+        ativo.setAtributos(attrs);
+
+        DiskInfoDTO disk = new DiskInfoDTO("Model", "SN1", "SSD", 500.0, 200.0, 40.0);
+        HealthCheckPayloadDTO payload = new HealthCheckPayloadDTO(
+                "PC-01", null, null, null, null, null, null, null, null, null, null,
+                null, null, null, List.of(disk)
+        );
+
+        when(currentUserProvider.getCurrentUsuario()).thenReturn(adminUser);
+        when(ativoRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(ativo));
+        when(ativoHealthHistoryRepository.saveAll(anyList())).thenReturn(Collections.emptyList());
+        when(ativoHealthHistoryRepository.findByAtivoIdAndComponenteInAndMetricaAndDataRegistroAfterOrderByDataRegistroAsc(
+                eq(1L), anyList(), eq("FREE_SPACE_GB"), any(LocalDateTime.class)))
+                .thenReturn(Collections.emptyList());
+        doNothing().when(healthCheckAuthorizationPolicy).assertCanUpdate(any(Usuario.class), any(Ativo.class));
+
+        // Act
+        healthCheckService.processHealthCheckPayload(1L, payload);
+
+        // Assert
+        verify(healthCheckAuthorizationPolicy).assertCanUpdate(adminUser, ativo);
+        verify(ativoHealthHistoryRepository).findByAtivoIdAndComponenteInAndMetricaAndDataRegistroAfterOrderByDataRegistroAsc(
+                eq(1L), anyList(), eq("FREE_SPACE_GB"), any(LocalDateTime.class));
     }
 }

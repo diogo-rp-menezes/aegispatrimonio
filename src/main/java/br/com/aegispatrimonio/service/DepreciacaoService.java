@@ -6,6 +6,7 @@ import br.com.aegispatrimonio.model.MetodoDepreciacao;
 import br.com.aegispatrimonio.model.StatusAtivo;
 import br.com.aegispatrimonio.model.Usuario;
 import br.com.aegispatrimonio.repository.AtivoRepository;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -16,6 +17,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -27,6 +30,7 @@ public class DepreciacaoService {
 
     private final AtivoRepository ativoRepository;
     private final CurrentUserProvider currentUserProvider; // Injetando CurrentUserProvider
+    private final EntityManager entityManager;
 
     // O construtor manual foi removido, pois @RequiredArgsConstructor já o gera.
     // public DepreciacaoService(AtivoRepository ativoRepository, CurrentUserProvider currentUserProvider) {
@@ -57,12 +61,36 @@ public class DepreciacaoService {
     public void recalcularDepreciacaoTodosAtivos() {
         Usuario auditor = currentUserProvider.getCurrentUsuario();
         log.info("AUDIT: Usuário {} iniciou o recálculo completo da depreciação para todos os ativos.", auditor.getEmail());
+
+        int batchSize = 100;
+        int count = 0;
+        int totalProcessed = 0;
+        List<Ativo> buffer = new ArrayList<>();
+
         try (Stream<Ativo> ativos = ativoRepository.streamAll()) {
-            List<Ativo> ativosAtualizados = ativos
-                    .peek(this::recalcularDepreciacaoTotal)
-                    .collect(Collectors.toList());
-            ativoRepository.saveAll(ativosAtualizados);
-            log.info("Recálculo concluído para {} ativos.", ativosAtualizados.size());
+            Iterator<Ativo> iterator = ativos.iterator();
+            while (iterator.hasNext()) {
+                Ativo ativo = iterator.next();
+                recalcularDepreciacaoTotal(ativo);
+                buffer.add(ativo);
+                count++;
+
+                if (count % batchSize == 0) {
+                    ativoRepository.saveAll(buffer);
+                    entityManager.flush();
+                    entityManager.clear();
+                    totalProcessed += buffer.size();
+                    buffer.clear();
+                }
+            }
+            if (!buffer.isEmpty()) {
+                ativoRepository.saveAll(buffer);
+                entityManager.flush();
+                entityManager.clear();
+                totalProcessed += buffer.size();
+                buffer.clear();
+            }
+            log.info("Recálculo concluído para {} ativos.", totalProcessed);
         }
     }
 
@@ -96,9 +124,14 @@ public class DepreciacaoService {
         if (mesesParaDepreciar < 0) mesesParaDepreciar = 0;
 
         BigDecimal depreciacaoTotal = BigDecimal.ZERO;
-        for (int i = 0; i < mesesParaDepreciar; i++) {
-            LocalDate dataCalculo = ativo.getDataInicioDepreciacao().plusMonths(i);
-            depreciacaoTotal = depreciacaoTotal.add(calcularValorDepreciacaoMensal(ativo, dataCalculo));
+        if (ativo.getMetodoDepreciacao() == MetodoDepreciacao.LINEAR) {
+            BigDecimal depreciacaoMensal = calcularValorDepreciacaoMensal(ativo, ativo.getDataInicioDepreciacao());
+            depreciacaoTotal = depreciacaoMensal.multiply(BigDecimal.valueOf(mesesParaDepreciar));
+        } else {
+            for (int i = 0; i < mesesParaDepreciar; i++) {
+                LocalDate dataCalculo = ativo.getDataInicioDepreciacao().plusMonths(i);
+                depreciacaoTotal = depreciacaoTotal.add(calcularValorDepreciacaoMensal(ativo, dataCalculo));
+            }
         }
 
         BigDecimal valorDepreciavel = ativo.getValorAquisicao().subtract(ativo.getValorResidual());
@@ -146,6 +179,20 @@ public class DepreciacaoService {
             long digitoAtual = vidaUtil - mesesDecorridos;
             BigDecimal taxa = BigDecimal.valueOf(digitoAtual).divide(BigDecimal.valueOf(somaDigitos), 10, RoundingMode.HALF_UP);
             return valorDepreciavel.multiply(taxa);
+        }
+
+        if (ativo.getMetodoDepreciacao() == MetodoDepreciacao.SALDO_DECRESCENTE) {
+            long vidaUtil = ativo.getVidaUtilMeses();
+            long mesesDecorridos = ChronoUnit.MONTHS.between(ativo.getDataInicioDepreciacao(), dataCalculo);
+
+            if (mesesDecorridos < 0 || mesesDecorridos >= vidaUtil) {
+                return BigDecimal.ZERO;
+            }
+
+            BigDecimal taxa = BigDecimal.valueOf(2).divide(BigDecimal.valueOf(vidaUtil), 10, RoundingMode.HALF_UP);
+            BigDecimal fatorDecaimento = BigDecimal.ONE.subtract(taxa).pow((int) mesesDecorridos);
+
+            return valorDepreciavel.multiply(fatorDecaimento).multiply(taxa);
         }
 
         // Padrão: MetodoDepreciacao.LINEAR

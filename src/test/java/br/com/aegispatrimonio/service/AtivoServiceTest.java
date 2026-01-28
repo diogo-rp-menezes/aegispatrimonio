@@ -5,22 +5,15 @@ import br.com.aegispatrimonio.dto.AtivoUpdateDTO;
 import br.com.aegispatrimonio.mapper.AtivoMapper;
 import br.com.aegispatrimonio.model.*;
 import br.com.aegispatrimonio.repository.*;
-import br.com.aegispatrimonio.security.CustomUserDetails;
 import jakarta.persistence.EntityNotFoundException;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockedStatic;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContext;
-import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -28,7 +21,6 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
-// CORREÇÃO: Importar todos os métodos estáticos do Mockito para resolver os erros de compilação.
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -57,14 +49,14 @@ class AtivoServiceTest {
     @Mock
     private SearchOptimizationService searchOptimizationService;
     @Mock
-    private CurrentUserProvider currentUserProvider; // Adicionado mock para CurrentUserProvider
+    private UserContextService userContextService;
+    @Mock
+    private AtivoHealthHistoryRepository healthHistoryRepository;
 
     @InjectMocks
     private AtivoService ativoService;
 
-    private MockedStatic<SecurityContextHolder> mockedSecurityContextHolder;
-
-    // Entidades de Teste
+    // Test Entities
     private Usuario adminUser, regularUser;
     private Filial filialA, filialB;
     private Ativo ativo;
@@ -88,7 +80,6 @@ class AtivoServiceTest {
         adminUser = new Usuario();
         adminUser.setId(1L);
         adminUser.setRole("ROLE_ADMIN");
-        adminUser.setEmail("admin@aegis.com"); // Adicionado email
         adminUser.setFuncionario(adminFunc);
 
         Funcionario funcionario = new Funcionario();
@@ -97,41 +88,34 @@ class AtivoServiceTest {
         regularUser = new Usuario();
         regularUser.setId(2L);
         regularUser.setRole("ROLE_USER");
-        regularUser.setEmail("user@aegis.com"); // Adicionado email
+        regularUser.setEmail("user@aegis.com");
         regularUser.setFuncionario(funcionario);
 
         ativo = new Ativo();
         ativo.setId(10L);
         ativo.setFilial(filialA);
-
-        // Mock do currentUserProvider no setUp para garantir que sempre haja um usuário
-        lenient().when(currentUserProvider.getCurrentUsuario()).thenReturn(adminUser); 
     }
 
-    @AfterEach
-    void tearDown() {
-        // Se mockedSecurityContextHolder foi inicializado, feche-o.
-        // if (mockedSecurityContextHolder != null) {
-        //     mockedSecurityContextHolder.close();
-        // }
-    }
-
-    private void mockUser(Usuario usuario) {
-        // Agora mockamos o currentUserProvider diretamente
-        lenient().when(currentUserProvider.getCurrentUsuario()).thenReturn(usuario);
+    private void mockUserContext(boolean isAdmin, Set<Long> filiais) {
+        lenient().when(userContextService.isAdmin()).thenReturn(isAdmin);
+        if (!isAdmin) {
+             lenient().when(userContextService.getUserFiliais()).thenReturn(filiais);
+        }
     }
 
     @Test
     @DisplayName("BuscarPorId: Usuário comum não pode acessar ativo de outra filial")
     void buscarPorId_quandoNaoAdminEOutraFilial_deveLancarExcecao() {
-        mockUser(regularUser);
+        // Arrange
+        mockUserContext(false, Set.of(1L)); // User has access only to Filial 1 (A)
+
         Ativo ativoOutraFilial = new Ativo();
         ativoOutraFilial.setId(11L);
-        ativoOutraFilial.setFilial(filialB);
-        when(ativoRepository.findByIdWithDetails(11L)).thenReturn(Optional.of(ativoOutraFilial));
-        // CORREÇÃO: Mockar o repositório de funcionários para garantir que a verificação de segurança ocorra
-        when(funcionarioRepository.findById(2L)).thenReturn(Optional.of(regularUser.getFuncionario()));
+        ativoOutraFilial.setFilial(filialB); // Filial 2 (B)
 
+        when(ativoRepository.findByIdWithDetails(11L)).thenReturn(Optional.of(ativoOutraFilial));
+
+        // Act & Assert
         assertThrows(AccessDeniedException.class, () -> ativoService.buscarPorId(11L));
     }
 
@@ -166,7 +150,7 @@ class AtivoServiceTest {
         when(tipoAtivoRepository.findById(1L)).thenReturn(Optional.of(new TipoAtivo()));
         when(fornecedorRepository.findById(1L)).thenReturn(Optional.of(new Fornecedor()));
         when(localizacaoRepository.findById(1L)).thenReturn(Optional.of(localizacao));
-        when(funcionarioRepository.findById(3L)).thenReturn(Optional.of(responsavelOutraFilial));
+        when(funcionarioRepository.findByIdWithFiliais(3L)).thenReturn(Optional.of(responsavelOutraFilial));
 
         assertThrows(IllegalArgumentException.class, () -> ativoService.atualizar(10L, updateDTO));
     }
@@ -220,7 +204,7 @@ class AtivoServiceTest {
         when(tipoAtivoRepository.findById(1L)).thenReturn(Optional.of(new TipoAtivo()));
         when(fornecedorRepository.findById(1L)).thenReturn(Optional.of(new Fornecedor()));
         when(localizacaoRepository.findById(1L)).thenReturn(Optional.of(localizacao));
-        when(funcionarioRepository.findById(1L)).thenReturn(Optional.of(adminUser.getFuncionario()));
+        when(funcionarioRepository.findByIdWithFiliais(1L)).thenReturn(Optional.of(adminUser.getFuncionario()));
 
         when(ativoRepository.save(any(Ativo.class))).thenAnswer(invocation -> {
             Ativo a = invocation.getArgument(0);
@@ -228,7 +212,7 @@ class AtivoServiceTest {
             return a;
         });
 
-        // Mock para o retorno final (não precisa ter os detalhes para este teste passar, pois verificamos o capture)
+        // Mock para o retorno final
         when(ativoRepository.findByIdWithDetails(99L)).thenReturn(Optional.of(ativo));
 
         // Act
@@ -250,26 +234,32 @@ class AtivoServiceTest {
     void listarTodos_comBuscaFuzzy_deveRankearResultados() {
         // Arrange
         String query = "laptp";
-        Ativo a1 = new Ativo(); a1.setId(1L); a1.setNome("Desktop");
-        Ativo a2 = new Ativo(); a2.setId(2L); a2.setNome("Laptop");
-        Ativo a3 = new Ativo(); a3.setId(3L); a3.setNome("Lap Top");
 
-        br.com.aegispatrimonio.dto.AtivoDTO dto2 = new br.com.aegispatrimonio.dto.AtivoDTO(2L, "Laptop", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
-        br.com.aegispatrimonio.dto.AtivoDTO dto3 = new br.com.aegispatrimonio.dto.AtivoDTO(3L, "Lap Top", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+        br.com.aegispatrimonio.dto.AtivoNameDTO n1 = new br.com.aegispatrimonio.dto.AtivoNameDTO(1L, "Desktop");
+        br.com.aegispatrimonio.dto.AtivoNameDTO n2 = new br.com.aegispatrimonio.dto.AtivoNameDTO(2L, "Laptop");
+        br.com.aegispatrimonio.dto.AtivoNameDTO n3 = new br.com.aegispatrimonio.dto.AtivoNameDTO(3L, "Lap Top");
 
         // Mock candidates returned by Repository
-        java.util.List<Ativo> candidates = java.util.List.of(a1, a2, a3);
+        java.util.List<br.com.aegispatrimonio.dto.AtivoNameDTO> candidates = java.util.List.of(n1, n2, n3);
         // Mock ranked result returned by Service
-        java.util.List<Ativo> ranked = java.util.List.of(a2, a3);
+        java.util.List<br.com.aegispatrimonio.dto.AtivoNameDTO> ranked = java.util.List.of(n2, n3);
 
-        mockUser(adminUser);
+        mockUserContext(true, null); // Admin
 
         // When finding candidates (name is null)
-        when(ativoRepository.findByFilters(any(), any(), any(), eq(null), any(org.springframework.data.domain.Pageable.class)))
-                .thenReturn(new org.springframework.data.domain.PageImpl<>(candidates));
+        when(ativoRepository.findSimpleByFilters(any(), any(), any(), any(), any(), any(), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(candidates);
 
         // When ranking
         when(searchOptimizationService.rankResults(eq(query), anyList(), any())).thenReturn((java.util.List) ranked);
+
+        // When fetching details for the page content
+        Ativo a2 = new Ativo(); a2.setId(2L); a2.setNome("Laptop");
+        Ativo a3 = new Ativo(); a3.setId(3L); a3.setNome("Lap Top");
+        when(ativoRepository.findAllByIdInWithDetails(anyList())).thenReturn(java.util.List.of(a2, a3));
+
+        br.com.aegispatrimonio.dto.AtivoDTO dto2 = new br.com.aegispatrimonio.dto.AtivoDTO(2L, "Laptop", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+        br.com.aegispatrimonio.dto.AtivoDTO dto3 = new br.com.aegispatrimonio.dto.AtivoDTO(3L, "Lap Top", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
         when(ativoMapper.toDTO(a2)).thenReturn(dto2);
         when(ativoMapper.toDTO(a3)).thenReturn(dto3);
@@ -277,11 +267,49 @@ class AtivoServiceTest {
         // Act
         org.springframework.data.domain.Page<br.com.aegispatrimonio.dto.AtivoDTO> result = ativoService.listarTodos(
                 org.springframework.data.domain.Pageable.ofSize(10),
-                null, null, null, query);
+                null, null, null, query, null);
 
         // Assert
         verify(searchOptimizationService).rankResults(eq(query), anyList(), any());
+        verify(ativoRepository).findAllByIdInWithDetails(anyList());
         org.junit.jupiter.api.Assertions.assertEquals(2, result.getContent().size());
         org.junit.jupiter.api.Assertions.assertEquals("Laptop", result.getContent().get(0).nome());
+    }
+
+    @Test
+    @DisplayName("getHealthHistory: Deve retornar lista quando usuário tem permissão")
+    void getHealthHistory_ShouldReturnList_WhenUserHasPermission() {
+        mockUserContext(true, null); // Admin
+        AtivoHealthHistory history = new AtivoHealthHistory();
+        history.setDataRegistro(java.time.LocalDateTime.now());
+        history.setComponente("DISK:0");
+        history.setValor(100.0);
+        history.setMetrica("FREE_SPACE_GB");
+
+        when(ativoRepository.findById(10L)).thenReturn(Optional.of(ativo));
+        when(healthHistoryRepository.findByAtivoIdAndMetricaOrderByDataRegistroAsc(10L, "FREE_SPACE_GB"))
+                .thenReturn(java.util.List.of(history));
+
+        java.util.List<br.com.aegispatrimonio.dto.AtivoHealthHistoryDTO> result = ativoService.getHealthHistory(10L);
+
+        org.junit.jupiter.api.Assertions.assertFalse(result.isEmpty());
+        org.junit.jupiter.api.Assertions.assertEquals("DISK:0", result.get(0).componente());
+    }
+
+    @Test
+    @DisplayName("ListarTodos: Deve filtrar por sem predição quando health=INDETERMINADO")
+    void listarTodos_comFiltroIndeterminado_deveFiltrarSemPredicao() {
+        // Arrange
+        mockUserContext(true, null); // Admin
+        when(ativoRepository.findByFilters(any(), any(), any(), any(), any(), any(), eq(false), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(org.springframework.data.domain.Page.empty());
+
+        // Act
+        ativoService.listarTodos(
+                org.springframework.data.domain.Pageable.ofSize(10),
+                null, null, null, null, "INDETERMINADO");
+
+        // Assert
+        verify(ativoRepository).findByFilters(any(), any(), any(), any(), isNull(), isNull(), eq(false), any());
     }
 }

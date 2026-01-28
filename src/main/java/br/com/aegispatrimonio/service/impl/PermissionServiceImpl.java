@@ -177,7 +177,7 @@ public class PermissionServiceImpl implements IPermissionService {
     public boolean hasFuncionarioPermission(Authentication authentication, Long funcionarioId, String action) {
         if (funcionarioId == null) return false;
 
-        return funcionarioRepository.findById(funcionarioId)
+        return funcionarioRepository.findByIdWithFiliais(funcionarioId)
                 .map(funcionario -> {
                     Set<Long> filiaisIds = new HashSet<>();
                     if (funcionario.getFiliais() != null) {

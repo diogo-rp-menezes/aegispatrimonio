@@ -16,9 +16,8 @@ import org.mockito.quality.Strictness;
 import org.springframework.security.core.Authentication;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -37,8 +36,7 @@ class PermissionServiceImplTest {
     @Mock
     private FuncionarioRepository funcionarioRepository;
 
-    @Mock
-    private MeterRegistry meterRegistry;
+    private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     @Mock
     private br.com.aegispatrimonio.service.SecurityAuditService auditService;
@@ -50,7 +48,7 @@ class PermissionServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        permissionService = new PermissionServiceImpl(usuarioRepository, ativoRepository, funcionarioRepository, new SimpleMeterRegistry(), auditService);
+        permissionService = new PermissionServiceImpl(usuarioRepository, ativoRepository, funcionarioRepository, meterRegistry, auditService);
         ReflectionTestUtils.setField(permissionService, "self", permissionService);
     }
 

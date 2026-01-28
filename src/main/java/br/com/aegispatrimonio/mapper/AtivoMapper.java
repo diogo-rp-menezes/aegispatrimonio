@@ -40,8 +40,10 @@ public class AtivoMapper {
             );
         }
 
-        LocalDate previsaoEsgotamento = null;
-        if (ativo.getAtributos() != null && ativo.getAtributos().containsKey("previsaoEsgotamentoDisco")) {
+        LocalDate previsaoEsgotamento = ativo.getPrevisaoEsgotamentoDisco();
+
+        // Fallback for compatibility during migration/mixed state
+        if (previsaoEsgotamento == null && ativo.getAtributos() != null && ativo.getAtributos().containsKey("previsaoEsgotamentoDisco")) {
              try {
                  Object val = ativo.getAtributos().get("previsaoEsgotamentoDisco");
                  if (val != null) {
