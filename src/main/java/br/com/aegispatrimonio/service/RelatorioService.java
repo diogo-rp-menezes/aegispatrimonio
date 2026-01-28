@@ -3,44 +3,42 @@ package br.com.aegispatrimonio.service;
 import br.com.aegispatrimonio.model.Ativo;
 import br.com.aegispatrimonio.model.Funcionario;
 import br.com.aegispatrimonio.repository.AtivoRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lowagie.text.*;
 import com.lowagie.text.pdf.PdfWriter;
 import jakarta.persistence.EntityNotFoundException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
-import java.util.Map;
 
 @Service
 public class RelatorioService {
 
     private final AtivoRepository ativoRepository;
     private final QRCodeService qrCodeService;
-    private final ObjectMapper objectMapper;
+    private final String frontendUrl;
 
-    public RelatorioService(AtivoRepository ativoRepository, QRCodeService qrCodeService, ObjectMapper objectMapper) {
+    public RelatorioService(AtivoRepository ativoRepository,
+                            QRCodeService qrCodeService,
+                            @Value("${app.frontend-url}") String frontendUrl) {
         this.ativoRepository = ativoRepository;
         this.qrCodeService = qrCodeService;
-        this.objectMapper = objectMapper;
+        this.frontendUrl = frontendUrl;
     }
 
     @Transactional(readOnly = true)
     public byte[] gerarQrCode(Long ativoId) {
-        Ativo ativo = ativoRepository.findById(ativoId)
-                .orElseThrow(() -> new EntityNotFoundException("Ativo não encontrado com ID: " + ativoId));
+        // Verifica se existe para lançar 404 caso contrário
+        if (!ativoRepository.existsById(ativoId)) {
+            throw new EntityNotFoundException("Ativo não encontrado com ID: " + ativoId);
+        }
 
         try {
-            Map<String, Object> data = new HashMap<>();
-            data.put("id", ativo.getId());
-            data.put("patrimonio", ativo.getNumeroPatrimonio() != null ? ativo.getNumeroPatrimonio() : "");
-            data.put("nome", ativo.getNome());
-
-            String content = objectMapper.writeValueAsString(data);
+            // Gera URL direta para a página de detalhes do ativo
+            String content = String.format("%s/ativos/%d", frontendUrl.replaceAll("/$", ""), ativoId);
             return qrCodeService.generateQRCode(content, 300, 300);
         } catch (Exception e) {
             throw new RuntimeException("Erro ao gerar conteúdo do QR Code", e);

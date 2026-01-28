@@ -5,11 +5,9 @@ import br.com.aegispatrimonio.model.AtivoDetalheHardware;
 import br.com.aegispatrimonio.model.Funcionario;
 import br.com.aegispatrimonio.model.TipoAtivo;
 import br.com.aegispatrimonio.repository.AtivoRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -28,17 +26,17 @@ class RelatorioServiceTest {
     @Mock
     private QRCodeService qrCodeService;
 
-    @Mock
-    private ObjectMapper objectMapper;
-
-    @InjectMocks
     private RelatorioService relatorioService;
 
     private Ativo ativo;
     private Funcionario funcionario;
+    private final String FRONTEND_URL = "http://test-frontend";
 
     @BeforeEach
     void setUp() {
+        // Manual instantiation to inject scalar value
+        relatorioService = new RelatorioService(ativoRepository, qrCodeService, FRONTEND_URL);
+
         funcionario = new Funcionario();
         funcionario.setNome("João da Silva");
 
@@ -56,6 +54,19 @@ class RelatorioServiceTest {
         AtivoDetalheHardware hardware = new AtivoDetalheHardware();
         hardware.setComputerName("NB-JOAO");
         ativo.setDetalheHardware(hardware);
+    }
+
+    @Test
+    void testGerarQrCode_Sucesso() {
+        when(ativoRepository.existsById(1L)).thenReturn(true);
+        when(qrCodeService.generateQRCode(anyString(), anyInt(), anyInt())).thenReturn(new byte[]{1, 2, 3});
+
+        byte[] result = relatorioService.gerarQrCode(1L);
+
+        assertNotNull(result);
+        verify(ativoRepository).existsById(1L);
+        // Verify the URL format
+        verify(qrCodeService).generateQRCode(eq(FRONTEND_URL + "/ativos/1"), eq(300), eq(300));
     }
 
     @Test
