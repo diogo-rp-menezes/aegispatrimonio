@@ -18,6 +18,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
@@ -39,6 +40,8 @@ class FornecedorControllerIT extends BaseIT {
     @Autowired private FuncionarioRepository funcionarioRepository;
     @Autowired private DepartamentoRepository departamentoRepository;
     @Autowired private FilialRepository filialRepository;
+    @Autowired private RoleRepository roleRepository;
+    @Autowired private PermissionRepository permissionRepository;
     @Autowired private JwtService jwtService;
     @Autowired private PasswordEncoder passwordEncoder;
 
@@ -55,6 +58,15 @@ class FornecedorControllerIT extends BaseIT {
         departamentoRepository.deleteAll();
         filialRepository.deleteAll();
         fornecedorRepository.deleteAll();
+        // RBAC cleanup handled by @Sql("/cleanup.sql") usually, but let's be safe if possible or rely on base cleanup
+        // We will assume BaseIT handles basic cleanup or we do it here if repositories available
+        // Note: deleting roles/permissions might affect other tests if not isolated, but H2 is usually per test suite execution or cleaned.
+        // Given dependencies, we'll clear user roles associations first via usuarioRepository.deleteAll() which cascades? No.
+        // We should clear roles/permissions if we create them.
+
+        // However, standard practice in this project seems to be explicit deletes.
+        // But Role/Permission might be static data in some setups.
+        // Let's create specific roles for this test to avoid collision.
 
         // Create initial Fornecedor
         Fornecedor novoFornecedor = new Fornecedor();
@@ -67,12 +79,25 @@ class FornecedorControllerIT extends BaseIT {
         this.filial = createFilial("Matriz", "MTRZ", "45543915000181");
         Departamento depto = createDepartamento("TI", filial);
 
+        // Setup RBAC for User
+        Permission readFornecedor = new Permission(null, "FORNECEDOR", "READ", "Ler Fornecedor", null);
+        readFornecedor = permissionRepository.save(readFornecedor);
+
+        Role userRole = new Role(null, "ROLE_USER_CUSTOM", "Custom User Role", Set.of(readFornecedor));
+        userRole = roleRepository.save(userRole);
+
+        // Create Admin Granular Role for Bypass
+        Role adminRole = new Role(null, "ROLE_ADMIN", "Administrator Role", new HashSet<>()); // Permissions not needed due to bypass logic
+        adminRole = roleRepository.save(adminRole);
+
         String adminEmail = "admin." + UUID.randomUUID() + "@aegis.com";
-        Funcionario adminFunc = createFuncionarioAndUsuario("Admin", adminEmail, "ROLE_ADMIN", depto, Set.of(filial));
+        // Admin gets ROLE_ADMIN bypass via Granular Role relationship
+        Funcionario adminFunc = createFuncionarioAndUsuario("Admin", adminEmail, "ROLE_ADMIN", depto, Set.of(filial), Set.of(adminRole));
         this.adminToken = jwtService.generateToken(new CustomUserDetails(adminFunc.getUsuario()));
 
         String userEmail = "user." + UUID.randomUUID() + "@aegis.com";
-        Funcionario userFunc = createFuncionarioAndUsuario("User", userEmail, "ROLE_USER", depto, Set.of(filial));
+        // User gets ROLE_USER legacy string (for whatever reason) AND the granular role
+        Funcionario userFunc = createFuncionarioAndUsuario("User", userEmail, "ROLE_USER", depto, Set.of(filial), Set.of(userRole));
         this.userToken = jwtService.generateToken(new CustomUserDetails(userFunc.getUsuario()));
     }
 
@@ -107,7 +132,7 @@ class FornecedorControllerIT extends BaseIT {
     }
 
     @Test
-    @DisplayName("POST /api/v1/fornecedores - Deve retornar Forbidden para usuário USER")
+    @DisplayName("POST /api/v1/fornecedores - Deve retornar Forbidden para usuário USER (sem permissão CREATE)")
     void criar_comUser_deveRetornarForbidden() throws Exception {
         FornecedorCreateDTO createDTO = new FornecedorCreateDTO("Novo Fornecedor User", "15302930000177", "Endereço", "Contato", "contato@novo.com", "987654321", "Obs Nova");
 
@@ -131,7 +156,7 @@ class FornecedorControllerIT extends BaseIT {
     }
 
     @Test
-    @DisplayName("GET /api/v1/fornecedores/{id} - Deve encontrar o fornecedor pelo ID")
+    @DisplayName("GET /api/v1/fornecedores/{id} - Deve encontrar o fornecedor pelo ID (Usuário com permissão READ)")
     void buscarPorId_deveRetornarFornecedor() throws Exception {
         mockMvc.perform(get("/api/v1/fornecedores/{id}", fornecedorAtivo.getId())
                         .header("Authorization", "Bearer " + userToken))
@@ -163,7 +188,7 @@ class FornecedorControllerIT extends BaseIT {
     }
 
     @Test
-    @DisplayName("DELETE /api/v1/fornecedores/{id} - Deve retornar Forbidden para usuário USER")
+    @DisplayName("DELETE /api/v1/fornecedores/{id} - Deve retornar Forbidden para usuário USER (sem permissão DELETE)")
     void deletar_comUser_deveRetornarForbidden() throws Exception {
         mockMvc.perform(delete("/api/v1/fornecedores/{id}", fornecedorAtivo.getId())
                         .header("Authorization", "Bearer " + userToken))
@@ -189,7 +214,7 @@ class FornecedorControllerIT extends BaseIT {
         return departamentoRepository.save(depto);
     }
 
-    private Funcionario createFuncionarioAndUsuario(String nome, String email, String role, Departamento depto, Set<Filial> filiais) {
+    private Funcionario createFuncionarioAndUsuario(String nome, String email, String role, Departamento depto, Set<Filial> filiais, Set<Role> granularRoles) {
         Funcionario func = new Funcionario();
         func.setNome(nome);
         func.setMatricula(nome.replaceAll("\\s+", "") + "-" + UUID.randomUUID().toString().substring(0, 8));
@@ -207,6 +232,11 @@ class FornecedorControllerIT extends BaseIT {
         user.setRole(role);
         user.setStatus(Status.ATIVO);
         user.setFuncionario(savedFunc);
+
+        if (granularRoles != null) {
+            user.setRoles(granularRoles);
+        }
+
         savedFunc.setUsuario(user);
 
         savedFunc.setFiliais(filiais);

@@ -26,14 +26,18 @@ class PermissionServiceMetricsTest {
     private MeterRegistry meterRegistry;
     private UsuarioRepository usuarioRepository;
     private AtivoRepository ativoRepository;
+    private br.com.aegispatrimonio.repository.FuncionarioRepository funcionarioRepository;
     private PermissionServiceImpl service;
+    private br.com.aegispatrimonio.service.SecurityAuditService auditService;
 
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
         usuarioRepository = mock(UsuarioRepository.class);
         ativoRepository = mock(AtivoRepository.class);
-        service = new PermissionServiceImpl(usuarioRepository, ativoRepository, meterRegistry);
+        funcionarioRepository = mock(br.com.aegispatrimonio.repository.FuncionarioRepository.class);
+        auditService = mock(br.com.aegispatrimonio.service.SecurityAuditService.class);
+        service = new PermissionServiceImpl(usuarioRepository, ativoRepository, funcionarioRepository, meterRegistry, auditService);
         ReflectionTestUtils.setField(service, "self", service);
     }
 

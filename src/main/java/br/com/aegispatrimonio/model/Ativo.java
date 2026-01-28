@@ -120,6 +120,9 @@ public class Ativo {
     @Column(columnDefinition = "json")
     @JdbcTypeCode(SqlTypes.JSON)
     private Map<String, Object> atributos;
+
+    @Column(name = "previsao_esgotamento_disco")
+    private LocalDate previsaoEsgotamentoDisco;
     
     
     @PrePersist

@@ -4,9 +4,10 @@
 export { handleResponse, handleApiError, fetchConfig, authInterceptor } from './api';
 
 // Exportações de serviços
-export { pessoaService } from './pessoas';
+export { funcionarioService } from './funcionarioService';
 export { departamentoService } from './departamentos';
 export { fornecedorService } from './fornecedorService';
+export { filialService } from './filialService';
 
 // Você pode adicionar outros serviços aqui no futuro
 // export { ativoService } from './ativos';

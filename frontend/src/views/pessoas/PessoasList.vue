@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { pessoaService, departamentoService } from "../../services";
+import { funcionarioService, departamentoService } from "../../services";
 
 const router = useRouter();
 const pessoas = ref([]);
@@ -33,9 +33,11 @@ async function carregarPessoas() {
   loading.value = true;
   error.value = null;
   try {
-    const data = await pessoaService.listar(filtros.value);
-    pessoas.value = data.content || data;
-    totalPages.value = data.totalPages || 1;
+    const data = await funcionarioService.listar(filtros.value);
+
+    // Backend returns a paginated response (Page<FuncionarioDTO>)
+    pessoas.value = data.content || [];
+    totalPages.value = data.totalPages || 0;
   } catch (err) {
     console.error('Erro ao carregar pessoas:', err);
     error.value = err.message || "Erro ao carregar pessoas";
@@ -56,26 +58,26 @@ async function carregarDepartamentos() {
 
 // Navegação
 function editarPessoa(id) {
-  router.push(`/pessoas/${id}/editar`);
+  router.push(`/funcionarios/${id}/editar`);
 }
 
 function verDetalhes(id) {
-  router.push(`/pessoas/${id}`);
+  router.push(`/funcionarios/${id}`);
 }
 
 function novaPessoa() {
-  router.push("/pessoas/novo");
+  router.push("/funcionarios/novo");
 }
 
 // Excluir pessoa
 async function excluirPessoa(id) {
-  if (confirm("Tem certeza que deseja excluir esta pessoa?")) {
+  if (confirm("Tem certeza que deseja excluir este funcionário?")) {
     try {
-      await pessoaService.deletar(id);
+      await funcionarioService.deletar(id);
       await carregarPessoas();
     } catch (err) {
-      console.error('Erro ao excluir pessoa:', err);
-      alert(err.message || "Erro ao excluir pessoa");
+      console.error('Erro ao excluir funcionário:', err);
+      alert(err.message || "Erro ao excluir funcionário");
     }
   }
 }
@@ -101,9 +103,9 @@ onMounted(() => {
 <template>
   <div>
     <div class="d-flex justify-content-between align-items-center mb-4">
-      <h2>Gestão de Pessoas</h2>
+      <h2>Gestão de Funcionários</h2>
       <button class="btn btn-success" @click="novaPessoa">
-        <i class="bi bi-person-plus"></i> Nova Pessoa
+        <i class="bi bi-person-plus"></i> Novo Funcionário
       </button>
     </div>
 
@@ -143,7 +145,7 @@ onMounted(() => {
     </div>
 
     <div v-if="loading" class="alert alert-info">
-      <i class="bi bi-arrow-repeat"></i> Carregando pessoas...
+      <i class="bi bi-arrow-repeat"></i> Carregando funcionários...
     </div>
     
     <div v-if="error" class="alert alert-danger">
@@ -168,7 +170,7 @@ onMounted(() => {
               <tr v-for="pessoa in pessoas" :key="pessoa.id">
                 <td>{{ pessoa.nome }}</td>
                 <td>{{ pessoa.email }}</td>
-                <td>{{ pessoa.departamento?.nome || 'N/A' }}</td>
+                <td>{{ pessoa.departamento || 'N/A' }}</td>
                 <td>{{ pessoa.cargo || 'N/A' }}</td>
                 <td class="text-center">
                   <div class="btn-group" role="group">
@@ -190,7 +192,7 @@ onMounted(() => {
 
         <!-- Mensagem de lista vazia -->
         <div v-if="!loading && pessoas.length === 0" class="text-center py-4 text-muted">
-          <i class="bi bi-inbox"></i> Nenhuma pessoa encontrada
+          <i class="bi bi-inbox"></i> Nenhum funcionário encontrado
         </div>
 
         <!-- Paginação -->

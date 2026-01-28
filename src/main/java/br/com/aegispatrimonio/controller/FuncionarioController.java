@@ -13,12 +13,12 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 /**
  * Controller para gerenciar as operações CRUD de Funcionários e seus respectivos Usuários.
@@ -39,19 +39,22 @@ public class FuncionarioController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Lista todos os funcionários", description = "Retorna a lista de todos os funcionários cadastrados no sistema.")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Lista retornada com sucesso", content = @Content(schema = @Schema(implementation = FuncionarioDTO.class))),
+            @ApiResponse(responseCode = "200", description = "Lista retornada com sucesso", content = @Content(schema = @Schema(implementation = Page.class))),
             @ApiResponse(responseCode = "401", description = "Não autenticado", content = @Content(schema = @Schema(hidden = true))),
             @ApiResponse(responseCode = "403", description = "Não autorizado", content = @Content(schema = @Schema(hidden = true)))
     })
-    public List<FuncionarioDTO> listarTodos() {
-        return funcionarioService.listarTodos();
+    public Page<FuncionarioDTO> listarTodos(
+            @Parameter(description = "Nome para filtro") @RequestParam(required = false) String nome,
+            @Parameter(description = "ID do departamento para filtro") @RequestParam(required = false) Long departamentoId,
+            @Parameter(hidden = true) Pageable pageable) {
+        return funcionarioService.listarTodos(nome, departamentoId, pageable);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("@permissionService.hasFuncionarioPermission(authentication, #id, 'READ')")
     @Operation(summary = "Busca um funcionário por ID", description = "Retorna um funcionário específico com base no ID.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Funcionário encontrado", content = @Content(schema = @Schema(implementation = FuncionarioDTO.class))),
@@ -93,7 +96,7 @@ public class FuncionarioController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionService.hasFuncionarioPermission(authentication, #id, 'DELETE')")
     @Operation(summary = "Deleta um funcionário", description = "Deleta um funcionário do sistema (exclusão lógica).")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "Funcionário deletado com sucesso"),

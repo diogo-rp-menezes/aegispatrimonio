@@ -1,29 +1,64 @@
-# Use a imagem oficial do OpenJDK para uma build otimizada
-FROM openjdk:21-jdk-slim as build
+# Stage 1: Build Frontend
+FROM node:20-alpine AS frontend-builder
+WORKDIR /app/frontend
 
-# Define o diretório de trabalho dentro do contêiner
+# Use production mode and leverage cache
+COPY frontend/package*.json ./
+RUN npm ci || npm install
+
+COPY frontend/ .
+RUN npm run build
+
+# Stage 2: Build Backend
+FROM eclipse-temurin:21-jdk-jammy AS backend-builder
 WORKDIR /app
 
-# Copia o arquivo pom.xml para que as dependências possam ser baixadas em cache
+# Optimize Maven cache
+COPY mvnw .
+COPY .mvn .mvn
 COPY pom.xml .
+RUN ./mvnw dependency:go-offline -B
 
-# Copia o código fonte da aplicação
 COPY src ./src
+# Embed frontend in backend
+COPY --from=frontend-builder /app/frontend/dist ./src/main/resources/static
 
-# Compila a aplicação e gera o JAR executável
-RUN ./mvnw clean package -DskipTests
+RUN ./mvnw clean package -DskipTests -B
 
-# Imagem final para a aplicação
-FROM openjdk:21-jdk-slim
+# Stage 3: Runtime
+FROM eclipse-temurin:21-jre-jammy AS runtime
 
-# Define o diretório de trabalho
+# Metadata
+LABEL maintainer="Docker Sentinel" \
+      org.opencontainers.image.title="Aegis Patrimônio" \
+      org.opencontainers.image.description="Sistema de Gestão de Ativos Patrimoniais" \
+      org.opencontainers.image.vendor="Aegis" \
+      org.opencontainers.image.version="1.0.0"
+
+# Install necessary runtime tools (curl for healthcheck)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
-# Copia o JAR gerado da etapa de build
-COPY --from=build /app/target/*.jar app.jar
+# Create non-root user
+RUN groupadd -r spring && useradd -r -g spring -m -s /bin/false spring
 
-# Expõe a porta em que a aplicação Spring Boot será executada
+# Copy JAR from builder
+COPY --from=backend-builder --chown=spring:spring /app/target/*.jar app.jar
+
+# JVM Performance & Container optimizations
+ENV JAVA_OPTS="-XX:+UseParallelGC -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom" \
+    SPRING_PROFILES_ACTIVE=prod
+
+# Change to non-root user
+USER spring
+
+# Healthcheck using Spring Boot Actuator
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:8080/actuator/health/liveness || exit 1
+
 EXPOSE 8080
 
-# Define o comando para executar a aplicação
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

@@ -39,8 +39,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import org.springframework.test.context.TestPropertySource;
+
 @AutoConfigureMockMvc
 @Transactional
+@TestPropertySource(properties = "spring.jackson.serialization.write-dates-as-timestamps=false")
 class AtivoControllerIT extends BaseIT {
 
     @Autowired

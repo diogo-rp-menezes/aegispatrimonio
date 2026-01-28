@@ -1,9 +1,12 @@
 package br.com.aegispatrimonio.service.impl;
 
+import br.com.aegispatrimonio.model.Filial;
+import br.com.aegispatrimonio.model.Funcionario;
 import br.com.aegispatrimonio.model.Permission;
 import br.com.aegispatrimonio.model.Role;
 import br.com.aegispatrimonio.model.Usuario;
 import br.com.aegispatrimonio.repository.AtivoRepository;
+import br.com.aegispatrimonio.repository.FuncionarioRepository;
 import br.com.aegispatrimonio.repository.UsuarioRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -14,13 +17,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -37,27 +38,133 @@ class PermissionServiceImplTest {
     private AtivoRepository ativoRepository;
 
     @Mock
-    private MeterRegistry meterRegistry;
+    private FuncionarioRepository funcionarioRepository;
+
+    private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     private PermissionServiceImpl permissionService;
 
+    @Mock
+    private br.com.aegispatrimonio.service.SecurityAuditService auditService;
+
+    @Mock
+    private Authentication authentication;
+
     @BeforeEach
     void setUp() {
-        permissionService = new PermissionServiceImpl(usuarioRepository, ativoRepository, new SimpleMeterRegistry());
+        permissionService = new PermissionServiceImpl(usuarioRepository, ativoRepository, funcionarioRepository, meterRegistry, auditService);
         ReflectionTestUtils.setField(permissionService, "self", permissionService);
     }
 
-    // ... (rest of the tests can remain same if they don't depend on AtivoRepository logic)
-    // Actually, I should inspect if I need to add tests for hasAtivoPermission later, but for now just fix compilation.
-
     @Test
     void testHasPermission_Granted() {
-        // ... (Reusing logic or just placeholder, assuming the file had content previously)
-        // Since I am overwriting, I must include content.
-        // I will copy from the previous "PermissionServiceImplTest.java" content I saw earlier,
-        // assuming they are similar or I can just fix the constructor.
-        // Wait, I saw "src/test/java/br/com/aegispatrimonio/service/PermissionServiceImplTest.java" content.
-        // I did NOT see "src/test/java/br/com/aegispatrimonio/service/impl/PermissionServiceImplTest.java" content fully.
-        // I should read it first to be safe.
+        String username = "user@example.com";
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authentication.getName()).thenReturn(username);
+
+        Usuario usuario = new Usuario();
+        usuario.setEmail(username);
+        Role role = new Role();
+        role.setName("ROLE_USER");
+        Permission permission = new Permission(1L, "ATIVO", "READ", "Read Asset", null);
+        role.setPermissions(Set.of(permission));
+        usuario.setRoles(Set.of(role));
+
+        when(usuarioRepository.findWithDetailsByEmail(username)).thenReturn(Optional.of(usuario));
+
+        assertTrue(permissionService.hasPermission(authentication, null, "ATIVO", "READ", null));
+    }
+
+    @Test
+    void testHasPermission_Denied_NoPermission() {
+        String username = "user@example.com";
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authentication.getName()).thenReturn(username);
+
+        Usuario usuario = new Usuario();
+        usuario.setEmail(username);
+        Role role = new Role();
+        role.setName("ROLE_USER");
+        // No permissions
+        usuario.setRoles(Set.of(role));
+
+        when(usuarioRepository.findWithDetailsByEmail(username)).thenReturn(Optional.of(usuario));
+
+        assertFalse(permissionService.hasPermission(authentication, null, "ATIVO", "WRITE", null));
+    }
+
+    @Test
+    void testHasPermission_Denied_ContextMismatch() {
+        String username = "user@example.com";
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authentication.getName()).thenReturn(username);
+
+        Usuario usuario = new Usuario();
+        usuario.setEmail(username);
+        Role role = new Role();
+        role.setName("ROLE_USER");
+        Permission permission = new Permission(1L, "ATIVO", "READ", "Read Asset", "filialId");
+        role.setPermissions(Set.of(permission));
+        usuario.setRoles(Set.of(role));
+
+        Funcionario funcionario = new Funcionario();
+        Filial filial1 = new Filial();
+        filial1.setId(1L);
+        funcionario.setFiliais(Set.of(filial1));
+        usuario.setFuncionario(funcionario);
+
+        when(usuarioRepository.findWithDetailsByEmail(username)).thenReturn(Optional.of(usuario));
+
+        // Requesting access for context 2L, but user has access to 1L
+        assertFalse(permissionService.hasPermission(authentication, null, "ATIVO", "READ", 2L));
+    }
+
+    @Test
+    void testHasPermission_Granted_ContextMatch() {
+        String username = "user@example.com";
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authentication.getName()).thenReturn(username);
+
+        Usuario usuario = new Usuario();
+        usuario.setEmail(username);
+        Role role = new Role();
+        role.setName("ROLE_USER");
+        Permission permission = new Permission(1L, "ATIVO", "READ", "Read Asset", "filialId");
+        role.setPermissions(Set.of(permission));
+        usuario.setRoles(Set.of(role));
+
+        Funcionario funcionario = new Funcionario();
+        Filial filial1 = new Filial();
+        filial1.setId(1L);
+        funcionario.setFiliais(Set.of(filial1));
+        usuario.setFuncionario(funcionario);
+
+        when(usuarioRepository.findWithDetailsByEmail(username)).thenReturn(Optional.of(usuario));
+
+        // Requesting access for context 1L, user has access to 1L
+        assertTrue(permissionService.hasPermission(authentication, null, "ATIVO", "READ", 1L));
+    }
+
+    @Test
+    void testHasPermission_AdminBypass() {
+        String username = "admin@example.com";
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authentication.getName()).thenReturn(username);
+
+        Usuario usuario = new Usuario();
+        usuario.setEmail(username);
+        Role role = new Role();
+        role.setName("ROLE_ADMIN");
+        usuario.setRoles(Set.of(role));
+
+        when(usuarioRepository.findWithDetailsByEmail(username)).thenReturn(Optional.of(usuario));
+
+        assertTrue(permissionService.hasPermission(authentication, null, "ANY_RESOURCE", "ANY_ACTION", null));
+    }
+
+    @Test
+    void testHasPermission_Unauthenticated() {
+        when(authentication.isAuthenticated()).thenReturn(false);
+        assertFalse(permissionService.hasPermission(authentication, null, "ATIVO", "READ", null));
     }
 }

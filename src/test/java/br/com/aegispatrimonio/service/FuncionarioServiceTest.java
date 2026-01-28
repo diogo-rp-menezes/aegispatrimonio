@@ -16,6 +16,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
@@ -42,7 +47,9 @@ class FuncionarioServiceTest {
     @Mock
     private PasswordEncoder passwordEncoder;
     @Mock
-    private CurrentUserProvider currentUserProvider; // Adicionado mock para CurrentUserProvider
+    private CurrentUserProvider currentUserProvider;
+    @Mock
+    private IPermissionService permissionService;
 
     @InjectMocks
     private FuncionarioService funcionarioService;
@@ -53,7 +60,7 @@ class FuncionarioServiceTest {
     private Filial filial;
     private Funcionario funcionario;
     private Usuario usuario;
-    private Usuario adminUser; // Adicionado para mockar o usuário
+    private Usuario adminUser;
 
     @BeforeEach
     void setUp() {
@@ -68,6 +75,7 @@ class FuncionarioServiceTest {
 
         funcionario = new Funcionario();
         funcionario.setId(1L);
+        funcionario.setNome("Funcionario Original");
         
         usuario = new Usuario();
         usuario.setId(1L);
@@ -78,7 +86,20 @@ class FuncionarioServiceTest {
         adminUser = new Usuario();
         adminUser.setId(1L);
         adminUser.setRole("ROLE_ADMIN");
-        lenient().when(currentUserProvider.getCurrentUsuario()).thenReturn(adminUser); // Mockando o usuário logado (lenient para evitar UnnecessaryStubbing)
+        lenient().when(currentUserProvider.getCurrentUsuario()).thenReturn(adminUser);
+    }
+
+    @Test
+    @DisplayName("ListarTodos: Deve chamar findAll com spec e pageable")
+    void listarTodos_deveChamarFindAll() {
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Funcionario> page = new PageImpl<>(List.of(funcionario));
+
+        when(funcionarioRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(page);
+
+        funcionarioService.listarTodos("nome", 1L, pageable);
+
+        verify(funcionarioRepository).findAll(any(Specification.class), eq(pageable));
     }
 
     @Test
@@ -119,6 +140,8 @@ class FuncionarioServiceTest {
 
         verify(funcionarioRepository).save(funcionario);
         verify(passwordEncoder).encode("newPassword");
+        // verify fields updated - need to update mock behavior or check side effects on 'funcionario' object
+        // Since we are mocking save to return 'funcionario', we can check 'funcionario' state.
         assertEquals("Funcionario Atualizado", funcionario.getNome());
         assertEquals("update@aegis.com", funcionario.getUsuario().getEmail());
     }

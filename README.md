@@ -34,6 +34,14 @@ O Aegis Patrimônio é um sistema robusto desenvolvido em Spring Boot para gest�
 
 ✅ Suportar múltiplas coligadas e departamentos
 
+## Destaques Técnicos (SOTA / Shift Left)
+
+O projeto adota a filosofia "Shift Left" e "MVP SOTA", implementando soluções de alta complexidade matemática de forma nativa e otimizada:
+
+- **Busca Fuzzy (Levenshtein):** Algoritmo de tolerância a erros de digitação implementado diretamente no backend, eliminando custos de LLM e latência de rede.
+- **Manutenção Preditiva:** Análise de exaustão de disco utilizando Regressão Linear Simples (Mínimos Quadrados) para prever falhas de hardware com precisão matemática.
+- **RBAC Granular (Aegis Shield):** Sistema de permissões hierárquicas e contextuais (Multi-tenant por Filial) que garante segurança em profundidade.
+
 ## Tecnologias Utilizadas
 
 ### Backend
@@ -59,18 +67,19 @@ O Aegis Patrimônio é um sistema robusto desenvolvido em Spring Boot para gest�
 
 ### ✅ Implementadas
 - **Gestão de Ativos:** CRUD completo com detalhes de hardware e depreciação.
+- **Busca Inteligente:** Pesquisa tolerante a erros e filtros avançados.
+- **Relatórios e Documentos:** Geração automática de Termos de Responsabilidade (PDF) e Etiquetas QR Code.
 - **Gestão de Fornecedores:** Cadastro e manutenção de fornecedores.
 - **Controle de Localizações:** Hierarquia de filiais e locais.
 - **Tipos de Ativo:** Categorização e ícones.
 - **Autenticação e Autorização:** JWT, RBAC (Role-Based Access Control) e Multi-tenancy.
 - **Auditoria:** Rastreamento de alterações com Hibernate Envers.
 - **Validações:** Bean Validation e regras de negócio consistentes.
-- **API RESTful:** Endpoints padronizados (V1) e documentados.
+- **Frontend Completo:** Interface moderna em Vue.js 3 + Bootstrap 5 totalmente integrada.
 
-### 🚀 Roadmap (Em Breve)
-- **Frontend Completo:** Integração total do Vue.js com o backend.
-- **Relatórios PDF:** Geração de termos de responsabilidade e relatórios gerenciais.
-- **QR Code:** Integração para leitura e etiquetação de ativos.
+### 🚀 Roadmap (Próximos Passos)
+- **Dashboard Analytics:** Visualização gráfica avançada dos dados preditivos.
+- **App Mobile:** Versão nativa para coletores de dados.
 
 ## Base Path da API e Exemplos
 

@@ -1,8 +1,10 @@
 package br.com.aegispatrimonio.service.impl;
 
+import br.com.aegispatrimonio.model.Filial;
 import br.com.aegispatrimonio.model.Permission;
 import br.com.aegispatrimonio.model.Role;
 import br.com.aegispatrimonio.repository.AtivoRepository;
+import br.com.aegispatrimonio.repository.FuncionarioRepository;
 import br.com.aegispatrimonio.repository.UsuarioRepository;
 import br.com.aegispatrimonio.service.IPermissionService;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -40,16 +42,20 @@ public class PermissionServiceImpl implements IPermissionService {
 
     private final UsuarioRepository usuarioRepository;
     private final AtivoRepository ativoRepository;
+    private final FuncionarioRepository funcionarioRepository;
     private final MeterRegistry meterRegistry;
+    private final br.com.aegispatrimonio.service.SecurityAuditService auditService;
 
     @org.springframework.beans.factory.annotation.Autowired
     @Lazy
     private PermissionServiceImpl self;
 
-    public PermissionServiceImpl(UsuarioRepository usuarioRepository, AtivoRepository ativoRepository, MeterRegistry meterRegistry) {
+    public PermissionServiceImpl(UsuarioRepository usuarioRepository, AtivoRepository ativoRepository, FuncionarioRepository funcionarioRepository, MeterRegistry meterRegistry, br.com.aegispatrimonio.service.SecurityAuditService auditService) {
         this.usuarioRepository = usuarioRepository;
         this.ativoRepository = ativoRepository;
+        this.funcionarioRepository = funcionarioRepository;
         this.meterRegistry = meterRegistry;
+        this.auditService = auditService;
     }
 
     /**
@@ -66,10 +72,12 @@ public class PermissionServiceImpl implements IPermissionService {
     public boolean hasPermission(Authentication authentication, Object targetId, String resource, String action, Object context) {
         Timer.Sample sample = Timer.start(meterRegistry);
         boolean allowed = false;
+        String denialReason = null;
 
         try {
             if (authentication == null || !authentication.isAuthenticated()) {
-                log.debug("[AUTHZ] Deny: Unauthenticated");
+                denialReason = "Unauthenticated";
+                log.debug("[AUTHZ] Deny: {}", denialReason);
                 return false;
             }
 
@@ -93,21 +101,24 @@ public class PermissionServiceImpl implements IPermissionService {
                     .orElse(null);
 
             if (matchedPermission == null) {
-                log.debug("[AUTHZ] Deny: No permission found for {} on {}/{}", username, resource, action);
+                denialReason = String.format("No permission found for %s on %s/%s", username, resource, action);
+                log.debug("[AUTHZ] Deny: {}", denialReason);
                 return false;
             }
 
             // 2. Check Context
             if (matchedPermission.getContextKey() != null && !matchedPermission.getContextKey().isEmpty()) {
                 if (context == null) {
-                    log.warn("[AUTHZ] Deny: Context required ({}) but missing for {} on {}/{}",
+                    denialReason = String.format("Context required (%s) but missing for %s on %s/%s",
                             matchedPermission.getContextKey(), username, resource, action);
+                    log.warn("[AUTHZ] Deny: {}", denialReason);
                     return false;
                 }
 
                 if ("filialId".equalsIgnoreCase(matchedPermission.getContextKey())) {
                     if (!effectiveSelf.hasContextAccess(username, context)) {
-                        log.debug("[AUTHZ] Deny: Context mismatch. User {} has no access to context {}", username, context);
+                        denialReason = String.format("Context mismatch. User %s has no access to context %s", username, context);
+                        log.debug("[AUTHZ] Deny: {}", denialReason);
                         return false;
                     }
                 }
@@ -117,9 +128,20 @@ public class PermissionServiceImpl implements IPermissionService {
             return true;
 
         } catch (Exception e) {
-            log.error("[AUTHZ] Error evaluating permission: {}", e.getMessage(), e);
+            denialReason = "Error evaluating permission: " + e.getMessage();
+            log.error("[AUTHZ] {}", denialReason, e);
             return false; // Fail safe
         } finally {
+             try {
+                 String username = (authentication != null) ? authentication.getName() : "anonymous";
+                 String contextStr = (context != null) ? context.toString() : null;
+                 if (auditService != null) {
+                    auditService.logAuthorization(username, resource, action, contextStr, allowed, denialReason);
+                 }
+             } catch (Exception ex) {
+                 log.error("Failed to trigger audit log", ex);
+             }
+
              try {
                 meterRegistry.counter(
                         "aegis_authz_total",
@@ -147,10 +169,25 @@ public class PermissionServiceImpl implements IPermissionService {
                     Long filialId = (ativo.getFilial() != null) ? ativo.getFilial().getId() : null;
                     return hasPermission(authentication, ativoId, "ATIVO", action, filialId);
                 })
-                .orElse(false); // If Ativo not found, deny access (or let controller handle 404, but security usually comes first)
-        // If security returns false for non-existent resource, it's 403.
-        // If we want 404, we should allow access or check existence in controller.
-        // But preventing probing is safer.
+                .orElse(false); // If Ativo not found, deny access
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean hasFuncionarioPermission(Authentication authentication, Long funcionarioId, String action) {
+        if (funcionarioId == null) return false;
+
+        return funcionarioRepository.findByIdWithFiliais(funcionarioId)
+                .map(funcionario -> {
+                    Set<Long> filiaisIds = new HashSet<>();
+                    if (funcionario.getFiliais() != null) {
+                        for (Filial f : funcionario.getFiliais()) {
+                            filiaisIds.add(f.getId());
+                        }
+                    }
+                    return hasPermission(authentication, funcionarioId, "FUNCIONARIO", action, filiaisIds);
+                })
+                .orElse(false);
     }
 
     /**

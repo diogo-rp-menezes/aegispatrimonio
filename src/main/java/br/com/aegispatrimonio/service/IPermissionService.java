@@ -26,4 +26,9 @@ public interface IPermissionService {
      * Verifica permissão em um Ativo específico, resolvendo o contexto (Filial) automaticamente.
      */
     boolean hasAtivoPermission(Authentication authentication, Long ativoId, String action);
+
+    /**
+     * Verifica permissão em um Funcionário específico, resolvendo o contexto (Filiais) automaticamente.
+     */
+    boolean hasFuncionarioPermission(Authentication authentication, Long funcionarioId, String action);
 }

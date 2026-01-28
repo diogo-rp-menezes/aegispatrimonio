@@ -57,6 +57,15 @@
           </select>
         </div>
 
+        <!-- Funcionário Responsável -->
+        <div class="mb-3">
+          <label for="funcionarioResponsavel" class="form-label">Responsável</label>
+          <select id="funcionarioResponsavel" v-model="form.funcionarioResponsavelId" class="form-select">
+            <option value="">Selecione...</option>
+            <option v-for="f in funcionarios" :key="f.id" :value="f.id">{{ f.nome }}</option>
+          </select>
+        </div>
+
         <!-- Fornecedor -->
         <div class="mb-3">
           <label for="fornecedor" class="form-label">Fornecedor *</label>
@@ -215,6 +224,7 @@ const form = reactive({
 const tipos = ref([]);
 const localizacoes = ref([]);
 const fornecedores = ref([]);
+const funcionarios = ref([]);
 const saving = ref(false);
 const showHardware = ref(false);
 
@@ -225,6 +235,7 @@ onMounted(async () => {
       tipoAtivoId: data.tipoAtivoId || '',
       localizacaoId: data.localizacaoId || '',
       fornecedorId: data.fornecedorId || '',
+      funcionarioResponsavelId: data.funcionarioResponsavelId || '',
       valorAquisicao: data.valorAquisicao || '',
       dataAquisicao: data.dataAquisicao || '',
     });
@@ -249,14 +260,16 @@ onMounted(async () => {
 
   // Carregar listas auxiliares
   try {
-    const [tiposData, locsData, fornData] = await Promise.all([
+    const [tiposData, locsData, fornData, funcData] = await Promise.all([
       request('/tipos-ativos').catch(() => []),
       request('/localizacoes').catch(() => []),
       request('/fornecedores').catch(() => []),
+      request('/funcionarios').catch(() => []),
     ]);
     tipos.value = tiposData;
     localizacoes.value = locsData;
     fornecedores.value = fornData;
+    funcionarios.value = funcData && funcData.content ? funcData.content : (Array.isArray(funcData) ? funcData : []);
   } catch (e) {
     console.warn('Não foi possível carregar listas auxiliares', e);
   }

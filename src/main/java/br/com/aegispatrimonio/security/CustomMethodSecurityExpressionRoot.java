@@ -21,6 +21,9 @@ public class CustomMethodSecurityExpressionRoot extends SecurityExpressionRoot i
      * RBAC with Context: hasPermission(#id, 'RESOURCE', 'ACTION', #context)
      */
     public boolean hasPermission(Object targetId, String resource, String action, Object context) {
+        // Handle explicit null targetId from SpEL which might be passed as null
+        // However, standard PermissionEvaluator takes (targetDomainObject, permission) or (targetId, targetType, permission)
+        // We are overloading it.
         return permissionService.hasPermission(this.getAuthentication(), targetId, resource, action, context);
     }
 

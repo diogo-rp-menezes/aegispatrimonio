@@ -2,14 +2,22 @@ package br.com.aegispatrimonio.controller;
 
 import br.com.aegispatrimonio.dto.AtivoCreateDTO;
 import br.com.aegispatrimonio.dto.AtivoDTO;
+import br.com.aegispatrimonio.dto.AtivoHealthHistoryDTO;
 import br.com.aegispatrimonio.dto.AtivoUpdateDTO;
+import br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO;
 import br.com.aegispatrimonio.service.AtivoService;
+import br.com.aegispatrimonio.service.IHealthCheckService;
+import br.com.aegispatrimonio.service.QRCodeService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 /**
  * Controller para gerenciar as operações CRUD de Ativos.
@@ -22,9 +30,13 @@ import org.springframework.web.bind.annotation.*;
 public class AtivoController {
 
     private final AtivoService ativoService;
+    private final QRCodeService qrCodeService;
+    private final IHealthCheckService healthCheckService;
 
-    public AtivoController(AtivoService ativoService) {
+    public AtivoController(AtivoService ativoService, QRCodeService qrCodeService, IHealthCheckService healthCheckService) {
         this.ativoService = ativoService;
+        this.qrCodeService = qrCodeService;
+        this.healthCheckService = healthCheckService;
     }
 
     /**
@@ -41,9 +53,10 @@ public class AtivoController {
             @RequestParam(required = false) Long filialId,
             @RequestParam(required = false) Long tipoAtivoId,
             @RequestParam(required = false) br.com.aegispatrimonio.model.StatusAtivo status,
-            @RequestParam(required = false) String nome
+            @RequestParam(required = false) String nome,
+            @RequestParam(required = false) String health
     ) {
-        return ativoService.listarTodos(pageable, filialId, tipoAtivoId, status, nome);
+        return ativoService.listarTodos(pageable, filialId, tipoAtivoId, status, nome, health);
     }
 
     /**
@@ -102,6 +115,7 @@ public class AtivoController {
 
     /**
      * Atualiza o status de saúde (health check) de um ativo.
+     * Recebe dados completos de hardware e disco para análise preditiva.
      * Requer permissão UPDATE no contexto da filial do ativo.
      *
      * @param id O ID do ativo a ter seu health check atualizado.
@@ -109,7 +123,41 @@ public class AtivoController {
     @PatchMapping("/{id}/health-check")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("@permissionService.hasAtivoPermission(authentication, #id, 'UPDATE')")
-    public void updateHealthCheck(@PathVariable Long id, @RequestBody Object ignoredPayload) {
+    public void updateHealthCheck(@PathVariable Long id, @RequestBody HealthCheckPayloadDTO payload) {
+        healthCheckService.processHealthCheckPayload(id, payload);
+    }
+
+    /**
+     * Recupera o histórico de saúde (ex: espaço em disco) do ativo.
+     * Requer permissão READ no contexto da filial do ativo.
+     *
+     * @param id O ID do ativo.
+     * @return Lista de AtivoHealthHistoryDTO.
+     */
+    @GetMapping("/{id}/health-history")
+    @PreAuthorize("@permissionService.hasAtivoPermission(authentication, #id, 'READ')")
+    public List<AtivoHealthHistoryDTO> getHealthHistory(@PathVariable Long id) {
+        return ativoService.getHealthHistory(id);
+    }
+
+    /**
+     * Gera um QR Code para o ativo especificado.
+     * Requer permissão READ no contexto do ativo.
+     *
+     * @param id O ID do ativo.
+     * @return Imagem PNG do QR Code.
+     */
+    @GetMapping(value = "/{id}/qrcode", produces = MediaType.IMAGE_PNG_VALUE)
+    @PreAuthorize("@permissionService.hasAtivoPermission(authentication, #id, 'READ')")
+    public ResponseEntity<byte[]> getQRCode(@PathVariable Long id) {
+        // Verifica existência (lança exceção se não encontrar)
         ativoService.buscarPorId(id);
+
+        String content = "AEGIS:ASSET:" + id;
+        byte[] qrCode = qrCodeService.generateQRCode(content, 200, 200);
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.IMAGE_PNG)
+                .body(qrCode);
     }
 }
