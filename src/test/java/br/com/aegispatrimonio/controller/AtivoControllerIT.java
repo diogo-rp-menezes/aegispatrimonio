@@ -11,6 +11,7 @@ import br.com.aegispatrimonio.model.*;
 import br.com.aegispatrimonio.repository.*;
 import br.com.aegispatrimonio.security.CustomUserDetails;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.cache.CacheManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -61,6 +62,7 @@ class AtivoControllerIT extends BaseIT {
     @Autowired private UsuarioRepository usuarioRepository;
     @Autowired private RoleRepository roleRepository;
     @Autowired private PermissionRepository permissionRepository;
+    @Autowired private CacheManager cacheManager;
 
     private Filial filialA;
     private Departamento deptoA;
@@ -83,12 +85,42 @@ class AtivoControllerIT extends BaseIT {
         this.ativoExistente = createAtivo("Desktop-01", "PAT-DESK-01", filialA, tipoAtivo, fornecedor, userA, localizacao);
 
         this.usuarioUser = createUsuario(userA, "user@example.com", "ROLE_USER");
+
+        // Grant permissions to ROLE_USER
+        Role roleUser = roleRepository.findByName("ROLE_USER").orElseThrow();
+        Permission readAtivo = createPermission("ATIVO", "READ", "filialId");
+        Permission updateAtivo = createPermission("ATIVO", "UPDATE", "filialId");
+
+        // Ensure permissions are linked
+        roleUser.getPermissions().add(readAtivo);
+        roleUser.getPermissions().add(updateAtivo);
+        roleRepository.saveAndFlush(roleUser);
+
         this.usuarioAdmin = createUsuario(null, "admin@example.com", "ROLE_ADMIN");
+    }
+
+    private Permission createPermission(String resource, String action, String contextKey) {
+        return permissionRepository.findAll().stream()
+                .filter(p -> p.getResource().equals(resource) && p.getAction().equals(action) && p.getContextKey().equals(contextKey))
+                .findFirst()
+                .orElseGet(() -> {
+                    Permission p = new Permission();
+                    p.setResource(resource);
+                    p.setAction(action);
+                    p.setContextKey(contextKey);
+                    return permissionRepository.saveAndFlush(p);
+                });
     }
 
     @AfterEach
     void tearDown() {
         SecurityContextHolder.clearContext();
+        if (cacheManager != null) {
+            cacheManager.getCacheNames().forEach(name -> {
+                var cache = cacheManager.getCache(name);
+                if (cache != null) cache.clear();
+            });
+        }
     }
 
     @Nested
@@ -268,8 +300,8 @@ class AtivoControllerIT extends BaseIT {
         }
 
         @Test
-        @DisplayName("Deve retornar 403 Forbidden para ID inexistente (Security First)")
-        void buscarPorId_comIdInexistente_deveRetornarNotFound() throws Exception {
+        @DisplayName("Deve retornar 403 Forbidden para ID inexistente (Segurança primeiro)")
+        void buscarPorId_comIdInexistente_deveRetornarForbidden() throws Exception {
             mockLogin(usuarioUser);
             mockMvc.perform(get("/api/v1/ativos/{id}", 9999L))
                     .andExpect(status().isForbidden());
@@ -308,7 +340,7 @@ class AtivoControllerIT extends BaseIT {
         }
 
         @Test
-        @DisplayName("Deve retornar 200 OK para USER (Granular RBAC allows UPDATE)")
+        @DisplayName("Deve retornar 200 OK para USER (com permissão)")
         void atualizar_comUser_deveRetornarOk() throws Exception {
             mockLogin(usuarioUser);
             AtivoUpdateDTO updateDTO = new AtivoUpdateDTO(
@@ -325,8 +357,8 @@ class AtivoControllerIT extends BaseIT {
         }
 
         @Test
-        @DisplayName("Deve retornar 403 Forbidden para ID inexistente (Security First)")
-        void atualizar_comIdInexistente_deveRetornarNotFound() throws Exception {
+        @DisplayName("Deve retornar 403 Forbidden para ID inexistente (Segurança primeiro)")
+        void atualizar_comIdInexistente_deveRetornarForbidden() throws Exception {
             mockLogin(usuarioAdmin);
             AtivoUpdateDTO updateDTO = new AtivoUpdateDTO(
                     ativoExistente.getFilial().getId(), "Nome", "Patrimonio",
@@ -363,8 +395,8 @@ class AtivoControllerIT extends BaseIT {
         }
 
         @Test
-        @DisplayName("Deve retornar 403 Forbidden para ID inexistente (Security First)")
-        void deletar_comIdInexistente_deveRetornarNotFound() throws Exception {
+        @DisplayName("Deve retornar 403 Forbidden para ID inexistente")
+        void deletar_comIdInexistente_deveRetornarForbidden() throws Exception {
             mockLogin(usuarioAdmin);
             mockMvc.perform(delete("/api/v1/ativos/{id}", 9999L))
                     .andExpect(status().isForbidden());
@@ -388,8 +420,8 @@ class AtivoControllerIT extends BaseIT {
         }
 
         @Test
-        @DisplayName("Deve retornar 403 Forbidden para ID inexistente (Security First)")
-        void healthCheck_comIdInexistente_deveRetornarNotFound() throws Exception {
+        @DisplayName("Deve retornar 403 Forbidden para ID inexistente")
+        void healthCheck_comIdInexistente_deveRetornarForbidden() throws Exception {
             mockLogin(usuarioUser);
             HealthCheckDTO healthCheckDTO = createMockHealthCheckDTO();
 
@@ -406,34 +438,18 @@ class AtivoControllerIT extends BaseIT {
         Usuario u = new Usuario();
         u.setEmail(email);
         u.setPassword("password");
-        u.setRole(roleName); // Legacy
+        u.setRole(roleName);
+
+        Role role = roleRepository.findByName(roleName).orElseGet(() -> {
+            Role newRole = new Role();
+            newRole.setName(roleName);
+            return roleRepository.save(newRole);
+        });
+        u.setRoles(new java.util.HashSet<>(java.util.Set.of(role)));
+
         u.setFuncionario(funcionario);
         u.setStatus(Status.ATIVO);
-
-        Role rbacRole = roleRepository.findByName(roleName).orElseGet(() -> {
-            Role r = new Role();
-            r.setName(roleName);
-            return roleRepository.save(r);
-        });
-
-        // Grant READ and UPDATE permission to ROLE_USER
-        if ("ROLE_USER".equals(roleName)) {
-             Permission pRead = permissionRepository.findByResourceAndAction("ATIVO", "READ")
-                .orElseGet(() -> permissionRepository.save(new Permission(null, "ATIVO", "READ", "Read Ativo", "filialId")));
-             Permission pUpdate = permissionRepository.findByResourceAndAction("ATIVO", "UPDATE")
-                .orElseGet(() -> permissionRepository.save(new Permission(null, "ATIVO", "UPDATE", "Update Ativo", "filialId")));
-
-             if (rbacRole.getPermissions() == null) {
-                 rbacRole.setPermissions(new java.util.HashSet<>());
-             }
-             rbacRole.getPermissions().add(pRead);
-             rbacRole.getPermissions().add(pUpdate);
-             roleRepository.save(rbacRole);
-        }
-
-        u.setRoles(Set.of(rbacRole));
-
-        return usuarioRepository.save(u);
+        return usuarioRepository.saveAndFlush(u);
     }
 
     private void mockLogin(Usuario usuario) {

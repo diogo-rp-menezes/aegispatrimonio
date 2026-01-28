@@ -2,19 +2,7 @@
 import { ref, onMounted } from "vue";
 import { useRouter } from 'vue-router';
 import { request } from '../services/api';
-import {
-  Chart as ChartJS,
-  Title,
-  Tooltip,
-  Legend,
-  BarElement,
-  CategoryScale,
-  LinearScale,
-  ArcElement
-} from 'chart.js';
-import { Bar, Doughnut } from 'vue-chartjs';
-
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
+import DashboardCharts from '../components/DashboardCharts.vue';
 
 const router = useRouter();
 
@@ -289,12 +277,12 @@ onMounted(async () => {
     <!-- Predictive Maintenance Section -->
     <h5 class="fw-bold mb-3"><i class="bi bi-cpu me-2"></i>Manutenção Preditiva (IA Híbrida)</h5>
     <div class="row g-3 mb-4">
-      <div class="col-md-8">
-        <div class="row g-3 mb-3">
-          <div v-for="stat in predictiveStats" :key="stat.title" class="col-md-12">
-            <div class="card h-100 border-0 shadow-sm predictive-card" @click="goToAssets(stat.filter)">
+      <div class="col-lg-8">
+        <div class="row g-3 h-100">
+          <div v-for="stat in predictiveStats" :key="stat.title" class="col-md-6 col-xl-4">
+            <div class="card h-100 border-0 shadow-sm">
               <div class="card-body d-flex align-items-center">
-                 <div
+                <div
                   :class="`bg-${stat.color} text-white rounded-circle d-flex align-items-center justify-content-center me-3 shadow-sm`"
                   style="width: 50px; height: 50px;"
                 >
@@ -309,32 +297,9 @@ onMounted(async () => {
             </div>
           </div>
         </div>
-
-        <!-- Trend Chart -->
-        <div class="card border-0 shadow-sm">
-          <div class="card-body">
-            <h6 class="fw-bold mb-3">Tendência de Falhas (Próximas 8 Semanas)</h6>
-            <div style="height: 250px;">
-              <Bar v-if="trendChartData.labels.length" :data="trendChartData" :options="chartOptions" />
-              <div v-else class="d-flex justify-content-center align-items-center h-100 text-muted">
-                Sem dados de tendência
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
-      <div class="col-md-4">
-        <div class="card h-100 border-0 shadow-sm">
-          <div class="card-body">
-            <h6 class="fw-bold mb-3 text-center">Distribuição de Risco</h6>
-            <div style="height: 200px;">
-              <Doughnut v-if="predictiveChartData.labels.length" :data="predictiveChartData" :options="chartOptions" />
-               <div v-else class="d-flex justify-content-center align-items-center h-100 text-muted">
-                Sem dados
-              </div>
-            </div>
-          </div>
-        </div>
+      <div class="col-lg-4">
+         <DashboardCharts :predictiveStats="predictiveStats" />
       </div>
     </div>
 

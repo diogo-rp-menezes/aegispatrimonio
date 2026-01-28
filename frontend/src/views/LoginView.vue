@@ -33,6 +33,13 @@
         <button type="submit" class="btn btn-primary w-100" :disabled="loading">
           {{ loading ? 'Entrando...' : 'Entrar' }}
         </button>
+
+        <div class="mt-3">
+          <hr>
+          <a :href="`${oauthBaseUrl}/oauth2/authorization/google`" class="btn btn-outline-danger w-100" :class="{ disabled: loading }">
+            <i class="bi bi-google me-2"></i> Entrar com Google
+          </a>
+        </div>
       </form>
 
       <div class="mt-4">
@@ -150,6 +157,47 @@ const handleLogin = async () => {
     loading.value = false;
   }
 };
+
+// OAuth2 Handler
+const oauthBaseUrl = fetchConfig.baseURL.replace('/api/v1', '');
+
+onMounted(async () => {
+  const token = route.query.token;
+  if (token) {
+    loading.value = true;
+    try {
+      localStorage.setItem('authToken', token);
+
+      // Fetch user context using the new token
+      // Note: request() automatically uses localStorage token
+      const data = await request('/auth/me');
+
+      // Save Roles
+      if (data.roles && data.roles.length > 0) {
+        localStorage.setItem('userRoles', JSON.stringify(data.roles));
+      } else {
+        localStorage.removeItem('userRoles');
+      }
+
+      // Save Filiais
+      if (data.filiais && data.filiais.length > 0) {
+          localStorage.setItem('allowedFiliais', JSON.stringify(data.filiais));
+          localStorage.setItem('currentFilial', data.filiais[0].id);
+      } else {
+          localStorage.removeItem('allowedFiliais');
+          localStorage.removeItem('currentFilial');
+      }
+
+      router.push('/dashboard');
+    } catch (err) {
+      console.error("OAuth login failed", err);
+      error.value = "Falha ao validar login social.";
+      localStorage.removeItem('authToken');
+    } finally {
+      loading.value = false;
+    }
+  }
+});
 </script>
 
 <style scoped>

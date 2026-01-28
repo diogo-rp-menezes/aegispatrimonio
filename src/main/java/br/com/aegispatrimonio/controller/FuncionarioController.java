@@ -81,7 +81,7 @@ public class FuncionarioController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("@permissionService.hasFuncionarioPermission(authentication, #id, 'UPDATE') and @permissionService.hasPermission(authentication, null, 'FUNCIONARIO', 'UPDATE', #updateDTO.filiaisIds)")
+    @PreAuthorize("@permissionService.hasPermission(authentication, #id, 'FUNCIONARIO', 'UPDATE', #updateDTO.filiaisIds)")
     @Operation(summary = "Atualiza um funcionário existente", description = "Atualiza os dados de um funcionário existente e seu respectivo usuário.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Funcionário atualizado com sucesso", content = @Content(schema = @Schema(implementation = FuncionarioDTO.class))),

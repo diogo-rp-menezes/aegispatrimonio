@@ -8,6 +8,7 @@ import br.com.aegispatrimonio.service.UserContextService;
 import jakarta.persistence.EntityManager;
 import org.hibernate.Session;
 import org.hibernate.stat.Statistics;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -91,6 +92,11 @@ public class UserContextServicePerformanceIT extends BaseIT {
 
         entityManager.flush();
         entityManager.clear();
+    }
+
+    @AfterEach
+    void tearDown() {
+        RequestContextHolder.resetRequestAttributes();
     }
 
     @Test
