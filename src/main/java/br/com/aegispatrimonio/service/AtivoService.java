@@ -1,12 +1,11 @@
 package br.com.aegispatrimonio.service;
 
 import br.com.aegispatrimonio.dto.AtivoCreateDTO;
+import br.com.aegispatrimonio.dto.AtivoHealthHistoryDTO;
 import br.com.aegispatrimonio.dto.AtivoDTO;
 import br.com.aegispatrimonio.dto.AtivoNameDTO;
 import br.com.aegispatrimonio.dto.AtivoDetalheHardwareDTO;
 import br.com.aegispatrimonio.dto.AtivoUpdateDTO;
-import br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO;
-import br.com.aegispatrimonio.dto.healthcheck.DiskInfoDTO;
 import br.com.aegispatrimonio.mapper.AtivoMapper;
 import br.com.aegispatrimonio.model.*;
 import br.com.aegispatrimonio.repository.*;
@@ -41,12 +40,11 @@ public class AtivoService {
     private final ManutencaoRepository manutencaoRepository;
     private final MovimentacaoRepository movimentacaoRepository;
     private final DepreciacaoService depreciacaoService;
-    private final CurrentUserProvider currentUserProvider;
     private final AtivoHealthHistoryRepository healthHistoryRepository;
-    private final PredictiveMaintenanceService predictiveMaintenanceService;
     private final SearchOptimizationService searchOptimizationService;
+    private final UserContextService userContextService;
 
-    public AtivoService(AtivoRepository ativoRepository, AtivoMapper ativoMapper, TipoAtivoRepository tipoAtivoRepository, LocalizacaoRepository localizacaoRepository, FornecedorRepository fornecedorRepository, FuncionarioRepository funcionarioRepository, FilialRepository filialRepository, ManutencaoRepository manutencaoRepository, MovimentacaoRepository movimentacaoRepository, DepreciacaoService depreciacaoService, CurrentUserProvider currentUserProvider, AtivoHealthHistoryRepository healthHistoryRepository, PredictiveMaintenanceService predictiveMaintenanceService, SearchOptimizationService searchOptimizationService) {
+    public AtivoService(AtivoRepository ativoRepository, AtivoMapper ativoMapper, TipoAtivoRepository tipoAtivoRepository, LocalizacaoRepository localizacaoRepository, FornecedorRepository fornecedorRepository, FuncionarioRepository funcionarioRepository, FilialRepository filialRepository, ManutencaoRepository manutencaoRepository, MovimentacaoRepository movimentacaoRepository, DepreciacaoService depreciacaoService, AtivoHealthHistoryRepository healthHistoryRepository, SearchOptimizationService searchOptimizationService, UserContextService userContextService) {
         this.ativoRepository = ativoRepository;
         this.ativoMapper = ativoMapper;
         this.tipoAtivoRepository = tipoAtivoRepository;
@@ -57,18 +55,9 @@ public class AtivoService {
         this.manutencaoRepository = manutencaoRepository;
         this.movimentacaoRepository = movimentacaoRepository;
         this.depreciacaoService = depreciacaoService;
-        this.currentUserProvider = currentUserProvider;
         this.healthHistoryRepository = healthHistoryRepository;
-        this.predictiveMaintenanceService = predictiveMaintenanceService;
         this.searchOptimizationService = searchOptimizationService;
-    }
-
-    private Usuario getUsuarioLogado() {
-        return currentUserProvider.getCurrentUsuario();
-    }
-
-    private boolean isAdmin(Usuario usuario) {
-        return "ROLE_ADMIN".equals(usuario.getRole());
+        this.userContextService = userContextService;
     }
 
     @Transactional(readOnly = true)
@@ -76,29 +65,36 @@ public class AtivoService {
                                       Long filialId,
                                       Long tipoAtivoId,
                                       StatusAtivo status,
-                                      String nome) {
-        Usuario usuarioLogado = getUsuarioLogado();
+                                      String nome,
+                                      String health) {
         org.springframework.data.domain.Pageable effectivePageable =
                 (pageable == null) ? org.springframework.data.domain.Pageable.unpaged() : pageable;
         boolean isFuzzySearch = (nome != null && !nome.isBlank());
 
+        // Calculate Date Range for Predictive Health
+        LocalDate minDate = null;
+        LocalDate maxDate = null;
+        Boolean hasPrediction = null;
+
+        if (health != null) {
+            LocalDate now = LocalDate.now();
+            switch (health) {
+                case "CRITICO" -> maxDate = now.plusDays(7);
+                case "ALERTA" -> {
+                    minDate = now.plusDays(7);
+                    maxDate = now.plusDays(30);
+                }
+                case "SAUDAVEL" -> minDate = now.plusDays(30);
+                case "INDETERMINADO" -> hasPrediction = false;
+            }
+        }
+
         // 1. Resolve Scope (Admin vs User Filiais)
         Set<Long> userFiliais = null;
-        boolean isAdmin = isAdmin(usuarioLogado);
+        boolean isAdmin = userContextService.isAdmin();
 
         if (!isAdmin) {
-            Funcionario funcionarioPrincipal = usuarioLogado.getFuncionario();
-            if (funcionarioPrincipal == null || funcionarioPrincipal.getId() == null) {
-                throw new AccessDeniedException("Usuário não é um funcionário ou não está associado a nenhuma filial.");
-            }
-            // Fetch fresh from DB to get Lazy collections
-            Optional<Funcionario> fOpt = funcionarioRepository.findById(funcionarioPrincipal.getId());
-            if (fOpt.isPresent()) {
-                userFiliais = fOpt.get().getFiliais().stream().map(Filial::getId).collect(Collectors.toSet());
-                if (userFiliais.isEmpty()) throw new AccessDeniedException("Usuário não está associado a nenhuma filial.");
-            } else {
-                throw new AccessDeniedException("Funcionário não encontrado.");
-            }
+            userFiliais = userContextService.getUserFiliais();
         }
 
         // 2. Fuzzy Search Path (Shift Left Optimization)
@@ -108,9 +104,9 @@ public class AtivoService {
             org.springframework.data.domain.Pageable limit = org.springframework.data.domain.PageRequest.of(0, 1000);
 
             if (isAdmin) {
-                candidates = ativoRepository.findSimpleByFilters(filialId, tipoAtivoId, status, limit);
+                candidates = ativoRepository.findSimpleByFilters(filialId, tipoAtivoId, status, minDate, maxDate, hasPrediction, limit);
             } else {
-                candidates = ativoRepository.findSimpleByFilialIdsAndFilters(userFiliais, filialId, tipoAtivoId, status, limit);
+                candidates = ativoRepository.findSimpleByFilialIdsAndFilters(userFiliais, filialId, tipoAtivoId, status, minDate, maxDate, hasPrediction, limit);
             }
 
             // Rank in memory using Levenshtein distance
@@ -142,107 +138,34 @@ public class AtivoService {
 
         // 3. Original Path (Strict / DB Paged)
         boolean unpaged = effectivePageable.isUnpaged();
-        boolean hasFilters = (filialId != null) || (tipoAtivoId != null) || (status != null);
+        boolean hasFilters = (filialId != null) || (tipoAtivoId != null) || (status != null) || (health != null);
 
         if (isAdmin) {
             if (unpaged && !hasFilters) {
                 return new PageImpl<>(ativoRepository.findAllWithDetails().stream().map(ativoMapper::toDTO).collect(Collectors.toList()));
             }
-            return ativoRepository.findByFilters(filialId, tipoAtivoId, status, null, effectivePageable).map(ativoMapper::toDTO);
+            return ativoRepository.findByFilters(filialId, tipoAtivoId, status, null, minDate, maxDate, hasPrediction, effectivePageable).map(ativoMapper::toDTO);
         } else {
             if (unpaged && !hasFilters) {
                 return new PageImpl<>(ativoRepository.findByFilialIdInWithDetails(userFiliais).stream().map(ativoMapper::toDTO).collect(Collectors.toList()));
             }
-            return ativoRepository.findByFilialIdsAndFilters(userFiliais, filialId, tipoAtivoId, status, null, effectivePageable).map(ativoMapper::toDTO);
+            return ativoRepository.findByFilialIdsAndFilters(userFiliais, filialId, tipoAtivoId, status, null, minDate, maxDate, hasPrediction, effectivePageable).map(ativoMapper::toDTO);
         }
     }
 
     @Transactional(readOnly = true)
     public AtivoDTO buscarPorId(Long id) {
-        Usuario usuarioLogado = getUsuarioLogado();
         Ativo ativo = ativoRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new EntityNotFoundException("Ativo não encontrado com ID: " + id));
 
-        if (!isAdmin(usuarioLogado)) {
-            Funcionario funcionarioPrincipal = usuarioLogado.getFuncionario();
-            if (funcionarioPrincipal == null || funcionarioPrincipal.getId() == null) {
-                throw new AccessDeniedException("Usuário não é um funcionário ou não está associado a nenhuma filial.");
-            }
-            Optional<Funcionario> funcionarioOpt = funcionarioRepository.findById(funcionarioPrincipal.getId());
-            if (funcionarioOpt.isPresent()) {
-                Funcionario funcionarioLogado = funcionarioOpt.get();
-                if (funcionarioLogado.getFiliais().stream().noneMatch(f -> f.getId().equals(ativo.getFilial().getId()))) {
-                    throw new AccessDeniedException("Você não tem permissão para acessar ativos desta filial.");
-                }
+        if (!userContextService.isAdmin()) {
+            Set<Long> userFiliais = userContextService.getUserFiliais();
+            if (!userFiliais.contains(ativo.getFilial().getId())) {
+                throw new AccessDeniedException("Você não tem permissão para acessar ativos desta filial.");
             }
         }
 
         return ativoMapper.toDTO(ativo);
-    }
-
-    @Transactional
-    public void processarHealthCheck(Long id, HealthCheckPayloadDTO payload) {
-        Ativo ativo = ativoRepository.findByIdWithDetails(id)
-                .orElseThrow(() -> new EntityNotFoundException("Ativo não encontrado com ID: " + id));
-
-        // Update basic hardware details
-        AtivoDetalheHardwareDTO hardwareDTO = new AtivoDetalheHardwareDTO(
-                payload.computerName(), payload.domain(), payload.osName(), payload.osVersion(),
-                payload.osArchitecture(), payload.motherboardManufacturer(), payload.motherboardModel(),
-                payload.motherboardSerialNumber(), payload.cpuModel(), payload.cpuCores(), payload.cpuThreads()
-        );
-        gerenciarDetalheHardware(ativo, hardwareDTO);
-
-        // Process Disks and History
-        if (payload.discos() != null) {
-            LocalDate worstPrediction = null;
-            List<AtivoHealthHistory> historyToSave = new java.util.ArrayList<>();
-            List<String> componentsToFetch = new java.util.ArrayList<>();
-
-            for (DiskInfoDTO disk : payload.discos()) {
-                if (disk.freeGb() != null) {
-                    AtivoHealthHistory history = new AtivoHealthHistory();
-                    history.setAtivo(ativo);
-                    history.setComponente("DISK:" + disk.serial());
-                    history.setMetrica("FREE_SPACE_GB");
-                    history.setValor(disk.freeGb());
-                    historyToSave.add(history);
-                    componentsToFetch.add("DISK:" + disk.serial());
-                }
-            }
-
-            if (!historyToSave.isEmpty()) {
-                healthHistoryRepository.saveAll(historyToSave);
-
-                // Fetch history for all components at once
-                List<AtivoHealthHistory> allHistory = healthHistoryRepository
-                        .findByAtivoIdAndComponenteInAndMetricaOrderByDataRegistroAsc(id, componentsToFetch, "FREE_SPACE_GB");
-
-                // Group by component
-                java.util.Map<String, List<AtivoHealthHistory>> historyByComponent = allHistory.stream()
-                        .collect(Collectors.groupingBy(AtivoHealthHistory::getComponente));
-
-                for (List<AtivoHealthHistory> componentHistory : historyByComponent.values()) {
-                    LocalDate prediction = predictiveMaintenanceService.predictExhaustionDate(componentHistory);
-                    if (prediction != null) {
-                        if (worstPrediction == null || prediction.isBefore(worstPrediction)) {
-                            worstPrediction = prediction;
-                        }
-                    }
-                }
-            }
-
-            // Store worst prediction in attributes
-            if (worstPrediction != null) {
-                if (ativo.getAtributos() == null) {
-                    ativo.setAtributos(new java.util.HashMap<>());
-                }
-                ativo.getAtributos().put("previsaoEsgotamentoDisco", worstPrediction.toString());
-                ativo.setPrevisaoEsgotamentoDisco(worstPrediction);
-            }
-        }
-
-        ativoRepository.save(ativo);
     }
 
     @Transactional
@@ -278,7 +201,7 @@ public class AtivoService {
         }
 
         if (ativoCreateDTO.funcionarioResponsavelId() != null) {
-            Funcionario responsavel = funcionarioRepository.findById(ativoCreateDTO.funcionarioResponsavelId())
+            Funcionario responsavel = funcionarioRepository.findByIdWithFiliais(ativoCreateDTO.funcionarioResponsavelId())
                     .orElseThrow(() -> new EntityNotFoundException("Funcionário responsável não encontrado com ID: " + ativoCreateDTO.funcionarioResponsavelId()));
             validarConsistenciaResponsavel(responsavel, filial);
             ativo.setFuncionarioResponsavel(responsavel);
@@ -335,7 +258,7 @@ public class AtivoService {
         }
 
         if (ativoUpdateDTO.funcionarioResponsavelId() != null) {
-            Funcionario responsavel = funcionarioRepository.findById(ativoUpdateDTO.funcionarioResponsavelId())
+            Funcionario responsavel = funcionarioRepository.findByIdWithFiliais(ativoUpdateDTO.funcionarioResponsavelId())
                     .orElseThrow(() -> new EntityNotFoundException("Funcionário responsável não encontrado com ID: " + ativoUpdateDTO.funcionarioResponsavelId()));
             validarConsistenciaResponsavel(responsavel, filial);
             ativo.setFuncionarioResponsavel(responsavel);
@@ -371,6 +294,24 @@ public class AtivoService {
         }
 
         ativoRepository.delete(ativo);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AtivoHealthHistoryDTO> getHealthHistory(Long ativoId) {
+        Ativo ativo = ativoRepository.findById(ativoId)
+                .orElseThrow(() -> new EntityNotFoundException("Ativo não encontrado com ID: " + ativoId));
+
+        if (!userContextService.isAdmin()) {
+            Set<Long> userFiliais = userContextService.getUserFiliais();
+            if (!userFiliais.contains(ativo.getFilial().getId())) {
+                throw new AccessDeniedException("Você não tem permissão para acessar o histórico deste ativo.");
+            }
+        }
+
+        return healthHistoryRepository.findByAtivoIdAndMetricaOrderByDataRegistroAsc(ativoId, "FREE_SPACE_GB")
+                .stream()
+                .map(h -> new AtivoHealthHistoryDTO(h.getDataRegistro(), h.getComponente(), h.getValor(), h.getMetrica()))
+                .collect(Collectors.toList());
     }
 
     private void validarNumeroPatrimonio(String numeroPatrimonio, Long ativoId) {

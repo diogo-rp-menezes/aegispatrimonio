@@ -1,6 +1,8 @@
 package br.com.aegispatrimonio.repository;
 
 import br.com.aegispatrimonio.dto.AtivoNameDTO;
+import br.com.aegispatrimonio.dto.ChartDataDTO;
+import br.com.aegispatrimonio.dto.RiskyAssetDTO;
 import br.com.aegispatrimonio.model.Ativo;
 import br.com.aegispatrimonio.model.StatusAtivo;
 import org.springframework.data.domain.Page;
@@ -31,6 +33,8 @@ public interface AtivoRepository extends JpaRepository<Ativo, Long> {
            "LEFT JOIN FETCH a.localizacao " +
            "LEFT JOIN FETCH a.tipoAtivo " +
            "LEFT JOIN FETCH a.funcionarioResponsavel " +
+           "LEFT JOIN FETCH a.detalheHardware " +
+           "LEFT JOIN FETCH a.fornecedor " +
            "WHERE a.id = :id")
     Optional<Ativo> findByIdWithDetails(@Param("id") Long id);
 
@@ -48,44 +52,97 @@ public interface AtivoRepository extends JpaRepository<Ativo, Long> {
     // Suporte à paginação mantendo compatibilidade no controller/serviço
     Page<Ativo> findByFilialIdIn(Set<Long> filialIds, Pageable pageable);
 
-    @Query("SELECT a FROM Ativo a WHERE (:filialId IS NULL OR a.filial.id = :filialId) " +
+    @Query(value = "SELECT a FROM Ativo a " +
+           "LEFT JOIN FETCH a.filial " +
+           "LEFT JOIN FETCH a.tipoAtivo " +
+           "LEFT JOIN FETCH a.localizacao " +
+           "LEFT JOIN FETCH a.fornecedor " +
+           "LEFT JOIN FETCH a.funcionarioResponsavel " +
+           "LEFT JOIN FETCH a.detalheHardware " +
+           "WHERE (:filialId IS NULL OR a.filial.id = :filialId) " +
            "AND (:tipoAtivoId IS NULL OR a.tipoAtivo.id = :tipoAtivoId) " +
            "AND (:status IS NULL OR a.status = :status) " +
-           "AND (:nome IS NULL OR LOWER(a.nome) LIKE LOWER(CONCAT('%', :nome, '%')))")
+           "AND (:nome IS NULL OR LOWER(a.nome) LIKE LOWER(CONCAT('%', :nome, '%'))) " +
+           "AND (:minDate IS NULL OR a.previsaoEsgotamentoDisco >= :minDate) " +
+           "AND (:maxDate IS NULL OR a.previsaoEsgotamentoDisco < :maxDate) " +
+           "AND (:hasPrediction IS NULL OR (:hasPrediction = true AND a.previsaoEsgotamentoDisco IS NOT NULL) OR (:hasPrediction = false AND a.previsaoEsgotamentoDisco IS NULL))",
+           countQuery = "SELECT COUNT(a) FROM Ativo a WHERE (:filialId IS NULL OR a.filial.id = :filialId) " +
+           "AND (:tipoAtivoId IS NULL OR a.tipoAtivo.id = :tipoAtivoId) " +
+           "AND (:status IS NULL OR a.status = :status) " +
+           "AND (:nome IS NULL OR LOWER(a.nome) LIKE LOWER(CONCAT('%', :nome, '%'))) " +
+           "AND (:minDate IS NULL OR a.previsaoEsgotamentoDisco >= :minDate) " +
+           "AND (:maxDate IS NULL OR a.previsaoEsgotamentoDisco < :maxDate) " +
+           "AND (:hasPrediction IS NULL OR (:hasPrediction = true AND a.previsaoEsgotamentoDisco IS NOT NULL) OR (:hasPrediction = false AND a.previsaoEsgotamentoDisco IS NULL))")
     Page<Ativo> findByFilters(@Param("filialId") Long filialId,
                               @Param("tipoAtivoId") Long tipoAtivoId,
                               @Param("status") StatusAtivo status,
                               @Param("nome") String nome,
+                              @Param("minDate") java.time.LocalDate minDate,
+                              @Param("maxDate") java.time.LocalDate maxDate,
+                              @Param("hasPrediction") Boolean hasPrediction,
                               Pageable pageable);
 
-    @Query("SELECT a FROM Ativo a WHERE a.filial.id IN :filialIds " +
+    @Query(value = "SELECT a FROM Ativo a " +
+           "LEFT JOIN FETCH a.filial " +
+           "LEFT JOIN FETCH a.tipoAtivo " +
+           "LEFT JOIN FETCH a.localizacao " +
+           "LEFT JOIN FETCH a.fornecedor " +
+           "LEFT JOIN FETCH a.funcionarioResponsavel " +
+           "LEFT JOIN FETCH a.detalheHardware " +
+           "WHERE a.filial.id IN :filialIds " +
            "AND (:filialId IS NULL OR a.filial.id = :filialId) " +
            "AND (:tipoAtivoId IS NULL OR a.tipoAtivo.id = :tipoAtivoId) " +
            "AND (:status IS NULL OR a.status = :status) " +
-           "AND (:nome IS NULL OR LOWER(a.nome) LIKE LOWER(CONCAT('%', :nome, '%')))")
+           "AND (:nome IS NULL OR LOWER(a.nome) LIKE LOWER(CONCAT('%', :nome, '%'))) " +
+           "AND (:minDate IS NULL OR a.previsaoEsgotamentoDisco >= :minDate) " +
+           "AND (:maxDate IS NULL OR a.previsaoEsgotamentoDisco < :maxDate) " +
+           "AND (:hasPrediction IS NULL OR (:hasPrediction = true AND a.previsaoEsgotamentoDisco IS NOT NULL) OR (:hasPrediction = false AND a.previsaoEsgotamentoDisco IS NULL))",
+           countQuery = "SELECT COUNT(a) FROM Ativo a WHERE a.filial.id IN :filialIds " +
+           "AND (:filialId IS NULL OR a.filial.id = :filialId) " +
+           "AND (:tipoAtivoId IS NULL OR a.tipoAtivo.id = :tipoAtivoId) " +
+           "AND (:status IS NULL OR a.status = :status) " +
+           "AND (:nome IS NULL OR LOWER(a.nome) LIKE LOWER(CONCAT('%', :nome, '%'))) " +
+           "AND (:minDate IS NULL OR a.previsaoEsgotamentoDisco >= :minDate) " +
+           "AND (:maxDate IS NULL OR a.previsaoEsgotamentoDisco < :maxDate) " +
+           "AND (:hasPrediction IS NULL OR (:hasPrediction = true AND a.previsaoEsgotamentoDisco IS NOT NULL) OR (:hasPrediction = false AND a.previsaoEsgotamentoDisco IS NULL))")
     Page<Ativo> findByFilialIdsAndFilters(@Param("filialIds") Set<Long> filialIds,
                                           @Param("filialId") Long filialId,
                                           @Param("tipoAtivoId") Long tipoAtivoId,
                                           @Param("status") StatusAtivo status,
                                           @Param("nome") String nome,
+                                          @Param("minDate") java.time.LocalDate minDate,
+                                          @Param("maxDate") java.time.LocalDate maxDate,
+                                          @Param("hasPrediction") Boolean hasPrediction,
                                           Pageable pageable);
 
     @Query("SELECT new br.com.aegispatrimonio.dto.AtivoNameDTO(a.id, a.nome) FROM Ativo a WHERE (:filialId IS NULL OR a.filial.id = :filialId) " +
            "AND (:tipoAtivoId IS NULL OR a.tipoAtivo.id = :tipoAtivoId) " +
-           "AND (:status IS NULL OR a.status = :status)")
+           "AND (:status IS NULL OR a.status = :status) " +
+           "AND (:minDate IS NULL OR a.previsaoEsgotamentoDisco >= :minDate) " +
+           "AND (:maxDate IS NULL OR a.previsaoEsgotamentoDisco < :maxDate) " +
+           "AND (:hasPrediction IS NULL OR (:hasPrediction = true AND a.previsaoEsgotamentoDisco IS NOT NULL) OR (:hasPrediction = false AND a.previsaoEsgotamentoDisco IS NULL))")
     List<AtivoNameDTO> findSimpleByFilters(@Param("filialId") Long filialId,
                                            @Param("tipoAtivoId") Long tipoAtivoId,
                                            @Param("status") StatusAtivo status,
+                                           @Param("minDate") java.time.LocalDate minDate,
+                                           @Param("maxDate") java.time.LocalDate maxDate,
+                                           @Param("hasPrediction") Boolean hasPrediction,
                                            Pageable pageable);
 
     @Query("SELECT new br.com.aegispatrimonio.dto.AtivoNameDTO(a.id, a.nome) FROM Ativo a WHERE a.filial.id IN :filialIds " +
            "AND (:filialId IS NULL OR a.filial.id = :filialId) " +
            "AND (:tipoAtivoId IS NULL OR a.tipoAtivo.id = :tipoAtivoId) " +
-           "AND (:status IS NULL OR a.status = :status)")
+           "AND (:status IS NULL OR a.status = :status) " +
+           "AND (:minDate IS NULL OR a.previsaoEsgotamentoDisco >= :minDate) " +
+           "AND (:maxDate IS NULL OR a.previsaoEsgotamentoDisco < :maxDate) " +
+           "AND (:hasPrediction IS NULL OR (:hasPrediction = true AND a.previsaoEsgotamentoDisco IS NOT NULL) OR (:hasPrediction = false AND a.previsaoEsgotamentoDisco IS NULL))")
     List<AtivoNameDTO> findSimpleByFilialIdsAndFilters(@Param("filialIds") Set<Long> filialIds,
                                                       @Param("filialId") Long filialId,
                                                       @Param("tipoAtivoId") Long tipoAtivoId,
                                                       @Param("status") StatusAtivo status,
+                                                      @Param("minDate") java.time.LocalDate minDate,
+                                                      @Param("maxDate") java.time.LocalDate maxDate,
+                                                      @Param("hasPrediction") Boolean hasPrediction,
                                                       Pageable pageable);
 
     @Query("SELECT a FROM Ativo a " +
@@ -132,4 +189,25 @@ public interface AtivoRepository extends JpaRepository<Ativo, Long> {
 
     @Query("SELECT COUNT(a) FROM Ativo a WHERE a.filial.id = :#{T(br.com.aegispatrimonio.context.TenantContext).getFilialId()} AND a.previsaoEsgotamentoDisco >= :safeDate")
     long countSafePredictionsByCurrentTenant(@Param("safeDate") java.time.LocalDate safeDate);
+
+    @Query("SELECT new br.com.aegispatrimonio.dto.RiskyAssetDTO(a.id, a.nome, a.tipoAtivo.nome, a.previsaoEsgotamentoDisco) " +
+           "FROM Ativo a WHERE a.filial.id = :#{T(br.com.aegispatrimonio.context.TenantContext).getFilialId()} " +
+           "AND a.previsaoEsgotamentoDisco IS NOT NULL " +
+           "AND a.previsaoEsgotamentoDisco < :limitDate " +
+           "ORDER BY a.previsaoEsgotamentoDisco ASC")
+    List<RiskyAssetDTO> findTopRiskyAssetsByCurrentTenant(@Param("limitDate") java.time.LocalDate limitDate, Pageable pageable);
+
+    @Query("SELECT new br.com.aegispatrimonio.dto.ChartDataDTO(a.status, COUNT(a)) " +
+           "FROM Ativo a WHERE a.filial.id = :#{T(br.com.aegispatrimonio.context.TenantContext).getFilialId()} " +
+           "GROUP BY a.status")
+    List<ChartDataDTO> countByStatusGrouped();
+
+    @Query("SELECT new br.com.aegispatrimonio.dto.ChartDataDTO(a.tipoAtivo.nome, COUNT(a)) " +
+           "FROM Ativo a WHERE a.filial.id = :#{T(br.com.aegispatrimonio.context.TenantContext).getFilialId()} " +
+           "GROUP BY a.tipoAtivo.nome")
+    List<ChartDataDTO> countByTipoAtivoGrouped();
+
+    @Query("SELECT a.previsaoEsgotamentoDisco FROM Ativo a WHERE a.filial.id = :#{T(br.com.aegispatrimonio.context.TenantContext).getFilialId()} " +
+           "AND a.previsaoEsgotamentoDisco >= :startDate AND a.previsaoEsgotamentoDisco < :endDate")
+    List<java.time.LocalDate> findPredictionsBetween(@Param("startDate") java.time.LocalDate startDate, @Param("endDate") java.time.LocalDate endDate);
 }

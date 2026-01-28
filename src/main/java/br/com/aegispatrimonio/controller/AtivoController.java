@@ -2,15 +2,22 @@ package br.com.aegispatrimonio.controller;
 
 import br.com.aegispatrimonio.dto.AtivoCreateDTO;
 import br.com.aegispatrimonio.dto.AtivoDTO;
+import br.com.aegispatrimonio.dto.AtivoHealthHistoryDTO;
 import br.com.aegispatrimonio.dto.AtivoUpdateDTO;
 import br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO;
 import br.com.aegispatrimonio.service.AtivoService;
+import br.com.aegispatrimonio.service.IHealthCheckService;
+import br.com.aegispatrimonio.service.QRCodeService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 /**
  * Controller para gerenciar as operações CRUD de Ativos.
@@ -23,9 +30,13 @@ import org.springframework.web.bind.annotation.*;
 public class AtivoController {
 
     private final AtivoService ativoService;
+    private final QRCodeService qrCodeService;
+    private final IHealthCheckService healthCheckService;
 
-    public AtivoController(AtivoService ativoService) {
+    public AtivoController(AtivoService ativoService, QRCodeService qrCodeService, IHealthCheckService healthCheckService) {
         this.ativoService = ativoService;
+        this.qrCodeService = qrCodeService;
+        this.healthCheckService = healthCheckService;
     }
 
     /**
@@ -36,15 +47,16 @@ public class AtivoController {
      * @return Uma lista de AtivoDTO representando todos os ativos.
      */
     @GetMapping
-    @PreAuthorize("#p1 == null or @permissionService.hasPermission(authentication, null, 'ATIVO', 'READ', #p1)")
+    @PreAuthorize("#filialId == null or @permissionService.hasPermission(authentication, null, 'ATIVO', 'READ', #filialId)")
     public Page<AtivoDTO> listarTodos(
             org.springframework.data.domain.Pageable pageable,
             @RequestParam(required = false) Long filialId,
             @RequestParam(required = false) Long tipoAtivoId,
             @RequestParam(required = false) br.com.aegispatrimonio.model.StatusAtivo status,
-            @RequestParam(required = false) String nome
+            @RequestParam(required = false) String nome,
+            @RequestParam(required = false) String health
     ) {
-        return ativoService.listarTodos(pageable, filialId, tipoAtivoId, status, nome);
+        return ativoService.listarTodos(pageable, filialId, tipoAtivoId, status, nome, health);
     }
 
     /**
@@ -69,7 +81,7 @@ public class AtivoController {
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'CREATE', #p0.filialId())")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'CREATE', #ativoCreateDTO.filialId)")
     public AtivoDTO criar(@RequestBody @Valid AtivoCreateDTO ativoCreateDTO) {
         return ativoService.criar(ativoCreateDTO);
     }
@@ -83,7 +95,7 @@ public class AtivoController {
      * @return O AtivoDTO com os dados atualizados.
      */
     @PutMapping("/{id}")
-    @PreAuthorize("@permissionService.hasAtivoPermission(authentication, #id, 'UPDATE') and @permissionService.hasPermission(authentication, null, 'ATIVO', 'UPDATE', #p1.filialId())")
+    @PreAuthorize("@permissionService.hasAtivoPermission(authentication, #id, 'UPDATE') and @permissionService.hasPermission(authentication, null, 'ATIVO', 'UPDATE', #ativoUpdateDTO.filialId)")
     public AtivoDTO atualizar(@PathVariable Long id, @RequestBody @Valid AtivoUpdateDTO ativoUpdateDTO) {
         return ativoService.atualizar(id, ativoUpdateDTO);
     }
@@ -112,6 +124,40 @@ public class AtivoController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("@permissionService.hasAtivoPermission(authentication, #id, 'UPDATE')")
     public void updateHealthCheck(@PathVariable Long id, @RequestBody HealthCheckPayloadDTO payload) {
-        ativoService.processarHealthCheck(id, payload);
+        healthCheckService.processHealthCheckPayload(id, payload);
+    }
+
+    /**
+     * Recupera o histórico de saúde (ex: espaço em disco) do ativo.
+     * Requer permissão READ no contexto da filial do ativo.
+     *
+     * @param id O ID do ativo.
+     * @return Lista de AtivoHealthHistoryDTO.
+     */
+    @GetMapping("/{id}/health-history")
+    @PreAuthorize("@permissionService.hasAtivoPermission(authentication, #id, 'READ')")
+    public List<AtivoHealthHistoryDTO> getHealthHistory(@PathVariable Long id) {
+        return ativoService.getHealthHistory(id);
+    }
+
+    /**
+     * Gera um QR Code para o ativo especificado.
+     * Requer permissão READ no contexto do ativo.
+     *
+     * @param id O ID do ativo.
+     * @return Imagem PNG do QR Code.
+     */
+    @GetMapping(value = "/{id}/qrcode", produces = MediaType.IMAGE_PNG_VALUE)
+    @PreAuthorize("@permissionService.hasAtivoPermission(authentication, #id, 'READ')")
+    public ResponseEntity<byte[]> getQRCode(@PathVariable Long id) {
+        // Verifica existência (lança exceção se não encontrar)
+        ativoService.buscarPorId(id);
+
+        String content = "AEGIS:ASSET:" + id;
+        byte[] qrCode = qrCodeService.generateQRCode(content, 200, 200);
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.IMAGE_PNG)
+                .body(qrCode);
     }
 }

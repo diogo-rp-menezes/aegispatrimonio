@@ -1,8 +1,29 @@
 <!-- src/views/DetailView.vue -->
 <script setup>
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, onMounted, onUnmounted, computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { request } from "../services/api";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+} from 'chart.js';
+import { Line } from 'vue-chartjs';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 const route = useRoute();
 const router = useRouter();
@@ -13,6 +34,9 @@ const error = ref(null);
 
 const historico = ref([]);
 const loadingHistorico = ref(false);
+
+const healthHistory = ref([]);
+const loadingHealth = ref(false);
 
 const showQrModal = ref(false);
 const qrCodeUrl = ref(null);
@@ -42,6 +66,124 @@ async function carregarHistorico() {
     loadingHistorico.value = false;
   }
 }
+
+async function carregarHealthHistory() {
+  loadingHealth.value = true;
+  try {
+    const data = await request(`/ativos/${route.params.id}/health-history`);
+    healthHistory.value = data || [];
+  } catch (err) {
+    console.error("Erro ao carregar histórico de saúde", err);
+  } finally {
+    loadingHealth.value = false;
+  }
+}
+
+const chartData = computed(() => {
+  if (!healthHistory.value || healthHistory.value.length === 0) {
+    return { labels: [], datasets: [] };
+  }
+
+  // Get all unique dates sorted
+  let uniqueDates = [...new Set(healthHistory.value.map(h => h.dataRegistro))].sort();
+
+  // Check and add prediction date
+  if (ativo.value && ativo.value.previsaoEsgotamentoDisco) {
+      const predDate = new Date(ativo.value.previsaoEsgotamentoDisco).toISOString().split('T')[0]; // Ensure comparable format
+      const lastDate = uniqueDates.length > 0 ? uniqueDates[uniqueDates.length - 1] : '';
+      if (predDate > lastDate) {
+          uniqueDates.push(ativo.value.previsaoEsgotamentoDisco); // Add raw prediction date
+      }
+  }
+
+  const formattedDates = uniqueDates.map(d => new Date(d).toLocaleString('pt-BR'));
+
+  // Group by component (Disk)
+  const components = [...new Set(healthHistory.value.map(h => h.componente))];
+
+  const datasets = components.map((comp, index) => {
+    // Colors for different lines
+    const colors = ['#0d6efd', '#dc3545', '#198754', '#ffc107', '#0dcaf0'];
+    const color = colors[index % colors.length];
+
+    // Create data array matching the unique dates
+    // Note: Prediction date won't match any history entry, so it gets null, which breaks the line?
+    // Chart.js handles nulls by breaking the line, which is fine for raw data.
+    const data = uniqueDates.map(date => {
+      const entry = healthHistory.value.find(h => h.componente === comp && h.dataRegistro === date);
+      return entry ? entry.valor : null;
+    });
+
+    return {
+      label: comp,
+      backgroundColor: color,
+      borderColor: color,
+      data: data,
+      fill: false,
+      tension: 0.1
+    };
+  });
+
+  // Add Regression Trendline (Shift Left - Backend Calculated)
+  if (ativo.value && ativo.value.atributos &&
+      ativo.value.atributos.prediction_slope &&
+      ativo.value.atributos.prediction_intercept &&
+      ativo.value.atributos.prediction_base_epoch_day) {
+
+     const slope = ativo.value.atributos.prediction_slope;
+     const intercept = ativo.value.atributos.prediction_intercept;
+     const baseEpochDay = ativo.value.atributos.prediction_base_epoch_day;
+
+     const trendData = uniqueDates.map(d => {
+         // Consistent date handling with Backend (LocalDate.toEpochDay)
+         // Assuming d is ISO string "YYYY-MM-DDTHH:mm:ss"
+         const datePart = d.split('T')[0]; // "YYYY-MM-DD"
+         const dateObj = new Date(datePart); // Treated as UTC
+         const daysFromEpoch = dateObj.getTime() / 86400000;
+
+         const x = daysFromEpoch - baseEpochDay;
+         const y = slope * x + intercept;
+         return y < 0 ? 0 : y; // Clamp to 0
+     });
+
+     datasets.push({
+         label: 'Tendência Estimada (IA)',
+         data: trendData,
+         borderColor: '#6c757d',
+         borderDash: [5, 5],
+         pointRadius: 0,
+         fill: false,
+         tension: 0
+     });
+  }
+
+  return {
+    labels: formattedDates,
+    datasets: datasets
+  };
+});
+
+const visibleAttributes = computed(() => {
+  if (!ativo.value || !ativo.value.atributos) return {};
+  const attrs = {};
+  for (const [key, val] of Object.entries(ativo.value.atributos)) {
+    if (!key.startsWith('prediction_')) {
+      attrs[key] = val;
+    }
+  }
+  return attrs;
+});
+
+const chartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    title: {
+      display: true,
+      text: 'Espaço Livre em Disco (GB) ao Longo do Tempo'
+    }
+  }
+};
 
 function voltar() {
   router.push("/ativos");
@@ -176,6 +318,7 @@ function getBadgeClass(type) {
 onMounted(() => {
   carregarAtivo();
   carregarHistorico();
+  carregarHealthHistory();
 });
 </script>
 
@@ -231,6 +374,18 @@ onMounted(() => {
       </div>
     </div>
 
+    <!-- Health History Chart -->
+    <div v-if="ativo && healthHistory.length > 0" class="card shadow-sm mb-4">
+      <div class="card-header bg-light">
+        <h5 class="mb-0"><i class="bi bi-activity me-2"></i>Histórico de Saúde (Disco)</h5>
+      </div>
+      <div class="card-body">
+         <div style="height: 300px;">
+            <Line :data="chartData" :options="chartOptions" />
+         </div>
+      </div>
+    </div>
+
     <!-- Hardware Details -->
     <div v-if="ativo && ativo.detalheHardware" class="card shadow-sm mb-4">
       <div class="card-header bg-light">
@@ -255,13 +410,13 @@ onMounted(() => {
     </div>
 
     <!-- Technical Attributes (Adaptive Taxonomy) -->
-    <div v-if="ativo && ativo.atributos && Object.keys(ativo.atributos).length > 0" class="card shadow-sm mb-4">
+    <div v-if="ativo && Object.keys(visibleAttributes).length > 0" class="card shadow-sm mb-4">
       <div class="card-header bg-light">
         <h5 class="mb-0"><i class="bi bi-tags me-2"></i>Especificações Técnicas</h5>
       </div>
       <div class="card-body">
         <ul class="list-group list-group-flush">
-          <li v-for="(val, key) in ativo.atributos" :key="key" class="list-group-item d-flex justify-content-between align-items-center">
+          <li v-for="(val, key) in visibleAttributes" :key="key" class="list-group-item d-flex justify-content-between align-items-center">
             <span class="fw-bold">{{ key }}</span>
             <span>{{ val }}</span>
           </li>
