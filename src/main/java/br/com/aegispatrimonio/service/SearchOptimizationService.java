@@ -21,14 +21,31 @@ public class SearchOptimizationService {
      * @return The edit distance (number of changes required to transform left to right)
      */
     public int calculateLevenshteinDistance(CharSequence left, CharSequence right) {
+        return calculateLevenshteinDistance(left, right, Integer.MAX_VALUE);
+    }
+
+    /**
+     * Calculates the Levenshtein distance between two CharSequences with a threshold.
+     * Uses a memory-optimized approach (two rows) and early exit.
+     *
+     * @param left      The first string
+     * @param right     The second string
+     * @param threshold The maximum allowed distance. If exceeded, returns threshold + 1.
+     * @return The edit distance or threshold + 1 if exceeded
+     */
+    public int calculateLevenshteinDistance(CharSequence left, CharSequence right, int threshold) {
         if (left == null || right == null) {
             throw new IllegalArgumentException("Strings must not be null");
         }
         int n = left.length();
         int m = right.length();
 
-        if (n == 0) return m;
-        if (m == 0) return n;
+        if (n == 0) return m <= threshold ? m : threshold + 1;
+        if (m == 0) return n <= threshold ? n : threshold + 1;
+
+        if (Math.abs(n - m) > threshold) {
+            return threshold + 1;
+        }
 
         if (n > m) {
             // Swap the strings to consume less memory
@@ -52,11 +69,17 @@ public class SearchOptimizationService {
         for (int j = 1; j <= m; j++) {
             char rightJ = right.charAt(j - 1);
             d[0] = j;
+            int minDistanceInRow = j;
 
             for (int i = 1; i <= n; i++) {
                 int cost = left.charAt(i - 1) == rightJ ? 0 : 1;
                 // minimum of deletion, insertion, substitution
                 d[i] = Math.min(Math.min(d[i - 1] + 1, p[i] + 1), p[i - 1] + cost);
+                minDistanceInRow = Math.min(minDistanceInRow, d[i]);
+            }
+
+            if (minDistanceInRow > threshold) {
+                return threshold + 1;
             }
 
             _d = p;
@@ -64,7 +87,7 @@ public class SearchOptimizationService {
             d = _d;
         }
 
-        return p[n];
+        return p[n] <= threshold ? p[n] : threshold + 1;
     }
 
     /**
@@ -89,7 +112,15 @@ public class SearchOptimizationService {
             return 0.0;
         }
 
-        int distance = calculateLevenshteinDistance(left, right);
+        // Determine threshold for score > 0.2
+        // dist < 0.8 * maxLength
+        int threshold = (int) Math.ceil(0.8 * maxLength) - 1;
+
+        int distance = calculateLevenshteinDistance(left, right, threshold);
+
+        if (distance > threshold) {
+            return 0.0;
+        }
 
         return 1.0 - ((double) distance / maxLength);
     }
