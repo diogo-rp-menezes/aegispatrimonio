@@ -140,8 +140,11 @@ public class TipoAtivoControllerIT extends BaseIT {
         func.setMatricula(nome.replaceAll("\\s+", "") + "-001");
         func.setCargo("Analista");
         func.setDepartamento(depto);
-        func.setFiliais(filiais);
+        func.setFiliais(new java.util.HashSet<>(filiais));
         func.setStatus(Status.ATIVO);
+
+        // Save Funcionario first to ensure it has an ID
+        func = funcionarioRepository.saveAndFlush(func);
 
         Usuario user = new Usuario();
         user.setEmail(email);
@@ -149,9 +152,11 @@ public class TipoAtivoControllerIT extends BaseIT {
         user.setRole(role);
         user.setStatus(Status.ATIVO);
         user.setFuncionario(func);
-        func.setUsuario(user);
 
-        usuarioRepository.saveAndFlush(user);
+        // Save Usuario
+        user = usuarioRepository.saveAndFlush(user);
+
+        func.setUsuario(user);
         return funcionarioRepository.saveAndFlush(func);
     }
 
