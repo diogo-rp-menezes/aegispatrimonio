@@ -45,6 +45,34 @@ public class ManutencaoService {
         return convertToResponseDTO(savedManutencao);
     }
 
+    /**
+     * Creates a maintenance ticket systematically (autonomous agent), bypassing the logged-in user check.
+     * The requester is set to the asset's responsible employee.
+     */
+    @Transactional
+    public Optional<ManutencaoResponseDTO> criarManutencaoSistemica(Ativo ativo, String descricao, TipoManutencao tipo) {
+        if (ativo.getFuncionarioResponsavel() == null) {
+            log.warn("SYSTEM: Cannot create autonomous maintenance for asset {} ({}) because it has no responsible employee.", ativo.getNome(), ativo.getId());
+            return Optional.empty();
+        }
+
+        Manutencao manutencao = new Manutencao();
+        manutencao.setAtivo(ativo);
+        manutencao.setSolicitante(ativo.getFuncionarioResponsavel());
+        manutencao.setTipo(tipo);
+        manutencao.setDescricaoProblema(descricao);
+        // Defaults
+        manutencao.setStatus(StatusManutencao.SOLICITADA);
+        manutencao.setDataSolicitacao(LocalDate.now());
+        manutencao.setObservacoes("Criado automaticamente pelo Agente de Manutenção Preditiva.");
+
+        Manutencao savedManutencao = manutencaoRepository.save(manutencao);
+
+        log.info("AUDIT: SYSTEM_AUTO criou a manutenção com ID {} para o ativo {}.", savedManutencao.getId(), savedManutencao.getAtivo().getId());
+
+        return Optional.of(convertToResponseDTO(savedManutencao));
+    }
+
     @Transactional(readOnly = true)
     public Optional<ManutencaoResponseDTO> buscarPorId(Long id) {
         log.debug("Buscando manutenção ID: {}", id);

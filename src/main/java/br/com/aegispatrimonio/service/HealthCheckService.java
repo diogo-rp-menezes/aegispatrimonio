@@ -42,6 +42,7 @@ public class HealthCheckService implements IHealthCheckService {
     private final PredictiveMaintenanceService predictiveMaintenanceService;
     private final AlertNotificationService alertNotificationService;
     private final AtivoHealthHistoryRepository ativoHealthHistoryRepository;
+    private final MaintenanceDispatcherService maintenanceDispatcherService;
 
     public HealthCheckService(AtivoRepository ativoRepository,
                               AtivoDetalheHardwareRepository detalheHardwareRepository,
@@ -53,7 +54,8 @@ public class HealthCheckService implements IHealthCheckService {
                               HealthCheckHistoryRepository healthCheckHistoryRepository,
                               PredictiveMaintenanceService predictiveMaintenanceService,
                               AlertNotificationService alertNotificationService,
-                              AtivoHealthHistoryRepository ativoHealthHistoryRepository) {
+                              AtivoHealthHistoryRepository ativoHealthHistoryRepository,
+                              MaintenanceDispatcherService maintenanceDispatcherService) {
         this.ativoRepository = ativoRepository;
         this.detalheHardwareRepository = detalheHardwareRepository;
         this.currentUserProvider = currentUserProvider;
@@ -65,6 +67,7 @@ public class HealthCheckService implements IHealthCheckService {
         this.predictiveMaintenanceService = predictiveMaintenanceService;
         this.alertNotificationService = alertNotificationService;
         this.ativoHealthHistoryRepository = ativoHealthHistoryRepository;
+        this.maintenanceDispatcherService = maintenanceDispatcherService;
     }
 
     @Override
@@ -230,6 +233,9 @@ public class HealthCheckService implements IHealthCheckService {
                         ativo.getAtributos().put("prediction_calculated_at", java.time.LocalDateTime.now().toString());
 
                         ativo.setPrevisaoEsgotamentoDisco(worstPredictionResult.exhaustionDate());
+
+                        // Autonomous dispatch
+                        maintenanceDispatcherService.dispatchIfNecessary(ativo, worstPredictionResult.exhaustionDate());
                     }
                 }
             }
