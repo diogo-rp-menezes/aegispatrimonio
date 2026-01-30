@@ -62,7 +62,7 @@ test.describe('Dashboard Predictive Visualization (SOTA)', () => {
 
   test('Deve exibir o gráfico de Distribuição de Risco', async ({ page }) => {
     // Verify the new section title
-    await expect(page.getByText('Distribuição de Risco')).toBeVisible();
+    await expect(page.getByText('Distribuição de Saúde (Preditiva)')).toBeVisible();
 
     // Verify the presence of all 4 charts (Status, Type, Trend, Risk)
     const charts = page.locator('canvas');

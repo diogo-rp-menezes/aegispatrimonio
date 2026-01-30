@@ -3,6 +3,21 @@ import { ref, onMounted } from "vue";
 import { useRouter } from 'vue-router';
 import { request } from '../services/api';
 import DashboardCharts from '../components/DashboardCharts.vue';
+import {
+  Chart as ChartJS,
+  Title,
+  Tooltip,
+  Legend,
+  BarElement,
+  CategoryScale,
+  LinearScale,
+  ArcElement,
+  LineElement,
+  PointElement
+} from 'chart.js'
+import { Bar, Doughnut, Line } from 'vue-chartjs'
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, LineElement, PointElement)
 
 const router = useRouter();
 
@@ -266,6 +281,19 @@ onMounted(async () => {
             <div style="height: 300px;">
               <Bar v-if="typeChartData.labels.length" :data="typeChartData" :options="chartOptions" />
                <div v-else class="d-flex justify-content-center align-items-center h-100 text-muted">
+                Sem dados disponíveis
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12">
+        <div class="card h-100 border-0 shadow-sm">
+          <div class="card-body">
+            <h5 class="fw-bold mb-3">Tendência de Falhas</h5>
+            <div style="height: 300px;">
+              <Line v-if="trendChartData.labels && trendChartData.labels.length" :data="trendChartData" :options="chartOptions" />
+              <div v-else class="d-flex justify-content-center align-items-center h-100 text-muted">
                 Sem dados disponíveis
               </div>
             </div>

@@ -52,7 +52,7 @@ test.describe('Dashboard Analytics & SOTA Features', () => {
     });
 
     // 5. Mock Recent Alerts
-    await page.route('**/alerts/recent', async route => {
+    await page.route('**/alertas/recent', async route => {
         const json = [
             {
                 id: 1,
@@ -60,7 +60,8 @@ test.describe('Dashboard Analytics & SOTA Features', () => {
                 titulo: 'CPU High Load',
                 mensagem: 'CPU usage is above 90%',
                 dataCriacao: '2024-05-20T10:00:00',
-                ativo: { id: 101, nome: 'Server 01' }
+                ativoNome: 'Server 01',
+                ativoId: 101
             }
         ];
         await route.fulfill({ json });
