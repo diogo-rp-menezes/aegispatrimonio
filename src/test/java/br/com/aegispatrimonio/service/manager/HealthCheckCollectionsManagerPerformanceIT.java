@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class HealthCheckCollectionsManagerPerformanceIT extends BaseIT {
 
     @Autowired
-    private DefaultHealthCheckCollectionsManager collectionsManager;
+    private HealthCheckCollectionsManager collectionsManager;
 
     @Autowired
     private FilialRepository filialRepository;

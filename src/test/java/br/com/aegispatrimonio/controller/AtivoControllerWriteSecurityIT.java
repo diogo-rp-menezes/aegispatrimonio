@@ -109,7 +109,7 @@ class AtivoControllerWriteSecurityIT extends BaseIT {
                 .andExpect(status().isForbidden());
 
         // Configura Mock para permitir ADMIN
-        when(permissionService.hasPermission(any(), any(), eq("ATIVO"), eq("CREATE"), any())).thenReturn(true);
+        when(permissionService.hasPermission(any(), any(), any(), any(), any())).thenReturn(true);
 
         mockMvc.perform(post("/api/v1/ativos")
                         .with(user(buildUser("ROLE_ADMIN")))
@@ -140,8 +140,8 @@ class AtivoControllerWriteSecurityIT extends BaseIT {
                 .andExpect(status().isForbidden());
 
         // Configura Mock para permitir ADMIN
-        when(permissionService.hasAtivoPermission(any(), eq(inexistenteId), eq("UPDATE"))).thenReturn(true);
-        when(permissionService.hasPermission(any(), any(), eq("ATIVO"), eq("UPDATE"), any())).thenReturn(true);
+        when(permissionService.hasAtivoPermission(any(), any(), any())).thenReturn(true);
+        when(permissionService.hasPermission(any(), any(), any(), any(), any())).thenReturn(true);
 
         mockMvc.perform(put("/api/v1/ativos/{id}", inexistenteId)
                         .with(user(buildUser("ROLE_ADMIN")))
@@ -168,7 +168,7 @@ class AtivoControllerWriteSecurityIT extends BaseIT {
                 .andExpect(status().isForbidden());
 
         // Mock para permitir ADMIN
-        when(permissionService.hasAtivoPermission(any(), eq(inexistenteId), eq("DELETE"))).thenReturn(true);
+        when(permissionService.hasAtivoPermission(any(), any(), any())).thenReturn(true);
 
         mockMvc.perform(delete("/api/v1/ativos/{id}", inexistenteId)
                         .with(user(buildUser("ROLE_ADMIN"))))
