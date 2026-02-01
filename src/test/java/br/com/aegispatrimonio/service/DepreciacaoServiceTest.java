@@ -124,4 +124,48 @@ class DepreciacaoServiceTest {
 
         assertEquals(0, depreciacaoEsperada.compareTo(valorCalculado.setScale(2, RoundingMode.HALF_UP)));
     }
+
+    @Test
+    @DisplayName("Deve calcular depreciação saldo decrescente corretamente")
+    void calcularDepreciacaoMensal_comMetodoSaldoDecrescente_deveCalcularCorretamente() {
+        ativo.setMetodoDepreciacao(MetodoDepreciacao.SALDO_DECRESCENTE);
+        ativo.setVidaUtilMeses(10);
+        ativo.setDataInicioDepreciacao(LocalDate.now().minusMonths(2));
+        when(ativoRepository.findById(1L)).thenReturn(Optional.of(ativo));
+
+        // --- Cálculo da depreciação esperada para validação ---
+        // Valor depreciável = 12000 - 2000 = 10000
+        // Vida útil = 10 meses. Taxa = 2 / 10 = 0.2
+        // Meses decorridos = 2
+        // Fator decaimento = (1 - 0.2)^2 = 0.8^2 = 0.64
+        // Depreciação = 10000 * 0.64 * 0.2 = 1280.00
+        BigDecimal depreciacaoEsperada = new BigDecimal("1280.00");
+
+        // --- Execução e Validação ---
+        BigDecimal valorCalculado = depreciacaoService.calcularDepreciacaoMensal(1L);
+
+        assertEquals(0, depreciacaoEsperada.compareTo(valorCalculado.setScale(2, RoundingMode.HALF_UP)));
+    }
+
+    @Test
+    @DisplayName("Deve calcular depreciação saldo decrescente 150% corretamente")
+    void calcularDepreciacaoMensal_comMetodoSaldoDecrescente150_deveCalcularCorretamente() {
+        ativo.setMetodoDepreciacao(MetodoDepreciacao.SALDO_DECRESCENTE_150);
+        ativo.setVidaUtilMeses(10);
+        ativo.setDataInicioDepreciacao(LocalDate.now().minusMonths(2));
+        when(ativoRepository.findById(1L)).thenReturn(Optional.of(ativo));
+
+        // --- Cálculo da depreciação esperada para validação ---
+        // Valor depreciável = 12000 - 2000 = 10000
+        // Vida útil = 10 meses. Taxa = 1.5 / 10 = 0.15
+        // Meses decorridos = 2
+        // Fator decaimento = (1 - 0.15)^2 = 0.85^2 = 0.7225
+        // Depreciação = 10000 * 0.7225 * 0.15 = 1083.75
+        BigDecimal depreciacaoEsperada = new BigDecimal("1083.75");
+
+        // --- Execução e Validação ---
+        BigDecimal valorCalculado = depreciacaoService.calcularDepreciacaoMensal(1L);
+
+        assertEquals(0, depreciacaoEsperada.compareTo(valorCalculado.setScale(2, RoundingMode.HALF_UP)));
+    }
 }

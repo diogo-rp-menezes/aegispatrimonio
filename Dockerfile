@@ -6,6 +6,10 @@ WORKDIR /app/frontend
 COPY frontend/package*.json ./
 RUN npm ci || npm install
 
+# Install dependencies
+RUN --mount=type=cache,target=/root/.npm npm install
+
+# Copy source code
 COPY frontend/ .
 RUN npm run build
 
@@ -19,6 +23,10 @@ COPY .mvn .mvn
 COPY pom.xml .
 RUN ./mvnw dependency:go-offline -B
 
+# Make wrapper executable (just in case) and download dependencies
+RUN --mount=type=cache,target=/root/.m2 chmod +x mvnw && ./mvnw dependency:go-offline
+
+# Copy backend source code
 COPY src ./src
 # Embed frontend in backend
 COPY --from=frontend-builder /app/frontend/dist ./src/main/resources/static
@@ -35,10 +43,8 @@ LABEL maintainer="Docker Sentinel" \
       org.opencontainers.image.vendor="Aegis" \
       org.opencontainers.image.version="1.0.0"
 
-# Install necessary runtime tools (curl for healthcheck)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# Build the application
+RUN --mount=type=cache,target=/root/.m2 ./mvnw clean package -DskipTests
 
 WORKDIR /app
 

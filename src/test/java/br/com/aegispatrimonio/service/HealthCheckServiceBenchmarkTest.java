@@ -66,7 +66,9 @@ class HealthCheckServiceBenchmarkTest {
         ativo.setId(ativoId);
         ativo.setAtributos(new java.util.HashMap<>());
 
+        when(currentUserProvider.getCurrentUsuario()).thenReturn(new br.com.aegispatrimonio.model.Usuario());
         when(ativoRepository.findByIdWithDetails(ativoId)).thenReturn(Optional.of(ativo));
+        doNothing().when(authorizationPolicy).assertCanUpdate(any(), any());
 
         // Mock optimization: findBy...ComponenteIn... must be called, not individual saves or finds
         when(ativoHealthHistoryRepository.findByAtivoIdAndComponenteInAndMetricaAndDataRegistroAfterOrderByDataRegistroAsc(

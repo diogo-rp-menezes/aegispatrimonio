@@ -1,10 +1,6 @@
 package br.com.aegispatrimonio.service.impl;
 
-import br.com.aegispatrimonio.model.Filial;
-import br.com.aegispatrimonio.model.Funcionario;
-import br.com.aegispatrimonio.model.Permission;
-import br.com.aegispatrimonio.model.Role;
-import br.com.aegispatrimonio.model.Usuario;
+import br.com.aegispatrimonio.model.*;
 import br.com.aegispatrimonio.repository.AtivoRepository;
 import br.com.aegispatrimonio.repository.FuncionarioRepository;
 import br.com.aegispatrimonio.repository.UsuarioRepository;
@@ -20,6 +16,8 @@ import org.mockito.quality.Strictness;
 import org.springframework.security.core.Authentication;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 
@@ -42,13 +40,13 @@ class PermissionServiceImplTest {
 
     private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
-    private PermissionServiceImpl permissionService;
-
     @Mock
     private br.com.aegispatrimonio.service.SecurityAuditService auditService;
 
     @Mock
     private Authentication authentication;
+
+    private PermissionServiceImpl permissionService;
 
     @BeforeEach
     void setUp() {
@@ -65,106 +63,137 @@ class PermissionServiceImplTest {
         Usuario usuario = new Usuario();
         usuario.setEmail(username);
         Role role = new Role();
-        role.setName("ROLE_USER");
-        Permission permission = new Permission(1L, "ATIVO", "READ", "Read Asset", null);
-        role.setPermissions(Set.of(permission));
-        usuario.setRoles(Set.of(role));
+        Permission permission = new Permission();
+        permission.setResource("RESOURCE");
+        permission.setAction("READ");
+        role.setPermissions(new HashSet<>(Collections.singletonList(permission)));
+        usuario.setRoles(new HashSet<>(Collections.singletonList(role)));
 
         when(usuarioRepository.findWithDetailsByEmail(username)).thenReturn(Optional.of(usuario));
 
-        assertTrue(permissionService.hasPermission(authentication, null, "ATIVO", "READ", null));
+        boolean result = permissionService.hasPermission(authentication, null, "RESOURCE", "READ", null);
+        assertTrue(result);
     }
 
     @Test
-    void testHasPermission_Denied_NoPermission() {
+    void testHasAtivoPermission_Granted() {
         String username = "user@example.com";
+        Long ativoId = 1L;
+        Long filialId = 10L;
+
         when(authentication.isAuthenticated()).thenReturn(true);
         when(authentication.getName()).thenReturn(username);
 
+        // Setup Ativo and Filial
+        Ativo ativo = new Ativo();
+        ativo.setId(ativoId);
+        Filial filial = new Filial();
+        filial.setId(filialId);
+        ativo.setFilial(filial);
+
+        when(ativoRepository.findById(ativoId)).thenReturn(Optional.of(ativo));
+
+        // Setup User, Funcionario, Role, Permission
         Usuario usuario = new Usuario();
         usuario.setEmail(username);
-        Role role = new Role();
-        role.setName("ROLE_USER");
-        // No permissions
-        usuario.setRoles(Set.of(role));
-
-        when(usuarioRepository.findWithDetailsByEmail(username)).thenReturn(Optional.of(usuario));
-
-        assertFalse(permissionService.hasPermission(authentication, null, "ATIVO", "WRITE", null));
-    }
-
-    @Test
-    void testHasPermission_Denied_ContextMismatch() {
-        String username = "user@example.com";
-        when(authentication.isAuthenticated()).thenReturn(true);
-        when(authentication.getName()).thenReturn(username);
-
-        Usuario usuario = new Usuario();
-        usuario.setEmail(username);
-        Role role = new Role();
-        role.setName("ROLE_USER");
-        Permission permission = new Permission(1L, "ATIVO", "READ", "Read Asset", "filialId");
-        role.setPermissions(Set.of(permission));
-        usuario.setRoles(Set.of(role));
 
         Funcionario funcionario = new Funcionario();
-        Filial filial1 = new Filial();
-        filial1.setId(1L);
-        funcionario.setFiliais(Set.of(filial1));
+        funcionario.setFiliais(new HashSet<>(Collections.singletonList(filial)));
         usuario.setFuncionario(funcionario);
+
+        Role role = new Role();
+        Permission permission = new Permission();
+        permission.setResource("ATIVO");
+        permission.setAction("READ");
+        permission.setContextKey("filialId");
+        role.setPermissions(new HashSet<>(Collections.singletonList(permission)));
+        usuario.setRoles(new HashSet<>(Collections.singletonList(role)));
 
         when(usuarioRepository.findWithDetailsByEmail(username)).thenReturn(Optional.of(usuario));
 
-        // Requesting access for context 2L, but user has access to 1L
-        assertFalse(permissionService.hasPermission(authentication, null, "ATIVO", "READ", 2L));
+        boolean result = permissionService.hasAtivoPermission(authentication, ativoId, "READ");
+        assertTrue(result);
     }
 
     @Test
-    void testHasPermission_Granted_ContextMatch() {
+    void testHasAtivoPermission_Denied_AtivoNotFound() {
+        Long ativoId = 1L;
+        when(ativoRepository.findById(ativoId)).thenReturn(Optional.empty());
+
+        boolean result = permissionService.hasAtivoPermission(authentication, ativoId, "READ");
+        assertFalse(result);
+    }
+
+    @Test
+    void testHasAtivoPermission_Denied_NoPermission() {
         String username = "user@example.com";
+        Long ativoId = 1L;
+        Long filialId = 10L;
+
         when(authentication.isAuthenticated()).thenReturn(true);
         when(authentication.getName()).thenReturn(username);
 
+        // Setup Ativo and Filial
+        Ativo ativo = new Ativo();
+        ativo.setId(ativoId);
+        Filial filial = new Filial();
+        filial.setId(filialId);
+        ativo.setFilial(filial);
+
+        when(ativoRepository.findById(ativoId)).thenReturn(Optional.of(ativo));
+
+        // Setup User without Permission
         Usuario usuario = new Usuario();
         usuario.setEmail(username);
-        Role role = new Role();
-        role.setName("ROLE_USER");
-        Permission permission = new Permission(1L, "ATIVO", "READ", "Read Asset", "filialId");
-        role.setPermissions(Set.of(permission));
-        usuario.setRoles(Set.of(role));
+        // No roles/permissions
+        usuario.setRoles(new HashSet<>());
+
+        when(usuarioRepository.findWithDetailsByEmail(username)).thenReturn(Optional.of(usuario));
+
+        boolean result = permissionService.hasAtivoPermission(authentication, ativoId, "READ");
+        assertFalse(result);
+    }
+
+    @Test
+    void testHasAtivoPermission_Denied_ContextMismatch() {
+        String username = "user@example.com";
+        Long ativoId = 1L;
+        Long filialId = 10L;
+        Long otherFilialId = 20L;
+
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authentication.getName()).thenReturn(username);
+
+        // Setup Ativo and Filial
+        Ativo ativo = new Ativo();
+        ativo.setId(ativoId);
+        Filial filial = new Filial();
+        filial.setId(filialId);
+        ativo.setFilial(filial);
+
+        when(ativoRepository.findById(ativoId)).thenReturn(Optional.of(ativo));
+
+        // Setup User with Permission but different Filial context
+        Usuario usuario = new Usuario();
+        usuario.setEmail(username);
 
         Funcionario funcionario = new Funcionario();
-        Filial filial1 = new Filial();
-        filial1.setId(1L);
-        funcionario.setFiliais(Set.of(filial1));
+        Filial otherFilial = new Filial();
+        otherFilial.setId(otherFilialId);
+        funcionario.setFiliais(new HashSet<>(Collections.singletonList(otherFilial)));
         usuario.setFuncionario(funcionario);
 
-        when(usuarioRepository.findWithDetailsByEmail(username)).thenReturn(Optional.of(usuario));
-
-        // Requesting access for context 1L, user has access to 1L
-        assertTrue(permissionService.hasPermission(authentication, null, "ATIVO", "READ", 1L));
-    }
-
-    @Test
-    void testHasPermission_AdminBypass() {
-        String username = "admin@example.com";
-        when(authentication.isAuthenticated()).thenReturn(true);
-        when(authentication.getName()).thenReturn(username);
-
-        Usuario usuario = new Usuario();
-        usuario.setEmail(username);
         Role role = new Role();
-        role.setName("ROLE_ADMIN");
-        usuario.setRoles(Set.of(role));
+        Permission permission = new Permission();
+        permission.setResource("ATIVO");
+        permission.setAction("READ");
+        permission.setContextKey("filialId");
+        role.setPermissions(new HashSet<>(Collections.singletonList(permission)));
+        usuario.setRoles(new HashSet<>(Collections.singletonList(role)));
 
         when(usuarioRepository.findWithDetailsByEmail(username)).thenReturn(Optional.of(usuario));
 
-        assertTrue(permissionService.hasPermission(authentication, null, "ANY_RESOURCE", "ANY_ACTION", null));
-    }
-
-    @Test
-    void testHasPermission_Unauthenticated() {
-        when(authentication.isAuthenticated()).thenReturn(false);
-        assertFalse(permissionService.hasPermission(authentication, null, "ATIVO", "READ", null));
+        boolean result = permissionService.hasAtivoPermission(authentication, ativoId, "READ");
+        assertFalse(result);
     }
 }

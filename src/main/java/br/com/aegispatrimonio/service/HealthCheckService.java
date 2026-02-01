@@ -3,6 +3,9 @@ package br.com.aegispatrimonio.service;
 import br.com.aegispatrimonio.dto.healthcheck.DiskInfoDTO;
 import br.com.aegispatrimonio.dto.healthcheck.HealthCheckDTO;
 import br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO;
+import br.com.aegispatrimonio.dto.healthcheck.SystemHealthDTO;
+import br.com.aegispatrimonio.dto.healthcheck.SystemDiskDTO;
+import br.com.aegispatrimonio.dto.healthcheck.SystemNetDTO;
 import br.com.aegispatrimonio.dto.PredictionResult;
 import br.com.aegispatrimonio.model.Ativo;
 import br.com.aegispatrimonio.model.AtivoDetalheHardware;
@@ -16,10 +19,16 @@ import br.com.aegispatrimonio.service.collector.OSHIHealthCheckCollector;
 import br.com.aegispatrimonio.service.manager.HealthCheckCollectionsManager;
 import br.com.aegispatrimonio.service.policy.HealthCheckAuthorizationPolicy;
 import br.com.aegispatrimonio.service.updater.HealthCheckUpdater;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -37,6 +46,8 @@ public class HealthCheckService implements IHealthCheckService {
     private final PredictiveMaintenanceService predictiveMaintenanceService;
     private final AlertNotificationService alertNotificationService;
     private final AtivoHealthHistoryRepository ativoHealthHistoryRepository;
+    private final MaintenanceDispatcherService maintenanceDispatcherService;
+    private final ObjectMapper objectMapper;
 
     public HealthCheckService(AtivoRepository ativoRepository,
                               AtivoDetalheHardwareRepository detalheHardwareRepository,
@@ -48,7 +59,9 @@ public class HealthCheckService implements IHealthCheckService {
                               HealthCheckHistoryRepository healthCheckHistoryRepository,
                               PredictiveMaintenanceService predictiveMaintenanceService,
                               AlertNotificationService alertNotificationService,
-                              AtivoHealthHistoryRepository ativoHealthHistoryRepository) {
+                              AtivoHealthHistoryRepository ativoHealthHistoryRepository,
+                              MaintenanceDispatcherService maintenanceDispatcherService,
+                              ObjectMapper objectMapper) {
         this.ativoRepository = ativoRepository;
         this.detalheHardwareRepository = detalheHardwareRepository;
         this.currentUserProvider = currentUserProvider;
@@ -60,6 +73,8 @@ public class HealthCheckService implements IHealthCheckService {
         this.predictiveMaintenanceService = predictiveMaintenanceService;
         this.alertNotificationService = alertNotificationService;
         this.ativoHealthHistoryRepository = ativoHealthHistoryRepository;
+        this.maintenanceDispatcherService = maintenanceDispatcherService;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -87,14 +102,62 @@ public class HealthCheckService implements IHealthCheckService {
     }
 
     @Override
+    public SystemHealthDTO getLatestSystemHealth() {
+        return healthCheckHistoryRepository.findTopByOrderByCreatedAtDesc()
+                .map(this::mapToDTO)
+                .orElse(null);
+    }
+
+    @Override
+    public Page<SystemHealthDTO> getSystemHealthHistory(Pageable pageable) {
+        return healthCheckHistoryRepository.findByOrderByCreatedAtDesc(pageable)
+                .map(this::mapToDTO);
+    }
+
+    @Override
+    public List<SystemHealthDTO> getRecentSystemAlerts() {
+        LocalDateTime cutoff = LocalDateTime.now().minusHours(24);
+        BigDecimal cpuLimit = new BigDecimal("0.90");
+        BigDecimal memLimit = new BigDecimal("0.10");
+        return healthCheckHistoryRepository.findByCreatedAtAfterAndCpuUsageGreaterThanOrCreatedAtAfterAndMemFreePercentLessThanOrderByCreatedAtDesc(
+                cutoff, cpuLimit, cutoff, memLimit
+        ).stream().map(this::mapToDTO).collect(Collectors.toList());
+    }
+
+    private SystemHealthDTO mapToDTO(br.com.aegispatrimonio.model.HealthCheckHistory h) {
+        List<SystemDiskDTO> disks = List.of();
+        List<SystemNetDTO> nets = List.of();
+
+        try {
+            if (h.getDisks() != null && !h.getDisks().isBlank()) {
+                disks = objectMapper.readValue(h.getDisks(), new TypeReference<>() {});
+            }
+            if (h.getNets() != null && !h.getNets().isBlank()) {
+                nets = objectMapper.readValue(h.getNets(), new TypeReference<>() {});
+            }
+        } catch (Exception e) {
+            // Ignore parse errors, return empty list
+        }
+
+        return new SystemHealthDTO(
+                h.getId(),
+                h.getCreatedAt(),
+                h.getHost(),
+                h.getCpuUsage(),
+                h.getMemFreePercent(),
+                disks,
+                nets
+        );
+    }
+
+    @Override
     @Transactional
     public void processHealthCheckPayload(Long id, HealthCheckPayloadDTO payload) {
         Ativo ativo = ativoRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new EntityNotFoundException("Ativo não encontrado com ID: " + id));
 
-        // Note: For processHealthCheckPayload, we typically trust the payload or the caller (Controller) ensures permissions via @PreAuthorize
-        // But consistent with updateHealthCheck, we might want to assert permissions here too, or rely on Controller.
-        // Given AtivoService logic, it relied on Controller @PreAuthorize. We will stick to that or logic inside AtivoService.
+        Usuario usuarioLogado = currentUserProvider.getCurrentUsuario();
+        authorizationPolicy.assertCanUpdate(usuarioLogado, ativo);
 
         // Update basic hardware details directly from payload
         updateHardwareDetailsFromPayload(ativo, payload);
@@ -191,6 +254,9 @@ public class HealthCheckService implements IHealthCheckService {
                         ativo.getAtributos().put("prediction_calculated_at", java.time.LocalDateTime.now().toString());
 
                         ativo.setPrevisaoEsgotamentoDisco(worstPredictionResult.exhaustionDate());
+
+                        // Autonomous dispatch
+                        maintenanceDispatcherService.dispatchIfNecessary(ativo, worstPredictionResult.exhaustionDate());
                     }
                 }
             }

@@ -41,6 +41,8 @@ class ManutencaoServiceTest {
     private FuncionarioRepository funcionarioRepository;
     @Mock
     private CurrentUserProvider currentUserProvider; // Adicionado mock para CurrentUserProvider
+    @Mock
+    private WorkflowAprovacaoService workflowService;
 
     @InjectMocks
     private ManutencaoService manutencaoService;
@@ -114,6 +116,12 @@ class ManutencaoServiceTest {
         when(manutencaoRepository.findById(100L)).thenReturn(Optional.of(manutencao));
         when(manutencaoRepository.save(any(Manutencao.class))).thenReturn(manutencao);
 
+        doAnswer(invocation -> {
+            Manutencao m = invocation.getArgument(0);
+            m.setStatus(StatusManutencao.APROVADA);
+            return null;
+        }).when(workflowService).aprovar(any(Manutencao.class));
+
         manutencaoService.aprovar(100L);
 
         assertEquals(StatusManutencao.APROVADA, manutencao.getStatus());
@@ -126,6 +134,9 @@ class ManutencaoServiceTest {
         manutencao.setStatus(StatusManutencao.APROVADA);
         when(manutencaoRepository.findById(100L)).thenReturn(Optional.of(manutencao));
 
+        doThrow(new ResourceConflictException("Transição inválida"))
+            .when(workflowService).aprovar(any(Manutencao.class));
+
         assertThrows(ResourceConflictException.class, () -> manutencaoService.aprovar(100L));
     }
 
@@ -137,6 +148,12 @@ class ManutencaoServiceTest {
         when(manutencaoRepository.findById(100L)).thenReturn(Optional.of(manutencao));
         when(funcionarioRepository.findById(20L)).thenReturn(Optional.of(tecnico));
         when(manutencaoRepository.save(any(Manutencao.class))).thenReturn(manutencao);
+
+        doAnswer(invocation -> {
+            Manutencao m = invocation.getArgument(0);
+            m.setStatus(StatusManutencao.EM_ANDAMENTO);
+            return null;
+        }).when(workflowService).iniciar(any(Manutencao.class));
 
         manutencaoService.iniciar(100L, inicioDTO);
 
@@ -174,6 +191,12 @@ class ManutencaoServiceTest {
         when(manutencaoRepository.findById(100L)).thenReturn(Optional.of(manutencao));
         when(manutencaoRepository.save(any(Manutencao.class))).thenReturn(manutencao);
 
+        doAnswer(invocation -> {
+            Manutencao m = invocation.getArgument(0);
+            m.setStatus(StatusManutencao.CONCLUIDA);
+            return null;
+        }).when(workflowService).concluir(any(Manutencao.class));
+
         manutencaoService.concluir(100L, conclusaoDTO);
 
         assertEquals(StatusManutencao.CONCLUIDA, manutencao.getStatus());
@@ -189,6 +212,12 @@ class ManutencaoServiceTest {
         ManutencaoCancelDTO cancelDTO = new ManutencaoCancelDTO("Motivo teste");
         when(manutencaoRepository.findById(100L)).thenReturn(Optional.of(manutencao));
         when(manutencaoRepository.save(any(Manutencao.class))).thenReturn(manutencao);
+
+        doAnswer(invocation -> {
+            Manutencao m = invocation.getArgument(0);
+            m.setStatus(StatusManutencao.CANCELADA);
+            return null;
+        }).when(workflowService).cancelar(any(Manutencao.class));
 
         manutencaoService.cancelar(100L, cancelDTO);
 
@@ -207,6 +236,12 @@ class ManutencaoServiceTest {
         when(manutencaoRepository.findById(100L)).thenReturn(Optional.of(manutencao));
         when(manutencaoRepository.save(any(Manutencao.class))).thenReturn(manutencao);
 
+        doAnswer(invocation -> {
+            Manutencao m = invocation.getArgument(0);
+            m.setStatus(StatusManutencao.CANCELADA);
+            return null;
+        }).when(workflowService).cancelar(any(Manutencao.class));
+
         manutencaoService.cancelar(100L, cancelDTO);
 
         assertEquals(StatusManutencao.CANCELADA, manutencao.getStatus());
@@ -221,6 +256,9 @@ class ManutencaoServiceTest {
         manutencao.setStatus(StatusManutencao.CONCLUIDA);
         ManutencaoCancelDTO cancelDTO = new ManutencaoCancelDTO("Motivo teste");
         when(manutencaoRepository.findById(100L)).thenReturn(Optional.of(manutencao));
+
+        doThrow(new ResourceConflictException("Transição inválida"))
+            .when(workflowService).cancelar(any(Manutencao.class));
 
         assertThrows(ResourceConflictException.class, () -> manutencaoService.cancelar(100L, cancelDTO));
     }

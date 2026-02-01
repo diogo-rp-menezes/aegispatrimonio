@@ -33,6 +33,8 @@ public interface AtivoRepository extends JpaRepository<Ativo, Long> {
            "LEFT JOIN FETCH a.localizacao " +
            "LEFT JOIN FETCH a.tipoAtivo " +
            "LEFT JOIN FETCH a.funcionarioResponsavel " +
+           "LEFT JOIN FETCH a.detalheHardware " +
+           "LEFT JOIN FETCH a.fornecedor " +
            "WHERE a.id = :id")
     Optional<Ativo> findByIdWithDetails(@Param("id") Long id);
 
@@ -191,8 +193,9 @@ public interface AtivoRepository extends JpaRepository<Ativo, Long> {
     @Query("SELECT new br.com.aegispatrimonio.dto.RiskyAssetDTO(a.id, a.nome, a.tipoAtivo.nome, a.previsaoEsgotamentoDisco) " +
            "FROM Ativo a WHERE a.filial.id = :#{T(br.com.aegispatrimonio.context.TenantContext).getFilialId()} " +
            "AND a.previsaoEsgotamentoDisco IS NOT NULL " +
+           "AND a.previsaoEsgotamentoDisco < :limitDate " +
            "ORDER BY a.previsaoEsgotamentoDisco ASC")
-    List<RiskyAssetDTO> findTopRiskyAssetsByCurrentTenant(Pageable pageable);
+    List<RiskyAssetDTO> findTopRiskyAssetsByCurrentTenant(@Param("limitDate") java.time.LocalDate limitDate, Pageable pageable);
 
     @Query("SELECT new br.com.aegispatrimonio.dto.ChartDataDTO(a.status, COUNT(a)) " +
            "FROM Ativo a WHERE a.filial.id = :#{T(br.com.aegispatrimonio.context.TenantContext).getFilialId()} " +

@@ -73,7 +73,7 @@ public class DashboardService {
 
         List<ChartDataDTO> ativosPorStatus = ativoRepository.countByStatusGrouped();
         List<ChartDataDTO> ativosPorTipo = ativoRepository.countByTipoAtivoGrouped();
-        List<RiskyAssetDTO> riskyAssets = ativoRepository.findTopRiskyAssetsByCurrentTenant(PageRequest.of(0, 5));
+        List<RiskyAssetDTO> riskyAssets = ativoRepository.findTopRiskyAssetsByCurrentTenant(warningThreshold, PageRequest.of(0, 5));
 
         return new DashboardStatsDTO(
             totalAtivos,

@@ -201,7 +201,7 @@ public class AtivoService {
         }
 
         if (ativoCreateDTO.funcionarioResponsavelId() != null) {
-            Funcionario responsavel = funcionarioRepository.findById(ativoCreateDTO.funcionarioResponsavelId())
+            Funcionario responsavel = funcionarioRepository.findByIdWithFiliais(ativoCreateDTO.funcionarioResponsavelId())
                     .orElseThrow(() -> new EntityNotFoundException("Funcionário responsável não encontrado com ID: " + ativoCreateDTO.funcionarioResponsavelId()));
             validarConsistenciaResponsavel(responsavel, filial);
             ativo.setFuncionarioResponsavel(responsavel);
@@ -258,7 +258,7 @@ public class AtivoService {
         }
 
         if (ativoUpdateDTO.funcionarioResponsavelId() != null) {
-            Funcionario responsavel = funcionarioRepository.findById(ativoUpdateDTO.funcionarioResponsavelId())
+            Funcionario responsavel = funcionarioRepository.findByIdWithFiliais(ativoUpdateDTO.funcionarioResponsavelId())
                     .orElseThrow(() -> new EntityNotFoundException("Funcionário responsável não encontrado com ID: " + ativoUpdateDTO.funcionarioResponsavelId()));
             validarConsistenciaResponsavel(responsavel, filial);
             ativo.setFuncionarioResponsavel(responsavel);

@@ -11,7 +11,11 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,6 +31,7 @@ import java.util.stream.Collectors;
  */
 @RestController
 @RequestMapping("/api/v1/auth")
+@Slf4j
 public class AuthController {
 
     private final AuthenticationManager authenticationManager;
@@ -55,7 +60,7 @@ public class AuthController {
                     new UsernamePasswordAuthenticationToken(loginRequest.email(), loginRequest.password())
             );
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Erro na autenticação: ", e);
             throw e;
         }
 
@@ -63,6 +68,18 @@ public class AuthController {
         final UserDetails userDetails = userDetailsService.loadUserByUsername(loginRequest.email());
         final String token = jwtService.generateToken(userDetails);
 
+        return ResponseEntity.ok(buildResponse(userDetails, token));
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<LoginResponseDTO> me(@AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(401).build();
+        }
+        return ResponseEntity.ok(buildResponse(userDetails, ""));
+    }
+
+    private LoginResponseDTO buildResponse(UserDetails userDetails, String token) {
         List<FilialSimpleDTO> filiais = Collections.emptyList();
         if (userDetails instanceof CustomUserDetails) {
             Usuario usuario = ((CustomUserDetails) userDetails).getUsuario();
@@ -73,7 +90,10 @@ public class AuthController {
             }
         }
 
-        // Retorna o token na resposta
-        return ResponseEntity.ok(new LoginResponseDTO(token, filiais));
+        List<String> roles = userDetails.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toList());
+
+        return new LoginResponseDTO(token, filiais, roles);
     }
 }

@@ -21,14 +21,31 @@ public class SearchOptimizationService {
      * @return The edit distance (number of changes required to transform left to right)
      */
     public int calculateLevenshteinDistance(CharSequence left, CharSequence right) {
+        return calculateLevenshteinDistance(left, right, Integer.MAX_VALUE);
+    }
+
+    /**
+     * Calculates the Levenshtein distance between two CharSequences with a threshold.
+     * Uses a memory-optimized approach (two rows) and early exit.
+     *
+     * @param left      The first string
+     * @param right     The second string
+     * @param threshold The maximum allowed distance. If exceeded, returns threshold + 1.
+     * @return The edit distance or threshold + 1 if exceeded
+     */
+    public int calculateLevenshteinDistance(CharSequence left, CharSequence right, int threshold) {
         if (left == null || right == null) {
             throw new IllegalArgumentException("Strings must not be null");
         }
         int n = left.length();
         int m = right.length();
 
-        if (n == 0) return m;
-        if (m == 0) return n;
+        if (n == 0) return m <= threshold ? m : threshold + 1;
+        if (m == 0) return n <= threshold ? n : threshold + 1;
+
+        if (Math.abs(n - m) > threshold) {
+            return threshold + 1;
+        }
 
         if (n > m) {
             // Swap the strings to consume less memory
@@ -39,8 +56,10 @@ public class SearchOptimizationService {
             m = right.length();
         }
 
-        int[] p = new int[n + 1]; // 'previous' cost array
-        int[] d = new int[n + 1]; // current cost array
+        Buffers buffers = BUFFERS.get();
+        buffers.ensureCapacity(n + 1);
+        int[] p = buffers.p;
+        int[] d = buffers.d;
         int[] _d; // placeholder
 
         for (int i = 0; i <= n; i++) {
@@ -50,11 +69,17 @@ public class SearchOptimizationService {
         for (int j = 1; j <= m; j++) {
             char rightJ = right.charAt(j - 1);
             d[0] = j;
+            int minDistanceInRow = j;
 
             for (int i = 1; i <= n; i++) {
                 int cost = left.charAt(i - 1) == rightJ ? 0 : 1;
                 // minimum of deletion, insertion, substitution
                 d[i] = Math.min(Math.min(d[i - 1] + 1, p[i] + 1), p[i - 1] + cost);
+                minDistanceInRow = Math.min(minDistanceInRow, d[i]);
+            }
+
+            if (minDistanceInRow > threshold) {
+                return threshold + 1;
             }
 
             _d = p;
@@ -62,7 +87,7 @@ public class SearchOptimizationService {
             d = _d;
         }
 
-        return p[n];
+        return p[n] <= threshold ? p[n] : threshold + 1;
     }
 
     /**
@@ -76,10 +101,26 @@ public class SearchOptimizationService {
         if (left == null || right == null) return 0.0;
         if (left.equals(right)) return 1.0;
 
-        int distance = calculateLevenshteinDistance(left, right);
         int maxLength = Math.max(left.length(), right.length());
-
         if (maxLength == 0) return 1.0;
+
+        // Optimization: If length difference is too large, it's impossible to reach > 0.2 score
+        // Score = 1.0 - (dist / maxLen) > 0.2  =>  dist < 0.8 * maxLen
+        // Since dist >= abs(len(left) - len(right)), if diff >= 0.8 * maxLen, we can skip
+        int lengthDiff = Math.abs(left.length() - right.length());
+        if ((double) lengthDiff / maxLength >= 0.8) {
+            return 0.0;
+        }
+
+        // Determine threshold for score > 0.2
+        // dist < 0.8 * maxLength
+        int threshold = (int) Math.ceil(0.8 * maxLength) - 1;
+
+        int distance = calculateLevenshteinDistance(left, right, threshold);
+
+        if (distance > threshold) {
+            return 0.0;
+        }
 
         return 1.0 - ((double) distance / maxLength);
     }
@@ -112,4 +153,19 @@ public class SearchOptimizationService {
     }
 
     private record ItemWithScore<T>(T item, double score) {}
+
+    private static class Buffers {
+        int[] p = new int[128];
+        int[] d = new int[128];
+
+        void ensureCapacity(int size) {
+            if (p.length < size) {
+                int newSize = Math.max(p.length * 2, size);
+                p = new int[newSize];
+                d = new int[newSize];
+            }
+        }
+    }
+
+    private static final ThreadLocal<Buffers> BUFFERS = ThreadLocal.withInitial(Buffers::new);
 }
