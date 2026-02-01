@@ -31,4 +31,9 @@ public interface IPermissionService {
      * Verifica permissão em um Funcionário específico, resolvendo o contexto (Filiais) automaticamente.
      */
     boolean hasFuncionarioPermission(Authentication authentication, Long funcionarioId, String action);
+
+    /**
+     * Verifica se o usuário possui um papel específico (role).
+     */
+    boolean hasRole(String username, String roleName);
 }
