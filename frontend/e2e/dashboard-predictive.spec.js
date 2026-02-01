@@ -79,4 +79,13 @@ test.describe('Dashboard Predictive Visualization (SOTA)', () => {
     await expect(unknownCard.locator('h3')).toHaveText('5 ativos');
   });
 
+  test('Deve navegar para lista de ativos filtrada ao clicar no card', async ({ page }) => {
+    // Click on the "Indeterminado" card
+    const unknownCard = page.locator('.card', { hasText: 'Indeterminado' });
+    await unknownCard.click();
+
+    // Verify URL parameters
+    await expect(page).toHaveURL(/.*\/ativos\?health=INDETERMINADO/);
+  });
+
 });

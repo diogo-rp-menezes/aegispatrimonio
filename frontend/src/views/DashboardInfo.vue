@@ -308,7 +308,7 @@ onMounted(async () => {
       <div class="col-lg-8">
         <div class="row g-3 h-100">
           <div v-for="stat in predictiveStats" :key="stat.title" class="col-md-6 col-xl-4">
-            <div class="card h-100 border-0 shadow-sm">
+            <div class="card h-100 border-0 shadow-sm predictive-card" @click="goToAssets(stat.filter)">
               <div class="card-body d-flex align-items-center">
                 <div
                   :class="`bg-${stat.color} text-white rounded-circle d-flex align-items-center justify-content-center me-3 shadow-sm`"
