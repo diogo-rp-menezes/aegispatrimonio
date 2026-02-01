@@ -3,6 +3,7 @@
 import { ref, onMounted, onUnmounted, computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { request } from "../services/api";
+import MovimentacaoModal from "../components/MovimentacaoModal.vue";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -42,6 +43,10 @@ const showQrModal = ref(false);
 const qrCodeUrl = ref(null);
 const loadingQr = ref(false);
 
+const showMovimentacaoModal = ref(false);
+const movimentacoes = ref([]);
+const loadingMovimentacoes = ref(false);
+
 async function carregarAtivo() {
   loading.value = true;
   error.value = null;
@@ -79,36 +84,70 @@ async function carregarHealthHistory() {
   }
 }
 
+async function carregarMovimentacoes() {
+    loadingMovimentacoes.value = true;
+    try {
+        const data = await request(`/movimentacoes/ativo/${route.params.id}`);
+        movimentacoes.value = data.content || [];
+    } catch (err) {
+        console.error("Erro ao carregar movimentações", err);
+    } finally {
+        loadingMovimentacoes.value = false;
+    }
+}
+
+async function efetivarMovimentacao(id) {
+    if(!confirm("Deseja realmente efetivar esta movimentação?")) return;
+    try {
+        await request(`/movimentacoes/efetivar/${id}`, { method: 'POST' });
+        await Promise.all([carregarAtivo(), carregarMovimentacoes()]);
+    } catch (err) {
+        console.error("Erro ao efetivar", err);
+        alert("Erro ao efetivar movimentação.");
+    }
+}
+
+async function cancelarMovimentacao(id) {
+    const motivo = prompt("Motivo do cancelamento:");
+    if (!motivo) return;
+    try {
+        await request(`/movimentacoes/cancelar/${id}`, {
+            method: 'POST',
+            body: JSON.stringify(motivo)
+        });
+        await carregarMovimentacoes();
+    } catch (err) {
+        console.error("Erro ao cancelar", err);
+        alert("Erro ao cancelar movimentação.");
+    }
+}
+
+function onMovimentacaoSuccess() {
+  carregarMovimentacoes();
+}
+
 const chartData = computed(() => {
   if (!healthHistory.value || healthHistory.value.length === 0) {
     return { labels: [], datasets: [] };
   }
 
-  // Get all unique dates sorted
   let uniqueDates = [...new Set(healthHistory.value.map(h => h.dataRegistro))].sort();
 
-  // Check and add prediction date
   if (ativo.value && ativo.value.previsaoEsgotamentoDisco) {
-      const predDate = new Date(ativo.value.previsaoEsgotamentoDisco).toISOString().split('T')[0]; // Ensure comparable format
+      const predDate = new Date(ativo.value.previsaoEsgotamentoDisco).toISOString().split('T')[0];
       const lastDate = uniqueDates.length > 0 ? uniqueDates[uniqueDates.length - 1] : '';
       if (predDate > lastDate) {
-          uniqueDates.push(ativo.value.previsaoEsgotamentoDisco); // Add raw prediction date
+          uniqueDates.push(ativo.value.previsaoEsgotamentoDisco);
       }
   }
 
-  const formattedDates = uniqueDates.map(d => new Date(d).toLocaleString('pt-BR'));
-
-  // Group by component (Disk)
+  const formattedDates = uniqueDates.map(d => new Date(d).toLocaleDateString('pt-BR'));
   const components = [...new Set(healthHistory.value.map(h => h.componente))];
 
   const datasets = components.map((comp, index) => {
-    // Colors for different lines
     const colors = ['#0d6efd', '#dc3545', '#198754', '#ffc107', '#0dcaf0'];
     const color = colors[index % colors.length];
 
-    // Create data array matching the unique dates
-    // Note: Prediction date won't match any history entry, so it gets null, which breaks the line?
-    // Chart.js handles nulls by breaking the line, which is fine for raw data.
     const data = uniqueDates.map(date => {
       const entry = healthHistory.value.find(h => h.componente === comp && h.dataRegistro === date);
       return entry ? entry.valor : null;
@@ -124,7 +163,6 @@ const chartData = computed(() => {
     };
   });
 
-  // Add Regression Trendline (Shift Left - Backend Calculated)
   if (ativo.value && ativo.value.atributos &&
       ativo.value.atributos.prediction_slope &&
       ativo.value.atributos.prediction_intercept &&
@@ -135,15 +173,13 @@ const chartData = computed(() => {
      const baseEpochDay = ativo.value.atributos.prediction_base_epoch_day;
 
      const trendData = uniqueDates.map(d => {
-         // Consistent date handling with Backend (LocalDate.toEpochDay)
-         // Assuming d is ISO string "YYYY-MM-DDTHH:mm:ss"
-         const datePart = d.split('T')[0]; // "YYYY-MM-DD"
-         const dateObj = new Date(datePart); // Treated as UTC
+         const datePart = d.split('T')[0];
+         const dateObj = new Date(datePart);
          const daysFromEpoch = dateObj.getTime() / 86400000;
 
          const x = daysFromEpoch - baseEpochDay;
          const y = slope * x + intercept;
-         return y < 0 ? 0 : y; // Clamp to 0
+         return y < 0 ? 0 : y;
      });
 
      datasets.push({
@@ -216,14 +252,13 @@ async function gerarTermo() {
       responseType: 'blob'
     });
 
-    // Create blob link to download
     const url = window.URL.createObjectURL(new Blob([response]));
     const link = document.createElement('a');
     link.href = url;
     link.setAttribute('download', `termo_responsabilidade_${ativo.value.id}.pdf`);
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link); // cleanup
+    document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
   } catch (err) {
     console.error("Erro ao gerar termo", err);
@@ -262,7 +297,7 @@ onUnmounted(() => {
 
 function formatDate(dateStr) {
   if (!dateStr) return "-";
-  return new Date(dateStr).toLocaleString("pt-BR");
+  return new Date(dateStr).toLocaleDateString("pt-BR");
 }
 
 function formatCurrency(val) {
@@ -319,6 +354,7 @@ onMounted(() => {
   carregarAtivo();
   carregarHistorico();
   carregarHealthHistory();
+  carregarMovimentacoes();
 });
 </script>
 
@@ -327,13 +363,16 @@ onMounted(() => {
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h2>Detalhes do Ativo</h2>
       <div>
+        <button class="btn btn-primary me-2" @click="showMovimentacaoModal = true" v-if="ativo && ativo.status === 'ATIVO'" title="Movimentar Ativo">
+            <i class="bi bi-arrow-left-right"></i> Movimentar
+        </button>
         <button class="btn btn-outline-dark me-2" @click="gerarTermo" v-if="ativo && ativo.funcionarioResponsavelId" title="Gerar Termo de Responsabilidade">
           <i class="bi bi-file-earmark-pdf"></i> Termo
         </button>
         <button class="btn btn-outline-secondary me-2" @click="openQrCode" v-if="ativo" title="Ver QR Code">
           <i class="bi bi-qr-code"></i> QR Code
         </button>
-        <button class="btn btn-primary me-2" @click="editar" v-if="ativo">
+        <button class="btn btn-outline-primary me-2" @click="editar" v-if="ativo">
           <i class="bi bi-pencil"></i> Editar
         </button>
         <button class="btn btn-danger me-2" @click="baixarAtivo" v-if="ativo" title="Baixar Item">
@@ -360,7 +399,9 @@ onMounted(() => {
           <strong>Data de Aquisição:</strong>
           {{ ativo.dataAquisicao || "Não informado" }} <br />
           <strong>Valor de Aquisição:</strong>
-          {{ formatCurrency(ativo.valorAquisicao) }}
+          {{ formatCurrency(ativo.valorAquisicao) }} <br/>
+          <strong>Localização Atual:</strong> {{ ativo.localizacaoNome }} <br/>
+          <strong>Responsável Atual:</strong> {{ ativo.funcionarioResponsavelNome }}
         </p>
       </div>
     </div>
@@ -409,7 +450,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Technical Attributes (Adaptive Taxonomy) -->
+    <!-- Technical Attributes -->
     <div v-if="ativo && Object.keys(visibleAttributes).length > 0" class="card shadow-sm mb-4">
       <div class="card-header bg-light">
         <h5 class="mb-0"><i class="bi bi-tags me-2"></i>Especificações Técnicas</h5>
@@ -424,11 +465,64 @@ onMounted(() => {
       </div>
     </div>
 
+    <!-- Histórico de Movimentações -->
+    <div v-if="ativo" class="card shadow-sm mb-4">
+      <div class="card-header bg-light">
+        <h5 class="mb-0"><i class="bi bi-arrow-left-right me-2"></i>Histórico de Movimentações</h5>
+      </div>
+      <div class="card-body p-0">
+         <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Data</th>
+                        <th>Destino (Local / Resp.)</th>
+                        <th>Motivo</th>
+                        <th>Status</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-if="loadingMovimentacoes">
+                         <td colspan="5" class="text-center py-4">Carregando...</td>
+                    </tr>
+                    <tr v-else-if="movimentacoes.length === 0">
+                         <td colspan="5" class="text-center py-4 text-muted">Nenhuma movimentação registrada.</td>
+                    </tr>
+                    <tr v-for="mov in movimentacoes" :key="mov.id">
+                        <td>{{ formatDate(mov.dataMovimentacao) }}</td>
+                        <td>
+                            <div><small class="text-muted">Local:</small> {{ mov.localizacaoDestinoNome }}</div>
+                            <div><small class="text-muted">Resp:</small> {{ mov.funcionarioDestinoNome }}</div>
+                        </td>
+                        <td>{{ mov.motivo }}</td>
+                        <td>
+                            <span :class="{'badge bg-warning': mov.status === 'PENDENTE', 'badge bg-success': mov.status === 'EFETIVADA', 'badge bg-secondary': mov.status === 'CANCELADA'}">
+                                {{ mov.status }}
+                            </span>
+                        </td>
+                        <td>
+                            <div v-if="mov.status === 'PENDENTE'">
+                                <button class="btn btn-sm btn-success me-1" @click="efetivarMovimentacao(mov.id)" title="Efetivar">
+                                    <i class="bi bi-check-lg"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger" @click="cancelarMovimentacao(mov.id)" title="Cancelar">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+         </div>
+      </div>
+    </div>
+
     <!-- Histórico de Auditoria -->
     <div v-if="ativo" class="card shadow-sm">
       <div class="card-header bg-light">
         <h5 class="mb-0">
-          <i class="bi bi-clock-history me-2"></i>Histórico de Alterações
+          <i class="bi bi-clock-history me-2"></i>Histórico de Auditoria (Sistema)
         </h5>
       </div>
       <div class="card-body p-0">
@@ -504,6 +598,15 @@ onMounted(() => {
         </div>
       </div>
     </div>
+
+    <!-- Movimentacao Modal -->
+    <MovimentacaoModal
+        :show="showMovimentacaoModal"
+        :ativo="ativo"
+        @close="showMovimentacaoModal = false"
+        @success="onMovimentacaoSuccess"
+    />
+
   </div>
 </template>
 
