@@ -1,6 +1,7 @@
 package br.com.aegispatrimonio.service.impl;
 
 import br.com.aegispatrimonio.model.Filial;
+import br.com.aegispatrimonio.model.Group;
 import br.com.aegispatrimonio.model.Permission;
 import br.com.aegispatrimonio.model.Role;
 import br.com.aegispatrimonio.repository.AtivoRepository;
@@ -207,6 +208,13 @@ public class PermissionServiceImpl implements IPermissionService {
                         for (Role role : u.getRoles()) {
                             if (role.getPermissions() != null) {
                                 perms.addAll(role.getPermissions());
+                            }
+                        }
+                    }
+                    if (u.getGroups() != null) {
+                        for (Group group : u.getGroups()) {
+                            if (group.getPermissions() != null) {
+                                perms.addAll(group.getPermissions());
                             }
                         }
                     }

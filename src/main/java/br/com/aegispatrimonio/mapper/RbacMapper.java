@@ -1,7 +1,9 @@
 package br.com.aegispatrimonio.mapper;
 
+import br.com.aegispatrimonio.dto.GroupDTO;
 import br.com.aegispatrimonio.dto.PermissionDTO;
 import br.com.aegispatrimonio.dto.RoleDTO;
+import br.com.aegispatrimonio.model.Group;
 import br.com.aegispatrimonio.model.Permission;
 import br.com.aegispatrimonio.model.Role;
 import org.springframework.stereotype.Component;
@@ -40,6 +42,25 @@ public class RbacMapper {
             role.getId(),
             role.getName(),
             role.getDescription(),
+            permissionDTOs
+        );
+    }
+
+    public GroupDTO toGroupDTO(Group group) {
+        if (group == null) {
+            return null;
+        }
+        Set<PermissionDTO> permissionDTOs = null;
+        if (group.getPermissions() != null) {
+            permissionDTOs = group.getPermissions().stream()
+                .map(this::toPermissionDTO)
+                .collect(Collectors.toSet());
+        }
+
+        return new GroupDTO(
+            group.getId(),
+            group.getName(),
+            group.getDescription(),
             permissionDTOs
         );
     }

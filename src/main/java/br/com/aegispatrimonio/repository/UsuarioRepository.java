@@ -24,7 +24,7 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
      * @param email O email a ser buscado.
      * @return Um Optional contendo o usuário, se encontrado.
      */
-    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"funcionario", "funcionario.filiais", "roles", "roles.permissions"})
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"funcionario", "funcionario.filiais", "roles", "roles.permissions", "groups", "groups.permissions"})
     @org.springframework.data.jpa.repository.Query("SELECT u FROM Usuario u WHERE u.email = :email")
     Optional<Usuario> findWithDetailsByEmail(String email);
 }

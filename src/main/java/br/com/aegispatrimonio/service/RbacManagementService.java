@@ -2,8 +2,10 @@ package br.com.aegispatrimonio.service;
 
 import br.com.aegispatrimonio.dto.*;
 import br.com.aegispatrimonio.mapper.RbacMapper;
+import br.com.aegispatrimonio.model.Group;
 import br.com.aegispatrimonio.model.Permission;
 import br.com.aegispatrimonio.model.Role;
+import br.com.aegispatrimonio.repository.GroupRepository;
 import br.com.aegispatrimonio.repository.PermissionRepository;
 import br.com.aegispatrimonio.repository.RoleRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -19,11 +21,13 @@ import java.util.stream.Collectors;
 public class RbacManagementService {
 
     private final RoleRepository roleRepository;
+    private final GroupRepository groupRepository;
     private final PermissionRepository permissionRepository;
     private final RbacMapper rbacMapper;
 
-    public RbacManagementService(RoleRepository roleRepository, PermissionRepository permissionRepository, RbacMapper rbacMapper) {
+    public RbacManagementService(RoleRepository roleRepository, GroupRepository groupRepository, PermissionRepository permissionRepository, RbacMapper rbacMapper) {
         this.roleRepository = roleRepository;
+        this.groupRepository = groupRepository;
         this.permissionRepository = permissionRepository;
         this.rbacMapper = rbacMapper;
     }
@@ -123,5 +127,74 @@ public class RbacManagementService {
             throw new EntityNotFoundException("Permissão não encontrada com ID: " + id);
         }
         permissionRepository.deleteById(id);
+    }
+
+    // --- Groups ---
+
+    @Transactional(readOnly = true)
+    public List<GroupDTO> listarGrupos() {
+        return groupRepository.findAll().stream()
+                .map(rbacMapper::toGroupDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public GroupDTO buscarGrupoPorId(Long id) {
+        return groupRepository.findById(id)
+                .map(rbacMapper::toGroupDTO)
+                .orElseThrow(() -> new EntityNotFoundException("Grupo não encontrado com ID: " + id));
+    }
+
+    @Transactional
+    public GroupDTO criarGrupo(GroupCreateDTO dto) {
+        if (groupRepository.findByName(dto.name()).isPresent()) {
+            throw new IllegalArgumentException("Já existe um grupo com o nome informado: " + dto.name());
+        }
+
+        Group group = new Group();
+        group.setName(dto.name());
+        group.setDescription(dto.description());
+
+        if (dto.permissionIds() != null && !dto.permissionIds().isEmpty()) {
+            List<Permission> permissions = permissionRepository.findAllById(dto.permissionIds());
+            if (permissions.size() != dto.permissionIds().size()) {
+                 throw new IllegalArgumentException("Algumas permissões informadas não existem.");
+            }
+            group.setPermissions(new HashSet<>(permissions));
+        }
+
+        return rbacMapper.toGroupDTO(groupRepository.save(group));
+    }
+
+    @Transactional
+    public GroupDTO atualizarGrupo(Long id, GroupUpdateDTO dto) {
+        Group group = groupRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Grupo não encontrado com ID: " + id));
+
+        Optional<Group> existingGroup = groupRepository.findByName(dto.name());
+        if (existingGroup.isPresent() && !existingGroup.get().getId().equals(id)) {
+             throw new IllegalArgumentException("Já existe um grupo com o nome informado: " + dto.name());
+        }
+
+        group.setName(dto.name());
+        group.setDescription(dto.description());
+
+        if (dto.permissionIds() != null) {
+            List<Permission> permissions = permissionRepository.findAllById(dto.permissionIds());
+             if (permissions.size() != dto.permissionIds().size()) {
+                 throw new IllegalArgumentException("Algumas permissões informadas não existem.");
+            }
+            group.setPermissions(new HashSet<>(permissions));
+        }
+
+        return rbacMapper.toGroupDTO(groupRepository.save(group));
+    }
+
+    @Transactional
+    public void deletarGrupo(Long id) {
+        if (!groupRepository.existsById(id)) {
+            throw new EntityNotFoundException("Grupo não encontrado com ID: " + id);
+        }
+        groupRepository.deleteById(id);
     }
 }

@@ -17,6 +17,9 @@ DELETE FROM tipos_ativo;
 DELETE FROM filiais;
 
 -- RBAC Cleanup
+DELETE FROM rbac_user_group;
+DELETE FROM rbac_group_permission;
+DELETE FROM rbac_group;
 DELETE FROM rbac_user_role;
 DELETE FROM rbac_role_permission;
 DELETE FROM rbac_permission;
