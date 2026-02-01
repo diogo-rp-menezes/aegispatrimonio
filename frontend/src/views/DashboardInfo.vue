@@ -35,9 +35,9 @@ const predictiveStats = ref([
 ]);
 
 const quickActions = ref([
+  { title: "Ler QR Code", icon: "bi-qr-code-scan", color: "dark", action: () => router.push('/scanner') },
   { title: "Cadastrar Ativo", icon: "bi-plus-lg", color: "primary", action: () => router.push('/ativos/novo') },
   { title: "Ver Ativos", icon: "bi-list-ul", color: "secondary", action: () => router.push('/ativos') },
-  // { title: "Relatórios", icon: "bi-file-earmark-text", color: "info", action: () => {} }, // Future
 ]);
 
 const tableData = ref([]);
