@@ -6,7 +6,6 @@ import br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO;
 import br.com.aegispatrimonio.dto.healthcheck.SystemHealthDTO;
 import br.com.aegispatrimonio.dto.healthcheck.SystemDiskDTO;
 import br.com.aegispatrimonio.dto.healthcheck.SystemNetDTO;
-import br.com.aegispatrimonio.dto.PredictionResult;
 import br.com.aegispatrimonio.model.Ativo;
 import br.com.aegispatrimonio.model.AtivoDetalheHardware;
 import br.com.aegispatrimonio.model.AtivoHealthHistory;
@@ -17,6 +16,7 @@ import br.com.aegispatrimonio.repository.AtivoRepository;
 import br.com.aegispatrimonio.repository.HealthCheckHistoryRepository;
 import br.com.aegispatrimonio.service.collector.OSHIHealthCheckCollector;
 import br.com.aegispatrimonio.service.manager.HealthCheckCollectionsManager;
+import br.com.aegispatrimonio.service.manager.HealthCheckPredictionManager;
 import br.com.aegispatrimonio.service.policy.HealthCheckAuthorizationPolicy;
 import br.com.aegispatrimonio.service.updater.HealthCheckUpdater;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -43,10 +43,9 @@ public class HealthCheckService implements IHealthCheckService {
     private final HealthCheckCollectionsManager collectionsManager;
     private final OSHIHealthCheckCollector oshiCollector;
     private final HealthCheckHistoryRepository healthCheckHistoryRepository;
-    private final PredictiveMaintenanceService predictiveMaintenanceService;
     private final AlertNotificationService alertNotificationService;
     private final AtivoHealthHistoryRepository ativoHealthHistoryRepository;
-    private final MaintenanceDispatcherService maintenanceDispatcherService;
+    private final HealthCheckPredictionManager predictionManager;
     private final ObjectMapper objectMapper;
 
     public HealthCheckService(AtivoRepository ativoRepository,
@@ -57,10 +56,9 @@ public class HealthCheckService implements IHealthCheckService {
                               HealthCheckCollectionsManager collectionsManager,
                               OSHIHealthCheckCollector oshiCollector,
                               HealthCheckHistoryRepository healthCheckHistoryRepository,
-                              PredictiveMaintenanceService predictiveMaintenanceService,
                               AlertNotificationService alertNotificationService,
                               AtivoHealthHistoryRepository ativoHealthHistoryRepository,
-                              MaintenanceDispatcherService maintenanceDispatcherService,
+                              HealthCheckPredictionManager predictionManager,
                               ObjectMapper objectMapper) {
         this.ativoRepository = ativoRepository;
         this.detalheHardwareRepository = detalheHardwareRepository;
@@ -70,10 +68,9 @@ public class HealthCheckService implements IHealthCheckService {
         this.collectionsManager = collectionsManager;
         this.oshiCollector = oshiCollector;
         this.healthCheckHistoryRepository = healthCheckHistoryRepository;
-        this.predictiveMaintenanceService = predictiveMaintenanceService;
         this.alertNotificationService = alertNotificationService;
         this.ativoHealthHistoryRepository = ativoHealthHistoryRepository;
-        this.maintenanceDispatcherService = maintenanceDispatcherService;
+        this.predictionManager = predictionManager;
         this.objectMapper = objectMapper;
     }
 
@@ -204,62 +201,7 @@ public class HealthCheckService implements IHealthCheckService {
 
         if (!historyToSave.isEmpty()) {
             ativoHealthHistoryRepository.saveAll(historyToSave);
-
-            // Prediction logic only runs if there are disks involved (for now)
-            if (!componentsToFetch.isEmpty()) {
-                // Throttling: Check if prediction was calculated recently (< 24h)
-                boolean shouldRecalculate = true;
-                if (ativo.getAtributos() != null && ativo.getAtributos().containsKey("prediction_calculated_at")) {
-                    try {
-                        java.time.LocalDateTime lastCalc = java.time.LocalDateTime.parse(ativo.getAtributos().get("prediction_calculated_at").toString());
-                        if (lastCalc.plusHours(24).isAfter(java.time.LocalDateTime.now())) {
-                            shouldRecalculate = false;
-                        }
-                    } catch (Exception e) {
-                        // Ignore parse errors and recalculate
-                    }
-                }
-
-                if (shouldRecalculate) {
-                    // Fetch history for all components at once (Sliding Window: 90 days)
-                    java.time.LocalDateTime cutoffDate = java.time.LocalDateTime.now().minusDays(90);
-                    List<AtivoHealthHistory> allHistory = ativoHealthHistoryRepository
-                            .findByAtivoIdAndComponenteInAndMetricaAndDataRegistroAfterOrderByDataRegistroAsc(id, componentsToFetch, "FREE_SPACE_GB", cutoffDate);
-
-                    // Group by component
-                    java.util.Map<String, List<AtivoHealthHistory>> historyByComponent = allHistory.stream()
-                            .collect(Collectors.groupingBy(AtivoHealthHistory::getComponente));
-
-                    PredictionResult worstPredictionResult = null;
-
-                    for (List<AtivoHealthHistory> componentHistory : historyByComponent.values()) {
-                        PredictionResult prediction = predictiveMaintenanceService.predictExhaustionDate(componentHistory);
-                        if (prediction != null && prediction.exhaustionDate() != null) {
-                            if (worstPredictionResult == null ||
-                                    prediction.exhaustionDate().isBefore(worstPredictionResult.exhaustionDate())) {
-                                worstPredictionResult = prediction;
-                            }
-                        }
-                    }
-
-                    // Store worst prediction in attributes
-                    if (worstPredictionResult != null) {
-                        if (ativo.getAtributos() == null) {
-                            ativo.setAtributos(new java.util.HashMap<>());
-                        }
-                        ativo.getAtributos().put("previsaoEsgotamentoDisco", worstPredictionResult.exhaustionDate().toString());
-                        ativo.getAtributos().put("prediction_slope", worstPredictionResult.slope());
-                        ativo.getAtributos().put("prediction_intercept", worstPredictionResult.intercept());
-                        ativo.getAtributos().put("prediction_base_epoch_day", worstPredictionResult.baseEpochDay());
-                        ativo.getAtributos().put("prediction_calculated_at", java.time.LocalDateTime.now().toString());
-
-                        ativo.setPrevisaoEsgotamentoDisco(worstPredictionResult.exhaustionDate());
-
-                        // Autonomous dispatch
-                        maintenanceDispatcherService.dispatchIfNecessary(ativo, worstPredictionResult.exhaustionDate());
-                    }
-                }
-            }
+            predictionManager.processPrediction(ativo, componentsToFetch);
         }
 
         ativoRepository.save(ativo);

@@ -8,6 +8,7 @@ import br.com.aegispatrimonio.model.*;
 import br.com.aegispatrimonio.repository.*;
 import br.com.aegispatrimonio.service.policy.HealthCheckAuthorizationPolicy;
 import br.com.aegispatrimonio.service.manager.HealthCheckCollectionsManager;
+import br.com.aegispatrimonio.service.manager.HealthCheckPredictionManager;
 import br.com.aegispatrimonio.service.updater.HealthCheckUpdater;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,7 +49,7 @@ class HealthCheckServiceTest {
     @Mock
     private HealthCheckCollectionsManager collectionsManager;
     @Mock
-    private PredictiveMaintenanceService predictiveMaintenanceService;
+    private HealthCheckPredictionManager predictionManager;
     @Mock
     private AlertNotificationService alertNotificationService;
     @Mock
@@ -119,8 +120,8 @@ class HealthCheckServiceTest {
     }
 
     @Test
-    @DisplayName("processHealthCheckPayload: Deve salvar histórico e atualizar hardware")
-    void processHealthCheckPayload_shouldSaveHistory() {
+    @DisplayName("processHealthCheckPayload: Deve delegar para predictionManager")
+    void processHealthCheckPayload_shouldDelegateToPredictionManager() {
         // Arrange
         DiskInfoDTO disk = new DiskInfoDTO("Model", "SN1", "SSD", 500.0, 200.0, 40.0);
         HealthCheckPayloadDTO payload = new HealthCheckPayloadDTO(
@@ -140,72 +141,7 @@ class HealthCheckServiceTest {
         verify(healthCheckAuthorizationPolicy).assertCanUpdate(adminUser, ativo);
         verify(ativoRepository).save(ativo);
         verify(ativoHealthHistoryRepository).saveAll(anyList());
-        // Verify alert notification
+        verify(predictionManager).processPrediction(eq(ativo), argThat(list -> list.contains("DISK:SN1")));
         verify(alertNotificationService).checkAndCreateAlerts(eq(1L), any(), eq(payload));
-
-        // Verify hardware details update (indirectly via ativo state)
-        // Since we didn't mock AtivoDetalheHardwareRepository save (it's cascading or handled inside logic),
-        // we check if the ativo object was modified.
-        // The implementation calls updateHardwareDetailsFromPayload which modifies the Ativo object.
-    }
-
-    @Test
-    @DisplayName("processHealthCheckPayload: Deve pular predição se calculada recentemente")
-    void processHealthCheckPayload_shouldSkipPredictionIfRecentlyCalculated() {
-        // Arrange
-        Map<String, Object> attrs = new java.util.HashMap<>();
-        attrs.put("prediction_calculated_at", LocalDateTime.now().minusHours(1).toString());
-        ativo.setAtributos(attrs);
-
-        DiskInfoDTO disk = new DiskInfoDTO("Model", "SN1", "SSD", 500.0, 200.0, 40.0);
-        HealthCheckPayloadDTO payload = new HealthCheckPayloadDTO(
-                "PC-01", null, null, null, null, null, null, null, null, null, null,
-                null, null, null, List.of(disk)
-        );
-
-        when(currentUserProvider.getCurrentUsuario()).thenReturn(adminUser);
-        when(ativoRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(ativo));
-        when(ativoHealthHistoryRepository.saveAll(anyList())).thenReturn(Collections.emptyList());
-        doNothing().when(healthCheckAuthorizationPolicy).assertCanUpdate(any(Usuario.class), any(Ativo.class));
-
-        // Act
-        healthCheckService.processHealthCheckPayload(1L, payload);
-
-        // Assert
-        verify(healthCheckAuthorizationPolicy).assertCanUpdate(adminUser, ativo);
-        // Should NOT fetch history for prediction
-        verify(ativoHealthHistoryRepository, never()).findByAtivoIdAndComponenteInAndMetricaAndDataRegistroAfterOrderByDataRegistroAsc(
-                anyLong(), anyList(), anyString(), any(LocalDateTime.class));
-    }
-
-    @Test
-    @DisplayName("processHealthCheckPayload: Deve executar predição quando expirada")
-    void processHealthCheckPayload_shouldExecutePredictionWhenExpired() {
-        // Arrange
-        Map<String, Object> attrs = new java.util.HashMap<>();
-        attrs.put("prediction_calculated_at", LocalDateTime.now().minusHours(25).toString());
-        ativo.setAtributos(attrs);
-
-        DiskInfoDTO disk = new DiskInfoDTO("Model", "SN1", "SSD", 500.0, 200.0, 40.0);
-        HealthCheckPayloadDTO payload = new HealthCheckPayloadDTO(
-                "PC-01", null, null, null, null, null, null, null, null, null, null,
-                null, null, null, List.of(disk)
-        );
-
-        when(currentUserProvider.getCurrentUsuario()).thenReturn(adminUser);
-        when(ativoRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(ativo));
-        when(ativoHealthHistoryRepository.saveAll(anyList())).thenReturn(Collections.emptyList());
-        when(ativoHealthHistoryRepository.findByAtivoIdAndComponenteInAndMetricaAndDataRegistroAfterOrderByDataRegistroAsc(
-                eq(1L), anyList(), eq("FREE_SPACE_GB"), any(LocalDateTime.class)))
-                .thenReturn(Collections.emptyList());
-        doNothing().when(healthCheckAuthorizationPolicy).assertCanUpdate(any(Usuario.class), any(Ativo.class));
-
-        // Act
-        healthCheckService.processHealthCheckPayload(1L, payload);
-
-        // Assert
-        verify(healthCheckAuthorizationPolicy).assertCanUpdate(adminUser, ativo);
-        verify(ativoHealthHistoryRepository).findByAtivoIdAndComponenteInAndMetricaAndDataRegistroAfterOrderByDataRegistroAsc(
-                eq(1L), anyList(), eq("FREE_SPACE_GB"), any(LocalDateTime.class));
     }
 }

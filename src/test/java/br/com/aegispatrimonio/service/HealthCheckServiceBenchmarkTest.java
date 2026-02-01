@@ -8,6 +8,7 @@ import br.com.aegispatrimonio.model.AtivoHealthHistory;
 import br.com.aegispatrimonio.repository.*;
 import br.com.aegispatrimonio.service.collector.OSHIHealthCheckCollector;
 import br.com.aegispatrimonio.service.manager.HealthCheckCollectionsManager;
+import br.com.aegispatrimonio.service.manager.HealthCheckPredictionManager;
 import br.com.aegispatrimonio.service.policy.HealthCheckAuthorizationPolicy;
 import br.com.aegispatrimonio.service.updater.HealthCheckUpdater;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,15 +38,15 @@ class HealthCheckServiceBenchmarkTest {
     @Mock private HealthCheckCollectionsManager collectionsManager;
     @Mock private OSHIHealthCheckCollector oshiCollector;
     @Mock private HealthCheckHistoryRepository healthCheckHistoryRepository;
-    @Mock private PredictiveMaintenanceService predictiveMaintenanceService;
     @Mock private AlertNotificationService alertNotificationService;
     @Mock private AtivoHealthHistoryRepository ativoHealthHistoryRepository;
+    @Mock private HealthCheckPredictionManager predictionManager;
 
     @InjectMocks
     private HealthCheckService healthCheckService;
 
     @Test
-    void testProcessHealthCheckPayload_NPlusOneQuery() {
+    void testProcessHealthCheckPayload_DelegatesEfficiently() {
         // Arrange
         Long ativoId = 1L;
         int diskCount = 50;
@@ -70,22 +71,17 @@ class HealthCheckServiceBenchmarkTest {
         when(ativoRepository.findByIdWithDetails(ativoId)).thenReturn(Optional.of(ativo));
         doNothing().when(authorizationPolicy).assertCanUpdate(any(), any());
 
-        // Mock optimization: findBy...ComponenteIn... must be called, not individual saves or finds
-        when(ativoHealthHistoryRepository.findByAtivoIdAndComponenteInAndMetricaAndDataRegistroAfterOrderByDataRegistroAsc(
-                eq(ativoId), anyList(), eq("FREE_SPACE_GB"), any(java.time.LocalDateTime.class)))
-                .thenReturn(new ArrayList<>());
-
         // Act
         healthCheckService.processHealthCheckPayload(ativoId, payload);
 
         // Assert
-        // Verify old methods are NOT called (N+1 check)
-        verify(ativoHealthHistoryRepository, never()).findByAtivoIdAndMetricaOrderByDataRegistroAsc(any(), any());
-        verify(ativoHealthHistoryRepository, never()).save(any(AtivoHealthHistory.class)); // saveAll should be used
+        // Verify delegation happens once
+        verify(predictionManager, times(1)).processPrediction(eq(ativo), anyList());
 
-        // Verify new optimized methods are called exactly once
-        verify(ativoHealthHistoryRepository, times(1)).findByAtivoIdAndComponenteInAndMetricaAndDataRegistroAfterOrderByDataRegistroAsc(
-                eq(ativoId), anyList(), eq("FREE_SPACE_GB"), any(java.time.LocalDateTime.class));
+        // Verify saveAll is called (batch insert)
         verify(ativoHealthHistoryRepository, times(1)).saveAll(anyList());
+
+        // Verify no N+1 on save
+        verify(ativoHealthHistoryRepository, never()).save(any(AtivoHealthHistory.class));
     }
 }
