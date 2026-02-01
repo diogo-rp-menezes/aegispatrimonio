@@ -9,6 +9,7 @@ import br.com.aegispatrimonio.service.AtivoService;
 import br.com.aegispatrimonio.service.IHealthCheckService;
 import br.com.aegispatrimonio.service.QRCodeService;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -32,11 +33,16 @@ public class AtivoController {
     private final AtivoService ativoService;
     private final QRCodeService qrCodeService;
     private final IHealthCheckService healthCheckService;
+    private final String frontendUrl;
 
-    public AtivoController(AtivoService ativoService, QRCodeService qrCodeService, IHealthCheckService healthCheckService) {
+    public AtivoController(AtivoService ativoService,
+                           QRCodeService qrCodeService,
+                           IHealthCheckService healthCheckService,
+                           @Value("${app.frontend-url}") String frontendUrl) {
         this.ativoService = ativoService;
         this.qrCodeService = qrCodeService;
         this.healthCheckService = healthCheckService;
+        this.frontendUrl = frontendUrl;
     }
 
     /**
@@ -153,7 +159,7 @@ public class AtivoController {
         // Verifica existência (lança exceção se não encontrar)
         ativoService.buscarPorId(id);
 
-        String content = "AEGIS:ASSET:" + id;
+        String content = frontendUrl + "/ativos/" + id;
         byte[] qrCode = qrCodeService.generateQRCode(content, 200, 200);
 
         return ResponseEntity.ok()
