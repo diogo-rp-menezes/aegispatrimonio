@@ -4,6 +4,8 @@ import br.com.aegispatrimonio.dto.healthcheck.DiskInfoDTO;
 import br.com.aegispatrimonio.dto.healthcheck.HealthCheckDTO;
 import br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO;
 import br.com.aegispatrimonio.dto.healthcheck.SystemHealthDTO;
+import br.com.aegispatrimonio.dto.healthcheck.SystemDiskDTO;
+import br.com.aegispatrimonio.dto.healthcheck.SystemNetDTO;
 import br.com.aegispatrimonio.dto.PredictionResult;
 import br.com.aegispatrimonio.model.Ativo;
 import br.com.aegispatrimonio.model.AtivoDetalheHardware;
@@ -17,6 +19,8 @@ import br.com.aegispatrimonio.service.collector.OSHIHealthCheckCollector;
 import br.com.aegispatrimonio.service.manager.HealthCheckCollectionsManager;
 import br.com.aegispatrimonio.service.policy.HealthCheckAuthorizationPolicy;
 import br.com.aegispatrimonio.service.updater.HealthCheckUpdater;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +47,7 @@ public class HealthCheckService implements IHealthCheckService {
     private final AlertNotificationService alertNotificationService;
     private final AtivoHealthHistoryRepository ativoHealthHistoryRepository;
     private final MaintenanceDispatcherService maintenanceDispatcherService;
+    private final ObjectMapper objectMapper;
 
     public HealthCheckService(AtivoRepository ativoRepository,
                               AtivoDetalheHardwareRepository detalheHardwareRepository,
@@ -55,7 +60,8 @@ public class HealthCheckService implements IHealthCheckService {
                               PredictiveMaintenanceService predictiveMaintenanceService,
                               AlertNotificationService alertNotificationService,
                               AtivoHealthHistoryRepository ativoHealthHistoryRepository,
-                              MaintenanceDispatcherService maintenanceDispatcherService) {
+                              MaintenanceDispatcherService maintenanceDispatcherService,
+                              ObjectMapper objectMapper) {
         this.ativoRepository = ativoRepository;
         this.detalheHardwareRepository = detalheHardwareRepository;
         this.currentUserProvider = currentUserProvider;
@@ -68,6 +74,7 @@ public class HealthCheckService implements IHealthCheckService {
         this.alertNotificationService = alertNotificationService;
         this.ativoHealthHistoryRepository = ativoHealthHistoryRepository;
         this.maintenanceDispatcherService = maintenanceDispatcherService;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -118,14 +125,28 @@ public class HealthCheckService implements IHealthCheckService {
     }
 
     private SystemHealthDTO mapToDTO(br.com.aegispatrimonio.model.HealthCheckHistory h) {
+        List<SystemDiskDTO> disks = List.of();
+        List<SystemNetDTO> nets = List.of();
+
+        try {
+            if (h.getDisks() != null && !h.getDisks().isBlank()) {
+                disks = objectMapper.readValue(h.getDisks(), new TypeReference<>() {});
+            }
+            if (h.getNets() != null && !h.getNets().isBlank()) {
+                nets = objectMapper.readValue(h.getNets(), new TypeReference<>() {});
+            }
+        } catch (Exception e) {
+            // Ignore parse errors, return empty list
+        }
+
         return new SystemHealthDTO(
                 h.getId(),
                 h.getCreatedAt(),
                 h.getHost(),
                 h.getCpuUsage(),
                 h.getMemFreePercent(),
-                h.getDisks(),
-                h.getNets()
+                disks,
+                nets
         );
     }
 

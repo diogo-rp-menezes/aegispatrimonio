@@ -2,6 +2,7 @@ package br.com.aegispatrimonio.dto.healthcheck;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record SystemHealthDTO(
     Long id,
@@ -9,7 +10,7 @@ public record SystemHealthDTO(
     String host,
     BigDecimal cpuUsage,
     BigDecimal memFreePercent,
-    String disks,
-    String nets
+    List<SystemDiskDTO> disks,
+    List<SystemNetDTO> nets
 ) {
 }
