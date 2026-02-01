@@ -31,6 +31,9 @@ const routes = [
       // Manutenções
       { path: "manutencoes", component: () => import("../views/ManutencoesView.vue") },
 
+      // Scanner
+      { path: "scanner", component: () => import("../views/ScannerView.vue") },
+
       // System Health (Admin Only)
       {
         path: "system-health",
