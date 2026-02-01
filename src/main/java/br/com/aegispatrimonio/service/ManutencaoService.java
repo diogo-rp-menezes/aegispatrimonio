@@ -33,6 +33,7 @@ public class ManutencaoService {
     private final FornecedorRepository fornecedorRepository;
     private final FuncionarioRepository funcionarioRepository;
     private final CurrentUserProvider currentUserProvider; // Injetando CurrentUserProvider
+    private final WorkflowAprovacaoService workflowService;
 
     @Transactional
     public ManutencaoResponseDTO criar(ManutencaoRequestDTO request) {
@@ -92,20 +93,14 @@ public class ManutencaoService {
     @Transactional
     public ManutencaoResponseDTO aprovar(Long id) {
         Manutencao manutencao = buscarEntidadePorId(id);
-        validarStatus(manutencao, StatusManutencao.SOLICITADA, "aprovada");
-        manutencao.setStatus(StatusManutencao.APROVADA);
+        workflowService.aprovar(manutencao);
         Manutencao updatedManutencao = manutencaoRepository.save(manutencao);
-
-        Usuario auditor = currentUserProvider.getCurrentUsuario();
-        log.info("AUDIT: Usuário {} aprovou a manutenção com ID {} para o ativo {}.", auditor.getEmail(), updatedManutencao.getId(), updatedManutencao.getAtivo().getId());
-
         return convertToResponseDTO(updatedManutencao);
     }
 
     @Transactional
     public ManutencaoResponseDTO iniciar(Long id, ManutencaoInicioDTO inicioDTO) {
         Manutencao manutencao = buscarEntidadePorId(id);
-        validarStatus(manutencao, StatusManutencao.APROVADA, "iniciada");
 
         Funcionario tecnico = funcionarioRepository.findById(inicioDTO.tecnicoId())
                 .orElseThrow(() -> new ResourceNotFoundException("Técnico não encontrado com ID: " + inicioDTO.tecnicoId()));
@@ -113,41 +108,30 @@ public class ManutencaoService {
         Ativo ativo = manutencao.getAtivo();
         validarConsistenciaFilial(tecnico, ativo, "Técnico responsável");
 
+        workflowService.iniciar(manutencao);
+        manutencao.setTecnicoResponsavel(tecnico);
+
         ativo.setStatus(StatusAtivo.EM_MANUTENCAO);
         ativoRepository.save(ativo);
 
-        manutencao.setStatus(StatusManutencao.EM_ANDAMENTO);
-        manutencao.setTecnicoResponsavel(tecnico);
-        manutencao.setDataInicio(LocalDate.now());
-
         Manutencao updatedManutencao = manutencaoRepository.save(manutencao);
-
-        Usuario auditor = currentUserProvider.getCurrentUsuario();
-        log.info("AUDIT: Usuário {} iniciou a manutenção com ID {} para o ativo {} com técnico {}.", auditor.getEmail(), updatedManutencao.getId(), updatedManutencao.getAtivo().getId(), tecnico.getNome());
-
         return convertToResponseDTO(updatedManutencao);
     }
 
     @Transactional
     public ManutencaoResponseDTO concluir(Long id, ManutencaoConclusaoDTO conclusaoDTO) {
         Manutencao manutencao = buscarEntidadePorId(id);
-        validarStatus(manutencao, StatusManutencao.EM_ANDAMENTO, "concluída");
+
+        workflowService.concluir(manutencao);
+        manutencao.setDescricaoServico(conclusaoDTO.descricaoServico());
+        manutencao.setCustoReal(conclusaoDTO.custoReal());
+        manutencao.setTempoExecucaoMinutos(conclusaoDTO.tempoExecucao());
 
         Ativo ativo = manutencao.getAtivo();
         ativo.setStatus(StatusAtivo.ATIVO);
         ativoRepository.save(ativo);
 
-        manutencao.setStatus(StatusManutencao.CONCLUIDA);
-        manutencao.setDescricaoServico(conclusaoDTO.descricaoServico());
-        manutencao.setCustoReal(conclusaoDTO.custoReal());
-        manutencao.setTempoExecucaoMinutos(conclusaoDTO.tempoExecucao());
-        manutencao.setDataConclusao(LocalDate.now());
-
         Manutencao updatedManutencao = manutencaoRepository.save(manutencao);
-
-        Usuario auditor = currentUserProvider.getCurrentUsuario();
-        log.info("AUDIT: Usuário {} concluiu a manutenção com ID {} para o ativo {}.", auditor.getEmail(), updatedManutencao.getId(), updatedManutencao.getAtivo().getId());
-
         return convertToResponseDTO(updatedManutencao);
     }
 
@@ -155,24 +139,16 @@ public class ManutencaoService {
     public ManutencaoResponseDTO cancelar(Long id, ManutencaoCancelDTO cancelDTO) {
         Manutencao manutencao = buscarEntidadePorId(id);
 
-        if (manutencao.getStatus() == StatusManutencao.CONCLUIDA || manutencao.getStatus() == StatusManutencao.CANCELADA) {
-            throw new ResourceConflictException("Manutenção já foi concluída ou cancelada e não pode ser alterada.");
-        }
-
         if (manutencao.getStatus() == StatusManutencao.EM_ANDAMENTO) {
             Ativo ativo = manutencao.getAtivo();
             ativo.setStatus(StatusAtivo.ATIVO);
             ativoRepository.save(ativo);
         }
 
-        manutencao.setStatus(StatusManutencao.CANCELADA);
+        workflowService.cancelar(manutencao);
         manutencao.setObservacoes(cancelDTO.motivo());
 
         Manutencao updatedManutencao = manutencaoRepository.save(manutencao);
-
-        Usuario auditor = currentUserProvider.getCurrentUsuario();
-        log.info("AUDIT: Usuário {} cancelou a manutenção com ID {} para o ativo {}. Motivo: {}.", auditor.getEmail(), updatedManutencao.getId(), updatedManutencao.getAtivo().getId(), cancelDTO.motivo());
-
         return convertToResponseDTO(updatedManutencao);
     }
 
@@ -203,12 +179,6 @@ public class ManutencaoService {
     private Manutencao buscarEntidadePorId(Long id) {
         return manutencaoRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Manutenção não encontrada com ID: " + id));
-    }
-
-    private void validarStatus(Manutencao manutencao, StatusManutencao statusEsperado, String acao) {
-        if (manutencao.getStatus() != statusEsperado) {
-            throw new ResourceConflictException("A manutenção não pode ser " + acao + " pois seu status atual é '" + manutencao.getStatus() + "' e o esperado era '" + statusEsperado + "'.");
-        }
     }
 
     private Manutencao convertToEntity(ManutencaoRequestDTO request) {
