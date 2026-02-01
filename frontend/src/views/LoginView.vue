@@ -36,7 +36,7 @@
 
         <div class="mt-3">
           <hr>
-          <a :href="`${oauthBaseUrl}/oauth2/authorization/google`" class="btn btn-outline-danger w-100" :class="{ disabled: loading }">
+          <a :href="googleLoginUrl" class="btn btn-outline-danger w-100" :class="{ disabled: loading }">
             <i class="bi bi-google me-2"></i> Entrar com Google
           </a>
         </div>
@@ -64,14 +64,13 @@ import { ref, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { fetchConfig, handleResponse, request } from '../services/api';
 
-// Calculate Backend URL (remove /api/v1 suffix if present to get root)
-const backendOrigin = fetchConfig.baseURL.includes('/api')
-    ? fetchConfig.baseURL.split('/api')[0]
-    : fetchConfig.baseURL; // If empty (proxy) or root, keeps as is.
+// Calculate Backend Root URL (remove /api/v1 suffix if present to get root for OAuth2)
+// Regex removes /api, /api/v1, or /api/v1/ at the end of the string
+const backendRoot = fetchConfig.baseURL.replace(/\/api(\/v1)?\/?$/, '');
 
 // OAuth2 Endpoints (Standard Spring Security)
-const googleLoginUrl = `${backendOrigin}/oauth2/authorization/google`;
-const githubLoginUrl = `${backendOrigin}/oauth2/authorization/github`;
+const googleLoginUrl = `${backendRoot}/oauth2/authorization/google`;
+const githubLoginUrl = `${backendRoot}/oauth2/authorization/github`;
 
 const email = ref('');
 const password = ref('');
@@ -80,38 +79,51 @@ const loading = ref(false);
 const router = useRouter();
 const route = useRoute();
 
+// Centralized logic to fetch user context and redirect
+const fetchUserContextAndRedirect = async (token) => {
+    loading.value = true;
+    try {
+        if (token) {
+            localStorage.setItem('authToken', token);
+        }
+
+        // Fetch user context
+        // Note: request() automatically uses localStorage token
+        const data = await request('/auth/me');
+
+        // Save Roles
+        if (data.roles && data.roles.length > 0) {
+            localStorage.setItem('userRoles', JSON.stringify(data.roles));
+        } else {
+            localStorage.removeItem('userRoles');
+        }
+
+        // Save Filiais
+        if (data.filiais && data.filiais.length > 0) {
+            localStorage.setItem('allowedFiliais', JSON.stringify(data.filiais));
+            localStorage.setItem('currentFilial', data.filiais[0].id);
+        } else {
+            localStorage.removeItem('allowedFiliais');
+            localStorage.removeItem('currentFilial');
+            console.warn("User has no allowed filiais.");
+        }
+
+        router.push('/dashboard');
+    } catch (e) {
+        console.error("Failed to fetch user context", e);
+        error.value = "Falha na autenticação.";
+        // Clear potential bad token
+        localStorage.removeItem('authToken');
+    } finally {
+        loading.value = false;
+    }
+};
+
 onMounted(async () => {
     // Check for token in URL (OAuth2 redirect)
     const token = route.query.token;
     if (token) {
-        localStorage.setItem('authToken', token);
-        loading.value = true;
-        try {
-            // Fetch user context
-            const data = await request('/auth/me');
-             // Save Roles
-            if (data.roles && data.roles.length > 0) {
-              localStorage.setItem('userRoles', JSON.stringify(data.roles));
-            } else {
-              localStorage.removeItem('userRoles');
-            }
-
-            // Save Filiais
-            if (data.filiais && data.filiais.length > 0) {
-                localStorage.setItem('allowedFiliais', JSON.stringify(data.filiais));
-                localStorage.setItem('currentFilial', data.filiais[0].id);
-            } else {
-                localStorage.removeItem('allowedFiliais');
-                localStorage.removeItem('currentFilial');
-            }
-            router.push('/dashboard');
-        } catch (e) {
-            console.error("Failed to fetch user context", e);
-            error.value = "Falha na autenticação via provedor externo.";
-            localStorage.removeItem('authToken');
-        } finally {
-            loading.value = false;
-        }
+        await fetchUserContextAndRedirect(token);
     }
 });
 
@@ -128,76 +140,15 @@ const handleLogin = async () => {
 
     const data = await handleResponse(response);
 
-    // Save Token
-    localStorage.setItem('authToken', data.token);
+    // If login successful, we get a token. Proceed to fetch context.
+    await fetchUserContextAndRedirect(data.token);
 
-    // Save Roles
-    if (data.roles && data.roles.length > 0) {
-      localStorage.setItem('userRoles', JSON.stringify(data.roles));
-    } else {
-      localStorage.removeItem('userRoles');
-    }
-
-    // Save Filiais
-    if (data.filiais && data.filiais.length > 0) {
-        localStorage.setItem('allowedFiliais', JSON.stringify(data.filiais));
-        // Always reset currentFilial to the first available one on login to avoid stale context from previous user
-        localStorage.setItem('currentFilial', data.filiais[0].id);
-    } else {
-        localStorage.removeItem('allowedFiliais');
-        localStorage.removeItem('currentFilial');
-        console.warn("User has no allowed filiais.");
-    }
-
-    router.push('/dashboard');
   } catch (err) {
     console.error(err);
     error.value = 'Falha no login. Verifique suas credenciais.';
-  } finally {
     loading.value = false;
   }
 };
-
-// OAuth2 Handler
-const oauthBaseUrl = fetchConfig.baseURL.replace('/api/v1', '');
-
-onMounted(async () => {
-  const token = route.query.token;
-  if (token) {
-    loading.value = true;
-    try {
-      localStorage.setItem('authToken', token);
-
-      // Fetch user context using the new token
-      // Note: request() automatically uses localStorage token
-      const data = await request('/auth/me');
-
-      // Save Roles
-      if (data.roles && data.roles.length > 0) {
-        localStorage.setItem('userRoles', JSON.stringify(data.roles));
-      } else {
-        localStorage.removeItem('userRoles');
-      }
-
-      // Save Filiais
-      if (data.filiais && data.filiais.length > 0) {
-          localStorage.setItem('allowedFiliais', JSON.stringify(data.filiais));
-          localStorage.setItem('currentFilial', data.filiais[0].id);
-      } else {
-          localStorage.removeItem('allowedFiliais');
-          localStorage.removeItem('currentFilial');
-      }
-
-      router.push('/dashboard');
-    } catch (err) {
-      console.error("OAuth login failed", err);
-      error.value = "Falha ao validar login social.";
-      localStorage.removeItem('authToken');
-    } finally {
-      loading.value = false;
-    }
-  }
-});
 </script>
 
 <style scoped>
