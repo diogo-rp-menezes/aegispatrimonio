@@ -18,6 +18,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -191,5 +192,29 @@ class AlertNotificationServiceTest {
             a.getMensagem().contains("SSD") &&
             a.getTipo() == TipoAlerta.CRITICO
         ));
+    }
+
+    @Test
+    void getRecentAlerts_ShouldCallFindTop5ByLidoFalse_WhenAdmin() {
+        when(userContextService.isAdmin()).thenReturn(true);
+        when(alertaRepository.findTop5ByLidoFalseOrderByDataCriacaoDesc()).thenReturn(new ArrayList<>());
+
+        service.getRecentAlerts();
+
+        verify(alertaRepository).findTop5ByLidoFalseOrderByDataCriacaoDesc();
+        verify(alertaRepository, never()).findTop5ByAtivo_Filial_IdInAndLidoFalseOrderByDataCriacaoDesc(any());
+    }
+
+    @Test
+    void getRecentAlerts_ShouldCallFindByFilial_WhenNotAdmin() {
+        when(userContextService.isAdmin()).thenReturn(false);
+        Set<Long> filiais = Set.of(1L, 2L);
+        when(userContextService.getUserFiliais()).thenReturn(filiais);
+        when(alertaRepository.findTop5ByAtivo_Filial_IdInAndLidoFalseOrderByDataCriacaoDesc(filiais)).thenReturn(new ArrayList<>());
+
+        service.getRecentAlerts();
+
+        verify(alertaRepository).findTop5ByAtivo_Filial_IdInAndLidoFalseOrderByDataCriacaoDesc(filiais);
+        verify(alertaRepository, never()).findTop5ByLidoFalseOrderByDataCriacaoDesc();
     }
 }

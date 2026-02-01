@@ -76,9 +76,10 @@ O projeto adota a filosofia "Shift Left" e "MVP SOTA", implementando soluções 
 - **Auditoria:** Rastreamento de alterações com Hibernate Envers.
 - **Validações:** Bean Validation e regras de negócio consistentes.
 - **Frontend Completo:** Interface moderna em Vue.js 3 + Bootstrap 5 totalmente integrada.
+- **Dashboard Analytics:** Visualização gráfica avançada dos dados preditivos, com drill-down e alertas em tempo real.
+- **Manutenção Preditiva:** Monitoramento proativo de saúde de hardware (Health Check) com previsão de falhas.
 
 ### 🚀 Roadmap (Próximos Passos)
-- **Dashboard Analytics:** Visualização gráfica avançada dos dados preditivos.
 - **App Mobile:** Versão nativa para coletores de dados.
 
 ## Base Path da API e Exemplos

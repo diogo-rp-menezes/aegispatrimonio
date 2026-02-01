@@ -15,8 +15,10 @@ import java.util.List;
 @Repository
 public interface AlertaRepository extends JpaRepository<Alerta, Long>, JpaSpecificationExecutor<Alerta> {
 
+    @EntityGraph(attributePaths = "ativo")
     List<Alerta> findTop5ByLidoFalseOrderByDataCriacaoDesc();
 
+    @EntityGraph(attributePaths = "ativo")
     List<Alerta> findTop5ByAtivo_Filial_IdInAndLidoFalseOrderByDataCriacaoDesc(Collection<Long> filialIds);
 
     List<Alerta> findByAtivoIdAndLidoFalseAndTipo(Long ativoId, TipoAlerta tipo);
