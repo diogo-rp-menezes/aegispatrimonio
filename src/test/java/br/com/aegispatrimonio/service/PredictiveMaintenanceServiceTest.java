@@ -65,4 +65,26 @@ class PredictiveMaintenanceServiceTest {
         PredictionResult result = service.predictExhaustionDate(history);
         assertNull(result);
     }
+
+    @Test
+    void predictExhaustionDate_ShouldCapDateAtMySQLMax_WhenTrendIsVerySlow() {
+        List<AtivoHealthHistory> history = new ArrayList<>();
+        // Point 1: Today, Value = 100
+        AtivoHealthHistory p1 = new AtivoHealthHistory();
+        p1.setDataRegistro(LocalDateTime.now());
+        p1.setValor(100.0);
+        history.add(p1);
+
+        // Point 2: Tomorrow, Value = 99.99999 (Very slow degradation)
+        // This would result in ~1 billion days to reach zero
+        AtivoHealthHistory p2 = new AtivoHealthHistory();
+        p2.setDataRegistro(LocalDateTime.now().plusDays(1));
+        p2.setValor(99.99999);
+        history.add(p2);
+
+        PredictionResult result = service.predictExhaustionDate(history);
+
+        assertNotNull(result);
+        assertEquals(LocalDate.of(9999, 12, 31), result.exhaustionDate());
+    }
 }

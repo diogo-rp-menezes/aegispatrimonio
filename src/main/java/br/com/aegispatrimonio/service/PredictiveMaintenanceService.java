@@ -67,6 +67,16 @@ public class PredictiveMaintenanceService {
              return null; // Already exhausted in the past (before first record)
         }
 
+        // Cap date at MySQL MAX (9999-12-31) to prevent DataTruncation or runtime errors
+        LocalDate maxDate = LocalDate.of(9999, 12, 31);
+        long maxEpochDay = maxDate.toEpochDay();
+
+        // Check if addition would overflow or exceed max date
+        // maxEpochDay is ~3.6 million, so logic is safe from long overflow unless firstDay is near Long.MAX (impossible)
+        if ((long) daysToZero > (maxEpochDay - firstDay)) {
+            return new PredictionResult(maxDate, beta, alpha, firstDay);
+        }
+
         LocalDate exhaustionDate = LocalDate.ofEpochDay(firstDay + (long) daysToZero);
         return new PredictionResult(exhaustionDate, beta, alpha, firstDay);
     }
