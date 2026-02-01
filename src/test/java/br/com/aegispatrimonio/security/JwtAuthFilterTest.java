@@ -1,7 +1,9 @@
 package br.com.aegispatrimonio.security;
 
 import br.com.aegispatrimonio.BaseIT;
+import br.com.aegispatrimonio.model.Status;
 import br.com.aegispatrimonio.model.Usuario;
+import br.com.aegispatrimonio.service.IPermissionService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,11 +35,15 @@ class JwtAuthFilterTest extends BaseIT {
     @MockBean
     private CustomUserDetailsService userDetailsService;
 
+    @MockBean(name = "permissionService")
+    private IPermissionService permissionService;
+
     private UserDetails createCustomUserDetails(String email, String role) {
         Usuario usuario = new Usuario();
         usuario.setEmail(email);
         usuario.setRole(role);
         usuario.setPassword("password");
+        usuario.setStatus(Status.ATIVO);
         return new CustomUserDetails(usuario);
     }
 
@@ -87,6 +93,11 @@ class JwtAuthFilterTest extends BaseIT {
         when(jwtService.extractUsername(token)).thenReturn(email);
         when(userDetailsService.loadUserByUsername(email)).thenReturn(userDetails);
         when(jwtService.isTokenValid(token, userDetails)).thenReturn(true);
+
+        // Permite que o UserContextService identifique o usuário como ADMIN
+        when(permissionService.hasRole(anyString(), org.mockito.ArgumentMatchers.eq("ROLE_ADMIN"))).thenReturn(true);
+        // Permite que o @PreAuthorize do Controller passe (bypass da verificação de filial)
+        when(permissionService.hasPermission(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.eq("ATIVO"), org.mockito.ArgumentMatchers.eq("READ"), org.mockito.ArgumentMatchers.any())).thenReturn(true);
 
         mockMvc.perform(get("/api/v1/ativos").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk());

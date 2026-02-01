@@ -51,9 +51,9 @@ class DefaultHealthCheckCollectionsManagerTest {
         // Ajustando as chamadas de construtor dos DTOs para corresponderem às assinaturas atuais
         HealthCheckDTO dto = new HealthCheckDTO(
                 null, null, null, null, null, null, null, null, null, null, null,
-                List.of(new DiscoDTO("modelo1", "tipo1", "serial1", BigDecimal.ZERO, BigDecimal.ZERO, 0)), // Corrigido
-                List.of(new MemoriaDTO("fabricante1", "tipo1", "serial1", 0)), // Corrigido
-                List.of(new AdaptadorRedeDTO("fabricante1", "modelo1", "mac1")) // Corrigido
+                List.of(new DiscoDTO("modelo1", "serial1", "tipo1", BigDecimal.ZERO, BigDecimal.ZERO, 0)), // Corrigido
+                List.of(new MemoriaDTO("fabricante1", "serial1", "partNumber1", 0)), // Corrigido
+                List.of(new AdaptadorRedeDTO("descricao1", "mac1", "127.0.0.1")) // Corrigido
         );
 
         when(mapper.toEntity(any(DiscoDTO.class))).thenReturn(new Disco());

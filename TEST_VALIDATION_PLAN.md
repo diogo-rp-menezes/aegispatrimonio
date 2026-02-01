@@ -30,31 +30,35 @@ Este documento descreve a metodologia para a execução e verificação da suít
     - **Agente Responsável:** `TEST_ENGINEER`
     - **Tarefa:** Executar todos os testes unitários do projeto.
     - **Critério de Aceite:** Relatório de execução indicando o número de testes passados, falhos e ignorados.
-    - **Status:** **FALHA NA COMPILAÇÃO DOS TESTES** - `mvn clean verify` falhou na fase `testCompile` devido a erros de construtor em `DefaultHealthCheckCollectionsManagerTest.java`.
+    - **Status:** **SUCESSO** - `mvn clean verify` executado com sucesso. Todos os testes unitários passaram. Correção aplicada em `DefaultHealthCheckCollectionsManagerTest.java`.
 
-- [ ] **2.2 Analisar Cobertura de Código (JaCoCo)**
+- [x] **2.2 Analisar Cobertura de Código (JaCoCo)**
     - **Agente Responsável:** `QUALITY_ENGINEER`
     - **Tarefa:** Analisar o relatório gerado pelo JaCoCo e comparar a cobertura de código (linha e branch) com a meta de ≥ 80% para a camada de serviço, conforme definido no `TEST_PLAN.md`.
     - **Critério de Aceite:** Relatório de análise de cobertura, destacando áreas com baixa cobertura e confirmando se a meta foi atingida.
+    - **Status:** **SUCESSO** - Verificação automatizada do JaCoCo confirmou que os limites de cobertura foram atingidos.
 
-- [ ] **2.3 Corrigir Falhas de Testes Unitários (se houver)**
+- [x] **2.3 Corrigir Falhas de Testes Unitários (se houver)**
     - **Agentes Responsáveis:** `BACKEND_ENGINEER`, `TEST_ENGINEER`
     - **Tarefa:** Analisar a causa raiz de cada teste unitário que falhou, corrigir o bug no código de produção ou no próprio teste, e re-executar a Etapa 2.1 até que todos os testes passem.
     - **Critério de Aceite:** Todos os testes unitários passando (status GREEN).
+    - **Status:** **CONCLUÍDO** - Ajustes semânticos realizados nos DTOs em `DefaultHealthCheckCollectionsManagerTest`.
 
 ---
 
 ## 🔄 Fase 3: Execução e Análise dos Testes de Integração
 
-- [ ] **3.1 Executar Suíte de Testes de Integração**
+- [x] **3.1 Executar Suíte de Testes de Integração**
     - **Agente Responsável:** `TEST_ENGINEER`
     - **Tarefa:** Executar todos os testes de integração do projeto (ex: `AtivoControllerIT`).
     - **Critério de Aceite:** Relatório de execução indicando o número de testes passados, falhos e ignorados.
+    - **Status:** **SUCESSO** - Execução completa via `mvn verify`.
 
-- [ ] **3.2 Analisar e Corrigir Falhas de Testes de Integração (se houver)**
+- [x] **3.2 Analisar e Corrigir Falhas de Testes de Integração (se houver)**
     - **Agentes Responsáveis:** `BACKEND_ENGINEER`, `SECURITY_ENGINEER`, `DATABASE_ARCHITECT`, `TEST_ENGINEER`
     - **Tarefa:** Realizar uma análise colaborativa das falhas. O `BACKEND_ENGINEER` investiga a lógica de negócio, o `SECURITY_ENGINEER` verifica falhas de autorização, o `DATABASE_ARCHITECT` analisa problemas de persistência, e o `TEST_ENGINEER` valida a correção dos testes.
     - **Critério de Aceite:** Todos os testes de integração passando (status GREEN).
+    - **Status:** **CONCLUÍDO** - Corrigido `JwtAuthFilterTest` adicionando mock de `PermissionService` e definindo status do usuário como ATIVO.
 
 ---
 
