@@ -5,7 +5,8 @@ import br.com.aegispatrimonio.dto.AtivoDTO;
 import br.com.aegispatrimonio.dto.AtivoHealthHistoryDTO;
 import br.com.aegispatrimonio.dto.AtivoUpdateDTO;
 import br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO;
-import br.com.aegispatrimonio.service.AtivoService;
+import br.com.aegispatrimonio.dto.query.AtivoQueryParams;
+import br.com.aegispatrimonio.service.IAtivoService;
 import br.com.aegispatrimonio.service.IHealthCheckService;
 import br.com.aegispatrimonio.service.QRCodeService;
 import jakarta.validation.Valid;
@@ -30,12 +31,12 @@ import java.util.List;
 @Validated
 public class AtivoController {
 
-    private final AtivoService ativoService;
+    private final IAtivoService ativoService;
     private final QRCodeService qrCodeService;
     private final IHealthCheckService healthCheckService;
     private final String frontendUrl;
 
-    public AtivoController(AtivoService ativoService,
+    public AtivoController(IAtivoService ativoService,
                            QRCodeService qrCodeService,
                            IHealthCheckService healthCheckService,
                            @Value("${app.frontend-url}") String frontendUrl) {
@@ -53,16 +54,12 @@ public class AtivoController {
      * @return Uma lista de AtivoDTO representando todos os ativos.
      */
     @GetMapping
-    @PreAuthorize("#filialId == null or @permissionService.hasPermission(authentication, null, 'ATIVO', 'READ', #filialId)")
+    @PreAuthorize("#queryParams.filialId == null or @permissionService.hasPermission(authentication, null, 'ATIVO', 'READ', #queryParams.filialId)")
     public Page<AtivoDTO> listarTodos(
             org.springframework.data.domain.Pageable pageable,
-            @RequestParam(required = false) Long filialId,
-            @RequestParam(required = false) Long tipoAtivoId,
-            @RequestParam(required = false) br.com.aegispatrimonio.model.StatusAtivo status,
-            @RequestParam(required = false) String nome,
-            @RequestParam(required = false) String health
+            @Valid AtivoQueryParams queryParams
     ) {
-        return ativoService.listarTodos(pageable, filialId, tipoAtivoId, status, nome, health);
+        return ativoService.listarTodos(pageable, queryParams);
     }
 
     /**

@@ -2,6 +2,7 @@ package br.com.aegispatrimonio.service;
 
 import br.com.aegispatrimonio.dto.AtivoCreateDTO;
 import br.com.aegispatrimonio.dto.AtivoUpdateDTO;
+import br.com.aegispatrimonio.dto.query.AtivoQueryParams;
 import br.com.aegispatrimonio.mapper.AtivoMapper;
 import br.com.aegispatrimonio.model.*;
 import br.com.aegispatrimonio.repository.*;
@@ -265,9 +266,10 @@ class AtivoServiceTest {
         when(ativoMapper.toDTO(a3)).thenReturn(dto3);
 
         // Act
+        AtivoQueryParams params = new AtivoQueryParams(null, null, null, query, null);
         org.springframework.data.domain.Page<br.com.aegispatrimonio.dto.AtivoDTO> result = ativoService.listarTodos(
                 org.springframework.data.domain.Pageable.ofSize(10),
-                null, null, null, query, null);
+                params);
 
         // Assert
         verify(searchOptimizationService).rankResults(eq(query), anyList(), any());
@@ -305,9 +307,10 @@ class AtivoServiceTest {
                 .thenReturn(org.springframework.data.domain.Page.empty());
 
         // Act
+        AtivoQueryParams params = new AtivoQueryParams(null, null, null, null, "INDETERMINADO");
         ativoService.listarTodos(
                 org.springframework.data.domain.Pageable.ofSize(10),
-                null, null, null, null, "INDETERMINADO");
+                params);
 
         // Assert
         verify(ativoRepository).findByFilters(any(), any(), any(), any(), isNull(), isNull(), eq(false), any());

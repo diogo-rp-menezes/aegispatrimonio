@@ -6,6 +6,7 @@ import br.com.aegispatrimonio.dto.AtivoDTO;
 import br.com.aegispatrimonio.dto.AtivoNameDTO;
 import br.com.aegispatrimonio.dto.AtivoDetalheHardwareDTO;
 import br.com.aegispatrimonio.dto.AtivoUpdateDTO;
+import br.com.aegispatrimonio.dto.query.AtivoQueryParams;
 import br.com.aegispatrimonio.mapper.AtivoMapper;
 import br.com.aegispatrimonio.model.*;
 import br.com.aegispatrimonio.repository.*;
@@ -28,7 +29,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
-public class AtivoService {
+public class AtivoService implements IAtivoService {
 
     private final AtivoRepository ativoRepository;
     private final AtivoMapper ativoMapper;
@@ -60,15 +61,19 @@ public class AtivoService {
         this.userContextService = userContextService;
     }
 
+    @Override
     @Transactional(readOnly = true)
     public Page<AtivoDTO> listarTodos(org.springframework.data.domain.Pageable pageable,
-                                      Long filialId,
-                                      Long tipoAtivoId,
-                                      StatusAtivo status,
-                                      String nome,
-                                      String health) {
+                                      AtivoQueryParams queryParams) {
         org.springframework.data.domain.Pageable effectivePageable =
                 (pageable == null) ? org.springframework.data.domain.Pageable.unpaged() : pageable;
+
+        Long filialId = queryParams.filialId();
+        Long tipoAtivoId = queryParams.tipoAtivoId();
+        StatusAtivo status = queryParams.status();
+        String nome = queryParams.nome();
+        String health = queryParams.health();
+
         boolean isFuzzySearch = (nome != null && !nome.isBlank());
 
         // Calculate Date Range for Predictive Health
@@ -153,6 +158,7 @@ public class AtivoService {
         }
     }
 
+    @Override
     @Transactional(readOnly = true)
     public AtivoDTO buscarPorId(Long id) {
         Ativo ativo = ativoRepository.findByIdWithDetails(id)
@@ -168,6 +174,7 @@ public class AtivoService {
         return ativoMapper.toDTO(ativo);
     }
 
+    @Override
     @Transactional
     public AtivoDTO criar(AtivoCreateDTO ativoCreateDTO) {
         validarNumeroPatrimonio(ativoCreateDTO.numeroPatrimonio(), null);
@@ -217,6 +224,7 @@ public class AtivoService {
         return ativoMapper.toDTO(ativoCompleto);
     }
 
+    @Override
     @Transactional
     public AtivoDTO atualizar(Long id, AtivoUpdateDTO ativoUpdateDTO) {
         Ativo ativo = ativoRepository.findByIdWithDetails(id)
@@ -280,6 +288,7 @@ public class AtivoService {
         return ativoMapper.toDTO(ativoAtualizado);
     }
 
+    @Override
     @Transactional
     public void deletar(Long id) {
         Ativo ativo = ativoRepository.findById(id)
@@ -296,6 +305,7 @@ public class AtivoService {
         ativoRepository.delete(ativo);
     }
 
+    @Override
     @Transactional(readOnly = true)
     public List<AtivoHealthHistoryDTO> getHealthHistory(Long ativoId) {
         Ativo ativo = ativoRepository.findById(ativoId)
