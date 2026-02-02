@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
  * Fornece um endpoint público para que os usuários possam obter um token JWT.
  */
 @RestController
-@RequestMapping("/api/v1/auth")
+@RequestMapping({"/api/v1/auth", "/api/auth"})
 @Slf4j
 public class AuthController {
 
