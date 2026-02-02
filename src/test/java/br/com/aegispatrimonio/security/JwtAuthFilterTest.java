@@ -69,18 +69,16 @@ class JwtAuthFilterTest extends BaseIT {
     }
 
     @Test
-    @DisplayName("Filtro: Deve lançar UsernameNotFoundException se o usuário do token não for encontrado")
-    void doFilterInternal_usuarioNaoEncontrado_deveLancarExcecao() {
+    @DisplayName("Filtro: Deve retornar 401 Unauthorized se o usuário do token não for encontrado")
+    void doFilterInternal_usuarioNaoEncontrado_deveRetornarUnauthorized() throws Exception {
         String token = "token-for-non-existing-user";
         String email = "non.existing@aegis.com";
 
         when(jwtService.extractUsername(token)).thenReturn(email);
         when(userDetailsService.loadUserByUsername(email)).thenThrow(new UsernameNotFoundException("User not found"));
 
-        // CORREÇÃO: O MockMvc propaga a exceção original do mock, então a verificamos diretamente.
-        assertThrows(UsernameNotFoundException.class, () -> {
-            mockMvc.perform(get("/api/v1/ativos").header("Authorization", "Bearer " + token));
-        });
+        mockMvc.perform(get("/api/v1/ativos").header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
