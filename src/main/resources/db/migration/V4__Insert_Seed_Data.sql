@@ -14,7 +14,7 @@ VALUES (1, 'Administrador do Sistema', 'ADM001', 'System Admin', 1, 'ATIVO', NOW
 
 -- 4. Usuario (Admin) - Password: "123456" (BCrypt)
 INSERT INTO usuarios (id, email, password, role, status, funcionario_id, criado_em, atualizado_em)
-VALUES (1, 'admin@aegis.com', '$2b$12$KovI10j2uB8v2H1xK7YgI.t9Hj/5Lw6E7pQ8Z9jK0mI1nO2pQ3rS.', 'ADMIN', 'ATIVO', 1, NOW(), NOW());
+VALUES (1, 'admin@aegis.com', '$2a$12$KovI10j2uB8v2H1xK7YgI.t9Hj/5Lw6E7pQ8Z9jK0mI1nO2pQ3rS.', 'ADMIN', 'ATIVO', 1, NOW(), NOW());
 
 -- 5. Funcionario <-> Filial
 INSERT INTO funcionario_filial (funcionario_id, filial_id)

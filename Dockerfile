@@ -2,14 +2,11 @@
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app/frontend
 
-# Use production mode and leverage cache
+# Leverage cache for node_modules
 COPY frontend/package*.json ./
-RUN npm ci || npm install
+RUN npm ci
 
-# Install dependencies
-RUN --mount=type=cache,target=/root/.npm npm install
-
-# Copy source code
+# Copy source code and build
 COPY frontend/ .
 RUN npm run build
 
@@ -21,10 +18,7 @@ WORKDIR /app
 COPY mvnw .
 COPY .mvn .mvn
 COPY pom.xml .
-RUN ./mvnw dependency:go-offline -B
-
-# Make wrapper executable (just in case) and download dependencies
-RUN --mount=type=cache,target=/root/.m2 chmod +x mvnw && ./mvnw dependency:go-offline
+RUN chmod +x mvnw && ./mvnw dependency:go-offline -B
 
 # Copy backend source code
 COPY src ./src
@@ -36,15 +30,15 @@ RUN ./mvnw clean package -DskipTests -B
 # Stage 3: Runtime
 FROM eclipse-temurin:21-jre-jammy AS runtime
 
+# Install curl for healthcheck
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
 # Metadata
 LABEL maintainer="Docker Sentinel" \
       org.opencontainers.image.title="Aegis Patrimônio" \
       org.opencontainers.image.description="Sistema de Gestão de Ativos Patrimoniais" \
       org.opencontainers.image.vendor="Aegis" \
       org.opencontainers.image.version="1.0.0"
-
-# Build the application
-RUN --mount=type=cache,target=/root/.m2 ./mvnw clean package -DskipTests
 
 WORKDIR /app
 
