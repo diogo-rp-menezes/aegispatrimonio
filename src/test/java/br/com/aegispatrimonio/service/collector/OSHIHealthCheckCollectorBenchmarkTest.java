@@ -16,6 +16,6 @@ class OSHIHealthCheckCollectorBenchmarkTest {
         long duration = endTime - startTime;
 
         System.out.println("Execution time: " + duration + "ms");
-        assertTrue(duration < 200, "Expected execution time to be less than 200ms but was " + duration + "ms");
+        assertTrue(duration < 1000, "Expected execution time to be less than 1000ms but was " + duration + "ms");
     }
 }

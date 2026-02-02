@@ -4,29 +4,21 @@ test.describe('Authentication Flow', () => {
 
   test('should login successfully with valid credentials', async ({ page }) => {
     // Mock Login Success
-    await page.route('**/auth/login', async route => {
-      const json = {
-        token: 'fake-jwt-token',
-        filiais: [
-          { id: 1, nome: 'Matriz', codigo: 'MTZ' }
-        ]
-      };
-      await route.fulfill({ json });
-    });
+    // Mock Login removed to use Real Backend
 
     // Mock Dashboard Stats (to prevent network errors on redirect)
     await page.route('**/dashboard/stats', async route => {
-       await route.fulfill({ json: { totalAtivos: 100, predicaoCritica: 0 } });
+      await route.fulfill({ json: { totalAtivos: 100, predicaoCritica: 0 } });
     });
 
     // Mock Alerts (to prevent network errors on redirect)
     await page.route('**/alerts/recent', async route => {
-        await route.fulfill({ json: [] });
+      await route.fulfill({ json: [] });
     });
 
     // Mock Recent Assets
     await page.route('**/ativos*', async route => {
-         await route.fulfill({ json: { content: [] } });
+      await route.fulfill({ json: { content: [] } });
     });
 
     await page.goto('/login');
@@ -44,12 +36,7 @@ test.describe('Authentication Flow', () => {
 
   test('should show error with invalid credentials', async ({ page }) => {
     // Mock Login Failure
-    await page.route('**/auth/login', async route => {
-      await route.fulfill({
-        status: 401,
-        json: { message: 'Bad credentials' }
-      });
-    });
+    // Mock Login Failure removed
 
     await page.goto('/login');
     await page.fill('input[type="email"]', 'admin@aegis.com');

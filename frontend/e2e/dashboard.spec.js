@@ -3,18 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Dashboard Analytics & SOTA Features', () => {
 
   test.beforeEach(async ({ page }) => {
-    // 1. Mock Login (Must include token AND filiais)
-    await page.route('**/auth/login', async route => {
-        await route.fulfill({
-            json: {
-                token: 'fake-jwt-token-sota-mvp',
-                filiais: [
-                    { id: 1, nome: 'Matriz', codigo: 'MTZ' },
-                    { id: 2, nome: 'Filial SP', codigo: 'SP' }
-                ]
-            }
-        });
-    });
+    // Mock Login removed to use Real Backend
 
     // 2. Mock the SOTA Dashboard Stats
     await page.route('**/dashboard/stats', async route => {
@@ -41,30 +30,30 @@ test.describe('Dashboard Analytics & SOTA Features', () => {
 
     // 3. Mock Recent Assets (Loose matcher to catch query params)
     await page.route('**/ativos*', async route => {
-        // Only mock if it's the dashboard list (check params if needed, or just return mock)
-        const json = {
-            content: [
-                { id: 101, nome: 'Dell Latitude 5420', tipoAtivoNome: 'Notebook', status: 'ATIVO' },
-                { id: 102, nome: 'Dell P2419H', tipoAtivoNome: 'Monitor', status: 'ATIVO' }
-            ]
-        };
-        await route.fulfill({ json });
+      // Only mock if it's the dashboard list (check params if needed, or just return mock)
+      const json = {
+        content: [
+          { id: 101, nome: 'Dell Latitude 5420', tipoAtivoNome: 'Notebook', status: 'ATIVO' },
+          { id: 102, nome: 'Dell P2419H', tipoAtivoNome: 'Monitor', status: 'ATIVO' }
+        ]
+      };
+      await route.fulfill({ json });
     });
 
     // 5. Mock Recent Alerts
     await page.route('**/alertas/recent', async route => {
-        const json = [
-            {
-                id: 1,
-                tipo: 'CRITICO',
-                titulo: 'CPU High Load',
-                mensagem: 'CPU usage is above 90%',
-                dataCriacao: '2024-05-20T10:00:00',
-                ativoNome: 'Server 01',
-                ativoId: 101
-            }
-        ];
-        await route.fulfill({ json });
+      const json = [
+        {
+          id: 1,
+          tipo: 'CRITICO',
+          titulo: 'CPU High Load',
+          mensagem: 'CPU usage is above 90%',
+          dataCriacao: '2024-05-20T10:00:00',
+          ativoNome: 'Server 01',
+          ativoId: 101
+        }
+      ];
+      await route.fulfill({ json });
     });
 
     // 4. Login Flow
@@ -103,16 +92,16 @@ test.describe('Dashboard Analytics & SOTA Features', () => {
   });
 
   test('Deve listar os ativos recentes', async ({ page }) => {
-      const table = page.locator('table');
-      await expect(table).toBeVisible();
-      await expect(page.getByText('Dell Latitude 5420')).toBeVisible();
+    const table = page.locator('table');
+    await expect(table).toBeVisible();
+    await expect(page.getByText('Dell Latitude 5420')).toBeVisible();
   });
 
   test('Deve exibir widget de alertas do sistema', async ({ page }) => {
-      const alertCard = page.locator('.card', { hasText: 'Alertas do Sistema' });
-      await expect(alertCard).toBeVisible();
-      await expect(alertCard.getByText('CPU High Load')).toBeVisible();
-      await expect(alertCard.getByText('Server 01')).toBeVisible();
+    const alertCard = page.locator('.card', { hasText: 'Alertas do Sistema' });
+    await expect(alertCard).toBeVisible();
+    await expect(alertCard.getByText('CPU High Load')).toBeVisible();
+    await expect(alertCard.getByText('Server 01')).toBeVisible();
   });
 
 });

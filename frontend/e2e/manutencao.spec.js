@@ -5,21 +5,13 @@ test.describe('Gestão de Manutenções', () => {
   // Fake DB
   let db = {
     manutencoes: [],
-    ativos: [{id: 1, nome: 'Notebook Dell', numeroPatrimonio: 'PAT-001'}]
+    ativos: [{ id: 1, nome: 'Notebook Dell', numeroPatrimonio: 'PAT-001' }]
   };
 
   test.beforeEach(async ({ page }) => {
     db.manutencoes = [];
 
-    // Mock Login
-    await page.route('**/auth/login', async route => {
-      await route.fulfill({
-        json: {
-          token: 'fake-jwt-token',
-          filiais: [{ id: 1, nome: 'Matriz', codigo: 'MTZ' }]
-        }
-      });
-    });
+    // Mock Login removed to use Real Backend
 
     // Mock Dashboard and Alerts (ignored for this test but needed for layout)
     await page.route('**/dashboard/stats', async route => route.fulfill({ json: {} }));
@@ -28,40 +20,40 @@ test.describe('Gestão de Manutenções', () => {
     // Mock Manutencoes API
     // GET /manutencoes
     await page.route('**/manutencoes?*', async route => {
-        if (route.request().method() === 'GET') {
-            await route.fulfill({
-                json: {
-                    content: db.manutencoes,
-                    totalElements: db.manutencoes.length,
-                    totalPages: 1,
-                    size: 10,
-                    number: 0
-                }
-            });
-        } else {
-            await route.continue();
-        }
+      if (route.request().method() === 'GET') {
+        await route.fulfill({
+          json: {
+            content: db.manutencoes,
+            totalElements: db.manutencoes.length,
+            totalPages: 1,
+            size: 10,
+            number: 0
+          }
+        });
+      } else {
+        await route.continue();
+      }
     });
 
     // POST /manutencoes (Create)
     await page.route('**/manutencoes', async route => {
-        if (route.request().method() === 'POST') {
-            const data = await route.request().postDataJSON();
-            const newId = db.manutencoes.length + 1;
-            const newManutencao = {
-                id: newId,
-                ...data,
-                ativoNome: 'Notebook Dell', // Mocked name
-                ativoNumeroPatrimonio: 'PAT-001',
-                solicitanteNome: 'Admin User',
-                status: 'SOLICITADA',
-                dataSolicitacao: new Date().toISOString()
-            };
-            db.manutencoes.push(newManutencao);
-            await route.fulfill({ json: newManutencao });
-        } else {
-            await route.continue();
-        }
+      if (route.request().method() === 'POST') {
+        const data = await route.request().postDataJSON();
+        const newId = db.manutencoes.length + 1;
+        const newManutencao = {
+          id: newId,
+          ...data,
+          ativoNome: 'Notebook Dell', // Mocked name
+          ativoNumeroPatrimonio: 'PAT-001',
+          solicitanteNome: 'Admin User',
+          status: 'SOLICITADA',
+          dataSolicitacao: new Date().toISOString()
+        };
+        db.manutencoes.push(newManutencao);
+        await route.fulfill({ json: newManutencao });
+      } else {
+        await route.continue();
+      }
     });
 
     // Login

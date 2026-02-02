@@ -3,21 +3,21 @@
 // Função para tratar respostas HTTP
 export const handleResponse = async (response) => {
   if (response.status === 401 || response.status === 403) {
-      // Opcional: Redirecionar para login ou limpar storage
-      // localStorage.removeItem('authToken');
-      // window.location.href = '/login';
+    // Opcional: Redirecionar para login ou limpar storage
+    // localStorage.removeItem('authToken');
+    // window.location.href = '/login';
   }
 
   if (!response.ok) {
     const error = await response.text();
     throw new Error(error || 'Erro na requisição');
   }
-  
+
   // Se a resposta for 204 (No Content), retorna null
   if (response.status === 204) {
     return null;
   }
-  
+
   return response.json();
 };
 
@@ -34,50 +34,53 @@ export const fetchConfig = {
 
 // Wrapper para fetch que injeta headers automaticamente
 export const request = async (endpoint, options = {}) => {
-    const token = localStorage.getItem('authToken');
-    const filialId = localStorage.getItem('currentFilial');
+  const token = localStorage.getItem('authToken');
+  const filialId = localStorage.getItem('currentFilial');
 
-    const headers = {
-        ...options.headers,
-    };
+  const headers = {
+    ...options.headers,
+  };
 
-    if (!headers['Content-Type'] && !(options.body instanceof FormData)) {
-        headers['Content-Type'] = 'application/json';
+  if (!headers['Content-Type'] && !(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  if (token) {
+    console.log('Adding Authorization header with token:', token);
+    headers['Authorization'] = `Bearer ${token}`;
+  } else {
+    console.log('No token found in localStorage');
+  }
+
+  if (filialId) {
+    headers['X-Filial-ID'] = filialId;
+  }
+
+  let url = `${fetchConfig.baseURL}${endpoint}`;
+
+  if (options.params) {
+    const query = new URLSearchParams(options.params).toString();
+    url += `?${query}`;
+  }
+
+  if (options.body && typeof options.body === 'object' && !(options.body instanceof FormData) && !(options.body instanceof URLSearchParams)) {
+    options.body = JSON.stringify(options.body);
+  }
+
+  const response = await fetch(url, {
+    ...options,
+    headers
+  });
+
+  if (options.responseType === 'blob') {
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(error || 'Erro na requisição');
     }
+    return response.blob();
+  }
 
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    if (filialId) {
-        headers['X-Filial-ID'] = filialId;
-    }
-
-    let url = `${fetchConfig.baseURL}${endpoint}`;
-
-    if (options.params) {
-        const query = new URLSearchParams(options.params).toString();
-        url += `?${query}`;
-    }
-
-    if (options.body && typeof options.body === 'object' && !(options.body instanceof FormData) && !(options.body instanceof URLSearchParams)) {
-        options.body = JSON.stringify(options.body);
-    }
-
-    const response = await fetch(url, {
-        ...options,
-        headers
-    });
-
-    if (options.responseType === 'blob') {
-        if (!response.ok) {
-             const error = await response.text();
-             throw new Error(error || 'Erro na requisição');
-        }
-        return response.blob();
-    }
-
-    return handleResponse(response);
+  return handleResponse(response);
 };
 
 // Interceptor legado (mantido para compatibilidade se usado em outro lugar, mas request() é preferido)

@@ -40,25 +40,30 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             return;
         }
 
-        jwt = authHeader.substring(7); // Extrai o token (remove "Bearer ")
-        userEmail = jwtService.extractUsername(jwt);
+        try {
+            jwt = authHeader.substring(7); // Extrai o token (remove "Bearer ")
+            userEmail = jwtService.extractUsername(jwt);
 
-        // Se temos o email e o usuário ainda não está autenticado no contexto de segurança
-        if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
+            // Se temos o email e o usuário ainda não está autenticado no contexto de
+            // segurança
+            if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
 
-            // Se o token for válido, autentica o usuário para esta requisição
-            if (jwtService.isTokenValid(jwt, userDetails)) {
-                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                        userDetails,
-                        null, // Não precisamos de credenciais (senha) aqui
-                        userDetails.getAuthorities()
-                );
-                authToken.setDetails(
-                        new WebAuthenticationDetailsSource().buildDetails(request)
-                );
-                SecurityContextHolder.getContext().setAuthentication(authToken);
+                // Se o token for válido, autentica o usuário para esta requisição
+                if (jwtService.isTokenValid(jwt, userDetails)) {
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null, // Não precisamos de credenciais (senha) aqui
+                            userDetails.getAuthorities());
+                    authToken.setDetails(
+                            new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
             }
+        } catch (Exception e) {
+            // Logar erro de token inválido se necessário, mas não interromper o filtro
+            // O usuário permanecerá não autenticado
+            System.out.println("Erro ao processar token JWT: " + e.getMessage());
         }
         filterChain.doFilter(request, response);
     }

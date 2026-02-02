@@ -3,17 +3,8 @@ import { test, expect } from '@playwright/test';
 test.describe('Dashboard Predictive Visualization (SOTA)', () => {
 
   test.beforeEach(async ({ page }) => {
-    // 1. Mock Login
-    await page.route('**/auth/login', async route => {
-        await route.fulfill({
-            json: {
-                token: 'fake-jwt-token-sota-mvp',
-                filiais: [
-                    { id: 1, nome: 'Matriz', codigo: 'MTZ' }
-                ]
-            }
-        });
-    });
+    // Mock Login removed to use Real Backend
+    // await page.route('**/auth/login', ...);
 
     // 2. Mock Stats with Predictive Data
     await page.route('**/dashboard/stats', async route => {
@@ -48,8 +39,8 @@ test.describe('Dashboard Predictive Visualization (SOTA)', () => {
 
     // 3. Mock Recent Assets
     await page.route('**/ativos*', async route => {
-        const json = { content: [] };
-        await route.fulfill({ json });
+      const json = { content: [] };
+      await route.fulfill({ json });
     });
 
     // 4. Login and go to Dashboard
