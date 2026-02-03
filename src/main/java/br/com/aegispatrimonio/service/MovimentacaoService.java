@@ -10,11 +10,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Objects;
 import java.util.Optional;
@@ -29,7 +27,6 @@ public class MovimentacaoService {
     private final AtivoRepository ativoRepository;
     private final LocalizacaoRepository localizacaoRepository;
     private final FuncionarioRepository funcionarioRepository;
-    private final FornecedorRepository fornecedorRepository;
 
     @Transactional
     public MovimentacaoResponseDTO criar(MovimentacaoRequestDTO request) {
@@ -66,22 +63,26 @@ public class MovimentacaoService {
 
     @Transactional(readOnly = true)
     public Page<MovimentacaoResponseDTO> findByFuncionarioDestinoId(Long funcionarioDestinoId, Pageable pageable) {
-        return movimentacaoRepository.findByFuncionarioDestinoId(funcionarioDestinoId, pageable).map(this::convertToResponseDTO);
+        return movimentacaoRepository.findByFuncionarioDestinoId(funcionarioDestinoId, pageable)
+                .map(this::convertToResponseDTO);
     }
 
     @Transactional(readOnly = true)
     public Page<MovimentacaoResponseDTO> findByLocalizacaoDestinoId(Long localizacaoDestinoId, Pageable pageable) {
-        return movimentacaoRepository.findByLocalizacaoDestinoId(localizacaoDestinoId, pageable).map(this::convertToResponseDTO);
+        return movimentacaoRepository.findByLocalizacaoDestinoId(localizacaoDestinoId, pageable)
+                .map(this::convertToResponseDTO);
     }
 
     @Transactional(readOnly = true)
     public Page<MovimentacaoResponseDTO> findByPeriodo(LocalDate startDate, LocalDate endDate, Pageable pageable) {
-        return movimentacaoRepository.findByDataMovimentacaoBetween(startDate, endDate, pageable).map(this::convertToResponseDTO);
+        return movimentacaoRepository.findByDataMovimentacaoBetween(startDate, endDate, pageable)
+                .map(this::convertToResponseDTO);
     }
 
     @Transactional(readOnly = true)
     public Page<MovimentacaoResponseDTO> findMovimentacoesPendentesPorAtivo(Long ativoId, Pageable pageable) {
-        return movimentacaoRepository.findByAtivoIdAndStatus(ativoId, StatusMovimentacao.PENDENTE, pageable).map(this::convertToResponseDTO);
+        return movimentacaoRepository.findByAtivoIdAndStatus(ativoId, StatusMovimentacao.PENDENTE, pageable)
+                .map(this::convertToResponseDTO);
     }
 
     @Transactional
@@ -142,23 +143,29 @@ public class MovimentacaoService {
                 .orElseThrow(() -> new ResourceNotFoundException("Ativo não encontrado com ID: " + request.ativoId()));
 
         if (ativo.getStatus() != StatusAtivo.ATIVO) {
-            throw new ResourceConflictException("Não é possível movimentar um ativo que não está com status 'ATIVO'. Status atual: " + ativo.getStatus());
+            throw new ResourceConflictException(
+                    "Não é possível movimentar um ativo que não está com status 'ATIVO'. Status atual: "
+                            + ativo.getStatus());
         }
 
         Localizacao localizacaoOrigem = ativo.getLocalizacao();
         Funcionario funcionarioOrigem = ativo.getFuncionarioResponsavel();
 
         if (!Objects.equals(localizacaoOrigem.getId(), request.localizacaoOrigemId())) {
-            throw new ResourceConflictException("A localização de origem informada não corresponde à localização atual do ativo.");
+            throw new ResourceConflictException(
+                    "A localização de origem informada não corresponde à localização atual do ativo.");
         }
         if (!Objects.equals(funcionarioOrigem.getId(), request.funcionarioOrigemId())) {
-            throw new ResourceConflictException("O funcionário de origem informado não corresponde ao responsável atual do ativo.");
+            throw new ResourceConflictException(
+                    "O funcionário de origem informado não corresponde ao responsável atual do ativo.");
         }
 
         Localizacao localizacaoDestino = localizacaoRepository.findById(request.localizacaoDestinoId())
-                .orElseThrow(() -> new ResourceNotFoundException("Localização de destino não encontrada com ID: " + request.localizacaoDestinoId()));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Localização de destino não encontrada com ID: " + request.localizacaoDestinoId()));
         Funcionario funcionarioDestino = funcionarioRepository.findById(request.funcionarioDestinoId())
-                .orElseThrow(() -> new ResourceNotFoundException("Funcionário de destino não encontrado com ID: " + request.funcionarioDestinoId()));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Funcionário de destino não encontrado com ID: " + request.funcionarioDestinoId()));
 
         Long filialIdDoAtivo = ativo.getFilial().getId();
         if (!Objects.equals(localizacaoDestino.getFilial().getId(), filialIdDoAtivo)) {

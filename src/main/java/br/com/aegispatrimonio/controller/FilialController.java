@@ -14,12 +14,11 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.server.ResponseStatusException;
-import org.springframework.http.ProblemDetail; // Importar ProblemDetail para erros
 
 import java.util.List;
 import java.util.Optional;
@@ -41,15 +40,11 @@ public class FilialController {
         this.filialService = filialService;
     }
 
-    @Operation(summary = "Lista todas as filiais",
-               description = "Retorna uma lista de todas as filiais. Acesso permitido para ADMIN e USER.")
+    @Operation(summary = "Lista todas as filiais", description = "Retorna uma lista de todas as filiais. Acesso permitido para ADMIN e USER.")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Lista de filiais retornada com sucesso",
-                    content = @Content(schema = @Schema(implementation = FilialDTO.class))),
-        @ApiResponse(responseCode = "401", description = "Não autenticado",
-                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
-        @ApiResponse(responseCode = "403", description = "Sem permissão de acesso",
-                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+            @ApiResponse(responseCode = "200", description = "Lista de filiais retornada com sucesso", content = @Content(schema = @Schema(implementation = FilialDTO.class))),
+            @ApiResponse(responseCode = "401", description = "Não autenticado", content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "403", description = "Sem permissão de acesso", content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
@@ -57,39 +52,29 @@ public class FilialController {
         return filialService.listarTodos();
     }
 
-    @Operation(summary = "Busca uma filial por ID",
-               description = "Retorna os detalhes de uma filial específica. Acesso permitido para ADMIN e USER.")
+    @Operation(summary = "Busca uma filial por ID", description = "Retorna os detalhes de uma filial específica. Acesso permitido para ADMIN e USER.")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Filial encontrada",
-                    content = @Content(schema = @Schema(implementation = FilialDTO.class))),
-        @ApiResponse(responseCode = "401", description = "Não autenticado",
-                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
-        @ApiResponse(responseCode = "403", description = "Sem permissão de acesso",
-                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
-        @ApiResponse(responseCode = "404", description = "Filial não encontrada",
-                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+            @ApiResponse(responseCode = "200", description = "Filial encontrada", content = @Content(schema = @Schema(implementation = FilialDTO.class))),
+            @ApiResponse(responseCode = "401", description = "Não autenticado", content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "403", description = "Sem permissão de acesso", content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "404", description = "Filial não encontrada", content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    public ResponseEntity<FilialDTO> buscarPorId(@Parameter(description = "ID da filial", example = "1") @PathVariable Long id) {
+    public ResponseEntity<FilialDTO> buscarPorId(
+            @Parameter(description = "ID da filial", example = "1") @PathVariable Long id) {
         Optional<FilialDTO> filial = filialService.buscarPorId(id);
         return filial.map(ResponseEntity::ok)
-                     .orElseGet(() -> ResponseEntity.notFound().build());
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    @Operation(summary = "Cria uma nova filial",
-               description = "Cria uma nova filial no sistema. Acesso restrito a ADMIN.")
+    @Operation(summary = "Cria uma nova filial", description = "Cria uma nova filial no sistema. Acesso restrito a ADMIN.")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "201", description = "Filial criada com sucesso",
-                    content = @Content(schema = @Schema(implementation = FilialDTO.class))),
-        @ApiResponse(responseCode = "400", description = "Dados inválidos",
-                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
-        @ApiResponse(responseCode = "401", description = "Não autenticado",
-                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
-        @ApiResponse(responseCode = "403", description = "Sem permissão de acesso (apenas ADMIN)",
-                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
-        @ApiResponse(responseCode = "409", description = "Conflito (ex: CNPJ ou código duplicado)",
-                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+            @ApiResponse(responseCode = "201", description = "Filial criada com sucesso", content = @Content(schema = @Schema(implementation = FilialDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Dados inválidos", content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "401", description = "Não autenticado", content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "403", description = "Sem permissão de acesso (apenas ADMIN)", content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "409", description = "Conflito (ex: CNPJ ou código duplicado)", content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -98,42 +83,32 @@ public class FilialController {
         return filialService.criar(filialCreateDTO);
     }
 
-    @Operation(summary = "Atualiza uma filial existente",
-               description = "Atualiza os dados de uma filial específica. Acesso restrito a ADMIN.")
+    @Operation(summary = "Atualiza uma filial existente", description = "Atualiza os dados de uma filial específica. Acesso restrito a ADMIN.")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Filial atualizada com sucesso",
-                    content = @Content(schema = @Schema(implementation = FilialDTO.class))),
-        @ApiResponse(responseCode = "400", description = "Dados inválidos",
-                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
-        @ApiResponse(responseCode = "401", description = "Não autenticado",
-                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
-        @ApiResponse(responseCode = "403", description = "Sem permissão de acesso (apenas ADMIN)",
-                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
-        @ApiResponse(responseCode = "404", description = "Filial não encontrada",
-                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
-        @ApiResponse(responseCode = "409", description = "Conflito (ex: CNPJ ou código duplicado)",
-                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+            @ApiResponse(responseCode = "200", description = "Filial atualizada com sucesso", content = @Content(schema = @Schema(implementation = FilialDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Dados inválidos", content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "401", description = "Não autenticado", content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "403", description = "Sem permissão de acesso (apenas ADMIN)", content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "404", description = "Filial não encontrada", content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "409", description = "Conflito (ex: CNPJ ou código duplicado)", content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<FilialDTO> atualizar(@Parameter(description = "ID da filial", example = "1") @PathVariable Long id, @RequestBody @Valid FilialUpdateDTO filialUpdateDTO) {
+    public ResponseEntity<FilialDTO> atualizar(
+            @Parameter(description = "ID da filial", example = "1") @PathVariable Long id,
+            @RequestBody @Valid FilialUpdateDTO filialUpdateDTO) {
         Optional<FilialDTO> filialAtualizada = filialService.atualizar(id, filialUpdateDTO);
         return filialAtualizada.map(ResponseEntity::ok)
-                               .orElseGet(() -> ResponseEntity.notFound().build());
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    @Operation(summary = "Deleta uma filial (exclusão lógica)",
-               description = "Marca uma filial como INATIVA. Acesso restrito a ADMIN.")
+    @Operation(summary = "Deleta uma filial (exclusão lógica)", description = "Marca uma filial como INATIVA. Acesso restrito a ADMIN.")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "204", description = "Filial deletada com sucesso"),
-        @ApiResponse(responseCode = "401", description = "Não autenticado",
-                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
-        @ApiResponse(responseCode = "403", description = "Sem permissão de acesso (apenas ADMIN)",
-                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
-        @ApiResponse(responseCode = "404", description = "Filial não encontrada",
-                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
-        @ApiResponse(responseCode = "409", description = "Conflito (ex: departamentos/funcionários associados)",
-                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+            @ApiResponse(responseCode = "204", description = "Filial deletada com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Não autenticado", content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "403", description = "Sem permissão de acesso (apenas ADMIN)", content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "404", description = "Filial não encontrada", content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "409", description = "Conflito (ex: departamentos/funcionários associados)", content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)

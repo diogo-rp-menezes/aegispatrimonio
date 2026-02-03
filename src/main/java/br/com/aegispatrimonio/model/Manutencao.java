@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.SQLDelete;
-import org.hibernate.annotations.Where;
+import org.hibernate.annotations.SQLRestriction;
 import org.hibernate.envers.Audited;
 import org.hibernate.envers.RelationTargetAuditMode;
 
@@ -21,9 +21,9 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString(exclude = {"ativo", "fornecedor", "solicitante", "tecnicoResponsavel"})
+@ToString(exclude = { "ativo", "fornecedor", "solicitante", "tecnicoResponsavel" })
 @SQLDelete(sql = "UPDATE manutencoes SET status = 'CANCELADA' WHERE id = ?")
-@Where(clause = "status <> 'CANCELADA'")
+@SQLRestriction("status <> 'CANCELADA'")
 @Audited
 public class Manutencao {
 

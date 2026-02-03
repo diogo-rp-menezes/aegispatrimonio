@@ -5,7 +5,6 @@ import br.com.aegispatrimonio.dto.healthcheck.HealthCheckPayloadDTO;
 import br.com.aegispatrimonio.model.*;
 import br.com.aegispatrimonio.repository.AlertaRepository;
 import br.com.aegispatrimonio.repository.AtivoRepository;
-import br.com.aegispatrimonio.repository.FuncionarioRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -18,9 +17,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 public class AlertNotificationService {
@@ -30,8 +27,8 @@ public class AlertNotificationService {
     private final UserContextService userContextService;
 
     public AlertNotificationService(AlertaRepository alertaRepository,
-                                    AtivoRepository ativoRepository,
-                                    UserContextService userContextService) {
+            AtivoRepository ativoRepository,
+            UserContextService userContextService) {
         this.alertaRepository = alertaRepository;
         this.ativoRepository = ativoRepository;
         this.userContextService = userContextService;
@@ -94,7 +91,9 @@ public class AlertNotificationService {
         // CPU Check (> 90%)
         if (payload.cpuLoad() != null && payload.cpuLoad() > 0.90) {
             createAlertIfNotExists(ativo, TipoAlerta.CRITICO, "Sobrecarga de CPU Detectada",
-                    "O uso de CPU está em " + String.format("%.1f", payload.cpuLoad() * 100) + "%. Verifique processos travados.", existingAlerts);
+                    "O uso de CPU está em " + String.format("%.1f", payload.cpuLoad() * 100)
+                            + "%. Verifique processos travados.",
+                    existingAlerts);
         }
 
         // Memory Check (< 10% free)
@@ -102,7 +101,9 @@ public class AlertNotificationService {
             double freePercent = (double) payload.memoryAvailable() / payload.memoryTotal();
             if (freePercent < 0.10) {
                 createAlertIfNotExists(ativo, TipoAlerta.CRITICO, "Memória RAM Crítica",
-                        "Memória livre está abaixo de 10% (" + String.format("%.1f", freePercent * 100) + "%). Risco de travamento.", existingAlerts);
+                        "Memória livre está abaixo de 10% (" + String.format("%.1f", freePercent * 100)
+                                + "%). Risco de travamento.",
+                        existingAlerts);
             }
         }
 
@@ -115,16 +116,19 @@ public class AlertNotificationService {
                 }
 
                 if (freePercent != null && freePercent < 0.10) {
-                    String diskName = disk.model() != null ? disk.model() : (disk.serial() != null ? disk.serial() : "Desconhecido");
+                    String diskName = disk.model() != null ? disk.model()
+                            : (disk.serial() != null ? disk.serial() : "Desconhecido");
                     createAlertIfNotExists(ativo, TipoAlerta.CRITICO, "Espaço em Disco Crítico",
                             "O disco " + diskName + " está com menos de 10% de espaço livre (" +
-                            String.format("%.1f", freePercent * 100) + "%). Risco de parada.", existingAlerts);
+                                    String.format("%.1f", freePercent * 100) + "%). Risco de parada.",
+                            existingAlerts);
                 }
             }
         }
     }
 
-    private void checkDiskPredictiveAlerts(Ativo ativo, LocalDate previsaoEsgotamentoDisco, List<Alerta> existingAlerts) {
+    private void checkDiskPredictiveAlerts(Ativo ativo, LocalDate previsaoEsgotamentoDisco,
+            List<Alerta> existingAlerts) {
         if (previsaoEsgotamentoDisco == null) {
             return;
         }
@@ -135,14 +139,19 @@ public class AlertNotificationService {
         // Se a previsão já passou (negativo) ou é hoje/amanhã, também é crítico
         if (daysUntilExhaustion < 7) {
             createAlertIfNotExists(ativo, TipoAlerta.CRITICO, "Risco Crítico de Falha de Disco",
-                    "A previsão de esgotamento do disco é para " + daysUntilExhaustion + " dias (" + previsaoEsgotamentoDisco + "). Ação imediata necessária.", existingAlerts);
+                    "A previsão de esgotamento do disco é para " + daysUntilExhaustion + " dias ("
+                            + previsaoEsgotamentoDisco + "). Ação imediata necessária.",
+                    existingAlerts);
         } else if (daysUntilExhaustion < 30) {
             createAlertIfNotExists(ativo, TipoAlerta.WARNING, "Alerta de Capacidade de Disco",
-                    "A previsão de esgotamento do disco é para " + daysUntilExhaustion + " dias (" + previsaoEsgotamentoDisco + "). Planeje a manutenção.", existingAlerts);
+                    "A previsão de esgotamento do disco é para " + daysUntilExhaustion + " dias ("
+                            + previsaoEsgotamentoDisco + "). Planeje a manutenção.",
+                    existingAlerts);
         }
     }
 
-    private void createAlertIfNotExists(Ativo ativo, TipoAlerta tipo, String titulo, String mensagem, List<Alerta> existingAlerts) {
+    private void createAlertIfNotExists(Ativo ativo, TipoAlerta tipo, String titulo, String mensagem,
+            List<Alerta> existingAlerts) {
         // Evita criar múltiplos alertas não lidos do mesmo tipo para o mesmo ativo
         boolean exists = existingAlerts.stream().anyMatch(a -> a.getTipo() == tipo);
         if (!exists) {

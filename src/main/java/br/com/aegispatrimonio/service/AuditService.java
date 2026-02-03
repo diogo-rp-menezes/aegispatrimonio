@@ -31,13 +31,14 @@ public class AuditService {
     }
 
     @Transactional(readOnly = true)
+    @SuppressWarnings("unchecked")
     public List<EntityRevisionDTO<AtivoDTO>> getAtivoHistory(Long id) {
         AuditReader reader = AuditReaderFactory.get(entityManager);
         Long currentFilialId = TenantContext.getFilialId();
 
         AuditQuery query = reader.createQuery()
-            .forRevisionsOfEntity(Ativo.class, false, true)
-            .add(AuditEntity.id().eq(id));
+                .forRevisionsOfEntity(Ativo.class, false, true)
+                .add(AuditEntity.id().eq(id));
 
         // Enforce Tenancy Isolation on the Audit Trail
         if (currentFilialId != null) {
@@ -47,16 +48,16 @@ public class AuditService {
         List<Object[]> results = query.getResultList();
 
         return results.stream()
-            .map(result -> {
-                Ativo entity = (Ativo) result[0];
-                CustomRevisionEntity revisionEntity = (CustomRevisionEntity) result[1];
-                RevisionType revisionType = (RevisionType) result[2];
+                .map(result -> {
+                    Ativo entity = (Ativo) result[0];
+                    CustomRevisionEntity revisionEntity = (CustomRevisionEntity) result[1];
+                    RevisionType revisionType = (RevisionType) result[2];
 
-                AtivoDTO dto = ativoMapper.toDTO(entity);
-                RevisionDTO revisionDTO = RevisionDTO.from(revisionEntity, revisionType);
+                    AtivoDTO dto = ativoMapper.toDTO(entity);
+                    RevisionDTO revisionDTO = RevisionDTO.from(revisionEntity, revisionType);
 
-                return new EntityRevisionDTO<>(dto, revisionDTO);
-            })
-            .collect(Collectors.toList());
+                    return new EntityRevisionDTO<>(dto, revisionDTO);
+                })
+                .collect(Collectors.toList());
     }
 }

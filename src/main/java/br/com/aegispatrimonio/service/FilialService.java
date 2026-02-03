@@ -10,7 +10,6 @@ import br.com.aegispatrimonio.model.Usuario;
 import br.com.aegispatrimonio.repository.DepartamentoRepository;
 import br.com.aegispatrimonio.repository.FilialRepository;
 import br.com.aegispatrimonio.repository.FuncionarioRepository;
-import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -33,7 +32,9 @@ public class FilialService {
     private final FilialMapper filialMapper;
     private final CurrentUserProvider currentUserProvider; // Injetando CurrentUserProvider
 
-    public FilialService(FilialRepository filialRepository, DepartamentoRepository departamentoRepository, FuncionarioRepository funcionarioRepository, FilialMapper filialMapper, CurrentUserProvider currentUserProvider) {
+    public FilialService(FilialRepository filialRepository, DepartamentoRepository departamentoRepository,
+            FuncionarioRepository funcionarioRepository, FilialMapper filialMapper,
+            CurrentUserProvider currentUserProvider) {
         this.filialRepository = filialRepository;
         this.departamentoRepository = departamentoRepository;
         this.funcionarioRepository = funcionarioRepository;
@@ -65,7 +66,8 @@ public class FilialService {
         Filial filialSalva = filialRepository.save(filial);
 
         Usuario usuarioLogado = currentUserProvider.getCurrentUsuario();
-        logger.info("AUDIT: Usuário {} criou a filial com ID {} e nome {}.", usuarioLogado.getEmail(), filialSalva.getId(), filialSalva.getNome());
+        logger.info("AUDIT: Usuário {} criou a filial com ID {} e nome {}.", usuarioLogado.getEmail(),
+                filialSalva.getId(), filialSalva.getNome());
 
         return filialMapper.toDTO(filialSalva);
     }
@@ -93,7 +95,8 @@ public class FilialService {
         Filial filialAtualizada = filialRepository.save(filial);
 
         Usuario usuarioLogado = currentUserProvider.getCurrentUsuario();
-        logger.info("AUDIT: Usuário {} atualizou a filial com ID {} e nome {}.", usuarioLogado.getEmail(), filialAtualizada.getId(), filialAtualizada.getNome());
+        logger.info("AUDIT: Usuário {} atualizou a filial com ID {} e nome {}.", usuarioLogado.getEmail(),
+                filialAtualizada.getId(), filialAtualizada.getNome());
 
         return Optional.of(filialMapper.toDTO(filialAtualizada));
     }
@@ -101,20 +104,24 @@ public class FilialService {
     @Transactional
     public void deletar(Long id) {
         Filial filial = filialRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Filial não encontrada com ID: " + id));
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Filial não encontrada com ID: " + id));
 
         if (departamentoRepository.existsByFilialId(id)) {
-            throw new IllegalStateException("Não é possível deletar a filial, pois existem departamentos associados a ela.");
+            throw new IllegalStateException(
+                    "Não é possível deletar a filial, pois existem departamentos associados a ela.");
         }
 
         if (funcionarioRepository.existsByFiliais_Id(id)) {
-            throw new IllegalStateException("Não é possível deletar a filial, pois existem funcionários associados a ela.");
+            throw new IllegalStateException(
+                    "Não é possível deletar a filial, pois existem funcionários associados a ela.");
         }
 
         filialRepository.delete(filial);
 
         Usuario usuarioLogado = currentUserProvider.getCurrentUsuario();
-        logger.info("AUDIT: Usuário {} deletou a filial com ID {} e nome {}.", usuarioLogado.getEmail(), id, filial.getNome());
+        logger.info("AUDIT: Usuário {} deletou a filial com ID {} e nome {}.", usuarioLogado.getEmail(), id,
+                filial.getNome());
     }
 
     private void validarUnicidade(String cnpj, String codigo, Long id) {

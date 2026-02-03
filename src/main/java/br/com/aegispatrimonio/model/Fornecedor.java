@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.SQLDelete;
-import org.hibernate.annotations.Where;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDateTime;
 
@@ -19,13 +19,13 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @ToString
 @SQLDelete(sql = "UPDATE fornecedores SET status = 'INATIVO' WHERE id = ?")
-@Where(clause = "status = 'ATIVO'")
+@SQLRestriction("status = 'ATIVO'")
 public class Fornecedor {
-    
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
     @Column(nullable = false)
     private String nome;
 
@@ -37,10 +37,10 @@ public class Fornecedor {
 
     @Column(name = "nome_contato_principal")
     private String nomeContatoPrincipal;
-    
+
     @Column(name = "email_principal")
     private String emailPrincipal;
-    
+
     @Column(name = "telefone_principal")
     private String telefonePrincipal;
 
@@ -50,13 +50,13 @@ public class Fornecedor {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private StatusFornecedor status;
-    
+
     @Column(name = "criado_em")
     private LocalDateTime criadoEm;
-    
+
     @Column(name = "atualizado_em")
     private LocalDateTime atualizadoEm;
-    
+
     @PrePersist
     protected void onCreate() {
         criadoEm = LocalDateTime.now();
@@ -65,7 +65,7 @@ public class Fornecedor {
             status = StatusFornecedor.ATIVO;
         }
     }
-    
+
     @PreUpdate
     public void preUpdate() {
         this.atualizadoEm = LocalDateTime.now();

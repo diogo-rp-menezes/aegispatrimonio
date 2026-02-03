@@ -1,6 +1,5 @@
 package br.com.aegispatrimonio.config;
 
-import br.com.aegispatrimonio.model.Usuario;
 import br.com.aegispatrimonio.repository.UsuarioRepository;
 import br.com.aegispatrimonio.security.CustomUserDetails;
 import br.com.aegispatrimonio.security.JwtService;

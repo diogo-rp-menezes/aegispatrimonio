@@ -19,7 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -45,7 +44,13 @@ public class AtivoService implements IAtivoService {
     private final SearchOptimizationService searchOptimizationService;
     private final UserContextService userContextService;
 
-    public AtivoService(AtivoRepository ativoRepository, AtivoMapper ativoMapper, TipoAtivoRepository tipoAtivoRepository, LocalizacaoRepository localizacaoRepository, FornecedorRepository fornecedorRepository, FuncionarioRepository funcionarioRepository, FilialRepository filialRepository, ManutencaoRepository manutencaoRepository, MovimentacaoRepository movimentacaoRepository, DepreciacaoService depreciacaoService, AtivoHealthHistoryRepository healthHistoryRepository, SearchOptimizationService searchOptimizationService, UserContextService userContextService) {
+    public AtivoService(AtivoRepository ativoRepository, AtivoMapper ativoMapper,
+            TipoAtivoRepository tipoAtivoRepository, LocalizacaoRepository localizacaoRepository,
+            FornecedorRepository fornecedorRepository, FuncionarioRepository funcionarioRepository,
+            FilialRepository filialRepository, ManutencaoRepository manutencaoRepository,
+            MovimentacaoRepository movimentacaoRepository, DepreciacaoService depreciacaoService,
+            AtivoHealthHistoryRepository healthHistoryRepository, SearchOptimizationService searchOptimizationService,
+            UserContextService userContextService) {
         this.ativoRepository = ativoRepository;
         this.ativoMapper = ativoMapper;
         this.tipoAtivoRepository = tipoAtivoRepository;
@@ -64,9 +69,10 @@ public class AtivoService implements IAtivoService {
     @Override
     @Transactional(readOnly = true)
     public Page<AtivoDTO> listarTodos(org.springframework.data.domain.Pageable pageable,
-                                      AtivoQueryParams queryParams) {
-        org.springframework.data.domain.Pageable effectivePageable =
-                (pageable == null) ? org.springframework.data.domain.Pageable.unpaged() : pageable;
+            AtivoQueryParams queryParams) {
+        org.springframework.data.domain.Pageable effectivePageable = (pageable == null)
+                ? org.springframework.data.domain.Pageable.unpaged()
+                : pageable;
 
         Long filialId = queryParams.filialId();
         Long tipoAtivoId = queryParams.tipoAtivoId();
@@ -105,13 +111,16 @@ public class AtivoService implements IAtivoService {
         // 2. Fuzzy Search Path (Shift Left Optimization)
         if (isFuzzySearch) {
             List<AtivoNameDTO> candidates;
-            // Fetch candidates matching other filters, ignoring name (limited to 1000 for safety)
+            // Fetch candidates matching other filters, ignoring name (limited to 1000 for
+            // safety)
             org.springframework.data.domain.Pageable limit = org.springframework.data.domain.PageRequest.of(0, 1000);
 
             if (isAdmin) {
-                candidates = ativoRepository.findSimpleByFilters(filialId, tipoAtivoId, status, minDate, maxDate, hasPrediction, limit);
+                candidates = ativoRepository.findSimpleByFilters(filialId, tipoAtivoId, status, minDate, maxDate,
+                        hasPrediction, limit);
             } else {
-                candidates = ativoRepository.findSimpleByFilialIdsAndFilters(userFiliais, filialId, tipoAtivoId, status, minDate, maxDate, hasPrediction, limit);
+                candidates = ativoRepository.findSimpleByFilialIdsAndFilters(userFiliais, filialId, tipoAtivoId, status,
+                        minDate, maxDate, hasPrediction, limit);
             }
 
             // Rank in memory using Levenshtein distance
@@ -122,7 +131,7 @@ public class AtivoService implements IAtivoService {
             int end = Math.min((start + effectivePageable.getPageSize()), ranked.size());
 
             if (start > ranked.size()) {
-                 return new PageImpl<>(List.of(), effectivePageable, ranked.size());
+                return new PageImpl<>(List.of(), effectivePageable, ranked.size());
             }
 
             List<AtivoNameDTO> pageContentDTOs = ranked.subList(start, end);
@@ -131,12 +140,13 @@ public class AtivoService implements IAtivoService {
             List<Ativo> fullEntities = ativoRepository.findAllByIdInWithDetails(ids);
 
             // Sort entities to match ranking order
-            Map<Long, Ativo> entityMap = fullEntities.stream().collect(Collectors.toMap(Ativo::getId, Function.identity()));
+            Map<Long, Ativo> entityMap = fullEntities.stream()
+                    .collect(Collectors.toMap(Ativo::getId, Function.identity()));
             List<AtivoDTO> pageContent = ids.stream()
-                .map(entityMap::get)
-                .filter(Objects::nonNull)
-                .map(ativoMapper::toDTO)
-                .collect(Collectors.toList());
+                    .map(entityMap::get)
+                    .filter(Objects::nonNull)
+                    .map(ativoMapper::toDTO)
+                    .collect(Collectors.toList());
 
             return new PageImpl<>(pageContent, effectivePageable, ranked.size());
         }
@@ -147,14 +157,18 @@ public class AtivoService implements IAtivoService {
 
         if (isAdmin) {
             if (unpaged && !hasFilters) {
-                return new PageImpl<>(ativoRepository.findAllWithDetails().stream().map(ativoMapper::toDTO).collect(Collectors.toList()));
+                return new PageImpl<>(ativoRepository.findAllWithDetails().stream().map(ativoMapper::toDTO)
+                        .collect(Collectors.toList()));
             }
-            return ativoRepository.findByFilters(filialId, tipoAtivoId, status, null, minDate, maxDate, hasPrediction, effectivePageable).map(ativoMapper::toDTO);
+            return ativoRepository.findByFilters(filialId, tipoAtivoId, status, null, minDate, maxDate, hasPrediction,
+                    effectivePageable).map(ativoMapper::toDTO);
         } else {
             if (unpaged && !hasFilters) {
-                return new PageImpl<>(ativoRepository.findByFilialIdInWithDetails(userFiliais).stream().map(ativoMapper::toDTO).collect(Collectors.toList()));
+                return new PageImpl<>(ativoRepository.findByFilialIdInWithDetails(userFiliais).stream()
+                        .map(ativoMapper::toDTO).collect(Collectors.toList()));
             }
-            return ativoRepository.findByFilialIdsAndFilters(userFiliais, filialId, tipoAtivoId, status, null, minDate, maxDate, hasPrediction, effectivePageable).map(ativoMapper::toDTO);
+            return ativoRepository.findByFilialIdsAndFilters(userFiliais, filialId, tipoAtivoId, status, null, minDate,
+                    maxDate, hasPrediction, effectivePageable).map(ativoMapper::toDTO);
         }
     }
 
@@ -189,27 +203,33 @@ public class AtivoService implements IAtivoService {
         ativo.setAtributos(ativoCreateDTO.atributos());
 
         Filial filial = filialRepository.findById(ativoCreateDTO.filialId())
-                .orElseThrow(() -> new EntityNotFoundException("Filial não encontrada com ID: " + ativoCreateDTO.filialId()));
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Filial não encontrada com ID: " + ativoCreateDTO.filialId()));
         ativo.setFilial(filial);
 
         TipoAtivo tipoAtivo = tipoAtivoRepository.findById(ativoCreateDTO.tipoAtivoId())
-                .orElseThrow(() -> new EntityNotFoundException("Tipo de Ativo não encontrado com ID: " + ativoCreateDTO.tipoAtivoId()));
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Tipo de Ativo não encontrado com ID: " + ativoCreateDTO.tipoAtivoId()));
         ativo.setTipoAtivo(tipoAtivo);
 
         Fornecedor fornecedor = fornecedorRepository.findById(ativoCreateDTO.fornecedorId())
-                .orElseThrow(() -> new EntityNotFoundException("Fornecedor não encontrado com ID: " + ativoCreateDTO.fornecedorId()));
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Fornecedor não encontrado com ID: " + ativoCreateDTO.fornecedorId()));
         ativo.setFornecedor(fornecedor);
 
         if (ativoCreateDTO.localizacaoId() != null) {
             Localizacao localizacao = localizacaoRepository.findById(ativoCreateDTO.localizacaoId())
-                    .orElseThrow(() -> new EntityNotFoundException("Localização não encontrada com ID: " + ativoCreateDTO.localizacaoId()));
+                    .orElseThrow(() -> new EntityNotFoundException(
+                            "Localização não encontrada com ID: " + ativoCreateDTO.localizacaoId()));
             validarConsistenciaLocalizacao(localizacao, filial);
             ativo.setLocalizacao(localizacao);
         }
 
         if (ativoCreateDTO.funcionarioResponsavelId() != null) {
-            Funcionario responsavel = funcionarioRepository.findByIdWithFiliais(ativoCreateDTO.funcionarioResponsavelId())
-                    .orElseThrow(() -> new EntityNotFoundException("Funcionário responsável não encontrado com ID: " + ativoCreateDTO.funcionarioResponsavelId()));
+            Funcionario responsavel = funcionarioRepository
+                    .findByIdWithFiliais(ativoCreateDTO.funcionarioResponsavelId())
+                    .orElseThrow(() -> new EntityNotFoundException("Funcionário responsável não encontrado com ID: "
+                            + ativoCreateDTO.funcionarioResponsavelId()));
             validarConsistenciaResponsavel(responsavel, filial);
             ativo.setFuncionarioResponsavel(responsavel);
         }
@@ -217,9 +237,10 @@ public class AtivoService implements IAtivoService {
         gerenciarDetalheHardware(ativo, ativoCreateDTO.detalheHardware());
 
         Ativo ativoSalvo = ativoRepository.save(ativo);
-        
+
         Ativo ativoCompleto = ativoRepository.findByIdWithDetails(ativoSalvo.getId())
-                .orElseThrow(() -> new IllegalStateException("Ativo recém-criado não encontrado. ID: " + ativoSalvo.getId()));
+                .orElseThrow(() -> new IllegalStateException(
+                        "Ativo recém-criado não encontrado. ID: " + ativoSalvo.getId()));
 
         return ativoMapper.toDTO(ativoCompleto);
     }
@@ -245,20 +266,24 @@ public class AtivoService implements IAtivoService {
         ativo.setAtributos(ativoUpdateDTO.atributos());
 
         Filial filial = filialRepository.findById(ativoUpdateDTO.filialId())
-                .orElseThrow(() -> new EntityNotFoundException("Filial não encontrada com ID: " + ativoUpdateDTO.filialId()));
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Filial não encontrada com ID: " + ativoUpdateDTO.filialId()));
         ativo.setFilial(filial);
 
         TipoAtivo tipoAtivo = tipoAtivoRepository.findById(ativoUpdateDTO.tipoAtivoId())
-                .orElseThrow(() -> new EntityNotFoundException("Tipo de Ativo não encontrado com ID: " + ativoUpdateDTO.tipoAtivoId()));
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Tipo de Ativo não encontrado com ID: " + ativoUpdateDTO.tipoAtivoId()));
         ativo.setTipoAtivo(tipoAtivo);
 
         Fornecedor fornecedor = fornecedorRepository.findById(ativoUpdateDTO.fornecedorId())
-                .orElseThrow(() -> new EntityNotFoundException("Fornecedor não encontrado com ID: " + ativoUpdateDTO.fornecedorId()));
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Fornecedor não encontrado com ID: " + ativoUpdateDTO.fornecedorId()));
         ativo.setFornecedor(fornecedor);
 
         if (ativoUpdateDTO.localizacaoId() != null) {
             Localizacao localizacao = localizacaoRepository.findById(ativoUpdateDTO.localizacaoId())
-                    .orElseThrow(() -> new EntityNotFoundException("Localização não encontrada com ID: " + ativoUpdateDTO.localizacaoId()));
+                    .orElseThrow(() -> new EntityNotFoundException(
+                            "Localização não encontrada com ID: " + ativoUpdateDTO.localizacaoId()));
             validarConsistenciaLocalizacao(localizacao, filial);
             ativo.setLocalizacao(localizacao);
         } else {
@@ -266,8 +291,10 @@ public class AtivoService implements IAtivoService {
         }
 
         if (ativoUpdateDTO.funcionarioResponsavelId() != null) {
-            Funcionario responsavel = funcionarioRepository.findByIdWithFiliais(ativoUpdateDTO.funcionarioResponsavelId())
-                    .orElseThrow(() -> new EntityNotFoundException("Funcionário responsável não encontrado com ID: " + ativoUpdateDTO.funcionarioResponsavelId()));
+            Funcionario responsavel = funcionarioRepository
+                    .findByIdWithFiliais(ativoUpdateDTO.funcionarioResponsavelId())
+                    .orElseThrow(() -> new EntityNotFoundException("Funcionário responsável não encontrado com ID: "
+                            + ativoUpdateDTO.funcionarioResponsavelId()));
             validarConsistenciaResponsavel(responsavel, filial);
             ativo.setFuncionarioResponsavel(responsavel);
         } else {
@@ -279,12 +306,12 @@ public class AtivoService implements IAtivoService {
         Ativo ativoAtualizado = ativoRepository.save(ativo);
 
         boolean precisaRecalcular = !Objects.equals(valorAquisicaoOriginal, ativoUpdateDTO.valorAquisicao()) ||
-                                  !Objects.equals(dataAquisicaoOriginal, ativoUpdateDTO.dataAquisicao());
+                !Objects.equals(dataAquisicaoOriginal, ativoUpdateDTO.dataAquisicao());
 
         if (precisaRecalcular) {
             depreciacaoService.recalcularDepreciacaoCompleta(ativoAtualizado.getId());
         }
-        
+
         return ativoMapper.toDTO(ativoAtualizado);
     }
 
@@ -295,11 +322,13 @@ public class AtivoService implements IAtivoService {
                 .orElseThrow(() -> new EntityNotFoundException("Ativo não encontrado com ID: " + id));
 
         if (manutencaoRepository.existsByAtivoId(id)) {
-            throw new IllegalStateException("Não é possível deletar o ativo, pois existem manutenções associadas a ele.");
+            throw new IllegalStateException(
+                    "Não é possível deletar o ativo, pois existem manutenções associadas a ele.");
         }
 
         if (movimentacaoRepository.existsByAtivoId(id)) {
-            throw new IllegalStateException("Não é possível deletar o ativo, pois existem movimentações associadas a ele.");
+            throw new IllegalStateException(
+                    "Não é possível deletar o ativo, pois existem movimentações associadas a ele.");
         }
 
         ativoRepository.delete(ativo);
@@ -320,7 +349,8 @@ public class AtivoService implements IAtivoService {
 
         return healthHistoryRepository.findByAtivoIdAndMetricaOrderByDataRegistroAsc(ativoId, "FREE_SPACE_GB")
                 .stream()
-                .map(h -> new AtivoHealthHistoryDTO(h.getDataRegistro(), h.getComponente(), h.getValor(), h.getMetrica()))
+                .map(h -> new AtivoHealthHistoryDTO(h.getDataRegistro(), h.getComponente(), h.getValor(),
+                        h.getMetrica()))
                 .collect(Collectors.toList());
     }
 

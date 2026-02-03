@@ -5,7 +5,6 @@ import br.com.aegispatrimonio.dto.LoginRequestDTO;
 import br.com.aegispatrimonio.dto.LoginResponseDTO;
 import br.com.aegispatrimonio.model.Usuario;
 import br.com.aegispatrimonio.security.CustomUserDetails;
-import br.com.aegispatrimonio.security.CustomUserDetailsService;
 import br.com.aegispatrimonio.security.JwtService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -31,27 +30,35 @@ import java.util.stream.Collectors;
  * Fornece um endpoint público para que os usuários possam obter um token JWT.
  */
 @RestController
-@RequestMapping({"/api/v1/auth", "/api/auth"})
+@RequestMapping({ "/api/v1/auth", "/api/auth" })
 @Slf4j
 public class AuthController {
 
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
-    private final CustomUserDetailsService userDetailsService;
 
-    public AuthController(AuthenticationManager authenticationManager, JwtService jwtService, CustomUserDetailsService userDetailsService) {
+    public AuthController(AuthenticationManager authenticationManager, JwtService jwtService) {
         this.authenticationManager = authenticationManager;
         this.jwtService = jwtService;
-        this.userDetailsService = userDetailsService;
     }
 
     /**
-     * Autentica um usuário com base em seu email e senha e retorna um token JWT se as credenciais forem válidas.
+     * Autentica um usuário com base em seu email e senha e retorna um token JWT se
+     * as credenciais forem válidas.
      * Este é um endpoint público e não requer autenticação prévia.
      *
      * @param loginRequest DTO contendo o email e a senha do usuário.
-     * @return ResponseEntity com status 200 OK e um LoginResponseDTO contendo o token JWT em caso de sucesso.
-     * @throws org.springframework.security.core.AuthenticationException se as credenciais forem inválidas, resultando em uma resposta 401 Unauthorized.
+     * @return ResponseEntity com status 200 OK e um LoginResponseDTO contendo o
+     *         token JWT em caso de sucesso.
+     * @throws org.springframework.security.core.AuthenticationException se as
+     *                                                                   credenciais
+     *                                                                   forem
+     *                                                                   inválidas,
+     *                                                                   resultando
+     *                                                                   em uma
+     *                                                                   resposta
+     *                                                                   401
+     *                                                                   Unauthorized.
      */
     @PostMapping("/login")
     public ResponseEntity<LoginResponseDTO> login(@RequestBody @Valid LoginRequestDTO loginRequest) {
@@ -59,15 +66,15 @@ public class AuthController {
         try {
             // Autentica o usuário com o Spring Security
             authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(loginRequest.email(), loginRequest.password())
-            );
+                    new UsernamePasswordAuthenticationToken(loginRequest.email(), loginRequest.password()));
         } catch (Exception e) {
             log.error("Erro na autenticação: ", e);
             throw e;
         }
 
         // Se a autenticação for bem-sucedida, gera o token
-        // Use o principal da autenticação para evitar recarregar do banco e possíveis erros de estado
+        // Use o principal da autenticação para evitar recarregar do banco e possíveis
+        // erros de estado
         final UserDetails userDetails = (UserDetails) authentication.getPrincipal();
         final String token = jwtService.generateToken(userDetails);
 
@@ -93,7 +100,8 @@ public class AuthController {
                             .collect(Collectors.toList());
                 }
             } catch (Exception e) {
-                // Captura exceções como LazyInitializationException para evitar que o login falhe completamente
+                // Captura exceções como LazyInitializationException para evitar que o login
+                // falhe completamente
                 // se houver problemas ao carregar as filiais (que são info secundária no login)
                 log.warn("Erro ao carregar filiais para o usuário {}: {}", userDetails.getUsername(), e.getMessage());
                 // filiais permanece vazia

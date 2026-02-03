@@ -9,7 +9,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.annotation.RequestScope;
 
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -23,7 +22,8 @@ public class UserContextService {
 
     private Funcionario cachedFuncionario;
 
-    public UserContextService(CurrentUserProvider currentUserProvider, FuncionarioRepository funcionarioRepository, IPermissionService permissionService) {
+    public UserContextService(CurrentUserProvider currentUserProvider, FuncionarioRepository funcionarioRepository,
+            IPermissionService permissionService) {
         this.currentUserProvider = currentUserProvider;
         this.funcionarioRepository = funcionarioRepository;
         this.permissionService = permissionService;

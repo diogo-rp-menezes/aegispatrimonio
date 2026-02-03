@@ -3,7 +3,7 @@ package br.com.aegispatrimonio.model;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.SQLDelete;
-import org.hibernate.annotations.Where;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDateTime;
 
@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 @ToString(exclude = "filial")
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @SQLDelete(sql = "UPDATE departamentos SET status = 'INATIVO' WHERE id = ?")
-@Where(clause = "status = 'ATIVO'")
+@SQLRestriction("status = 'ATIVO'")
 public class Departamento {
 
     @Id

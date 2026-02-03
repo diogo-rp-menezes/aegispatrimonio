@@ -6,7 +6,6 @@ import br.com.aegispatrimonio.dto.query.AtivoQueryParams;
 import br.com.aegispatrimonio.mapper.AtivoMapper;
 import br.com.aegispatrimonio.model.*;
 import br.com.aegispatrimonio.repository.*;
-import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,6 +17,7 @@ import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -100,7 +100,7 @@ class AtivoServiceTest {
     private void mockUserContext(boolean isAdmin, Set<Long> filiais) {
         lenient().when(userContextService.isAdmin()).thenReturn(isAdmin);
         if (!isAdmin) {
-             lenient().when(userContextService.getUserFiliais()).thenReturn(filiais);
+            lenient().when(userContextService.getUserFiliais()).thenReturn(filiais);
         }
     }
 
@@ -127,7 +127,8 @@ class AtivoServiceTest {
         localizacaoOutraFilial.setId(2L);
         localizacaoOutraFilial.setFilial(filialB);
 
-        AtivoCreateDTO createDTO = new AtivoCreateDTO(1L, "Notebook", 1L, "PAT-01", localizacaoOutraFilial.getId(), LocalDate.now(), 1L, BigDecimal.TEN, 1L, "Obs", null, null);
+        AtivoCreateDTO createDTO = new AtivoCreateDTO(1L, "Notebook", 1L, "PAT-01", localizacaoOutraFilial.getId(),
+                LocalDate.now(), 1L, BigDecimal.TEN, 1L, "Obs", null, null);
 
         when(filialRepository.findById(1L)).thenReturn(Optional.of(filialA));
         when(tipoAtivoRepository.findById(1L)).thenReturn(Optional.of(new TipoAtivo()));
@@ -144,7 +145,8 @@ class AtivoServiceTest {
         responsavelOutraFilial.setId(3L);
         responsavelOutraFilial.setFiliais(Set.of(filialB));
 
-        AtivoUpdateDTO updateDTO = new AtivoUpdateDTO(1L, "Nome", "PAT-10", 1L, 1L, StatusAtivo.ATIVO, LocalDate.now(), 1L, BigDecimal.TEN, responsavelOutraFilial.getId(), "Obs", null, null);
+        AtivoUpdateDTO updateDTO = new AtivoUpdateDTO(1L, "Nome", "PAT-10", 1L, 1L, StatusAtivo.ATIVO, LocalDate.now(),
+                1L, BigDecimal.TEN, responsavelOutraFilial.getId(), "Obs", null, null);
 
         when(ativoRepository.findByIdWithDetails(10L)).thenReturn(Optional.of(ativo));
         when(filialRepository.findById(1L)).thenReturn(Optional.of(filialA));
@@ -192,14 +194,12 @@ class AtivoServiceTest {
     void criar_comDetalhesHardware_deveSalvarCorretamente() {
         // Arrange
         br.com.aegispatrimonio.dto.AtivoDetalheHardwareDTO hardwareDTO = new br.com.aegispatrimonio.dto.AtivoDetalheHardwareDTO(
-            "PC-01", "DOMAIN", "Windows 11", "22H2", "x64",
-            "Dell", "Model X", "SN123", "i7", 8, 16
-        );
+                "PC-01", "DOMAIN", "Windows 11", "22H2", "x64",
+                "Dell", "Model X", "SN123", "i7", 8, 16);
 
         AtivoCreateDTO createDTO = new AtivoCreateDTO(
-            1L, "PC Gamer", 1L, "PAT-99", 1L, LocalDate.now(), 1L,
-            BigDecimal.valueOf(5000), 1L, "Obs", null, hardwareDTO
-        );
+                1L, "PC Gamer", 1L, "PAT-99", 1L, LocalDate.now(), 1L,
+                BigDecimal.valueOf(5000), 1L, "Obs", null, hardwareDTO);
 
         when(filialRepository.findById(1L)).thenReturn(Optional.of(filialA));
         when(tipoAtivoRepository.findById(1L)).thenReturn(Optional.of(new TipoAtivo()));
@@ -241,26 +241,34 @@ class AtivoServiceTest {
         br.com.aegispatrimonio.dto.AtivoNameDTO n3 = new br.com.aegispatrimonio.dto.AtivoNameDTO(3L, "Lap Top");
 
         // Mock candidates returned by Repository
-        java.util.List<br.com.aegispatrimonio.dto.AtivoNameDTO> candidates = java.util.List.of(n1, n2, n3);
+        List<br.com.aegispatrimonio.dto.AtivoNameDTO> candidates = List.of(n1, n2, n3);
         // Mock ranked result returned by Service
-        java.util.List<br.com.aegispatrimonio.dto.AtivoNameDTO> ranked = java.util.List.of(n2, n3);
+        List<br.com.aegispatrimonio.dto.AtivoNameDTO> ranked = List.of(n2, n3);
 
         mockUserContext(true, null); // Admin
 
         // When finding candidates (name is null)
-        when(ativoRepository.findSimpleByFilters(any(), any(), any(), any(), any(), any(), any(org.springframework.data.domain.Pageable.class)))
+        when(ativoRepository.findSimpleByFilters(any(), any(), any(), any(), any(), any(),
+                any(org.springframework.data.domain.Pageable.class)))
                 .thenReturn(candidates);
 
         // When ranking
-        when(searchOptimizationService.rankResults(eq(query), anyList(), any())).thenReturn((java.util.List) ranked);
+        when(searchOptimizationService.<br.com.aegispatrimonio.dto.AtivoNameDTO>rankResults(eq(query), anyList(),
+                any())).thenReturn(ranked);
 
         // When fetching details for the page content
-        Ativo a2 = new Ativo(); a2.setId(2L); a2.setNome("Laptop");
-        Ativo a3 = new Ativo(); a3.setId(3L); a3.setNome("Lap Top");
-        when(ativoRepository.findAllByIdInWithDetails(anyList())).thenReturn(java.util.List.of(a2, a3));
+        Ativo a2 = new Ativo();
+        a2.setId(2L);
+        a2.setNome("Laptop");
+        Ativo a3 = new Ativo();
+        a3.setId(3L);
+        a3.setNome("Lap Top");
+        when(ativoRepository.findAllByIdInWithDetails(anyList())).thenReturn(List.of(a2, a3));
 
-        br.com.aegispatrimonio.dto.AtivoDTO dto2 = new br.com.aegispatrimonio.dto.AtivoDTO(2L, "Laptop", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
-        br.com.aegispatrimonio.dto.AtivoDTO dto3 = new br.com.aegispatrimonio.dto.AtivoDTO(3L, "Lap Top", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+        br.com.aegispatrimonio.dto.AtivoDTO dto2 = new br.com.aegispatrimonio.dto.AtivoDTO(2L, "Laptop", null, null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+        br.com.aegispatrimonio.dto.AtivoDTO dto3 = new br.com.aegispatrimonio.dto.AtivoDTO(3L, "Lap Top", null, null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
         when(ativoMapper.toDTO(a2)).thenReturn(dto2);
         when(ativoMapper.toDTO(a3)).thenReturn(dto3);
@@ -290,9 +298,9 @@ class AtivoServiceTest {
 
         when(ativoRepository.findById(10L)).thenReturn(Optional.of(ativo));
         when(healthHistoryRepository.findByAtivoIdAndMetricaOrderByDataRegistroAsc(10L, "FREE_SPACE_GB"))
-                .thenReturn(java.util.List.of(history));
+                .thenReturn(List.of(history));
 
-        java.util.List<br.com.aegispatrimonio.dto.AtivoHealthHistoryDTO> result = ativoService.getHealthHistory(10L);
+        List<br.com.aegispatrimonio.dto.AtivoHealthHistoryDTO> result = ativoService.getHealthHistory(10L);
 
         org.junit.jupiter.api.Assertions.assertFalse(result.isEmpty());
         org.junit.jupiter.api.Assertions.assertEquals("DISK:0", result.get(0).componente());
@@ -303,7 +311,8 @@ class AtivoServiceTest {
     void listarTodos_comFiltroIndeterminado_deveFiltrarSemPredicao() {
         // Arrange
         mockUserContext(true, null); // Admin
-        when(ativoRepository.findByFilters(any(), any(), any(), any(), any(), any(), eq(false), any(org.springframework.data.domain.Pageable.class)))
+        when(ativoRepository.findByFilters(any(), any(), any(), any(), any(), any(), eq(false),
+                any(org.springframework.data.domain.Pageable.class)))
                 .thenReturn(org.springframework.data.domain.Page.empty());
 
         // Act

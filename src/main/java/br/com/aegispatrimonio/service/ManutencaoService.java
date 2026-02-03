@@ -19,7 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.Objects;
 import java.util.Optional;
 
 @Slf4j
@@ -41,19 +40,24 @@ public class ManutencaoService {
         Manutencao savedManutencao = manutencaoRepository.save(manutencao);
 
         Usuario auditor = currentUserProvider.getCurrentUsuario();
-        log.info("AUDIT: Usuário {} criou a manutenção com ID {} para o ativo {}.", auditor.getEmail(), savedManutencao.getId(), savedManutencao.getAtivo().getId());
+        log.info("AUDIT: Usuário {} criou a manutenção com ID {} para o ativo {}.", auditor.getEmail(),
+                savedManutencao.getId(), savedManutencao.getAtivo().getId());
 
         return convertToResponseDTO(savedManutencao);
     }
 
     /**
-     * Creates a maintenance ticket systematically (autonomous agent), bypassing the logged-in user check.
+     * Creates a maintenance ticket systematically (autonomous agent), bypassing the
+     * logged-in user check.
      * The requester is set to the asset's responsible employee.
      */
     @Transactional
-    public Optional<ManutencaoResponseDTO> criarManutencaoSistemica(Ativo ativo, String descricao, TipoManutencao tipo) {
+    public Optional<ManutencaoResponseDTO> criarManutencaoSistemica(Ativo ativo, String descricao,
+            TipoManutencao tipo) {
         if (ativo.getFuncionarioResponsavel() == null) {
-            log.warn("SYSTEM: Cannot create autonomous maintenance for asset {} ({}) because it has no responsible employee.", ativo.getNome(), ativo.getId());
+            log.warn(
+                    "SYSTEM: Cannot create autonomous maintenance for asset {} ({}) because it has no responsible employee.",
+                    ativo.getNome(), ativo.getId());
             return Optional.empty();
         }
 
@@ -69,7 +73,8 @@ public class ManutencaoService {
 
         Manutencao savedManutencao = manutencaoRepository.save(manutencao);
 
-        log.info("AUDIT: SYSTEM_AUTO criou a manutenção com ID {} para o ativo {}.", savedManutencao.getId(), savedManutencao.getAtivo().getId());
+        log.info("AUDIT: SYSTEM_AUTO criou a manutenção com ID {} para o ativo {}.", savedManutencao.getId(),
+                savedManutencao.getAtivo().getId());
 
         return Optional.of(convertToResponseDTO(savedManutencao));
     }
@@ -81,11 +86,13 @@ public class ManutencaoService {
     }
 
     @Transactional(readOnly = true)
-    public Page<ManutencaoResponseDTO> listar(Long ativoId, StatusManutencao status, TipoManutencao tipo, Long solicitanteId, Long fornecedorId,
-                                              LocalDate dataSolicitacaoInicio, LocalDate dataSolicitacaoFim, LocalDate dataConclusaoInicio,
-                                              LocalDate dataConclusaoFim, Pageable pageable) {
+    public Page<ManutencaoResponseDTO> listar(Long ativoId, StatusManutencao status, TipoManutencao tipo,
+            Long solicitanteId, Long fornecedorId,
+            LocalDate dataSolicitacaoInicio, LocalDate dataSolicitacaoFim, LocalDate dataConclusaoInicio,
+            LocalDate dataConclusaoFim, Pageable pageable) {
         log.debug("Listando manutenções com filtros");
-        Specification<Manutencao> spec = ManutencaoSpecification.build(ativoId, status, tipo, solicitanteId, fornecedorId,
+        Specification<Manutencao> spec = ManutencaoSpecification.build(ativoId, status, tipo, solicitanteId,
+                fornecedorId,
                 dataSolicitacaoInicio, dataSolicitacaoFim, dataConclusaoInicio, dataConclusaoFim);
         return manutencaoRepository.findAll(spec, pageable).map(this::convertToResponseDTO);
     }
@@ -103,7 +110,8 @@ public class ManutencaoService {
         Manutencao manutencao = buscarEntidadePorId(id);
 
         Funcionario tecnico = funcionarioRepository.findById(inicioDTO.tecnicoId())
-                .orElseThrow(() -> new ResourceNotFoundException("Técnico não encontrado com ID: " + inicioDTO.tecnicoId()));
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Técnico não encontrado com ID: " + inicioDTO.tecnicoId()));
 
         Ativo ativo = manutencao.getAtivo();
         validarConsistenciaFilial(tecnico, ativo, "Técnico responsável");
@@ -157,13 +165,15 @@ public class ManutencaoService {
         Manutencao manutencao = buscarEntidadePorId(id);
 
         if (manutencao.getStatus() != StatusManutencao.SOLICITADA) {
-            throw new ResourceConflictException("Apenas manutenções com status 'SOLICITADA' podem ser deletadas. Considere cancelar a manutenção para preservar o histórico.");
+            throw new ResourceConflictException(
+                    "Apenas manutenções com status 'SOLICITADA' podem ser deletadas. Considere cancelar a manutenção para preservar o histórico.");
         }
 
         manutencaoRepository.delete(manutencao);
 
         Usuario auditor = currentUserProvider.getCurrentUsuario();
-        log.info("AUDIT: Usuário {} deletou a manutenção com ID {} para o ativo {}.", auditor.getEmail(), id, manutencao.getAtivo().getId());
+        log.info("AUDIT: Usuário {} deletou a manutenção com ID {} para o ativo {}.", auditor.getEmail(), id,
+                manutencao.getAtivo().getId());
     }
 
     @Transactional(readOnly = true)
@@ -186,18 +196,22 @@ public class ManutencaoService {
                 .orElseThrow(() -> new ResourceNotFoundException("Ativo não encontrado com ID: " + request.ativoId()));
 
         if (ativo.getStatus() != StatusAtivo.ATIVO) {
-            throw new ResourceConflictException("Não é possível criar manutenção para um ativo que não está com status 'ATIVO'. Status atual: " + ativo.getStatus());
+            throw new ResourceConflictException(
+                    "Não é possível criar manutenção para um ativo que não está com status 'ATIVO'. Status atual: "
+                            + ativo.getStatus());
         }
 
         Funcionario solicitante = funcionarioRepository.findById(request.solicitanteId())
-                .orElseThrow(() -> new ResourceNotFoundException("Solicitante não encontrado com ID: " + request.solicitanteId()));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Solicitante não encontrado com ID: " + request.solicitanteId()));
 
         validarConsistenciaFilial(solicitante, ativo, "Solicitante");
 
         Fornecedor fornecedor = null;
         if (request.fornecedorId() != null) {
             fornecedor = fornecedorRepository.findById(request.fornecedorId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Fornecedor não encontrado com ID: " + request.fornecedorId()));
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Fornecedor não encontrado com ID: " + request.fornecedorId()));
         }
 
         Manutencao manutencao = new Manutencao();

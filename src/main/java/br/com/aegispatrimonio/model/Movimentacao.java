@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.SQLDelete;
-import org.hibernate.annotations.Where;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -18,9 +18,9 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString(exclude = {"ativo", "localizacaoOrigem", "localizacaoDestino", "funcionarioOrigem", "funcionarioDestino"})
+@ToString(exclude = { "ativo", "localizacaoOrigem", "localizacaoDestino", "funcionarioOrigem", "funcionarioDestino" })
 @SQLDelete(sql = "UPDATE movimentacoes SET status = 'CANCELADA' WHERE id = ?")
-@Where(clause = "status <> 'CANCELADA'")
+@SQLRestriction("status <> 'CANCELADA'")
 public class Movimentacao {
 
     @Id

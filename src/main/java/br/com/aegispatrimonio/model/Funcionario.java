@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.SQLDelete;
-import org.hibernate.annotations.Where;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDateTime;
 import java.util.HashSet;
@@ -20,11 +20,11 @@ import java.util.Set;
 @Getter
 @Setter
 @NoArgsConstructor
-@ToString(exclude = {"departamento", "filiais", "usuario"})
+@ToString(exclude = { "departamento", "filiais", "usuario" })
 @Entity
 @Table(name = "funcionarios")
 @SQLDelete(sql = "UPDATE funcionarios SET status = 'INATIVO' WHERE id = ?")
-@Where(clause = "status = 'ATIVO'")
+@SQLRestriction("status = 'ATIVO'")
 public class Funcionario {
 
     @Id
@@ -50,11 +50,7 @@ public class Funcionario {
 
     // CORREÇÃO: Relacionamento alterado para ManyToMany
     @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-        name = "funcionario_filial",
-        joinColumns = @JoinColumn(name = "funcionario_id"),
-        inverseJoinColumns = @JoinColumn(name = "filial_id")
-    )
+    @JoinTable(name = "funcionario_filial", joinColumns = @JoinColumn(name = "funcionario_id"), inverseJoinColumns = @JoinColumn(name = "filial_id"))
     private Set<Filial> filiais = new HashSet<>();
 
     @OneToOne(mappedBy = "funcionario", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)

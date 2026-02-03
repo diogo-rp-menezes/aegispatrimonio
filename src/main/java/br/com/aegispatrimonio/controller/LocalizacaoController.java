@@ -14,15 +14,16 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 /**
- * Controller para gerenciar as operações CRUD de Localizações (ex: Sala de Reunião, Almoxarifado).
- * Fornece endpoints para listar, buscar, criar, atualizar e deletar localizações.
+ * Controller para gerenciar as operações CRUD de Localizações (ex: Sala de
+ * Reunião, Almoxarifado).
+ * Fornece endpoints para listar, buscar, criar, atualizar e deletar
+ * localizações.
  */
 @RestController
 @RequestMapping("/api/v1/localizacoes")
@@ -57,7 +58,8 @@ public class LocalizacaoController {
             @ApiResponse(responseCode = "403", description = "Não autorizado"),
             @ApiResponse(responseCode = "404", description = "Localização não encontrada")
     })
-    public LocalizacaoDTO buscarPorId(@Parameter(description = "ID da localização a ser buscada", example = "1") @PathVariable Long id) {
+    public LocalizacaoDTO buscarPorId(
+            @Parameter(description = "ID da localização a ser buscada", example = "1") @PathVariable Long id) {
         return localizacaoService.buscarPorId(id);
     }
 
@@ -85,7 +87,9 @@ public class LocalizacaoController {
             @ApiResponse(responseCode = "403", description = "Não autorizado"),
             @ApiResponse(responseCode = "404", description = "Localização não encontrada")
     })
-    public LocalizacaoDTO atualizar(@Parameter(description = "ID da localização a ser atualizada", example = "1") @PathVariable Long id, @Valid @RequestBody LocalizacaoUpdateDTO localizacaoUpdateDTO) {
+    public LocalizacaoDTO atualizar(
+            @Parameter(description = "ID da localização a ser atualizada", example = "1") @PathVariable Long id,
+            @Valid @RequestBody LocalizacaoUpdateDTO localizacaoUpdateDTO) {
         return localizacaoService.atualizar(id, localizacaoUpdateDTO);
     }
 
@@ -99,7 +103,8 @@ public class LocalizacaoController {
             @ApiResponse(responseCode = "403", description = "Não autorizado"),
             @ApiResponse(responseCode = "404", description = "Localização não encontrada")
     })
-    public void deletar(@Parameter(description = "ID da localização a ser deletada", example = "1") @PathVariable Long id) {
+    public void deletar(
+            @Parameter(description = "ID da localização a ser deletada", example = "1") @PathVariable Long id) {
         localizacaoService.deletar(id);
     }
 }
