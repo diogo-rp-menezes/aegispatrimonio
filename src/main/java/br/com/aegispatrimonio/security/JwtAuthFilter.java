@@ -4,6 +4,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -15,6 +16,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 
 @Component
+@Slf4j
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
@@ -63,7 +65,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         } catch (Exception e) {
             // Logar erro de token inválido se necessário, mas não interromper o filtro
             // O usuário permanecerá não autenticado
-            System.out.println("Erro ao processar token JWT: " + e.getMessage());
+            log.error("Erro ao processar token JWT: {}", e.getMessage());
         }
         filterChain.doFilter(request, response);
     }

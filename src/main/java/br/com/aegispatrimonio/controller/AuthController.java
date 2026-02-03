@@ -3,6 +3,7 @@ package br.com.aegispatrimonio.controller;
 import br.com.aegispatrimonio.dto.FilialSimpleDTO;
 import br.com.aegispatrimonio.dto.LoginRequestDTO;
 import br.com.aegispatrimonio.dto.LoginResponseDTO;
+import br.com.aegispatrimonio.model.Funcionario;
 import br.com.aegispatrimonio.model.Usuario;
 import br.com.aegispatrimonio.security.CustomUserDetails;
 import br.com.aegispatrimonio.security.JwtService;
@@ -94,17 +95,18 @@ public class AuthController {
         if (userDetails instanceof CustomUserDetails) {
             Usuario usuario = ((CustomUserDetails) userDetails).getUsuario();
             try {
-                if (usuario.getFuncionario() != null && usuario.getFuncionario().getFiliais() != null) {
-                    filiais = usuario.getFuncionario().getFiliais().stream()
-                            .map(f -> new FilialSimpleDTO(f.getId(), f.getNome()))
-                            .collect(Collectors.toList());
+                if (usuario.getFuncionario() != null) {
+                    Funcionario func = usuario.getFuncionario();
+                    if (func.getFiliais() != null) {
+                        filiais = func.getFiliais().stream()
+                                .map(f -> new FilialSimpleDTO(f.getId(), f.getNome()))
+                                .collect(Collectors.toList());
+                    }
                 }
             } catch (Exception e) {
-                // Captura exceções como LazyInitializationException para evitar que o login
-                // falhe completamente
-                // se houver problemas ao carregar as filiais (que são info secundária no login)
-                log.warn("Erro ao carregar filiais para o usuário {}: {}", userDetails.getUsername(), e.getMessage());
-                // filiais permanece vazia
+                log.error("Resiliência no login: Falha ao carregar filiais para usuário {}. Motivo: {}",
+                        userDetails.getUsername(), e.getMessage());
+                // filiais permanece Collections.emptyList()
             }
         }
 
