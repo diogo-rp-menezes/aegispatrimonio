@@ -49,8 +49,9 @@ public class FuncionarioController {
     public Page<FuncionarioDTO> listarTodos(
             @Parameter(description = "Nome para filtro") @RequestParam(required = false) String nome,
             @Parameter(description = "ID do departamento para filtro") @RequestParam(required = false) Long departamentoId,
+            @Parameter(description = "Role do usuário para filtro") @RequestParam(required = false) String role,
             @Parameter(hidden = true) Pageable pageable) {
-        return funcionarioService.listarTodos(nome, departamentoId, pageable);
+        return funcionarioService.listarTodos(nome, departamentoId, role, pageable);
     }
 
     @GetMapping("/{id}")

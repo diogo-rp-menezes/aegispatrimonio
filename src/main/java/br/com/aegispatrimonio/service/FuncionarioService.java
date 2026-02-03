@@ -56,7 +56,7 @@ public class FuncionarioService {
     }
 
     @Transactional(readOnly = true)
-    public Page<FuncionarioDTO> listarTodos(String nome, Long departamentoId, Pageable pageable) {
+    public Page<FuncionarioDTO> listarTodos(String nome, Long departamentoId, String role, Pageable pageable) {
         Usuario usuario = currentUserProvider.getCurrentUsuario();
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 
@@ -71,6 +71,12 @@ public class FuncionarioService {
         if (departamentoId != null) {
             spec = spec.and((root, query, cb) ->
                     cb.equal(root.get("departamento").get("id"), departamentoId)
+            );
+        }
+
+        if (role != null && !role.trim().isEmpty()) {
+            spec = spec.and((root, query, cb) ->
+                    cb.equal(root.join("usuario").get("role"), role)
             );
         }
 

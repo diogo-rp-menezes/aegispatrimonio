@@ -97,7 +97,20 @@ class FuncionarioServiceTest {
 
         when(funcionarioRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(page);
 
-        funcionarioService.listarTodos("nome", 1L, pageable);
+        funcionarioService.listarTodos("nome", 1L, null, pageable);
+
+        verify(funcionarioRepository).findAll(any(Specification.class), eq(pageable));
+    }
+
+    @Test
+    @DisplayName("ListarTodos: Deve filtrar por role quando informado")
+    void listarTodos_comRole_deveFiltrar() {
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Funcionario> page = new PageImpl<>(List.of(funcionario));
+
+        when(funcionarioRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(page);
+
+        funcionarioService.listarTodos(null, null, "ROLE_TECNICO", pageable);
 
         verify(funcionarioRepository).findAll(any(Specification.class), eq(pageable));
     }

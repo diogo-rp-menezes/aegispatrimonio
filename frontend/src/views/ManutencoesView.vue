@@ -180,11 +180,144 @@
       </div>
     </div>
   </section>
+
+  <!-- Start Modal -->
+  <div v-if="showStartModal" class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5)">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Iniciar Manutenção</h5>
+          <button type="button" class="btn-close" @click="showStartModal = false"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Técnico Responsável</label>
+            <select class="form-select" v-model="selectedTechnicianId">
+              <option value="">Selecione...</option>
+              <option v-for="tech in technicians" :key="tech.id" :value="tech.id">
+                {{ tech.nome }} ({{ tech.matricula }})
+              </option>
+            </select>
+            <div class="form-text">
+               Certifique-se de escolher um técnico da mesma filial.
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" @click="showStartModal = false">Cancelar</button>
+          <button type="button" class="btn btn-primary" @click="confirmStart">Iniciar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Conclude Modal -->
+  <div v-if="showConcludeModal" class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5)">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Concluir Manutenção</h5>
+          <button type="button" class="btn-close" @click="showConcludeModal = false"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+             <label class="form-label">Descrição do Serviço *</label>
+             <textarea class="form-control" v-model="concludeData.descricaoServico" rows="3" required></textarea>
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Custo Real (R$)</label>
+              <input type="number" class="form-control" v-model="concludeData.custoReal" min="0" step="0.01">
+            </div>
+             <div class="col-md-6 mb-3">
+              <label class="form-label">Tempo Execução (min)</label>
+              <input type="number" class="form-control" v-model="concludeData.tempoExecucao" min="1">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" @click="showConcludeModal = false">Cancelar</button>
+          <button type="button" class="btn btn-success" @click="confirmConclude">Concluir</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cancel Modal -->
+  <div v-if="showCancelModal" class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5)">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Cancelar Manutenção</h5>
+          <button type="button" class="btn-close" @click="showCancelModal = false"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Motivo do Cancelamento *</label>
+            <textarea class="form-control" v-model="cancelMotivo" rows="3" required></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+           <button type="button" class="btn btn-secondary" @click="showCancelModal = false">Fechar</button>
+           <button type="button" class="btn btn-danger" @click="confirmCancel">Confirmar Cancelamento</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Details Modal -->
+  <div v-if="showDetailsModal && selectedItem" class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5)">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Detalhes da Manutenção #{{ selectedItem.id }}</h5>
+          <button type="button" class="btn-close" @click="showDetailsModal = false"></button>
+        </div>
+        <div class="modal-body">
+          <dl class="row">
+            <dt class="col-sm-3">Ativo</dt>
+            <dd class="col-sm-9">{{ selectedItem.ativoNome }} ({{ selectedItem.ativoNumeroPatrimonio }})</dd>
+
+            <dt class="col-sm-3">Tipo</dt>
+            <dd class="col-sm-9">{{ selectedItem.tipo }}</dd>
+
+            <dt class="col-sm-3">Status</dt>
+            <dd class="col-sm-9">
+               <span :class="`badge bg-${getStatusColor(selectedItem.status)}`">{{ selectedItem.status }}</span>
+            </dd>
+
+            <dt class="col-sm-3">Solicitante</dt>
+            <dd class="col-sm-9">{{ selectedItem.solicitanteNome }}</dd>
+
+            <dt class="col-sm-3">Data Solicitação</dt>
+            <dd class="col-sm-9">{{ formatDate(selectedItem.dataSolicitacao) }}</dd>
+
+             <dt class="col-sm-3">Problema</dt>
+            <dd class="col-sm-9">{{ selectedItem.descricaoProblema }}</dd>
+
+            <div v-if="selectedItem.tecnicoResponsavelNome">
+               <dt class="col-sm-3">Técnico</dt>
+               <dd class="col-sm-9">{{ selectedItem.tecnicoResponsavelNome }}</dd>
+            </div>
+
+             <div v-if="selectedItem.descricaoServico">
+               <dt class="col-sm-3">Serviço Realizado</dt>
+               <dd class="col-sm-9">{{ selectedItem.descricaoServico }}</dd>
+            </div>
+          </dl>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" @click="showDetailsModal = false">Fechar</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
 import { manutencaoService } from '../services/manutencaoService';
+import { request } from '../services/api';
 import ManutencaoForm from './ManutencaoForm.vue';
 
 const items = ref([]);
@@ -192,6 +325,26 @@ const loading = ref(false);
 const showForm = ref(false);
 const filterStatus = ref('');
 const editId = ref(null);
+
+// Modal States
+const showStartModal = ref(false);
+const showConcludeModal = ref(false);
+const showDetailsModal = ref(false);
+const showCancelModal = ref(false);
+
+const selectedItem = ref(null);
+
+// Form Data
+const technicians = ref([]);
+const selectedTechnicianId = ref("");
+
+const concludeData = reactive({
+  descricaoServico: "",
+  custoReal: 0,
+  tempoExecucao: 60
+});
+
+const cancelMotivo = ref("");
 
 const pageInfo = reactive({
   page: 0,
@@ -201,6 +354,15 @@ const pageInfo = reactive({
   from: 0,
   to: 0,
 });
+
+async function fetchTechnicians() {
+  try {
+    const response = await request('/funcionarios?role=ROLE_TECNICO&size=100');
+    technicians.value = response.content;
+  } catch (e) {
+    console.error("Erro ao buscar técnicos:", e);
+  }
+}
 
 async function fetchPage(page = 0) {
   loading.value = true;
@@ -272,41 +434,69 @@ async function aprovar(item) {
   }
 }
 
-async function iniciar(item) {
-  // Mock de input técnico ID para MVP (Hardcoded por enquanto ou prompt)
-  const tecnicoId = prompt("ID do Técnico Responsável (deve ser da mesma filial):");
-  if (!tecnicoId) return;
+function iniciar(item) {
+  selectedItem.value = item;
+  selectedTechnicianId.value = "";
+  showStartModal.value = true;
+}
+
+async function confirmStart() {
+  if (!selectedTechnicianId.value) {
+    alert("Selecione um técnico.");
+    return;
+  }
 
   try {
-    await manutencaoService.iniciar(item.id, { tecnicoId: parseInt(tecnicoId) });
+    await manutencaoService.iniciar(selectedItem.value.id, { tecnicoId: parseInt(selectedTechnicianId.value) });
+    showStartModal.value = false;
     fetchPage(pageInfo.page);
   } catch (e) {
     alert('Erro ao iniciar: ' + e.message);
   }
 }
 
-async function concluir(item) {
-  const descricao = prompt("Descrição do Serviço:");
-  if (!descricao) return;
+function concluir(item) {
+  selectedItem.value = item;
+  concludeData.descricaoServico = "";
+  concludeData.custoReal = 0;
+  concludeData.tempoExecucao = 60;
+  showConcludeModal.value = true;
+}
+
+async function confirmConclude() {
+  if (!concludeData.descricaoServico) {
+    alert("Informe a descrição do serviço.");
+    return;
+  }
 
   try {
-    await manutencaoService.concluir(item.id, {
-      descricaoServico: descricao,
-      custoReal: 0, // Simplificação
-      tempoExecucao: 60 // Simplificação
+    await manutencaoService.concluir(selectedItem.value.id, {
+      descricaoServico: concludeData.descricaoServico,
+      custoReal: concludeData.custoReal,
+      tempoExecucao: concludeData.tempoExecucao
     });
+    showConcludeModal.value = false;
     fetchPage(pageInfo.page);
   } catch (e) {
     alert('Erro ao concluir: ' + e.message);
   }
 }
 
-async function cancelar(item) {
-  const motivo = prompt("Motivo do cancelamento:");
-  if (!motivo) return;
+function cancelar(item) {
+  selectedItem.value = item;
+  cancelMotivo.value = "";
+  showCancelModal.value = true;
+}
+
+async function confirmCancel() {
+  if (!cancelMotivo.value) {
+    alert("Informe o motivo.");
+    return;
+  }
 
   try {
-    await manutencaoService.cancelar(item.id, motivo);
+    await manutencaoService.cancelar(selectedItem.value.id, cancelMotivo.value);
+    showCancelModal.value = false;
     fetchPage(pageInfo.page);
   } catch (e) {
     alert('Erro ao cancelar: ' + e.message);
@@ -314,11 +504,13 @@ async function cancelar(item) {
 }
 
 function verDetalhes(item) {
-  alert(`Detalhes da Manutenção #${item.id}\nAtivo: ${item.ativoNome}\nProblema: ${item.descricaoProblema}`);
+  selectedItem.value = item;
+  showDetailsModal.value = true;
 }
 
 onMounted(() => {
   fetchPage(0);
+  fetchTechnicians();
 });
 </script>
 
