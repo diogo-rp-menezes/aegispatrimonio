@@ -2,7 +2,6 @@
 <workspace_context>
 <artifacts>
 --- CURRENT TASK CHECKLIST ---
-
 # Aegis Patrimônio: Dockerize & Debug Task
 
 - [x] Dockerize Frontend (Dockerfile + Nginx)
@@ -14,7 +13,6 @@
 - [X] Final User Verification
 
 --- IMPLEMENTATION PLAN ---
-
 # Dockerize Frontend Implementation Plan
 
 The goal is to include the Vue.js frontend in the existing Docker Compose setup, allowing the entire application (DB, Backend, and Frontend) to run in containers.
@@ -48,11 +46,5 @@ Create a multi-stage Dockerfile:
 - Access the frontend in the browser (<http://localhost>).
 - Verify login and data fetching from the backend.
 </artifacts>
-
 </workspace_context>
-<mission_brief>fix the bug: :8080/api/auth/login:1  Failed to load resource: the server responded with a status of 404 ()
-installHook.js:1 Error: {"timestamp":"2026-02-02T23:36:56.416+00:00","status":404,"error":"Not Found","path":"/api/auth/login"}
-    at Hd (index-RvdWR7bF.js:22:23466)
-    at async h (index-RvdWR7bF.js:39:43461)
-overrideMethod @ installHook.js:1
-</mission_brief>
+<mission_brief>[Describe your task here...]</mission_brief>
