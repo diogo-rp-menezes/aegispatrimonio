@@ -122,7 +122,8 @@ A API retorna erros padronizados conforme **RFC 7807** (`application/problem+jso
    ```bash
    docker compose up -d
    ```
-   Acesse a API em `http://localhost:8080`.
+   - **Frontend:** `http://localhost`
+   - **API:** `http://localhost:8080`
 
 ### Opção 2: Maven (Local)
 1. Configure o banco de dados MySQL localmente ou via Docker.
