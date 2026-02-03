@@ -14,11 +14,15 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class ApplicationControllerAdvice {
+
+    private static final Logger log = LoggerFactory.getLogger(ApplicationControllerAdvice.class);
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
@@ -78,6 +82,13 @@ public class ApplicationControllerAdvice {
     @ResponseStatus(HttpStatus.CONFLICT)
     public ProblemDetail handleResourceConflictException(ResourceConflictException ex, HttpServletRequest request) {
         return buildProblem(HttpStatus.CONFLICT, "Conflict", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(Exception.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public ProblemDetail handleAllUncaughtException(Exception ex, HttpServletRequest request) {
+        log.error("Unknown error occurred: ", ex);
+        return buildProblem(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error", "An unexpected error occurred.", request);
     }
 
     private ProblemDetail buildProblem(HttpStatus status, String title, String detail, HttpServletRequest request) {

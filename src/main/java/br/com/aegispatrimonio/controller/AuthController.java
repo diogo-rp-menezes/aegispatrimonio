@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -54,9 +55,10 @@ public class AuthController {
      */
     @PostMapping("/login")
     public ResponseEntity<LoginResponseDTO> login(@RequestBody @Valid LoginRequestDTO loginRequest) {
+        Authentication authentication;
         try {
             // Autentica o usuário com o Spring Security
-            authenticationManager.authenticate(
+            authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(loginRequest.email(), loginRequest.password())
             );
         } catch (Exception e) {
@@ -65,7 +67,8 @@ public class AuthController {
         }
 
         // Se a autenticação for bem-sucedida, gera o token
-        final UserDetails userDetails = userDetailsService.loadUserByUsername(loginRequest.email());
+        // Use o principal da autenticação para evitar recarregar do banco e possíveis erros de estado
+        final UserDetails userDetails = (UserDetails) authentication.getPrincipal();
         final String token = jwtService.generateToken(userDetails);
 
         return ResponseEntity.ok(buildResponse(userDetails, token));
@@ -83,10 +86,17 @@ public class AuthController {
         List<FilialSimpleDTO> filiais = Collections.emptyList();
         if (userDetails instanceof CustomUserDetails) {
             Usuario usuario = ((CustomUserDetails) userDetails).getUsuario();
-            if (usuario.getFuncionario() != null && usuario.getFuncionario().getFiliais() != null) {
-                filiais = usuario.getFuncionario().getFiliais().stream()
-                        .map(f -> new FilialSimpleDTO(f.getId(), f.getNome()))
-                        .collect(Collectors.toList());
+            try {
+                if (usuario.getFuncionario() != null && usuario.getFuncionario().getFiliais() != null) {
+                    filiais = usuario.getFuncionario().getFiliais().stream()
+                            .map(f -> new FilialSimpleDTO(f.getId(), f.getNome()))
+                            .collect(Collectors.toList());
+                }
+            } catch (Exception e) {
+                // Captura exceções como LazyInitializationException para evitar que o login falhe completamente
+                // se houver problemas ao carregar as filiais (que são info secundária no login)
+                log.warn("Erro ao carregar filiais para o usuário {}: {}", userDetails.getUsername(), e.getMessage());
+                // filiais permanece vazia
             }
         }
 
