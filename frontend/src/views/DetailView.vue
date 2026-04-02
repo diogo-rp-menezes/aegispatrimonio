@@ -144,13 +144,22 @@ const chartData = computed(() => {
   const formattedDates = uniqueDates.map(d => new Date(d).toLocaleDateString('pt-BR'));
   const components = [...new Set(healthHistory.value.map(h => h.componente))];
 
+  const healthMap = new Map();
+  healthHistory.value.forEach(h => {
+    if (!healthMap.has(h.componente)) {
+      healthMap.set(h.componente, new Map());
+    }
+    healthMap.get(h.componente).set(h.dataRegistro, h.valor);
+  });
+
+  const colors = ['#0d6efd', '#dc3545', '#198754', '#ffc107', '#0dcaf0'];
   const datasets = components.map((comp, index) => {
-    const colors = ['#0d6efd', '#dc3545', '#198754', '#ffc107', '#0dcaf0'];
     const color = colors[index % colors.length];
 
+    const compMap = healthMap.get(comp);
     const data = uniqueDates.map(date => {
-      const entry = healthHistory.value.find(h => h.componente === comp && h.dataRegistro === date);
-      return entry ? entry.valor : null;
+      const val = compMap ? compMap.get(date) : undefined;
+      return val !== undefined ? val : null;
     });
 
     return {
