@@ -18,15 +18,12 @@ public class UserContextService {
 
     private final CurrentUserProvider currentUserProvider;
     private final FuncionarioRepository funcionarioRepository;
-    private final IPermissionService permissionService;
 
     private Funcionario cachedFuncionario;
 
-    public UserContextService(CurrentUserProvider currentUserProvider, FuncionarioRepository funcionarioRepository,
-            IPermissionService permissionService) {
+    public UserContextService(CurrentUserProvider currentUserProvider, FuncionarioRepository funcionarioRepository) {
         this.currentUserProvider = currentUserProvider;
         this.funcionarioRepository = funcionarioRepository;
-        this.permissionService = permissionService;
     }
 
     public Usuario getCurrentUser() {
@@ -35,7 +32,11 @@ public class UserContextService {
 
     public boolean isAdmin() {
         Usuario usuario = getCurrentUser();
-        return permissionService.hasRole(usuario.getEmail(), "ROLE_ADMIN");
+        if (usuario == null || usuario.getRoles() == null) {
+            return false;
+        }
+        return usuario.getRoles().stream()
+                .anyMatch(r -> "ROLE_ADMIN".equals(r.getName()));
     }
 
     @Transactional(readOnly = true)
