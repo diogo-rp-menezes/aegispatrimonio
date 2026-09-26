@@ -15,6 +15,12 @@ import java.util.function.Function;
 @Service
 public class JwtService {
 
+    private final TokenDenylistService tokenDenylistService;
+
+    public JwtService(TokenDenylistService tokenDenylistService) {
+        this.tokenDenylistService = tokenDenylistService;
+    }
+
     @Value("${jwt.secret}")
     private String jwtSecret;
 
@@ -40,8 +46,19 @@ public class JwtService {
     }
 
     public boolean isTokenValid(String token, UserDetails userDetails) {
+        if (tokenDenylistService.isRevoked(token)) {
+            return false;
+        }
         final String username = extractUsername(token);
         return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
+    }
+
+    /**
+     * Extrai o timestamp de expiração (epoch millis) do token, para uso na
+     * denylist do logout.
+     */
+    public long extractExpirationEpochMillis(String token) {
+        return extractExpiration(token).getTime();
     }
 
     private boolean isTokenExpired(String token) {

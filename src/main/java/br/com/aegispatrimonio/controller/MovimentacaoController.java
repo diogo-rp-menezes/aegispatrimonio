@@ -41,7 +41,7 @@ public class MovimentacaoController {
     private final MovimentacaoService movimentacaoService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'CREATE', null)")
     @Operation(summary = "Cria uma nova movimentação", description = "Cria uma nova solicitação de movimentação de ativo. Acesso permitido para ADMIN e USER.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Movimentação criada com sucesso", content = @Content(schema = @Schema(implementation = MovimentacaoResponseDTO.class))),
@@ -56,7 +56,7 @@ public class MovimentacaoController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'READ', null)")
     @Operation(summary = "Lista todas as movimentações", description = "Retorna uma lista paginada de todas as movimentações de ativos. Acesso permitido para ADMIN e USER.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Lista de movimentações retornada com sucesso", content = @Content(schema = @Schema(implementation = MovimentacaoResponseDTO.class))),
@@ -70,7 +70,7 @@ public class MovimentacaoController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'READ', null)")
     @Operation(summary = "Busca uma movimentação por ID", description = "Retorna os detalhes de uma movimentação específica. Acesso permitido para ADMIN e USER.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Movimentação encontrada", content = @Content(schema = @Schema(implementation = MovimentacaoResponseDTO.class))),
@@ -85,7 +85,7 @@ public class MovimentacaoController {
     }
 
     @GetMapping("/ativo/{ativoId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'READ', null)")
     @Operation(summary = "Lista movimentações por ID do ativo", description = "Retorna uma lista paginada de movimentações para um ativo específico. Acesso permitido para ADMIN e USER.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Lista de movimentações retornada com sucesso", content = @Content(schema = @Schema(implementation = MovimentacaoResponseDTO.class))),
@@ -101,7 +101,7 @@ public class MovimentacaoController {
     }
 
     @GetMapping("/status/{status}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'READ', null)")
     @Operation(summary = "Lista movimentações por status", description = "Retorna uma lista paginada de movimentações com um status específico. Acesso permitido para ADMIN e USER.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Lista de movimentações retornada com sucesso", content = @Content(schema = @Schema(implementation = MovimentacaoResponseDTO.class))),
@@ -117,7 +117,7 @@ public class MovimentacaoController {
     }
 
     @GetMapping("/funcionario-destino/{funcionarioDestinoId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'READ', null)")
     @Operation(summary = "Lista movimentações por funcionário de destino", description = "Retorna uma lista paginada de movimentações com um funcionário de destino específico. Acesso permitido para ADMIN e USER.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Lista de movimentações retornada com sucesso", content = @Content(schema = @Schema(implementation = MovimentacaoResponseDTO.class))),
@@ -133,7 +133,7 @@ public class MovimentacaoController {
     }
 
     @GetMapping("/localizacao-destino/{localizacaoDestinoId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'READ', null)")
     @Operation(summary = "Lista movimentações por localização de destino", description = "Retorna uma lista paginada de movimentações com uma localização de destino específica. Acesso permitido para ADMIN e USER.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Lista de movimentações retornada com sucesso", content = @Content(schema = @Schema(implementation = MovimentacaoResponseDTO.class))),
@@ -149,7 +149,7 @@ public class MovimentacaoController {
     }
 
     @GetMapping("/periodo")
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'READ', null)")
     @Operation(summary = "Lista movimentações por período", description = "Retorna uma lista paginada de movimentações dentro de um período de datas. Acesso permitido para ADMIN e USER.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Lista de movimentações retornada com sucesso", content = @Content(schema = @Schema(implementation = MovimentacaoResponseDTO.class))),
@@ -166,7 +166,7 @@ public class MovimentacaoController {
     }
 
     @GetMapping("/ativo/pendentes/{ativoId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'READ', null)")
     @Operation(summary = "Lista movimentações pendentes por ativo", description = "Retorna uma lista paginada de movimentações pendentes para um ativo específico. Acesso permitido para ADMIN e USER.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Lista de movimentações retornada com sucesso", content = @Content(schema = @Schema(implementation = MovimentacaoResponseDTO.class))),
@@ -182,7 +182,7 @@ public class MovimentacaoController {
     }
 
     @PostMapping("/efetivar/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'UPDATE', null)")
     @Operation(summary = "Efetiva uma movimentação", description = "Efetiva uma movimentação pendente, atualizando a localização e o responsável do ativo. Acesso restrito a ADMIN.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Movimentação efetivada com sucesso", content = @Content(schema = @Schema(implementation = MovimentacaoResponseDTO.class))),
@@ -198,7 +198,7 @@ public class MovimentacaoController {
     }
 
     @PostMapping("/cancelar/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'UPDATE', null)")
     @Operation(summary = "Cancela uma movimentação", description = "Cancela uma movimentação pendente. Acesso restrito a ADMIN.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Movimentação cancelada com sucesso", content = @Content(schema = @Schema(implementation = MovimentacaoResponseDTO.class))),
@@ -216,7 +216,7 @@ public class MovimentacaoController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'DELETE', null)")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Deleta uma movimentação", description = "Deleta uma movimentação pendente do sistema. Acesso restrito a ADMIN.")
     @ApiResponses(value = {

@@ -47,7 +47,7 @@ public class FilialController {
             @ApiResponse(responseCode = "403", description = "Sem permissão de acesso", content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'READ', null)")
     public List<FilialDTO> listarTodos() {
         return filialService.listarTodos();
     }
@@ -60,7 +60,7 @@ public class FilialController {
             @ApiResponse(responseCode = "404", description = "Filial não encontrada", content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'READ', null)")
     public ResponseEntity<FilialDTO> buscarPorId(
             @Parameter(description = "ID da filial", example = "1") @PathVariable Long id) {
         Optional<FilialDTO> filial = filialService.buscarPorId(id);
@@ -78,7 +78,7 @@ public class FilialController {
     })
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'CREATE', null)")
     public FilialDTO criar(@RequestBody @Valid FilialCreateDTO filialCreateDTO) {
         return filialService.criar(filialCreateDTO);
     }
@@ -93,7 +93,7 @@ public class FilialController {
             @ApiResponse(responseCode = "409", description = "Conflito (ex: CNPJ ou código duplicado)", content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'UPDATE', null)")
     public ResponseEntity<FilialDTO> atualizar(
             @Parameter(description = "ID da filial", example = "1") @PathVariable Long id,
             @RequestBody @Valid FilialUpdateDTO filialUpdateDTO) {
@@ -112,7 +112,7 @@ public class FilialController {
     })
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'DELETE', null)")
     public void deletar(@Parameter(description = "ID da filial", example = "1") @PathVariable Long id) {
         filialService.deletar(id);
     }

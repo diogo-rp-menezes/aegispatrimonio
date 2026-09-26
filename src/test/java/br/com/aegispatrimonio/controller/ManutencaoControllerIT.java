@@ -48,6 +48,7 @@ public class ManutencaoControllerIT extends BaseIT {
     @Autowired private DepartamentoRepository departamentoRepository;
     @Autowired private TipoAtivoRepository tipoAtivoRepository;
     @Autowired private FornecedorRepository fornecedorRepository;
+    @Autowired private br.com.aegispatrimonio.repository.RoleRepository roleRepository;
 
     @Autowired
     private JwtService jwtService;
@@ -156,6 +157,11 @@ public class ManutencaoControllerIT extends BaseIT {
         Usuario user = new Usuario();
         user.setEmail(email); user.setPassword(passwordEncoder.encode("password")); user.setRole(role);
         user.setStatus(Status.ATIVO); user.setFuncionario(func); func.setUsuario(user);
+        // Autorização granular: o admin bypass do PermissionServiceImpl exige o vínculo
+        // rbac_user_role com a role ROLE_ADMIN (coluna legada 'role' não é consultada).
+        if ("ROLE_ADMIN".equals(role)) {
+            roleRepository.findByName("ROLE_ADMIN").ifPresent(r -> user.setRoles(java.util.Set.of(r)));
+        }
         return funcionarioRepository.save(func);
     }
 

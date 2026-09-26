@@ -38,7 +38,7 @@ public class LocalizacaoController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'READ', null)")
     @Operation(summary = "Lista todas as localizações", description = "Retorna a lista de todas as localizações cadastradas no sistema.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Lista retornada com sucesso", content = @Content(schema = @Schema(implementation = LocalizacaoDTO.class))),
@@ -50,7 +50,7 @@ public class LocalizacaoController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'READ', null)")
     @Operation(summary = "Busca uma localização por ID", description = "Retorna uma localização específica com base no ID.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Localização encontrada", content = @Content(schema = @Schema(implementation = LocalizacaoDTO.class))),
@@ -65,7 +65,7 @@ public class LocalizacaoController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'CREATE', #localizacaoCreateDTO.filialId)")
     @Operation(summary = "Cria uma nova localização", description = "Cria uma nova localização no sistema.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Localização criada com sucesso", content = @Content(schema = @Schema(implementation = LocalizacaoDTO.class))),
@@ -78,7 +78,7 @@ public class LocalizacaoController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'UPDATE', null)")
     @Operation(summary = "Atualiza uma localização existente", description = "Atualiza os dados de uma localização existente no sistema.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Localização atualizada com sucesso", content = @Content(schema = @Schema(implementation = LocalizacaoDTO.class))),
@@ -95,7 +95,7 @@ public class LocalizacaoController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'DELETE', null)")
     @Operation(summary = "Deleta uma localização", description = "Deleta uma localização do sistema (exclusão lógica).")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "Localização deletada com sucesso"),

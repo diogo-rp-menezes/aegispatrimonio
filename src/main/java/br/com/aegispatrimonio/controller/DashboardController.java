@@ -18,7 +18,7 @@ public class DashboardController {
     }
 
     @GetMapping("/stats")
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'READ', null)")
     public DashboardStatsDTO getStats() {
         return dashboardService.getStats();
     }

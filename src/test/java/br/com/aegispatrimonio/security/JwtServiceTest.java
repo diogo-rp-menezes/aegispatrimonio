@@ -26,7 +26,7 @@ class JwtServiceTest {
 
     @BeforeEach
     void setUp() {
-        jwtService = new JwtService();
+        jwtService = new JwtService(new TokenDenylistService());
         // Injeta os valores que seriam preenchidos pelo @Value do Spring
         ReflectionTestUtils.setField(jwtService, "jwtSecret", testSecret);
         ReflectionTestUtils.setField(jwtService, "jwtExpiration", oneHour);
@@ -106,5 +106,37 @@ class JwtServiceTest {
 
         // Assert
         assertThrows(Exception.class, () -> jwtService.isTokenValid(malformedToken, userDetails));
+    }
+
+    @Test
+    @DisplayName("Logout: token revogado deve ser rejeitado em isTokenValid")
+    void isTokenValid_deveRetornarFalseParaTokenRevogado() {
+        // Arrange
+        UserDetails userDetails = createTestUser("testuser@aegis.com");
+        String token = jwtService.generateToken(userDetails);
+        TokenDenylistService denylist = new TokenDenylistService();
+        ReflectionTestUtils.setField(jwtService, "tokenDenylistService", denylist);
+
+        denylist.revoke(token, jwtService.extractExpirationEpochMillis(token));
+
+        // Act + Assert
+        assertFalse(jwtService.isTokenValid(token, userDetails));
+    }
+
+    @Test
+    @DisplayName("Logout: token válido (não revogado) não deve ser afetado pela denylist")
+    void isTokenValid_tokenNaoRevogado_deveContinuarValido() {
+        // Arrange
+        UserDetails userDetails = createTestUser("testuser@aegis.com");
+        String token = jwtService.generateToken(userDetails);
+        TokenDenylistService denylist = new TokenDenylistService();
+        ReflectionTestUtils.setField(jwtService, "tokenDenylistService", denylist);
+
+        // Outro token revogado; o atual não
+        String outroToken = jwtService.generateToken(createTestUser("outro@aegis.com"));
+        denylist.revoke(outroToken, jwtService.extractExpirationEpochMillis(outroToken));
+
+        // Act + Assert
+        assertTrue(jwtService.isTokenValid(token, userDetails));
     }
 }

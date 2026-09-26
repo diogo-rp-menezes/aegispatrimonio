@@ -7,8 +7,11 @@ import br.com.aegispatrimonio.model.Funcionario;
 import br.com.aegispatrimonio.model.Usuario;
 import br.com.aegispatrimonio.security.CustomUserDetails;
 import br.com.aegispatrimonio.security.JwtService;
+import br.com.aegispatrimonio.security.TokenDenylistService;
+import br.com.aegispatrimonio.service.SecurityAuditService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -37,10 +40,15 @@ public class AuthController {
 
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
+    private final TokenDenylistService tokenDenylistService;
+    private final SecurityAuditService securityAuditService;
 
-    public AuthController(AuthenticationManager authenticationManager, JwtService jwtService) {
+    public AuthController(AuthenticationManager authenticationManager, JwtService jwtService,
+            TokenDenylistService tokenDenylistService, SecurityAuditService securityAuditService) {
         this.authenticationManager = authenticationManager;
         this.jwtService = jwtService;
+        this.tokenDenylistService = tokenDenylistService;
+        this.securityAuditService = securityAuditService;
     }
 
     /**
@@ -88,6 +96,35 @@ public class AuthController {
             return ResponseEntity.status(401).build();
         }
         return ResponseEntity.ok(buildResponse(userDetails, ""));
+    }
+
+    /**
+     * Logout server-side: revoga o token JWT presente no header Authorization,
+     * adicionando-o à denylist até sua expiração. Requests subsequentes com o
+     * mesmo token recebem 401.
+     *
+     * Idempotente: chamar logout duas vezes (ou sem token válido) retorna 204.
+     * Sem body — o cliente deve descartar o token localmente.
+     */
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@RequestHeader(value = "Authorization", required = false) String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            // Sem token: nada a revogar; logout permanece idempotente
+            return ResponseEntity.noContent().build();
+        }
+
+        final String token = authHeader.substring(7);
+        try {
+            final long expiresAt = jwtService.extractExpirationEpochMillis(token);
+            final String username = jwtService.extractUsername(token);
+            tokenDenylistService.revoke(token, expiresAt);
+            securityAuditService.logAuthorization(username, "auth", "LOGOUT", "logout", true,
+                    "Token revogado via logout server-side");
+        } catch (Exception e) {
+            // Token inválido/expirado: nada a revogar — logout segue idempotente
+            log.warn("Logout com token inválido ou expirado: {}", e.getMessage());
+        }
+        return ResponseEntity.noContent().build();
     }
 
     private LoginResponseDTO buildResponse(UserDetails userDetails, String token) {

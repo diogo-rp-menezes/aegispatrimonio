@@ -44,7 +44,7 @@ public class DepartamentoController {
         @ApiResponse(responseCode = "403", description = "Sem permissão de acesso")
     })
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'READ', null)")
     public List<DepartamentoDTO> listarTodos() {
         return departamentoService.listarTodos();
     }
@@ -59,7 +59,7 @@ public class DepartamentoController {
         @ApiResponse(responseCode = "404", description = "Departamento não encontrado")
     })
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'READ', null)")
     public DepartamentoDTO buscarPorId(@Parameter(description = "ID do departamento", example = "1") @PathVariable Long id) {
         return departamentoService.buscarPorId(id);
     }
@@ -76,7 +76,7 @@ public class DepartamentoController {
     })
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'CREATE', #departamentoCreateDTO.filialId)")
     public DepartamentoDTO criar(@RequestBody @Valid DepartamentoCreateDTO departamentoCreateDTO) {
         return departamentoService.criar(departamentoCreateDTO);
     }
@@ -93,7 +93,7 @@ public class DepartamentoController {
         @ApiResponse(responseCode = "409", description = "Conflito (ex: departamento já existente)")
     })
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'UPDATE', null)")
     public DepartamentoDTO atualizar(@Parameter(description = "ID do departamento", example = "1") @PathVariable Long id, @RequestBody @Valid DepartamentoUpdateDTO departamentoUpdateDTO) {
         return departamentoService.atualizar(id, departamentoUpdateDTO);
     }
@@ -109,7 +109,7 @@ public class DepartamentoController {
     })
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'DELETE', null)")
     public void deletar(@Parameter(description = "ID do departamento", example = "1") @PathVariable Long id) {
         departamentoService.deletar(id);
     }

@@ -31,7 +31,7 @@ public class TipoAtivoController {
      * @return Uma lista de TipoAtivoDTO representando todos os tipos de ativo.
      */
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'READ', null)")
     public List<TipoAtivoDTO> listarTodos() {
         return tipoAtivoService.listarTodos();
     }
@@ -45,7 +45,7 @@ public class TipoAtivoController {
      * @throws jakarta.persistence.EntityNotFoundException se o tipo de ativo não for encontrado.
      */
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'READ', null)")
     public TipoAtivoDTO buscarPorId(@PathVariable Long id) {
         return tipoAtivoService.buscarPorId(id);
     }
@@ -60,7 +60,7 @@ public class TipoAtivoController {
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'CREATE', null)")
     public TipoAtivoDTO criar(@RequestBody @Valid TipoAtivoCreateDTO tipoAtivoCreateDTO) {
         return tipoAtivoService.criar(tipoAtivoCreateDTO);
     }
@@ -76,7 +76,7 @@ public class TipoAtivoController {
      * @throws IllegalArgumentException se o novo nome já estiver em uso por outro tipo de ativo.
      */
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'UPDATE', null)")
     public TipoAtivoDTO atualizar(@PathVariable Long id, @RequestBody @Valid TipoAtivoCreateDTO tipoAtivoUpdateDTO) {
         return tipoAtivoService.atualizar(id, tipoAtivoUpdateDTO);
     }
@@ -91,7 +91,7 @@ public class TipoAtivoController {
      */
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'DELETE', null)")
     public void deletar(@PathVariable Long id) {
         tipoAtivoService.deletar(id);
     }
