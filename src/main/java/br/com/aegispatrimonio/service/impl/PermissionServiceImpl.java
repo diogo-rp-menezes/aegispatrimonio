@@ -49,7 +49,7 @@ public class PermissionServiceImpl implements IPermissionService {
 
     @org.springframework.beans.factory.annotation.Autowired
     @Lazy
-    private PermissionServiceImpl self;
+    private IPermissionService self;
 
     public PermissionServiceImpl(UsuarioRepository usuarioRepository, AtivoRepository ativoRepository, FuncionarioRepository funcionarioRepository, MeterRegistry meterRegistry, br.com.aegispatrimonio.service.SecurityAuditService auditService) {
         this.usuarioRepository = usuarioRepository;
@@ -84,7 +84,7 @@ public class PermissionServiceImpl implements IPermissionService {
 
             String username = authentication.getName();
             // Use 'self' to trigger cache proxy if available
-            PermissionServiceImpl effectiveSelf = (self != null) ? self : this;
+            IPermissionService effectiveSelf = (self != null) ? self : this;
 
             // 0. Admin Bypass
             if (effectiveSelf.hasRole(username, "ROLE_ADMIN")) {
@@ -198,6 +198,7 @@ public class PermissionServiceImpl implements IPermissionService {
      * @param username The username (email).
      * @return A set of permissions.
      */
+    @Override
     @Cacheable(value = "userPermissions", key = "#username", unless = "#result == null")
     @Transactional(readOnly = true)
     public Set<Permission> getUserPermissions(String username) {
@@ -248,6 +249,7 @@ public class PermissionServiceImpl implements IPermissionService {
      * @param context  The context ID or Collection of IDs.
      * @return true if user has access.
      */
+    @Override
     @Cacheable(value = "userContext", key = "#username + '-' + #context.toString()", unless = "#result == false")
     @Transactional(readOnly = true)
     public boolean hasContextAccess(String username, Object context) {

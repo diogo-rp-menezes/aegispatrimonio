@@ -1,6 +1,9 @@
 package br.com.aegispatrimonio.service;
 
+import br.com.aegispatrimonio.model.Permission;
 import org.springframework.security.core.Authentication;
+
+import java.util.Set;
 
 /**
  * Service de autorização contextual (RBAC granular).
@@ -36,4 +39,14 @@ public interface IPermissionService {
      * Verifica se o usuário possui um papel específico (role).
      */
     boolean hasRole(String username, String roleName);
+
+    /**
+     * Recupera as permissões de um usuário.
+     */
+    Set<Permission> getUserPermissions(String username);
+
+    /**
+     * Verifica acesso ao contexto.
+     */
+    boolean hasContextAccess(String username, Object context);
 }
