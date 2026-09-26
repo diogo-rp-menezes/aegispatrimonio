@@ -83,17 +83,23 @@ public class AlertNotificationService {
     public void checkAndCreateAlerts(Long ativoId, LocalDate previsaoEsgotamentoDisco, HealthCheckPayloadDTO payload) {
         Ativo ativoRef = ativoRepository.getReferenceById(ativoId);
         List<Alerta> existingAlerts = alertaRepository.findByAtivoIdAndLidoFalse(ativoId);
-        checkDiskPredictiveAlerts(ativoRef, previsaoEsgotamentoDisco, existingAlerts);
-        checkResourceUsageAlerts(ativoRef, payload, existingAlerts);
+        java.util.List<Alerta> newAlerts = new java.util.ArrayList<>();
+
+        checkDiskPredictiveAlerts(ativoRef, previsaoEsgotamentoDisco, existingAlerts, newAlerts);
+        checkResourceUsageAlerts(ativoRef, payload, existingAlerts, newAlerts);
+
+        if (!newAlerts.isEmpty()) {
+            alertaRepository.saveAll(newAlerts);
+        }
     }
 
-    private void checkResourceUsageAlerts(Ativo ativo, HealthCheckPayloadDTO payload, List<Alerta> existingAlerts) {
+    private void checkResourceUsageAlerts(Ativo ativo, HealthCheckPayloadDTO payload, List<Alerta> existingAlerts, List<Alerta> newAlerts) {
         // CPU Check (> 90%)
         if (payload.cpuLoad() != null && payload.cpuLoad() > 0.90) {
             createAlertIfNotExists(ativo, TipoAlerta.CRITICO, "Sobrecarga de CPU Detectada",
                     "O uso de CPU está em " + String.format("%.1f", payload.cpuLoad() * 100)
                             + "%. Verifique processos travados.",
-                    existingAlerts);
+                    existingAlerts, newAlerts);
         }
 
         // Memory Check (< 10% free)
@@ -103,7 +109,7 @@ public class AlertNotificationService {
                 createAlertIfNotExists(ativo, TipoAlerta.CRITICO, "Memória RAM Crítica",
                         "Memória livre está abaixo de 10% (" + String.format("%.1f", freePercent * 100)
                                 + "%). Risco de travamento.",
-                        existingAlerts);
+                        existingAlerts, newAlerts);
             }
         }
 
@@ -121,14 +127,14 @@ public class AlertNotificationService {
                     createAlertIfNotExists(ativo, TipoAlerta.CRITICO, "Espaço em Disco Crítico",
                             "O disco " + diskName + " está com menos de 10% de espaço livre (" +
                                     String.format("%.1f", freePercent * 100) + "%). Risco de parada.",
-                            existingAlerts);
+                            existingAlerts, newAlerts);
                 }
             }
         }
     }
 
     private void checkDiskPredictiveAlerts(Ativo ativo, LocalDate previsaoEsgotamentoDisco,
-            List<Alerta> existingAlerts) {
+            List<Alerta> existingAlerts, List<Alerta> newAlerts) {
         if (previsaoEsgotamentoDisco == null) {
             return;
         }
@@ -141,17 +147,17 @@ public class AlertNotificationService {
             createAlertIfNotExists(ativo, TipoAlerta.CRITICO, "Risco Crítico de Falha de Disco",
                     "A previsão de esgotamento do disco é para " + daysUntilExhaustion + " dias ("
                             + previsaoEsgotamentoDisco + "). Ação imediata necessária.",
-                    existingAlerts);
+                    existingAlerts, newAlerts);
         } else if (daysUntilExhaustion < 30) {
             createAlertIfNotExists(ativo, TipoAlerta.WARNING, "Alerta de Capacidade de Disco",
                     "A previsão de esgotamento do disco é para " + daysUntilExhaustion + " dias ("
                             + previsaoEsgotamentoDisco + "). Planeje a manutenção.",
-                    existingAlerts);
+                    existingAlerts, newAlerts);
         }
     }
 
     private void createAlertIfNotExists(Ativo ativo, TipoAlerta tipo, String titulo, String mensagem,
-            List<Alerta> existingAlerts) {
+            List<Alerta> existingAlerts, List<Alerta> newAlerts) {
         // Evita criar múltiplos alertas não lidos do mesmo tipo para o mesmo ativo
         boolean exists = existingAlerts.stream().anyMatch(a -> a.getTipo() == tipo);
         if (!exists) {
@@ -160,7 +166,7 @@ public class AlertNotificationService {
             alerta.setTipo(tipo);
             alerta.setTitulo(titulo);
             alerta.setMensagem(mensagem);
-            alertaRepository.save(alerta);
+            newAlerts.add(alerta);
             existingAlerts.add(alerta);
         }
     }

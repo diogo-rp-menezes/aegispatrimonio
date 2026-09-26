@@ -58,7 +58,7 @@ class AlertNotificationServiceTest {
 
         service.checkAndCreateAlerts(1L, ativo.getPrevisaoEsgotamentoDisco(), emptyPayload);
 
-        verify(alertaRepository).save(any(Alerta.class));
+        verify(alertaRepository).saveAll(anyList());
     }
 
     @Test
@@ -69,7 +69,7 @@ class AlertNotificationServiceTest {
 
         service.checkAndCreateAlerts(1L, ativo.getPrevisaoEsgotamentoDisco(), emptyPayload);
 
-        verify(alertaRepository).save(any(Alerta.class));
+        verify(alertaRepository).saveAll(anyList());
     }
 
     @Test
@@ -86,7 +86,7 @@ class AlertNotificationServiceTest {
 
         service.checkAndCreateAlerts(1L, ativo.getPrevisaoEsgotamentoDisco(), emptyPayload);
 
-        verify(alertaRepository, never()).save(any(Alerta.class));
+        verify(alertaRepository, never()).saveAll(anyList());
     }
 
     @Test
@@ -115,6 +115,7 @@ class AlertNotificationServiceTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void shouldCreateCriticalAlertWhenCpuIsHigh() {
         HealthCheckPayloadDTO highCpuPayload = new HealthCheckPayloadDTO(
                 null, null, null, null, null, null, null, null, null, null, null,
@@ -127,12 +128,13 @@ class AlertNotificationServiceTest {
 
         service.checkAndCreateAlerts(1L, null, highCpuPayload);
 
-        verify(alertaRepository).save(argThat(a ->
-            a.getTitulo().contains("Sobrecarga de CPU") && a.getTipo() == TipoAlerta.CRITICO
+        verify(alertaRepository).saveAll(argThat(list ->
+            ((List<Alerta>)list).stream().anyMatch(a -> a.getTitulo().contains("Sobrecarga de CPU") && a.getTipo() == TipoAlerta.CRITICO)
         ));
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void shouldCreateCriticalAlertWhenMemoryIsLow() {
         HealthCheckPayloadDTO lowMemPayload = new HealthCheckPayloadDTO(
                 null, null, null, null, null, null, null, null, null, null, null,
@@ -145,12 +147,13 @@ class AlertNotificationServiceTest {
 
         service.checkAndCreateAlerts(1L, null, lowMemPayload);
 
-        verify(alertaRepository).save(argThat(a ->
-            a.getTitulo().contains("Memória RAM") && a.getTipo() == TipoAlerta.CRITICO
+        verify(alertaRepository).saveAll(argThat(list ->
+            ((List<Alerta>)list).stream().anyMatch(a -> a.getTitulo().contains("Memória RAM") && a.getTipo() == TipoAlerta.CRITICO)
         ));
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void shouldCreateCriticalAlertWhenDiskSpaceIsLow() {
         DiskInfoDTO lowSpaceDisk = new DiskInfoDTO("SSD", "SN123", "NVMe", 500.0, 40.0, 0.08); // 8% free
         HealthCheckPayloadDTO lowDiskPayload = new HealthCheckPayloadDTO(
@@ -164,14 +167,15 @@ class AlertNotificationServiceTest {
 
         service.checkAndCreateAlerts(1L, null, lowDiskPayload);
 
-        verify(alertaRepository).save(argThat(a ->
-            a.getTitulo().contains("Espaço em Disco Crítico") &&
+        verify(alertaRepository).saveAll(argThat(list ->
+            ((List<Alerta>)list).stream().anyMatch(a -> a.getTitulo().contains("Espaço em Disco Crítico") &&
             a.getMensagem().contains("SSD") &&
-            a.getTipo() == TipoAlerta.CRITICO
+            a.getTipo() == TipoAlerta.CRITICO)
         ));
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void shouldCreateCriticalAlertWhenDiskSpaceIsLowCalculated() {
         // 500GB total, 40GB free = 8% free (Critical < 10%)
         // freePercent is NULL to simulate "dumb" agent
@@ -187,10 +191,10 @@ class AlertNotificationServiceTest {
 
         service.checkAndCreateAlerts(1L, null, lowDiskPayload);
 
-        verify(alertaRepository).save(argThat(a ->
-            a.getTitulo().contains("Espaço em Disco Crítico") &&
+        verify(alertaRepository).saveAll(argThat(list ->
+            ((List<Alerta>)list).stream().anyMatch(a -> a.getTitulo().contains("Espaço em Disco Crítico") &&
             a.getMensagem().contains("SSD") &&
-            a.getTipo() == TipoAlerta.CRITICO
+            a.getTipo() == TipoAlerta.CRITICO)
         ));
     }
 
