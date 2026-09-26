@@ -5,34 +5,32 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o 
 
 ## [Unreleased]
 ### Added
-* Estrutura inicial do projeto frontend Aegis com arquitetura baseada em módulos ES6
-* Serviço de API centralizado (`frontend/src/services/api.js`) com interceptadores de requisição/resposta
-* Integração com @popperjs/core para posicionamento de elementos flutuantes (tooltips, dropdowns, popovers)
-* Configuração de build e desenvolvimento (a definir conforme tooling adotado)
+* Estrutura inicial do frontend com 15 módulos JavaScript
+* Integração com @popperjs/core ^2.11.8 para posicionamento de elementos (tooltips, dropdowns, popovers)
+* Camada de serviços de API em `frontend/src/services/api.js` com função `request` para chamadas HTTP
 
 ### Changed
-* Refatoração do módulo `api.js`: separação da lógica de `request` em funções menores para reduzir complexidade ciclomática (atual: 13) <!-- source: server/analyze-pipeline.ts#L45 -->
+* —
 
 ### Deprecated
-* Nenhuma funcionalidade marcada para remoção no momento
+* —
 
 ### Removed
-* Nenhuma funcionalidade removida
+* —
 
 ### Fixed
-* Remoção de chamadas `console.error` e `console.log` residuais em `frontend/src/services/api.js` (linhas 26, 49, 52) antes de build de produção <!-- source: server/analyze-pipeline.ts#L38-L42 -->
+* —
 
 ### Security
-* Nenhuma correção de vulnerabilidade conhecida até o momento
+* —
 
 ---
 
 ## [0.1.0] - 2025-01-15
 ### Added
-* Inicialização do repositório Aegis como aplicação frontend vanilla JavaScript (ESM)
-* Adição de @popperjs/core ^2.11.8 como única dependência de produção
-* Criação da estrutura de pastas `frontend/src/` com separação por domínio (services, components, utils, styles)
-* Implementação do cliente HTTP base com suporte a headers de autenticação, tratamento de erros padronizado e timeout configurável
+* Inicialização do projeto Aegis1 (frontend)
+* Configuração de dependência de produção: @popperjs/core ^2.11.8
+* Módulos de frontend organizados em `frontend/src/`
 
 ### Changed
 * —
@@ -50,3 +48,10 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o 
 * **MINOR (Y):** novas funcionalidades compatíveis com versões anteriores
 * **PATCH (Z):** correções de bugs compatíveis com versões anteriores
 * Cada entrada deve ser curta, no imperativo, e referenciar o PR/issue relacionado quando possível: `Corrige timeout em uploads grandes (#123)`
+
+---
+
+## Observações técnicas conhecidas (pendentes de resolução)
+* [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] Remover chamadas `console.error` (linha 26) e `console.log` (linhas 49, 52) em `frontend/src/services/api.js` antes de deploy em produção
+* [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] Refatorar função `request` em `frontend/src/services/api.js:36` (complexidade ciclomática 13) em funções menores para melhorar manutenibilidade
+* [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] Definir `name`, `version` e `scripts` no `package.json` (atualmente ausentes)

@@ -18,11 +18,9 @@ public class JwtSecretValidator {
 
     @PostConstruct
     public void validate() {
-        String[] profiles = env.getActiveProfiles();
-        for (String p : profiles) {
-            if ("prod".equalsIgnoreCase(p) && (jwtSecret == null || jwtSecret.trim().isEmpty())) {
-                throw new IllegalStateException("JWT secret must be defined when running with profile 'prod'. Set the JWT_SECRET environment variable or jwt.secret property.");
-            }
+        if (jwtSecret == null || jwtSecret.trim().isEmpty()) {
+            throw new IllegalStateException(
+                "JWT secret is required. Set the JWT_SECRET environment variable or jwt.secret property. The application refuses to start without it (fail-fast).");
         }
     }
 }
