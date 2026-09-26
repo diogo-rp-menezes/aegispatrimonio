@@ -65,8 +65,9 @@ public class AtivoRequestDTO {
     @Size(max = 255, message = "Informações de garantia devem ter no máximo 255 caracteres")
     private String informacoesGarantia;
 
-    @NotNull(message = "Pessoa responsável é obrigatória")
-    private Long pessoaResponsavelId;
+    // CORREÇÃO: Renomeado de pessoaResponsavelId para funcionarioResponsavelId
+    @NotNull(message = "Funcionário responsável é obrigatório")
+    private Long funcionarioResponsavelId;
 
     @Size(max = 500, message = "Observações devem ter no máximo 500 caracteres")
     private String observacoes;
