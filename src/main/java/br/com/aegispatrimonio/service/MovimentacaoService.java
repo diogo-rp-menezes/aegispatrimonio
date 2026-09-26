@@ -4,6 +4,7 @@ import br.com.aegispatrimonio.dto.request.MovimentacaoRequestDTO;
 import br.com.aegispatrimonio.dto.response.MovimentacaoResponseDTO;
 import br.com.aegispatrimonio.exception.ResourceConflictException;
 import br.com.aegispatrimonio.exception.ResourceNotFoundException;
+import org.springframework.security.access.AccessDeniedException;
 import br.com.aegispatrimonio.model.*;
 import br.com.aegispatrimonio.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -27,6 +29,7 @@ public class MovimentacaoService {
     private final AtivoRepository ativoRepository;
     private final LocalizacaoRepository localizacaoRepository;
     private final FuncionarioRepository funcionarioRepository;
+    private final UserContextService userContextService;
 
     @Transactional
     public MovimentacaoResponseDTO criar(MovimentacaoRequestDTO request) {
@@ -43,53 +46,87 @@ public class MovimentacaoService {
 
     @Transactional(readOnly = true)
     public Page<MovimentacaoResponseDTO> findAll(Pageable pageable) {
-        return movimentacaoRepository.findAll(pageable).map(this::convertToResponseDTO);
+        if (isAdmin()) {
+            return movimentacaoRepository.findAll(pageable).map(this::convertToResponseDTO);
+        }
+        return movimentacaoRepository.findByAtivoFilialIdIn(getUserFiliais(), pageable)
+                .map(this::convertToResponseDTO);
     }
 
     @Transactional(readOnly = true)
     public Optional<MovimentacaoResponseDTO> buscarPorId(Long id) {
-        return movimentacaoRepository.findById(id).map(this::convertToResponseDTO);
+        return movimentacaoRepository.findById(id)
+                .map(this::requireAcessoFilial)
+                .map(this::convertToResponseDTO);
     }
 
     @Transactional(readOnly = true)
     public Page<MovimentacaoResponseDTO> findByAtivoId(Long ativoId, Pageable pageable) {
-        return movimentacaoRepository.findByAtivoId(ativoId, pageable).map(this::convertToResponseDTO);
+        if (isAdmin()) {
+            return movimentacaoRepository.findByAtivoId(ativoId, pageable).map(this::convertToResponseDTO);
+        }
+        return movimentacaoRepository.findByAtivoIdAndAtivoFilialIdIn(ativoId, getUserFiliais(), pageable)
+                .map(this::convertToResponseDTO);
     }
 
     @Transactional(readOnly = true)
     public Page<MovimentacaoResponseDTO> findByStatus(StatusMovimentacao status, Pageable pageable) {
-        return movimentacaoRepository.findByStatus(status, pageable).map(this::convertToResponseDTO);
+        if (isAdmin()) {
+            return movimentacaoRepository.findByStatus(status, pageable).map(this::convertToResponseDTO);
+        }
+        return movimentacaoRepository.findByStatusAndAtivoFilialIdIn(status, getUserFiliais(), pageable)
+                .map(this::convertToResponseDTO);
     }
 
     @Transactional(readOnly = true)
     public Page<MovimentacaoResponseDTO> findByFuncionarioDestinoId(Long funcionarioDestinoId, Pageable pageable) {
-        return movimentacaoRepository.findByFuncionarioDestinoId(funcionarioDestinoId, pageable)
+        if (isAdmin()) {
+            return movimentacaoRepository.findByFuncionarioDestinoId(funcionarioDestinoId, pageable)
+                    .map(this::convertToResponseDTO);
+        }
+        return movimentacaoRepository
+                .findByFuncionarioDestinoIdAndAtivoFilialIdIn(funcionarioDestinoId, getUserFiliais(), pageable)
                 .map(this::convertToResponseDTO);
     }
 
     @Transactional(readOnly = true)
     public Page<MovimentacaoResponseDTO> findByLocalizacaoDestinoId(Long localizacaoDestinoId, Pageable pageable) {
-        return movimentacaoRepository.findByLocalizacaoDestinoId(localizacaoDestinoId, pageable)
+        if (isAdmin()) {
+            return movimentacaoRepository.findByLocalizacaoDestinoId(localizacaoDestinoId, pageable)
+                    .map(this::convertToResponseDTO);
+        }
+        return movimentacaoRepository
+                .findByLocalizacaoDestinoIdAndAtivoFilialIdIn(localizacaoDestinoId, getUserFiliais(), pageable)
                 .map(this::convertToResponseDTO);
     }
 
     @Transactional(readOnly = true)
     public Page<MovimentacaoResponseDTO> findByPeriodo(LocalDate startDate, LocalDate endDate, Pageable pageable) {
-        return movimentacaoRepository.findByDataMovimentacaoBetween(startDate, endDate, pageable)
+        if (isAdmin()) {
+            return movimentacaoRepository.findByDataMovimentacaoBetween(startDate, endDate, pageable)
+                    .map(this::convertToResponseDTO);
+        }
+        return movimentacaoRepository
+                .findByDataMovimentacaoBetweenAndAtivoFilialIdIn(startDate, endDate, getUserFiliais(), pageable)
                 .map(this::convertToResponseDTO);
     }
 
     @Transactional(readOnly = true)
     public Page<MovimentacaoResponseDTO> findMovimentacoesPendentesPorAtivo(Long ativoId, Pageable pageable) {
-        return movimentacaoRepository.findByAtivoIdAndStatus(ativoId, StatusMovimentacao.PENDENTE, pageable)
+        if (isAdmin()) {
+            return movimentacaoRepository.findByAtivoIdAndStatus(ativoId, StatusMovimentacao.PENDENTE, pageable)
+                    .map(this::convertToResponseDTO);
+        }
+        return movimentacaoRepository
+                .findByAtivoIdAndStatusAndAtivoFilialIdIn(ativoId, StatusMovimentacao.PENDENTE, getUserFiliais(),
+                        pageable)
                 .map(this::convertToResponseDTO);
     }
 
     @Transactional
     public MovimentacaoResponseDTO efetivarMovimentacao(Long id) {
         log.info("Efetivando movimentação ID: {}", id);
-        Movimentacao movimentacao = movimentacaoRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Movimentação não encontrada com ID: " + id));
+        Movimentacao movimentacao = buscarEntidadeComAcesso(id);
 
         if (movimentacao.getStatus() != StatusMovimentacao.PENDENTE) {
             throw new ResourceConflictException("Somente movimentações pendentes podem ser efetivadas.");
@@ -110,8 +147,7 @@ public class MovimentacaoService {
     @Transactional
     public MovimentacaoResponseDTO cancelarMovimentacao(Long id, String motivoCancelamento) {
         log.info("Cancelando movimentação ID: {}", id);
-        Movimentacao movimentacao = movimentacaoRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Movimentação não encontrada com ID: " + id));
+        Movimentacao movimentacao = buscarEntidadeComAcesso(id);
 
         if (movimentacao.getStatus() != StatusMovimentacao.PENDENTE) {
             throw new ResourceConflictException("Somente movimentações pendentes podem ser canceladas.");
@@ -127,8 +163,7 @@ public class MovimentacaoService {
     @Transactional
     public void deletar(Long id) {
         log.warn("Tentativa de deletar movimentação ID: {}", id);
-        Movimentacao movimentacao = movimentacaoRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Movimentação não encontrada com ID: " + id));
+        Movimentacao movimentacao = buscarEntidadeComAcesso(id);
 
         if (movimentacao.getStatus() != StatusMovimentacao.PENDENTE) {
             throw new ResourceConflictException("Apenas movimentações com status 'PENDENTE' podem ser deletadas.");
@@ -136,6 +171,33 @@ public class MovimentacaoService {
 
         movimentacaoRepository.delete(movimentacao);
         log.info("Movimentação ID: {} deletada com sucesso.", id);
+    }
+
+    private boolean isAdmin() {
+        return userContextService.isAdmin();
+    }
+
+    private Set<Long> getUserFiliais() {
+        return userContextService.getUserFiliais();
+    }
+
+    private Movimentacao buscarEntidadeComAcesso(Long id) {
+        return movimentacaoRepository.findById(id)
+                .map(this::requireAcessoFilial)
+                .orElseThrow(() -> new ResourceNotFoundException("Movimentação não encontrada com ID: " + id));
+    }
+
+    /**
+     * Garante que não-ADMIN só acesse movimentações cujo ativo pertence às suas filiais.
+     */
+    private Movimentacao requireAcessoFilial(Movimentacao movimentacao) {
+        if (!isAdmin()) {
+            Set<Long> userFiliais = getUserFiliais();
+            if (!userFiliais.contains(movimentacao.getAtivo().getFilial().getId())) {
+                throw new AccessDeniedException("Você não tem permissão para acessar movimentações desta filial.");
+            }
+        }
+        return movimentacao;
     }
 
     private Movimentacao convertToEntity(MovimentacaoRequestDTO request) {

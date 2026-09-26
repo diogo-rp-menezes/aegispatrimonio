@@ -7,6 +7,7 @@ import br.com.aegispatrimonio.dto.request.ManutencaoRequestDTO;
 import br.com.aegispatrimonio.dto.response.ManutencaoResponseDTO;
 import br.com.aegispatrimonio.exception.ResourceConflictException;
 import br.com.aegispatrimonio.exception.ResourceNotFoundException;
+import org.springframework.security.access.AccessDeniedException;
 import br.com.aegispatrimonio.model.*;
 import br.com.aegispatrimonio.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Optional;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -33,6 +35,7 @@ public class ManutencaoService {
     private final FuncionarioRepository funcionarioRepository;
     private final CurrentUserProvider currentUserProvider; // Injetando CurrentUserProvider
     private final WorkflowAprovacaoService workflowService;
+    private final UserContextService userContextService;
 
     @Transactional
     public ManutencaoResponseDTO criar(ManutencaoRequestDTO request) {
@@ -82,7 +85,9 @@ public class ManutencaoService {
     @Transactional(readOnly = true)
     public Optional<ManutencaoResponseDTO> buscarPorId(Long id) {
         log.debug("Buscando manutenção ID: {}", id);
-        return manutencaoRepository.findById(id).map(this::convertToResponseDTO);
+        return manutencaoRepository.findById(id)
+                .map(this::requireAcessoFilial)
+                .map(this::convertToResponseDTO);
     }
 
     @Transactional(readOnly = true)
@@ -91,9 +96,13 @@ public class ManutencaoService {
             LocalDate dataSolicitacaoInicio, LocalDate dataSolicitacaoFim, LocalDate dataConclusaoInicio,
             LocalDate dataConclusaoFim, Pageable pageable) {
         log.debug("Listando manutenções com filtros");
+        Set<Long> filiaisIds = null;
+        if (!userContextService.isAdmin()) {
+            filiaisIds = userContextService.getUserFiliais();
+        }
         Specification<Manutencao> spec = ManutencaoSpecification.build(ativoId, status, tipo, solicitanteId,
                 fornecedorId,
-                dataSolicitacaoInicio, dataSolicitacaoFim, dataConclusaoInicio, dataConclusaoFim);
+                dataSolicitacaoInicio, dataSolicitacaoFim, dataConclusaoInicio, dataConclusaoFim, filiaisIds);
         return manutencaoRepository.findAll(spec, pageable).map(this::convertToResponseDTO);
     }
 
@@ -188,7 +197,21 @@ public class ManutencaoService {
 
     private Manutencao buscarEntidadePorId(Long id) {
         return manutencaoRepository.findById(id)
+                .map(this::requireAcessoFilial)
                 .orElseThrow(() -> new ResourceNotFoundException("Manutenção não encontrada com ID: " + id));
+    }
+
+    /**
+     * Garante que não-ADMIN só acesse manutenções cujo ativo pertence às suas filiais.
+     */
+    private Manutencao requireAcessoFilial(Manutencao manutencao) {
+        if (!userContextService.isAdmin()) {
+            Set<Long> userFiliais = userContextService.getUserFiliais();
+            if (!userFiliais.contains(manutencao.getAtivo().getFilial().getId())) {
+                throw new AccessDeniedException("Você não tem permissão para acessar manutenções desta filial.");
+            }
+        }
+        return manutencao;
     }
 
     private Manutencao convertToEntity(ManutencaoRequestDTO request) {

@@ -8,6 +8,7 @@ import jakarta.persistence.criteria.Predicate;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 public class ManutencaoSpecification {
 
@@ -15,6 +16,17 @@ public class ManutencaoSpecification {
                                                   Long solicitanteId, Long fornecedorId, LocalDate dataSolicitacaoInicio,
                                                   LocalDate dataSolicitacaoFim, LocalDate dataConclusaoInicio,
                                                   LocalDate dataConclusaoFim) {
+        return build(ativoId, status, tipo, solicitanteId, fornecedorId, dataSolicitacaoInicio,
+                dataSolicitacaoFim, dataConclusaoInicio, dataConclusaoFim, null);
+    }
+
+    /**
+     * @param filiaisIds filiais permitidas para o usuário (null = sem restrição, ex.: ADMIN)
+     */
+    public static Specification<Manutencao> build(Long ativoId, StatusManutencao status, TipoManutencao tipo,
+                                                  Long solicitanteId, Long fornecedorId, LocalDate dataSolicitacaoInicio,
+                                                  LocalDate dataSolicitacaoFim, LocalDate dataConclusaoInicio,
+                                                  LocalDate dataConclusaoFim, Set<Long> filiaisIds) {
         return (root, query, criteriaBuilder) -> {
             List<Predicate> predicates = new ArrayList<>();
 
@@ -38,6 +50,9 @@ public class ManutencaoSpecification {
             }
             if (dataConclusaoInicio != null && dataConclusaoFim != null) {
                 predicates.add(criteriaBuilder.between(root.get("dataConclusao"), dataConclusaoInicio, dataConclusaoFim));
+            }
+            if (filiaisIds != null && !filiaisIds.isEmpty()) {
+                predicates.add(root.get("ativo").get("filial").get("id").in(filiaisIds));
             }
 
             if (query.getResultType() != Long.class && query.getResultType() != long.class) {

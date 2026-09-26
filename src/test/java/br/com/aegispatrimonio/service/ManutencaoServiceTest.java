@@ -12,6 +12,11 @@ import br.com.aegispatrimonio.repository.FornecedorRepository;
 import br.com.aegispatrimonio.repository.FuncionarioRepository;
 import br.com.aegispatrimonio.repository.ManutencaoRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.access.AccessDeniedException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,6 +48,8 @@ class ManutencaoServiceTest {
     private CurrentUserProvider currentUserProvider; // Adicionado mock para CurrentUserProvider
     @Mock
     private WorkflowAprovacaoService workflowService;
+    @Mock
+    private UserContextService userContextService;
 
     @InjectMocks
     private ManutencaoService manutencaoService;
@@ -86,6 +93,77 @@ class ManutencaoServiceTest {
         adminUser.setId(1L);
         adminUser.setRole("ROLE_ADMIN");
         lenient().when(currentUserProvider.getCurrentUsuario()).thenReturn(adminUser); // Mockando o usuário logado (lenient para evitar UnnecessaryStubbing)
+        // Por padrão, os testes existentes rodam como ADMIN (sem restrição de filial)
+        lenient().when(userContextService.isAdmin()).thenReturn(true);
+    }
+
+    @Test
+    @DisplayName("Listar: USER não-admin deve filtrar manutenções pelas suas filiais")
+    void listar_comUserNaoAdmin_deveFiltrarPorFiliais() {
+        when(userContextService.isAdmin()).thenReturn(false);
+        when(userContextService.getUserFiliais()).thenReturn(Set.of(1L));
+        when(manutencaoRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(Page.empty());
+
+        manutencaoService.listar(null, null, null, null, null, null, null, null, null,
+                PageRequest.of(0, 10));
+
+        // Verifica que a Specification foi construída com o filtro de filiais (indiretamente:
+        // o repositório foi chamado com uma spec não-nula)
+        verify(manutencaoRepository).findAll(any(Specification.class), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("Listar: ADMIN não deve ter filtro por filiais")
+    void listar_comAdmin_naoDeveChamarGetUserFiliais() {
+        when(userContextService.isAdmin()).thenReturn(true);
+        when(manutencaoRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(Page.empty());
+
+        manutencaoService.listar(null, null, null, null, null, null, null, null, null,
+                PageRequest.of(0, 10));
+
+        verify(userContextService, never()).getUserFiliais();
+        verify(manutencaoRepository).findAll(any(Specification.class), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("BuscarPorId: USER de outra filial deve receber AccessDeniedException")
+    void buscarPorId_comUserDeOutraFilial_deveLancarAccessDenied() {
+        when(userContextService.isAdmin()).thenReturn(false);
+        when(userContextService.getUserFiliais()).thenReturn(Set.of(99L)); // usuário da filial 99, ativo na filial 1
+        when(manutencaoRepository.findById(100L)).thenReturn(Optional.of(manutencao));
+
+        assertThrows(AccessDeniedException.class, () -> manutencaoService.buscarPorId(100L));
+    }
+
+    @Test
+    @DisplayName("BuscarPorId: USER da mesma filial deve ver a manutenção")
+    void buscarPorId_comUserDaMesmaFilial_deveRetornar() {
+        when(userContextService.isAdmin()).thenReturn(false);
+        when(userContextService.getUserFiliais()).thenReturn(Set.of(1L));
+        when(manutencaoRepository.findById(100L)).thenReturn(Optional.of(manutencao));
+
+        assertTrue(manutencaoService.buscarPorId(100L).isPresent());
+    }
+
+    @Test
+    @DisplayName("Aprovar: USER de outra filial deve receber AccessDeniedException")
+    void aprovar_comUserDeOutraFilial_deveLancarAccessDenied() {
+        when(userContextService.isAdmin()).thenReturn(false);
+        when(userContextService.getUserFiliais()).thenReturn(Set.of(99L));
+        when(manutencaoRepository.findById(100L)).thenReturn(Optional.of(manutencao));
+
+        assertThrows(AccessDeniedException.class, () -> manutencaoService.aprovar(100L));
+        verify(manutencaoRepository, never()).save(any(Manutencao.class));
+    }
+
+    @Test
+    @DisplayName("BuscarPorId: ADMIN deve ver manutenção de qualquer filial")
+    void buscarPorId_comAdmin_deveRetornar() {
+        when(manutencaoRepository.findById(100L)).thenReturn(Optional.of(manutencao));
+
+        assertTrue(manutencaoService.buscarPorId(100L).isPresent());
     }
 
     @Test

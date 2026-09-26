@@ -9,6 +9,10 @@ import br.com.aegispatrimonio.repository.FuncionarioRepository;
 import br.com.aegispatrimonio.repository.LocalizacaoRepository;
 import br.com.aegispatrimonio.repository.MovimentacaoRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,6 +39,8 @@ class MovimentacaoServiceTest {
     private LocalizacaoRepository localizacaoRepository;
     @Mock
     private FuncionarioRepository funcionarioRepository;
+    @Mock
+    private UserContextService userContextService;
 
     @InjectMocks
     private MovimentacaoService movimentacaoService;
@@ -81,6 +87,83 @@ class MovimentacaoServiceTest {
         movimentacao.setLocalizacaoOrigem(localizacaoOrigem);
         movimentacao.setLocalizacaoDestino(localizacaoDestino);
         movimentacao.setStatus(StatusMovimentacao.PENDENTE);
+        // Por padrão, os testes existentes rodam como ADMIN (sem restrição de filial)
+        lenient().when(userContextService.isAdmin()).thenReturn(true);
+    }
+
+    @Test
+    @DisplayName("FindAll: USER não-admin deve listar apenas movimentações das suas filiais")
+    void findAll_comUserNaoAdmin_deveFiltrarPorFiliais() {
+        when(userContextService.isAdmin()).thenReturn(false);
+        when(userContextService.getUserFiliais()).thenReturn(Set.of(1L));
+        when(movimentacaoRepository.findByAtivoFilialIdIn(anySet(), any(Pageable.class))).thenReturn(Page.empty());
+
+        movimentacaoService.findAll(PageRequest.of(0, 10));
+
+        verify(movimentacaoRepository).findByAtivoFilialIdIn(Set.of(1L), PageRequest.of(0, 10));
+        verify(movimentacaoRepository, never()).findAll(any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("FindAll: ADMIN deve listar tudo")
+    void findAll_comAdmin_deveListarTudo() {
+        when(movimentacaoRepository.findAll(any(Pageable.class))).thenReturn(Page.empty());
+        movimentacaoService.findAll(PageRequest.of(0, 10));
+
+        verify(movimentacaoRepository).findAll(any(Pageable.class));
+        verify(movimentacaoRepository, never()).findByAtivoFilialIdIn(anySet(), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("BuscarPorId: USER de outra filial deve receber AccessDeniedException")
+    void buscarPorId_comUserDeOutraFilial_deveLancarAccessDenied() {
+        when(userContextService.isAdmin()).thenReturn(false);
+        when(userContextService.getUserFiliais()).thenReturn(Set.of(99L)); // ativo na filial 1
+        when(movimentacaoRepository.findById(1L)).thenReturn(Optional.of(movimentacao));
+
+        assertThrows(AccessDeniedException.class, () -> movimentacaoService.buscarPorId(1L));
+    }
+
+    @Test
+    @DisplayName("BuscarPorId: USER da mesma filial deve ver a movimentação")
+    void buscarPorId_comUserDaMesmaFilial_deveRetornar() {
+        when(userContextService.isAdmin()).thenReturn(false);
+        when(userContextService.getUserFiliais()).thenReturn(Set.of(1L));
+        when(movimentacaoRepository.findById(1L)).thenReturn(Optional.of(movimentacao));
+
+        assertTrue(movimentacaoService.buscarPorId(1L).isPresent());
+    }
+
+    @Test
+    @DisplayName("Efetivar: USER de outra filial deve receber AccessDeniedException")
+    void efetivarMovimentacao_comUserDeOutraFilial_deveLancarAccessDenied() {
+        when(userContextService.isAdmin()).thenReturn(false);
+        when(userContextService.getUserFiliais()).thenReturn(Set.of(99L));
+        when(movimentacaoRepository.findById(1L)).thenReturn(Optional.of(movimentacao));
+
+        assertThrows(AccessDeniedException.class, () -> movimentacaoService.efetivarMovimentacao(1L));
+        verify(movimentacaoRepository, never()).save(any(Movimentacao.class));
+    }
+
+    @Test
+    @DisplayName("Cancelar: USER de outra filial deve receber AccessDeniedException")
+    void cancelarMovimentacao_comUserDeOutraFilial_deveLancarAccessDenied() {
+        when(userContextService.isAdmin()).thenReturn(false);
+        when(userContextService.getUserFiliais()).thenReturn(Set.of(99L));
+        when(movimentacaoRepository.findById(1L)).thenReturn(Optional.of(movimentacao));
+
+        assertThrows(AccessDeniedException.class, () -> movimentacaoService.cancelarMovimentacao(1L, "motivo"));
+    }
+
+    @Test
+    @DisplayName("Deletar: USER de outra filial deve receber AccessDeniedException")
+    void deletar_comUserDeOutraFilial_deveLancarAccessDenied() {
+        when(userContextService.isAdmin()).thenReturn(false);
+        when(userContextService.getUserFiliais()).thenReturn(Set.of(99L));
+        when(movimentacaoRepository.findById(1L)).thenReturn(Optional.of(movimentacao));
+
+        assertThrows(AccessDeniedException.class, () -> movimentacaoService.deletar(1L));
+        verify(movimentacaoRepository, never()).delete(any(Movimentacao.class));
     }
 
     @Test

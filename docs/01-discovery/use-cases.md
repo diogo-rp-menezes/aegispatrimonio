@@ -1,660 +1,491 @@
-# Use Case Specification: UC-01 — Gerenciar Cadastros Mestres
-
-## 1. Characterization
-* **Primary Actor:** Administrador de Cadastros
-* **Secondary Actors:** Sistema Backend (API REST)
-* **Stakeholders & Interests:** 
-  - Administrador de Cadastros — mantém dados mestres consistentes para relatórios e alocação
-  - Gestor de Manutenção — depende de departamentos, filiais, fornecedores e funcionários corretos para ordens
-* **Trigger:** Usuário acessa módulo de cadastros e seleciona criar, listar, buscar, atualizar ou excluir entidade
-* **Preconditions:** 
-  - Usuário autenticado com perfil de administrador
-  - Backend disponível e respondendo
-* **Postconditions (Success Guarantee):** Entidade criada/atualizada/excluída com sucesso; lista atualizada refletindo alteração; validações de integridade referencial respeitadas
-* **Scope:** Frontend Aegis1 — módulo de cadastros (departamentos, filiais, fornecedores, funcionários)
-* **Level:** User goal
-
-## 2. Main Scenario (Happy Path) — Criar Entidade
-1. Administrador acessa tela de cadastro da entidade desejada (departamento/filial/fornecedor/funcionário)
-2. Sistema exibe formulário vazio com campos obrigatórios marcados
-3. Administrador preenche dados e submete
-4. Frontend valida campos obrigatórios localmente
-5. Frontend envia `POST /api/{entidade}` via `api.js:request` com payload JSON
-6. Backend valida regras de negócio e persiste
-7. Backend retorna `201 Created` com entidade criada (incluindo ID)
-8. Frontend exibe toast de sucesso e atualiza lista (chama `listar`)
-9. Caso de uso encerra com sucesso
-
-## 3. Alternative Scenarios
-### AS-1: Editar Entidade Existente
-* **Ponto de extensão:** Passo 1 — administrador clica em "Editar" na linha da lista
-* **Passos:**
-  1. Sistema busca entidade via `GET /api/{entidade}/{id}` (`buscarPorId`)
-  2. Preenche formulário com dados atuais
-  3. Administrador altera campos e submete
-  4. Frontend envia `PUT /api/{entidade}/{id}`
-  5. Backend retorna `200 OK` com entidade atualizada
-  6. Frontend atualiza lista e exibe sucesso
-* **Retorno ao fluxo principal:** Não, encerra como fluxo independente
-
-### AS-2: Excluir Entidade Sem Vinculações
-* **Ponto de extensão:** Passo 1 — administrador clica em "Excluir" e confirma no modal
-* **Passos:**
-  1. Frontend envia `DELETE /api/{entidade}/{id}`
-  2. Backend verifica ausência de ordens vinculadas (BR-05)
-  3. Backend remove e retorna `204 No Content`
-  4. Frontend remove da lista local e exibe sucesso
-* **Retorno ao fluxo principal:** Não, encerra
-
-## 4. Exception Scenarios
-### EX-1: Validação de Campos Obrigatórios Falha (Frontend)
-* **Ponto de extensão:** Passo 4 do cenário principal
-* **Condição de erro:** Campo obrigatório vazio ou formato inválido
-* **Tratamento:** Frontend bloqueia submissão, destaca campo em vermelho, exibe mensagem inline "Campo obrigatório" — não chama API
-
-### EX-2: Entidade Duplicada (Backend 409)
-* **Ponto de extensão:** Passo 6 do cenário principal
-* **Condição de erro:** Backend retorna `409 Conflict` (ex: código de departamento já existe)
-* **Tratamento:** `api.js:handleApiError` captura, frontend exibe toast "Registro já existe" e mantém formulário aberto para correção
-
-### EX-3: Exclusão Bloqueada por Ordens Vinculadas (BR-05)
-* **Ponto de extensão:** Passo 2 do AS-2
-* **Condição de erro:** Backend retorna `409 Conflict` com mensagem "Entidade possui ordens vinculadas"
-* **Tratamento:** `handleApiError` processa, frontend exibe modal informativo: "Não é possível excluir — existem ordens de manutenção associadas. Reatribua ou conclua as ordens antes."
-
-### EX-4: Falha de Rede / Timeout
-* **Ponto de extensão:** Qualquer chamada `request`
-* **Condição de erro:** `fetch` rejeita ou timeout (sem resposta em 30s)
-* **Tratamento:** `handleApiError` registra no console (dev) / Sentry (prod), exibe toast "Erro de conexão — tente novamente", mantém estado anterior
-
-## 5. Business Rules Envolvidas
-* **BR-05:** Exclusão de entidades mestras bloqueada se houver ordens vinculadas — backend retorna 409, frontend trata via `handleApiError`
-* **BR-06:** Todas as mutações passam por `authInterceptor` para anexar token JWT; expiração dispara refresh automático antes de retry único
-
-## 6. Non-Functional Requirements Relevantes
-* Latência P95 da chamada `request` < 800 ms (BRD Guardrail)
-* Taxa de erro de integração API < 1% (BRD Guardrail)
-* Zero vazamento de dados sensíveis no frontend (authInterceptor) — BRD Guardrail
-
-## 7. Frequency of Use
-Baixa a média — usado na configuração inicial e manutenção esporádica de cadastros
-
-## 8. Assumptions
-* Backend expõe endpoints REST compatíveis: `POST/GET/PUT/DELETE /api/{departamentos|filiais|fornecedores|funcionarios}` e `/api/{entidade}/{id}`
-* Payloads seguem contratos implícitos no `api.js` (não documentados no codebase atual)
-* `authInterceptor` em `api.js` já implementa refresh token automático
-
-## 9. Open Issues
-* Contrato OpenAPI formal não existe — alinhar com time de Backend antes de testes integrados
-* Tratamento de `console.error/log` residuais em `api.js:26,49,52` deve ser removido antes de produção (diagnóstico)
-
-## 10. Related Artifacts
-* **User Stories:** US-CAD-01 a US-CAD-20 (CRUD 4 entidades × 5 operações)
-* **User Flow:** `user-flows.md#cadastros-mestres`
-* **API envolvida:** `api-specification.md#cadastros-mestres`
-
-
-# Use Case Specification: UC-02 — Criar Ordem de Manutenção
-
-## 1. Characterization
-* **Primary Actor:** Gestor de Manutenção ou Técnico de Campo (quem abre a solicitação)
-* **Secondary Actors:** Sistema Backend (API REST), Administrador de Cadastros (dados mestres pré-existentes)
-* **Stakeholders & Interests:** 
-  - Gestor — rastreabilidade desde a origem
-  - Técnico — clareza do que executar
-  - Aprovador — base para decisão posterior
-* **Trigger:** Usuário clica "Nova Ordem" no dashboard ou lista de ordens
-* **Preconditions:** 
-  - Usuário autenticado
-  - Pelo menos um departamento, filial, fornecedor (se externo) e funcionário (técnico responsável) cadastrados
-  - Ativo/equipamento identificado (informado no formulário)
-* **Postconditions (Success Guarantee):** Ordem criada no estado "Aberta" com ID único, técnico responsável alocado, visível na lista para início
-* **Scope:** Frontend Aegis1 — módulo de ordens de manutenção
-* **Level:** User goal
-
-## 2. Main Scenario (Happy Path)
-1. Usuário acessa "Nova Ordem de Manutenção"
-2. Sistema exibe formulário com campos: ativo, descrição do problema, prioridade, departamento, filial, técnico responsável, tipo (preventiva/corretiva), fornecedor (opcional)
-3. Usuário preenche campos obrigatórios e submete
-4. Frontend valida localmente (campos obrigatórios, técnico alocado)
-5. Frontend envia `POST /api/ordens` via `request` com payload
-6. Backend valida BR-01 (estado "Aberta" + técnico alocado) e persiste
-7. Backend retorna `201 Created` com ordem completa (ID, estado "Aberta", timestamps)
-8. Frontend exibe toast "Ordem criada com sucesso", redireciona para detalhe da ordem (`buscarPorId`)
-9. Caso de uso encerra com sucesso
-
-## 3. Alternative Scenarios
-### AS-1: Criar a Partir de Template/Checklist (Futuro)
-* **Ponto de extensão:** Passo 2 — usuário seleciona "Usar template"
-* **Passos:** [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — Premissa: futuro módulo de checklists digitais (BRD Future Considerations). Não implementado no escopo atual.
-* **Retorno ao fluxo principal:** Não aplicável (fora de escopo)
-
-## 4. Exception Scenarios
-### EX-1: Técnico Responsável Não Informado (BR-01)
-* **Ponto de extensão:** Passo 4
-* **Condição de erro:** Campo "técnico responsável" vazio
-* **Tratamento:** Frontend bloqueia submissão, destaca campo, mensagem "Técnico responsável é obrigatório para criar a ordem (BR-01)"
-
-### EX-2: Dados Mestres Ausentes
-* **Ponto de extensão:** Passo 2
-* **Condição de erro:** Listas de departamentos/filiais/funcionários vazias (GET retorna array vazio)
-* **Tratamento:** Frontend exibe alerta "Cadastre departamentos, filiais e técnicos antes de criar ordens" e desabilita botão "Nova Ordem"
-
-### EX-3: Erro de Validação Backend (400/422)
-* **Ponto de extensão:** Passo 6
-* **Condição de erro:** Backend rejeita payload (ex: ativo inexistente, filial inválida)
-* **Tratamento:** `handleApiError` exibe toast com mensagem do backend, mantém formulário preenchido para correção
-
-### EX-4: Falha de Autenticação / Token Expirado (BR-06)
-* **Ponto de extensão:** Passo 5
-* **Condição de erro:** `authInterceptor` detecta 401, tenta refresh, falha
-* **Tratamento:** Redireciona para tela de login limpa, preserva dados do formulário em `sessionStorage` para recuperação pós-login
-
-## 5. Business Rules Envolvidas
-* **BR-01:** Uma ordem só pode ser iniciada se estiver no estado "Aberta" e tiver técnico responsável alocado — criação já exige técnico
-* **BR-06:** Mutações passam por `authInterceptor` com JWT + refresh automático
-
-## 6. Non-Functional Requirements Relevantes
-* Latência P95 < 800 ms (criação)
-* Taxa de erro API < 1%
-* Formulário deve carregar listas mestras em < 1s (cache local após primeiro load)
-
-## 7. Frequency of Use
-Alta — múltiplas vezes por dia por gestores e técnicos
-
-## 8. Assumptions
-* Backend endpoint `POST /api/ordens` existe e aceita contrato implícito
-* Estados de ordem: "Aberta" → "Em Andamento" → "Aprovada" → "Concluída" / "Cancelada"
-* Prioridade: enum (Baixa, Média, Alta, Crítica)
-
-## 9. Open Issues
-* Definir campos obrigatórios vs opcionais no contrato de API
-* Validação de ativo: backend valida existência? Frontend precisa de autocomplete?
-
-## 10. Related Artifacts
-* **User Stories:** US-ORD-01 (Criar ordem)
-* **User Flow:** `user-flows.md#criar-ordem`
-* **API envolvida:** `api-specification.md#ordens-post`
-
-
-# Use Case Specification: UC-03 — Iniciar Ordem de Manutenção
-
-## 1. Characterization
-* **Primary Actor:** Técnico de Campo
-* **Secondary Actors:** Sistema Backend (API REST)
-* **Stakeholders & Interests:** 
-  - Técnico — registra início real do trabalho
-  - Gestor — visibilidade de ordens em andamento
-  - Aprovador — sabe que execução começou
-* **Trigger:** Técnico abre ordem no estado "Aberta" e clica "Iniciar"
-* **Preconditions:** 
-  - Ordem existe no estado "Aberta"
-  - Técnico logado é o responsável alocado na ordem (ou tem permissão de delegação)
-  - Backend disponível
-* **Postconditions (Success Guarantee):** Ordem transiciona para "Em Andamento", timestamp de início registrado, botão "Iniciar" desabilitado, "Aprovar" ainda não habilitado
-* **Scope:** Frontend Aegis1 — detalhe da ordem / ação "Iniciar"
-* **Level:** User goal
-
-## 2. Main Scenario (Happy Path)
-1. Técnico acessa lista de ordens, filtra "Minhas Ordens" / "Abertas"
-2. Clica na ordem desejada → abre detalhe (`GET /api/ordens/{id}` → `buscarPorId`)
-3. Sistema exibe detalhes + botão "Iniciar" habilitado (estado "Aberta" + técnico responsável = usuário logado)
-4. Técnico clica "Iniciar", confirma no modal
-5. Frontend envia `PATCH /api/ordens/{id}/iniciar` (ou `PUT /api/ordens/{id}` com estado "Em Andamento")
-6. Backend valida BR-01 (estado "Aberta" + técnico alocado) e transiciona
-7. Backend retorna `200 OK` com ordem atualizada (estado "Em Andamento", `iniciadoEm`, `iniciadoPor`)
-8. Frontend atualiza UI: badge "Em Andamento", botão "Iniciar" oculto, timestamp visível
-9. Caso de uso encerra com sucesso
-
-## 3. Alternative Scenarios
-### AS-1: Delegar Início a Outro Técnico (Futuro)
-* **Ponto de extensão:** Passo 3 — técnico não é o responsável mas tem permissão
-* **Passos:** [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — Premissa: regra de delegação não definida no BRD. Fora de escopo atual.
-
-## 4. Exception Scenarios
-### EX-1: Ordem Não Está "Aberta" (BR-01)
-* **Ponto de extensão:** Passo 3 ou 6
-* **Condição de erro:** Ordem já "Em Andamento", "Aprovada", "Concluída" ou "Cancelada"
-* **Tratamento:** Backend retorna `409 Conflict` "Transição inválida", `handleApiError` exibe toast, frontend desabilita botão "Iniciar" e recarrega estado via `buscarPorId`
-
-### EX-2: Técnico Logado Não É o Responsável
-* **Ponto de extensão:** Passo 3
-* **Condição de erro:** `responsavelId` ≠ `usuarioLogado.id` e sem permissão de delegação
-* **Tratamento:** Frontend oculta botão "Iniciar" (ou exibe desabilitado com tooltip "Apenas o técnico responsável pode iniciar")
-
-### EX-3: Falha de Rede / Timeout
-* **Ponto de extensão:** Passo 5
-* **Condição de erro:** `request` falha (rede, timeout, 5xx)
-* **Tratamento:** `handleApiError` loga, toast "Erro ao iniciar — tente novamente", botão permanece habilitado para retry
-
-### EX-4: Token Expirado Durante Ação (BR-06)
-* **Ponto de extensão:** Passo 5
-* **Condição de erro:** `authInterceptor` recebe 401, refresh falha
-* **Tratamento:** Redireciona login, preserva `ordemId` para retomar após autenticação
-
-## 5. Business Rules Envolvidas
-* **BR-01:** Ordem só pode ser iniciada se estado "Aberta" e técnico responsável alocado
-* **BR-06:** `authInterceptor` anexa JWT, refresh automático + retry único
-
-## 6. Non-Functional Requirements Relevantes
-* Latência P95 < 800 ms (ação de transição de estado)
-* Disponibilidade: ação deve funcionar offline-first? [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — Premissa: PWA com sincronização posterior não especificado no BRD. Escopo atual: apenas online.
-
-## 7. Frequency of Use
-Muito alta — cada ordem ativa passa por este passo uma vez
-
-## 8. Assumptions
-* Endpoint de transição: `PATCH /api/ordens/{id}/iniciar` ou `PUT /api/ordens/{id}` com `{ estado: "EM_ANDAMENTO" }` — a confirmar com Backend
-* Backend registra `iniciadoEm` (timestamp server) e `iniciadoPor` (userId do token)
-
-## 9. Open Issues
-* Contrato exato do endpoint de transição de estado não documentado
-* Permissão de delegação não definida — assumir "apenas responsável" por enquanto
-
-## 10. Related Artifacts
-* **User Stories:** US-ORD-02 (Iniciar ordem)
-* **User Flow:** `user-flows.md#iniciar-ordem`
-* **API envolvida:** `api-specification.md#ordens-patch-iniciar`
-
-
-# Use Case Specification: UC-04 — Aprovar Ordem de Manutenção
-
-## 1. Characterization
-* **Primary Actor:** Aprovador/Supervisor
-* **Secondary Actors:** Sistema Backend (API REST), Técnico de Campo (evidências)
-* **Stakeholders & Interests:** 
-  - Aprovador — valida execução com evidências
-  - Gestor — conformidade auditável
-  - Compliance — rastreabilidade para NR-10/NR-12
-* **Trigger:** Aprovador abre ordem no estado "Em Andamento" e clica "Aprovar"
-* **Preconditions:** 
-  - Ordem no estado "Em Andamento"
-  - Backend retorna `canApprove: true` na busca da ordem (evidências presentes)
-  - Aprovador autenticado com perfil de aprovação
-* **Postconditions (Success Guarantee):** Ordem transiciona para "Aprovada", timestamp e autor registrados, botão "Concluir" habilitado para técnico, "Cancelar" ainda disponível
-* **Scope:** Frontend Aegis1 — detalhe da ordem / ação "Aprovar"
-* **Level:** User goal
-
-## 2. Main Scenario (Happy Path)
-1. Aprovador acessa lista de ordens "Para Aprovação" (filtro estado "Em Andamento" + `canApprove: true`)
-2. Clica na ordem → abre detalhe (`buscarPorId`)
-3. Sistema exibe evidências anexadas (checklist, fotos — retornadas pela API) + botão "Aprovar" habilitado
-4. Aprovador revisa evidências, clica "Aprovar", confirma no modal
-5. Frontend envia `PATCH /api/ordens/{id}/aprovar` (ou `PUT` com estado "Aprovada")
-6. Backend valida BR-02 (evidência presente) e transiciona
-7. Backend retorna `200 OK` com ordem atualizada (estado "Aprovada", `aprovadoEm`, `aprovadoPor`)
-8. Frontend atualiza UI: badge "Aprovada", botão "Aprovar" oculto, "Concluir" visível para técnico
-9. Caso de uso encerra com sucesso
-
-## 3. Alternative Scenarios
-### AS-1: Aprovar com Observações
-* **Ponto de extensão:** Passo 4 — modal inclui campo "Observações da aprovação" (opcional)
-* **Passos:**
-  1. Aprovador preenche observações
-  2. Payload inclui `observacoesAprovacao`
-  3. Backend persiste no histórico da ordem
-* **Retorno ao fluxo principal:** Sim, mesmo endpoint, dado adicional
-
-## 4. Exception Scenarios
-### EX-1: Evidências Insuficientes (BR-02)
-* **Ponto de extensão:** Passo 3 ou 6
-* **Condição de erro:** Backend retorna `canApprove: false` ou `409 Conflict` "Evidências necessárias"
-* **Tratamento:** Frontend oculta/desabilita "Aprovar", exibe banner "Aguardando evidências do técnico (checklist/foto)". Técnico deve anexar antes.
-
-### EX-2: Ordem Não Está "Em Andamento"
-* **Ponto de extensão:** Passo 6
-* **Condição de erro:** Estado divergente (ex: já "Aprovada" ou "Cancelada")
-* **Tratamento:** `409 Conflict` "Transição inválida", `handleApiError` toast, recarrega estado
-
-### EX-3: Aprovador Sem Permissão
-* **Ponto de extensão:** Passo 3
-* **Condição de erro:** Usuário logado não tem role "aprovador"
-* **Tratamento:** Frontend não exibe botão "Aprovar" (controle de UI baseado em role do token/JWT)
-
-### EX-4: Falha de Rede / Timeout / Auth (BR-06)
-* **Ponto de extensão:** Passo 5
-* **Condição de erro:** Mesmos padrões de UC-03
-* **Tratamento:** Idem UC-03 EX-3/EX-4
-
-## 5. Business Rules Envolvidas
-* **BR-02:** Aprovar exige evidência de execução (checklist assinado ou foto) — backend valida, frontend habilita botão apenas quando `canApprove: true`
-* **BR-03:** Concluir só permitido após aprovar; cancelar permitido em qualquer estado exceto "Concluída"
-* **BR-06:** `authInterceptor` com JWT + refresh
-
-## 6. Non-Functional Requirements Relevantes
-* Latência P95 < 800 ms
-* Auditoria: log de aprovação imutável (backend) — frontend apenas exibe
-
-## 7. Frequency of Use
-Alta — cada ordem concluída passa por aprovação
-
-## 8. Assumptions
-* Endpoint: `PATCH /api/ordens/{id}/aprovar` com body opcional `{ observacoes }`
-* API retorna `canApprove: boolean` no `GET /api/ordens/{id}` quando estado = "Em Andamento"
-* Evidências (fotos, checklists) são anexadas pelo técnico em fluxo separado (fora de escopo atual — BRD Future Considerations)
-
-## 9. Open Issues
-* Como técnico anexa evidências no escopo atual? BRD menciona "checklist assinado ou foto" mas Future Considerations lista "Checklists digitais e anexos fotográficos" como futuro. **Gap crítico** — alinhar com Backend se evidência é apenas campo texto "relato" no MVP.
-* Permissão de aprovação: role-based ou por alocação? Assumir role "aprovador" no token.
-
-## 10. Related Artifacts
-* **User Stories:** US-ORD-03 (Aprovar ordem)
-* **User Flow:** `user-flows.md#aprovar-ordem`
-* **API envolvida:** `api-specification.md#ordens-patch-aprovar`
-
-
-# Use Case Specification: UC-05 — Concluir Ordem de Manutenção
-
-## 1. Characterization
-* **Primary Actor:** Técnico de Campo
-* **Secondary Actors:** Sistema Backend (API REST)
-* **Stakeholders & Interests:** 
-  - Técnico — fecha ordem após execução aprovada
-  - Gestor — custoTotalPorAtivo atualizado automaticamente
-  - Financeiro — base para rateio de custos
-* **Trigger:** Técnico abre ordem no estado "Aprovada" e clica "Concluir"
-* **Preconditions:** 
-  - Ordem no estado "Aprovada" (BR-03)
-  - Técnico logado é o responsável (ou tem permissão)
-  - Custos (mão de obra, material, terceiros) informados ou calculados
-* **Postconditions (Success Guarantee):** Ordem transiciona para "Concluída", timestamp registrado, custos consolidados, `custoTotalPorAtivo` do ativo atualizado no backend, botões de ação todos desabilitados
-* **Scope:** Frontend Aegis1 — detalhe da ordem / ação "Concluir"
-* **Level:** User goal
-
-## 2. Main Scenario (Happy Path)
-1. Técnico acessa "Minhas Ordens" → filtro "Aprovadas"
-2. Clica na ordem → detalhe (`buscarPorId`)
-3. Sistema exibe resumo de custos (se já informados) + botão "Concluir" habilitado (estado "Aprovada")
-4. Técnico clica "Concluir", modal solicita confirmação e permite ajustar custos finais (horas reais, materiais usados, valor terceiros)
-5. Técnico confirma
-6. Frontend envia `PATCH /api/ordens/{id}/concluir` com `{ custos: { maoDeObra, materiais, terceiros } }`
-7. Backend valida BR-03 (estado "Aprovada"), persiste custos, recalcula `custoTotalPorAtivo` do ativo, transiciona para "Concluída"
-8. Backend retorna `200 OK` com ordem finalizada + `custoTotalPorAtivo` atualizado do ativo
-9. Frontend atualiza UI: badge "Concluída", todos botões de ação desabilitados, exibe custo total da ordem e do ativo
-10. Caso de uso encerra com sucesso
-
-## 3. Alternative Scenarios
-### AS-1: Concluir Sem Ajuste de Custos (Valores Padrão)
-* **Ponto de extensão:** Passo 4 — técnico aceita custos sugeridos/preenchidos anteriormente
-* **Passos:** Modal exibe valores pré-preenchidos, técnico apenas confirma
-* **Retorno ao fluxo principal:** Sim, mesmo endpoint
-
-## 4. Exception Scenarios
-### EX-1: Ordem Não Está "Aprovada" (BR-03)
-* **Ponto de extensão:** Passo 3 ou 7
-* **Condição de erro:** Estado ≠ "Aprovada" (ex: "Em Andamento", "Cancelada")
-* **Tratamento:** Backend `409 Conflict` "Concluir só permitido após aprovação", frontend toast, recarrega estado
-
-### EX-2: Custos Obrigatórios Não Informados
-* **Ponto de extensão:** Passo 6
-* **Condição de erro:** Backend exige pelo menos um custo > 0, retorna `400 Bad Request`
-* **Tratamento:** `handleApiError` exibe erros de validação por campo no modal, técnico corrige e reenvia
-
-### EX-3: Falha no Cálculo de custoTotalPorAtivo (Backend)
-* **Ponto de extensão:** Passo 7
-* **Condição de erro:** Backend retorna `500` ou inconsistência no valor retornado
-* **Tratamento:** `handleApiError` loga, toast "Erro ao finalizar — contate suporte", ordem pode ficar em estado inconsistente → requer intervenção manual
-
-### EX-4: Rede / Auth (BR-06)
-* **Ponto de extensão:** Passo 6
-* **Tratamento:** Idem UC-03 EX-3/EX-4
-
-## 5. Business Rules Envolvidas
-* **BR-03:** Concluir só permitido após aprovar; cancelar permitido em qualquer estado exceto "Concluída"
-* **BR-04:** `custoTotalPorAtivo` = soma de custos (mão de obra + material + terceiros) de ordens **concluídas** vinculadas ao ativo — cálculo no backend, frontend apenas exibe
-* **BR-06:** `authInterceptor` JWT + refresh
-
-## 6. Non-Functional Requirements Relevantes
-* Latência P95 < 800 ms
-* Consistência: `custoTotalPorAtivo` exibido no frontend deve bater com backend (teste de contrato Pact — BRD Risk)
-
-## 7. Frequency of Use
-Alta — cada ordem aprovada é concluída
-
-## 8. Assumptions
-* Endpoint: `PATCH /api/ordens/{id}/concluir` com body de custos
-* Backend recalcula `custoTotalPorAtivo` atomicamente na transação de conclusão
-* Frontend não calcula — apenas exibe valor retornado
-
-## 9. Open Issues
-* Campos de custo no modal: quais obrigatórios? Validação frontend vs backend?
-* Permissão de concluir: apenas técnico responsável ou qualquer técnico da equipe?
-
-## 10. Related Artifacts
-* **User Stories:** US-ORD-04 (Concluir ordem)
-* **User Flow:** `user-flows.md#concluir-ordem`
-* **API envolvida:** `api-specification.md#ordens-patch-concluir`
-
-
-# Use Case Specification: UC-06 — Cancelar Ordem de Manutenção
-
-## 1. Characterization
-* **Primary Actor:** Gestor de Manutenção ou Técnico de Campo (conforme permissão)
-* **Secondary Actors:** Sistema Backend (API REST)
-* **Stakeholders & Interests:** 
-  - Gestor — cancela ordens desnecessárias/duplicadas
-  - Técnico — cancela se não for mais executar
-  - Auditoria — rastro de cancelamento com justificativa
-* **Trigger:** Usuário abre ordem (estado ≠ "Concluída") e clica "Cancelar"
-* **Preconditions:** 
-  - Ordem em qualquer estado exceto "Concluída" (BR-03)
-  - Usuário com permissão de cancelamento (gestor ou técnico responsável)
-* **Postconditions (Success Guarantee):** Ordem transiciona para "Cancelada", timestamp e autor registrados, justificativa salva, ordem não entra em `custoTotalPorAtivo` (apenas concluídas contam — BR-04)
-* **Scope:** Frontend Aegis1 — detalhe da ordem / ação "Cancelar"
-* **Level:** User goal
-
-## 2. Main Scenario (Happy Path)
-1. Usuário abre ordem (estado "Aberta", "Em Andamento" ou "Aprovada")
-2. Sistema exibe botão "Cancelar" habilitado (BR-03: permitido exceto "Concluída")
-3. Usuário clica "Cancelar", modal exige justificativa obrigatória (texto livre)
-4. Usuário preenche justificativa e confirma
-5. Frontend envia `PATCH /api/ordens/{id}/cancelar` com `{ justificativa }`
-6. Backend valida estado ≠ "Concluída", persiste, transiciona para "Cancelada"
-7. Backend retorna `200 OK` com ordem cancelada (`canceladoEm`, `canceladoPor`, `justificativaCancelamento`)
-8. Frontend atualiza UI: badge "Cancelada", botões de ação desabilitados, justificativa visível no histórico
-9. Caso de uso encerra com sucesso
-
-## 3. Alternative Scenarios
-### AS-1: Cancelar Durante Criação (Antes de Iniciar)
-* **Ponto de extensão:** Ordem no estado "Aberta" — mesmo fluxo, justificativa "Duplicada / Não procedente"
-* **Retorno ao fluxo principal:** Mesmo cenário principal
-
-## 4. Exception Scenarios
-### EX-1: Ordem Já "Concluída" (BR-03)
-* **Ponto de extensão:** Passo 2 ou 6
-* **Condição de erro:** Estado = "Concluída"
-* **Tratamento:** Frontend não exibe botão "Cancelar" (UI); se chamada forçada, backend `409 Conflict` "Ordem concluída não pode ser cancelada"
-
-### EX-2: Justificativa Vazia
-* **Ponto de extensão:** Passo 3
-* **Condição de erro:** Usuário tenta confirmar sem preencher
-* **Tratamento:** Frontend valida localmente, bloqueia botão "Confirmar", mensagem "Justificativa é obrigatória"
-
-### EX-3: Sem Permissão
-* **Ponto de extensão:** Passo 2
-* **Condição de erro:** Usuário não é gestor nem técnico responsável
-* **Tratamento:** Botão "Cancelar" oculto/desabilitado (UI baseada em role/ownership)
-
-### EX-4: Rede / Auth
-* **Ponto de extensão:** Passo 5
-* **Tratamento:** Idem UC-03
-
-## 5. Business Rules Envolvidas
-* **BR-03:** Cancelar permitido em qualquer estado exceto "Concluída"
-* **BR-04:** `custoTotalPorAtivo` soma apenas ordens **concluídas** — canceladas não entram
-* **BR-06:** `authInterceptor` JWT + refresh
-
-## 6. Non-Functional Requirements Relevantes
-* Latência P95 < 800 ms
-* Auditoria: justificativa imutável após confirmação
-
-## 7. Frequency of Use
-Baixa a média — exceção, não regra
-
-## 8. Assumptions
-* Endpoint: `PATCH /api/ordens/{id}/cancelar` com `{ justificativa }`
-* Justificativa: string obrigatória, máx 500 chars (a definir)
-
-## 9. Open Issues
-* Quem pode cancelar em cada estado? (ex: técnico cancela "Aberta", gestor cancela "Aprovada") — não definido no BRD
-* Cancelamento de ordem "Em Andamento" deve estornar custos parciais? BRD diz apenas concluídas contam — assumir que não há custos parciais persistidos antes de concluir.
-
-## 10. Related Artifacts
-* **User Stories:** US-ORD-05 (Cancelar ordem)
-* **User Flow:** `user-flows.md#cancelar-ordem`
-* **API envolvida:** `api-specification.md#ordens-patch-cancelar`
-
-
-# Use Case Specification: UC-07 — Consultar Ordens de Manutenção (Listar e Buscar por ID)
-
-## 1. Characterization
-* **Primary Actor:** Gestor de Manutenção, Técnico de Campo, Aprovador/Supervisor
-* **Secondary Actors:** Sistema Backend (API REST)
-* **Stakeholders & Interests:** 
-  - Todos — visibilidade de status, filtros, busca rápida
-  - Gestor — relatórios e KPIs
-* **Trigger:** Usuário acessa módulo de ordens (lista) ou clica em link/notificação de ordem específica
-* **Preconditions:** 
-  - Usuário autenticado
-  - Backend disponível
-* **Postconditions (Success Guarantee):** Lista paginada/filtrada exibida; ou detalhe completo da ordem carregado
-* **Scope:** Frontend Aegis1 — listagem e detalhe de ordens
-* **Level:** User goal
-
-## 2. Main Scenario (Happy Path) — Listar com Filtros
-1. Usuário acessa "Ordens de Manutenção"
-2. Frontend carrega primeira página: `GET /api/ordens?page=1&size=20` via `request`
-3. Backend retorna lista paginada + metadados (total, page, size)
-4. Frontend renderiza tabela/cards com colunas: ID, Ativo, Estado, Prioridade, Técnico, Datas
-5. Usuário aplica filtros (estado, prioridade, técnico, filial, período) → frontend adiciona query params e recarrega
-6. Usuário pagina / ordena → novas requisições
-7. Caso de uso encerra (usuário sai da tela)
-
-## 3. Alternative Scenarios
-### AS-1: Buscar Por ID (Acesso Direto)
-* **Ponto de extensão:** Usuário cola URL `/ordens/123` ou clica notificação
-* **Passos:**
-  1. Frontend chama `GET /api/ordens/123` (`buscarPorId`)
-  2. Backend retorna ordem completa com evidências, custos, histórico de transições
-  3. Frontend exibe tela de detalhe com ações conforme estado/permissão
-* **Retorno ao fluxo principal:** Não, fluxo independente
-
-### AS-2: Exportar Lista (Futuro)
-* **Ponto de extensão:** Passo 5 — botão "Exportar CSV"
-* **Passos:** [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — Premissa: relatórios avançados são Out-of-Scope (BRD). Não implementar no MVP.
-
-## 4. Exception Scenarios
-### EX-1: Ordem Não Encontrada (404)
-* **Ponto de extensão:** AS-1 Passo 2
-* **Condição de erro:** ID inexistente ou sem permissão de visualização
-* **Tratamento:** `handleApiError` processa 404, frontend exibe página "Ordem não encontrada" com link "Voltar à lista"
-
-### EX-2: Falha de Carregamento Inicial
-* **Ponto de extensão:** Passo 2 (listar)
-* **Condição de erro:** Rede, 5xx, timeout
-* **Tratamento:** `handleApiError` toast, botão "Tentar novamente", estado vazio com skeleton
-
-### EX-3: Filtros Retornam Resultado Vazio
-* **Ponto de extensão:** Passo 5
-* **Condição de erro:** Backend retorna `data: []`, `total: 0`
-* **Tratamento:** Frontend exibe estado vazio ilustrado "Nenhuma ordem encontrada com estes filtros" + botão "Limpar filtros"
-
-## 5. Business Rules Envolvidas
-* **BR-06:** `authInterceptor` em todas as chamadas (GET incluídas para autorização)
-* **BR-04:** `custoTotalPorAtivo` exibido no detalhe — apenas ordens concluídas somam
-
-## 6. Non-Functional Requirements Relevantes
-* Latência P95 < 800 ms (listagem e detalhe)
-* Paginação: tamanho de página configurável (padrão 20, máx 100)
-* Cache: lista não cacheada (dados sensíveis/voláteis); detalhe pode cachear 30s [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
-
-## 7. Frequency of Use
-Muito alta — tela principal de todos os perfis
-
-## 8. Assumptions
-* Endpoints: `GET /api/ordens` (paginado, filtros via query) e `GET /api/ordens/{id}`
-* Filtros suportados: `estado`, `prioridade`, `tecnicoId`, `filialId`, `departamentoId`, `dataInicio`, `dataFim`
-* Ordenação: `sort=campo,direcao`
-
-## 9. Open Issues
-* Permissão de visualização: usuário vê apenas suas ordens ou todas da filial? BRD não define — assumir "todas da filial do usuário" por enquanto
-* Campos retornados no `listar` vs `buscarPorId` — alinhar com Backend para evitar over-fetching
-
-## 10. Related Artifacts
-* **User Stories:** US-ORD-06 (Listar), US-ORD-07 (Buscar por ID)
-* **User Flow:** `user-flows.md#listar-ordens`, `user-flows.md#detalhe-ordem`
-* **API envolvida:** `api-specification.md#ordens-get`, `api-specification.md#ordens-get-id`
-
-
-# Use Case Specification: UC-08 — Visualizar Custo Total por Ativo
-
-## 1. Characterization
-* **Primary Actor:** Gestor de Manutenção
-* **Secondary Actors:** Sistema Backend (API REST)
-* **Stakeholders & Interests:** 
-  - Gestor — decisão de substituição / plano preventivo baseada em TCO
-  - Diretoria/Financeiro — visibilidade de custos por equipamento
-* **Trigger:** Gestor acessa dashboard ou tela "Custos por Ativo" ou clica em ativo na ordem
-* **Preconditions:** 
-  - Pelo menos uma ordem **concluída** vinculada ao ativo (BR-04)
-  - Backend calcula e expõe `custoTotalPorAtivo`
-* **Postconditions (Success Guarantee):** Valor exibido reflete soma de custos de ordens concluídas do ativo, atualizado em tempo real após cada conclusão
-* **Scope:** Frontend Aegis1 — dashboard / tela de ativos / detalhe da ordem
-* **Level:** User goal
-
-## 2. Main Scenario (Happy Path)
-1. Gestor acessa "Custos por Ativo" (menu lateral) ou dashboard com cards de ativos
-2. Frontend carrega lista de ativos com custo: `GET /api/ativos/custos-totais` (ou `GET /api/ativos?include=custoTotal`)
-3. Backend retorna array: `[{ ativoId, identificador, descricao, custoTotalPorAtivo, qtdOrdensConcluidas }]`
-4. Frontend renderiza tabela/grid ordenável por custo (decrescente padrão)
-5. Gestor clica em ativo → abre detalhe com breakdown: lista de ordens concluídas + custos individuais (mão de obra, material, terceiros)
-6. Frontend chama `GET /api/ativos/{id}/ordens-concluidas` para breakdown
-7. Caso de uso encerra
-
-## 3. Alternative Scenarios
-### AS-1: Ver Custo no Detalhe da Ordem
-* **Ponto de extensão:** UC-07 detalhe da ordem (estado "Concluída")
-* **Passos:**
-  1. Tela de detalhe exibe card "Custo Total do Ativo: R$ X.XXX,XX"
-  2. Valor vem do campo `custoTotalPorAtivo` no response de `buscarPorId` da ordem
-* **Retorno ao fluxo principal:** Sim, mesmo dado, contexto diferente
-
-## 4. Exception Scenarios
-### EX-1: Ativo Sem Ordens Concluídas
-* **Ponto de extensão:** Passo 3
-* **Condição de erro:** Backend retorna `custoTotalPorAtivo: 0` ou `null`
-* **Tratamento:** Frontend exibe "R$ 0,00" ou "Sem ordens concluídas" — não é erro, estado válido
-
-### EX-2: Divergência Frontend/Backend (BRD Risk)
-* **Ponto de extensão:** Passo 3 ou 6
-* **Condição de erro:** Valor exibido não confere com soma manual das ordens
-* **Tratamento:** [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — Premissa: teste de contrato (Pact) no CI detecta. Frontend deve confiar no backend (BR-04: cálculo no backend). Se divergência, log + alerta para time.
-
-### EX-3: Falha de Carga / Timeout
-* **Ponto de extensão:** Passo 2 ou 6
-* **Tratamento:** `handleApiError` toast, skeleton loading, botão "Recarregar"
-
-## 5. Business Rules Envolvidas
-* **BR-04:** `custoTotalPorAtivo` = soma de custos (mão de obra + material + terceiros) de ordens **concluídas** vinculadas ao ativo — cálculo no backend, frontend apenas exibe
-* **BR-06:** `authInterceptor` em chamadas
-
-## 6. Non-Functional Requirements Relevantes
-* Latência P95 < 800 ms (dashboard carrega múltiplos ativos)
-* Consistência: valor deve ser idêntico em dashboard, tela de ativos e detalhe da ordem (single source of truth = backend)
-
-## 7. Frequency of Use
-Média — gestor consulta semanalmente / em reuniões de planejamento
-
-## 8. Assumptions
-* Endpoint agregado: `GET /api/ativos/custos-totais` ou `GET /api/ativos` com `include=custoTotal`
-* Endpoint breakdown: `GET /api/ativos/{id}/ordens-concluidas`
-* Ativo é entidade distinta de ordem — cadastro de ativos não está no glossário do BRD mas é implícito. [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — Premissa: ativos existem no backend; frontend apenas consome.
-
-## 9. Open Issues
-* Cadastro de ativos: quem cria? Existe CRUD de ativos no frontend? BRD menciona apenas "departamentos, filiais, fornecedores, funcionários" como cadastros mestres. Ativos podem vir de outro sistema (CMMS/ERP).
-* Fórmula exata de custo: horas × rateio + materiais + terceiros — confirmar com Backend/Financeiro
-
-## 10. Related Artifacts
-* **User Stories:** US-KPI-01 (Visualizar custo por ativo)
-* **User Flow:** `user-flows.md#custo-total-por-ativo`
-* **API envolvida:** `api-specification.md#ativos-custos`
+# Use Case Specification — Aegis1 (Regenerado com AST Java)
+
+> **Versão:** 2.0 · **Status:** Draft · **Owner:** Product / Arquitetura
+> **Base:** Glossário (Ubiquitous Language) + BRD v2.0 + NFR v2.0
+> **Cobertura:** Frontend (Vue 3) + Backend (Java 21/Spring Boot 3.3) — domínio completo extraído via AST
+
+---
+
+## Sumário de Casos de Uso por Domínio
+
+| Domínio | Casos de Uso | Atores Principais |
+| :--- | :--- | :--- |
+| **Cadastros Mestres** | UC-01 a UC-04 | Admin Cadastros, Gestor |
+| **Ativos & Hardware** | UC-05 a UC-12 | Gestor Patrimônio, Técnico, Admin |
+| **Manutenção (Ordens)** | UC-13 a UC-20 | Gestor, Técnico, Aprovador |
+| **Manutenção Preventiva** | UC-21 a UC-24 | Gestor, Técnico |
+| **Manutenção Preditiva** | UC-25 a UC-28 | Gestor, Sistema (automático) |
+| **Busca Inteligente (Fuzzy)** | UC-29 a UC-31 | Todos |
+| **Segurança & Aegis Shield** | UC-32 a UC-38 | Admin Global, Auditor, Usuário |
+| **Relatórios & QR/PDF** | UC-39 a UC-42 | Gestor, Técnico, Admin |
+| **Auditoria & Compliance** | UC-43 a UC-45 | Auditor, Compliance, Admin |
+
+---
+
+## Domínio: Cadastros Mestres
+
+### UC-01 — Gerenciar Filiais (CRUD + Multi-tenancy Root)
+* **Ator Primário:** Administrador Global / Admin Cadastros
+* **Pré-condições:** Usuário autenticado com role ADMIN; backend disponível
+* **Fluxo Principal:**
+  1. Admin acessa "Cadastros → Filiais"
+  2. Lista paginada com busca fuzzy (nome, CNPJ, código)
+  3. **Criar:** Preenche razão social, CNPJ, código, endereço, telefone, email → `POST /api/v1/filiais` → 201
+  4. **Editar:** Seleciona filial → `GET /api/v1/filiais/{id}` → altera → `PUT /api/v1/filiais/{id}` → 200
+  5. **Excluir:** Confirma modal → `DELETE /api/v1/filiais/{id}` → valida BR-04 (sem ativos/ordens vinculados) → 204
+* **Regras:** BR-04, BR-13 (multi-tenancy root), NFR-SEC04
+* **API:** `FilialController` + `FilialService` + `FilialRepository`
+
+### UC-02 — Gerenciar Departamentos (CRUD + Hierarquia)
+* **Ator Primário:** Administrador de Cadastros (por Filial)
+* **Pré-condições:** Filial selecionada no contexto (multi-tenancy); role GESTOR ou ADMIN na filial
+* **Fluxo Principal:** Similar a UC-01, endpoint `/api/v1/filiais/{filialId}/departamentos`
+* **Regras:** BR-04, BR-13 (isolamento por filial), NFR-SEC04
+* **API:** `DepartamentoController` + `DepartamentoService`
+
+### UC-03 — Gerenciar Fornecedores (CRUD + Contratos/SLA)
+* **Ator Primário:** Administrador de Cadastros / Gestor
+* **Campos Estendidos:** Razão social, CNPJ, contato, email, telefone, endereço, **categoria**, **SLA padrão (horas)**, **avaliação (1-5)**, **certificações**
+* **Fluxo Principal:** Endpoint `/api/v1/fornecedores` (scoped por filial via multi-tenancy)
+* **Regras:** BR-04, BR-13, NFR-SEC04
+* **API:** `FornecedorController` + `FornecedorService`
+
+### UC-04 — Gerenciar Funcionários (CRUD + Vinculação Usuário + Responsabilidades)
+* **Ator Primário:** Administrador de Cadastros / RH
+* **Campos Estendidos:** Nome, CPF, matrícula, cargo, email, telefone, **filial**, **departamento**, **função manutenção** (TECNICO, APROVADOR, SOLICITANTE), **usuário do sistema** (link 1:1 com `Usuario` para login)
+* **Fluxo Principal:** Endpoint `/api/v1/funcionarios`; criação pode provisionar `Usuario` + credenciais iniciais
+* **Regras:** BR-13, BR-14 (permissões por função), NFR-SEC04
+* **API:** `FuncionarioController` + `FuncionarioService` + `UsuarioService` (provisionamento)
+
+### UC-05 — Gerenciar Tipos de Ativo (Classificação + Depreciação)
+* **Ator Primário:** Administrador de Cadastros / Gestor Patrimônio
+* **Campos:** Nome, código, categoria (HARDWARE, SOFTWARE, MOBILIARIO, VEICULO, OUTRO), **vida útil padrão (anos)**, **valor residual %**, **requer detalhe hardware** (boolean)
+* **Fluxo Principal:** `/api/v1/tipos-ativo`; usado na criação de ativos para depreciação automática
+* **Regras:** BR-03 (depreciação linear), NFR-M01
+* **API:** `TipoAtivoController` + `TipoAtivoService`
+
+---
+
+## Domínio: Ativos & Hardware
+
+### UC-06 — Cadastrar Ativo Completo (com Detalhe Hardware + QR Code + Termo PDF)
+* **Ator Primário:** Gestor Patrimônio / Admin Cadastros
+* **Pré-condições:** TipoAtivo, Filial, Departamento, Localização, Fornecedor (opcional), Funcionário responsável pré-cadastrados
+* **Fluxo Principal:**
+  1. Acessa "Ativos → Novo Ativo"
+  2. Seleciona TipoAtivo → se `requerDetalheHardware=true`, exibe seção hardware
+  3. Preenche: tag (único), serial, modelo, fabricante, data aquisição, valor, filial, departamento, localização, responsável, fornecedor, nota fiscal
+  4. **Se Hardware:** Preenche CPU (modelo, cores, frequência), Memória (total GB, tipo), Discos (array: tipo SSD/HDD, capacidade GB, serial, health SMART), Adaptadores de Rede (array: MAC, IP, velocidade, tipo)
+  5. Submete → `POST /api/v1/ativos` → Backend: valida, calcula depreciação (BR-03), gera QR Code (tag + URL pública + hash), persiste `Ativo` + `AtivoDetalheHardware` + componentes
+  6. Retorna 201 com ativo completo + URL do QR Code + URL do Termo PDF
+  7. Frontend exibe sucesso; opção "Imprimir Termo" (PDF) e "Imprimir Etiqueta QR"
+* **Regras:** BR-01, BR-02, BR-03, BR-17, BR-18, NFR-P04
+* **API:** `AtivoController.create()` → `AtivoService.createWithHardware()` → `QRCodeGenerator` + `PdfGenerator`
+
+### UC-07 — Consultar Ativo (Detalhe + Hardware + Histórico + Auditoria)
+* **Ator Primário:** Técnico, Gestor, Auditor, Aprovador
+* **Fluxo Principal:**
+  1. Busca por tag/serial/modelo (busca fuzzy UC-29) ou lista paginada
+  2. Clica no ativo → `GET /api/v1/ativos/{id}` → retorna ativo + detalhe hardware + componentes + depreciação atual + `custoTotalPorAtivo` + últimas ordens + health check atual
+  3. Aba "Auditoria" → `GET /api/v1/ativos/{id}/auditoria` (Envers) → timeline imutável
+  4. Aba "QR Code" → visualiza/imprime etiqueta
+* **Regras:** BR-13 (multi-tenancy), BR-16 (auditoria), NFR-SEC04
+* **API:** `AtivoController.findById()`, `AtivoController.auditoria()`
+
+### UC-08 — Atualizar Ativo (Dados Cadastrais + Transferência + Reavaliação)
+* **Ator Primário:** Gestor Patrimônio / Técnico (transferência)
+* **Fluxo Principal:**
+  1. Edita dados cadastrais → `PUT /api/v1/ativos/{id}` (campos permitidos: localização, responsável, departamento, status)
+  2. **Transferência:** Mudança de filial/departamento/localização → gera novo Termo de Responsabilidade PDF (BR-17) → auditoria registra transferência
+  3. **Reavaliação:** Atualização de valor/residual → recalcula depreciação futura
+* **Regras:** BR-01 (multi-tenancy na transferência), BR-03, BR-17, BR-16
+* **API:** `AtivoController.update()`, `AtivoService.transferir()`
+
+### UC-09 — Baixar/Desativar Ativo (Fim de Vida)
+* **Ator Primário:** Gestor Patrimônio
+* **Fluxo Principal:**
+  1. Confirma baixa → `PATCH /api/v1/ativos/{id}/baixar` → status = "BAIXADO", data baixa, motivo
+  2. Bloqueia novas ordens; mantém histórico e auditoria
+  3. `custoTotalPorAtivo` final consolidado para relatório de TCO
+* **Regras:** BR-04 (ordens vinculadas impedem exclusão física), BR-16
+* **API:** `AtivoController.baixar()`
+
+### UC-10 — Gerenciar Detalhe de Hardware (CRUD Componentes)
+* **Ator Primário:** Técnico (coleta em campo) / Gestor
+* **Fluxo Principal:**
+  1. Em detalhe do ativo, aba "Hardware"
+  2. **Adicionar/Atualizar Disco:** `POST/PUT /api/v1/ativos/{id}/hardware/discos` → campos: tipo, capacidade, serial, health SMART (raw), temperatura, horas ligado
+  3. **Adicionar/Atualizar Memória:** `POST/PUT /api/v1/ativos/{id}/hardware/memorias` → capacidade, tipo, frequência
+  4. **Adicionar/Atualizar Adaptador Rede:** `POST/PUT /api/v1/ativos/{id}/hardware/adaptadores-rede` → MAC, IP, velocidade, tipo (WiFi/Ethernet)
+  5. Coleta em campo: Técnico escaneia QR Code → app PWA → preenche métricas SMART → sincroniza
+* **Regras:** BR-02, BR-10 (health check alimenta preditiva), NFR-P03
+* **API:** `AtivoDetalheHardwareController` + sub-recursos
+
+### UC-11 — Depreciação & TCO (Custo Total por Ativo)
+* **Ator Primário:** Gestor Patrimônio / Financeiro
+* **Fluxo Principal:**
+  1. Dashboard "Análise de Custos" → `GET /api/v1/relatorios/custo-total-por-ativo` (paginado, filtros: filial, tipo, período)
+  2. Retorna: ativo, tag, valor aquisição, valor residual, depreciação acumulada, valor contábil atual, `custoTotalPorAtivo` (soma ordens concluídas), **TCO = valor aquisição + custoTotalPorAtivo - valor residual**
+  3. Drill-down: clica no ativo → detalhe de ordens concluídas com custos (mão de obra, material, terceiros)
+  4. Exporta CSV/PDF
+* **Regras:** BR-08, BR-13, NFR-P01
+* **API:** `RelatorioController.custoTotalPorAtivo()`
+
+### UC-12 — Buscar Ativos (Fuzzy + Filtros + Paginação)
+* **Ver UC-29** — Busca Inteligente unificada
+
+---
+
+## Domínio: Manutenção (Ordens Corretivas)
+
+### UC-13 — Criar Ordem de Manutenção Corretiva
+* **Ator Primário:** Solicitante (Funcionário) / Gestor / Técnico
+* **Pré-condições:** Ativo existe; técnico responsável cadastrado como funcionário com função TECNICO
+* **Fluxo Principal:**
+  1. "Ordens → Nova Ordem" → seleciona "Corretiva"
+  2. Preenche: ativo (busca fuzzy), descrição problema, prioridade (BAIXA/MEDIA/ALTA/CRITICA), filial/departamento/localização (herdados do ativo), técnico responsável, tipo serviço, fornecedor (se terceirizado), custo estimado
+  3. Submete → `POST /api/v1/ordens` → Backend valida BR-05 (estado "Aberta" + técnico alocado) → persiste `SolicitacaoManutencao` com estado "ABERTA"
+  4. Retorna 201 com ordem + notificação (push/email) para técnico responsável
+* **Regras:** BR-05, BR-13, BR-14 (técnico só vê suas ordens), NFR-P01
+* **API:** `SolicitacaoManutencaoController.createCorretiva()`
+
+### UC-14 — Iniciar Execução da Ordem
+* **Ator Primário:** Técnico de Campo (mobile/PWA)
+* **Pré-condições:** Ordem estado "ABERTA"; técnico = responsável ou GESTOR da filial
+* **Fluxo Principal:**
+  1. Técnico abre ordem (lista "Minhas Ordens" ou QR Code do ativo)
+  2. Clica "Iniciar" → `PATCH /api/v1/ordens/{id}/iniciar` → Backend valida BR-05 → estado = "EM_ANDAMENTO", timestamp início, usuário executor
+  3. Frontend: cronômetro inicia; técnico registra materiais/horas parciais
+* **Regras:** BR-05, BR-13, BR-14, NFR-U02 (mobile touch)
+* **API:** `SolicitacaoManutencaoController.iniciar()`
+
+### UC-15 — Aprovar Ordem (Validação de Evidências)
+* **Ator Primário:** Aprovador / Supervisor / Gestor da filial
+* **Pré-condições:** Ordem estado "EM_ANDAMENTO" ou "AGUARDANDO_APROVACAO"; usuário com permissão `ORDEM_APROVAR` na filial
+* **Fluxo Principal:**
+  1. Aprovador abre ordem → revisa descrição, fotos, checklist, assinatura do técnico
+  2. Se conforme: "Aprovar" → `PATCH /api/v1/ordens/{id}/aprovar` → Backend valida BR-06 (evidência obrigatória) → estado = "APROVADA", timestamp, aprovador
+  3. Se não conforme: "Rejeitar" → motivo → estado = "EM_ANDAMENTO" (retorna para técnico)
+  4. Notificação para técnico e solicitante
+* **Regras:** BR-06, BR-13, BR-14, BR-16 (auditoria), NFR-C03 (NR-10/12 checklist)
+* **API:** `SolicitacaoManutencaoController.aprovar()`, `SolicitacaoManutencaoController.rejeitar()`
+
+### UC-16 — Concluir Ordem (Fechamento + Custos Finais)
+* **Ator Primário:** Técnico (após aprovação) / Gestor
+* **Pré-condições:** Ordem estado "APROVADA"
+* **Fluxo Principal:**
+  1. Técnico/Gestor abre ordem → "Concluir"
+  2. Preenche custos finais: mão de obra (horas × rate), materiais (itens + qtd × valor), terceiros (fornecedor + valor), observações finais
+  3. Submete → `PATCH /api/v1/ordens/{id}/concluir` → Backend valida BR-07 → estado = "CONCLUIDA", timestamp, custos finais persistidos
+  4. **Trigger automático:** Atualiza `custoTotalPorAtivo` do ativo (BR-08); verifica se dispara manutenção preventiva baseada em uso/tempo
+  5. Gera Termo de Responsabilidade final (PDF) se transferência de custódia
+* **Regras:** BR-07, BR-08, BR-13, BR-16, NFR-P01
+* **API:** `SolicitacaoManutencaoController.concluir()` → `AtivoService.atualizarCustoTotal()`
+
+### UC-17 — Cancelar Ordem
+* **Ator Primário:** Solicitante / Gestor / Técnico
+* **Pré-condições:** Ordem estado ≠ "CONCLUIDA"
+* **Fluxo Principal:**
+  1. "Cancelar" → motivo obrigatório → `PATCH /api/v1/ordens/{id}/cancelar` → estado = "CANCELADA"
+  2. Não afeta `custoTotalPorAtivo` (apenas ordens concluídas contam)
+  3. Auditoria registra cancelamento com motivo
+* **Regras:** BR-07, BR-16
+* **API:** `SolicitacaoManutencaoController.cancelar()`
+
+### UC-18 — Listar/Buscar Ordens (Filtros + Paginação + Multi-tenancy)
+* **Ator Primário:** Todos (visibilidade por role/filial)
+* **Fluxo Principal:**
+  1. "Ordens" → lista paginada server-side
+  2. Filtros: estado, prioridade, filial, departamento, técnico, ativo (busca fuzzy), período, tipo (corretiva/preventiva/preditiva)
+  3. `GET /api/v1/ordens?page=0&size=20&estado=ABERTA&filialId=1&busca=notebok` → fuzzy no ativo
+  4. Ordenação: prioridade (critica primeiro), data criação, SLA
+* **Regras:** BR-11, BR-12, BR-13, BR-14, NFR-P01, NFR-S02
+* **API:** `SolicitacaoManutencaoController.listar()`
+
+### UC-19 — Dashboard de Ordens (KPIs + Alertas Tempo Real)
+* **Ator Primário:** Gestor, Aprovador, Admin
+* **Fluxo Principal:**
+  1. Dashboard → `GET /api/v1/dashboard/ordens` → cards: abertas, em andamento, aguardando aprovação, vencendo SLA (24h), concluídas mês, custo total mês
+  2. Gráficos: tendência 30 dias, por prioridade, por filial, por tipo ativo
+  3. Alertas: ordens > 24h sem aprovação, ordens > SLA, health check crítico (preditiva)
+  4. WebSocket / SSE para atualizações tempo real (ordem iniciada, aprovada, concluída)
+* **Regras:** BR-13, BR-14, NFR-O03, NFR-O04
+* **API:** `DashboardController.ordens()` + WebSocket endpoint
+
+### UC-20 — SLA & Escalation (Automático)
+* **Ator Primário:** Sistema (Scheduler) → Notifica Aprovador/Gestor
+* **Fluxo Principal:**
+  1. Job diário (Spring Scheduler) verifica ordens "ABERTA"/"EM_ANDAMENTO"/"AGUARDANDO_APROVACAO" > 24h
+  2. Envia notificação (email/push) para aprovador + gestor da filial
+  3. Após 48h: escala para ADMIN global
+  4. Registra evento de auditoria (SLA breach)
+* **Regras:** BR-06, NFR-O04
+* **API:** `SlaSchedulerService` + `NotificationService`
+
+---
+
+## Domínio: Manutenção Preventiva
+
+### UC-21 — Cadastrar Plano de Manutenção Preventiva
+* **Ator Primário:** Gestor de Manutenção
+* **Pré-condições:** Ativo cadastrado; técnico padrão opcional; checklist template (futuro)
+* **Fluxo Principal:**
+  1. "Preventiva → Novo Plano" → seleciona ativo(s) ou tipo de ativo + filial
+  2. Define: frequência (CRON: diário, semanal, mensal, trimestral, anual), dia/hora preferencial, técnico padrão, descrição padrão, checklist (futuro)
+  3. Submete → `POST /api/v1/preventivas` → persiste `ManutencaoPreventiva` com próximo agendamento calculado
+* **Regras:** BR-09, BR-13, BR-14
+* **API:** `ManutencaoPreventivaController.create()`
+
+### UC-22 — Geração Automática de Ordens Preventivas (Scheduler)
+* **Ator Primário:** Sistema (Spring Scheduler @Scheduled)
+* **Fluxo Principal:**
+  1. Job a cada 15 min verifica `ManutencaoPreventiva` com `proximaExecucao <= now`
+  2. Para cada: cria `SolicitacaoManutencao` tipo "PREVENTIVA" com dados do plano, estado "ABERTA", técnico padrão
+  3. Atualiza `proximaExecucao` (próximo CRON)
+  4. Notifica técnico responsável
+  5. Log de auditoria: geração automática
+* **Regras:** BR-09, BR-16, NFR-A05
+* **API:** `ManutencaoPreventivaSchedulerService`
+
+### UC-23 — Gerenciar Planos Preventivos (Editar, Pausar, Excluir)
+* **Ator Primário:** Gestor de Manutenção
+* **Fluxo Principal:** CRUD padrão em `/api/v1/preventivas/{id}`; pausa = `ativo=false`; exclusão bloqueada se houver ordens geradas (BR-04 adaptado)
+
+### UC-24 — Relatório de Aderência Preventiva
+* **Ator Primário:** Gestor / Compliance
+* **Fluxo Principal:**
+  1. `GET /api/v1/relatorios/preventiva-aderencia` → % ordens preventivas concluídas no prazo / total geradas
+  2. Filtros: filial, período, tipo ativo
+  3. Detalha: plano, ordens geradas, concluídas no prazo, atrasadas, canceladas
+  4. Exporta PDF/CSV para evidência NR-10/12
+
+---
+
+## Domínio: Manutenção Preditiva (Health Check + Regressão Linear)
+
+### UC-25 — Health Check de Ativo (Coleta + Análise SMART)
+* **Ator Primário:** Técnico (coleta) / Sistema (agendado) / `ManutencaoPreditivaService`
+* **Fluxo Principal:**
+  1. **Coleta manual:** Técnico escaneia QR Code → PWA → lê SMART (smartctl / WMI) → preenche: reallocated_sectors, seek_error_rate, spin_retry_count, temperature, power_on_hours → `POST /api/v1/ativos/{id}/health-check`
+  2. **Coleta automática (agente):** Serviço em background no ativo (futuro) → envia métricas periódicas
+  3. Backend: `HealthCheckService.analisar()` → calcula score 0-100 baseado em thresholds configuráveis por tipo de disco
+  4. Persiste `HealthCheck` (histórico) + atualiza `AtivoDetalheHardware.discos[].healthScore`
+  5. Se score < threshold (ex.: 60) → gera alerta + UC-27
+* **Regras:** BR-10, NFR-P03, NFR-O04
+* **API:** `HealthCheckController.coletar()`, `HealthCheckService.analisar()`
+
+### UC-26 — Previsão de Falha de Disco (Regressão Linear - Mínimos Quadrados)
+* **Ator Primário:** Sistema (`ManutencaoPreditivaService` - batch noturno)
+* **Fluxo Principal:**
+  1. Job noturno (02:00) → para cada ativo com ≥ 3 health checks históricos:
+  2. `ManutencaoPreditivaService.preverFalhaDisco(ativoId)` → regressão linear simples (y = ax + b) sobre `reallocated_sectors` vs `power_on_hours` (ou temperatura vs tempo)
+  3. Calcula: **dias até threshold crítico** (ex.: reallocated_sectors > 100) + **intervalo de confiança 95%**
+  4. Persiste `PrevisaoFalha` (ativo, disco, dataPrevista, probabilidade, icInferior, icSuperior, modeloUsado)
+  5. Se probabilidade > 80% E dataPrevista < 30 dias → UC-27
+* **Regras:** BR-10, NFR-P03, NFR-S03
+* **API:** `ManutencaoPreditivaService.preverFalhaDisco()`, `PrevisaoFalhaRepository`
+
+### UC-27 — Geração Automática de Ordem Preditiva
+* **Ator Primário:** Sistema (triggered by UC-26 ou UC-25)
+* **Fluxo Principal:**
+  1. Condição: previsão falha disco > 80% em < 30 dias OU health check score < 40 (crítico imediato)
+  2. Cria `SolicitacaoManutencao` tipo "PREDITIVA" → descrição: "Falha de disco prevista para {data} (probabilidade {X}%). Substituir disco preventivamente."
+  3. Prioridade = ALTA/CRITICA; técnico = responsável do ativo ou padrão da filial
+  4. Alerta no dashboard (UC-19) + notificação push/email
+  5. Auditoria: origem = "PREDITIVA_AUTO"
+* **Regras:** BR-10, BR-16, NFR-O04
+* **API:** `ManutencaoPreditivaService.gerarOrdemPreditiva()`
+
+### UC-28 — Dashboard Preditivo & Gestão de Riscos
+* **Ator Primário:** Gestor Patrimônio / Gestor Manutenção / Admin
+* **Fluxo Principal:**
+  1. "Preditiva → Dashboard" → `GET /api/v1/dashboard/preditiva`
+  2. Cards: ativos monitorados, alertas ativos, ordens preditivas abertas, previsões < 30 dias
+  3. Tabela: ativo, tag, disco, health score, probabilidade falha, data prevista, IC 95%, ação (ver ordem, agendar substituição)
+  4. Filtros: filial, probabilidade, horizonte (7/30/90 dias)
+  5. Ação: "Agendar Substituição" → cria ordem preventiva programada + marca previsão como "tratada"
+* **Regras:** BR-13, BR-14, NFR-P01, NFR-O03
+* **API:** `DashboardController.preditiva()`
+
+---
+
+## Domínio: Busca Inteligente (Fuzzy Search - Levenshtein)
+
+### UC-29 — Busca Global Unificada (Fuzzy + Filtros)
+* **Ator Primário:** Todos os usuários
+* **Fluxo Principal:**
+  1. Header: campo de busca global (placeholder: "Buscar ativo, ordem, funcionário, fornecedor...")
+  2. Digita termo (ex.: "notebok", "dell 5520", "joao silva") → debounce 300ms
+  3. `GET /api/v1/busca?q=notebok&types=ativo,ordem,funcionario,fornecedor&filialId=1&page=0&size=10`
+  4. Backend: `FuzzySearchService.buscar()` → Levenshtein distance ≤ 2 (configurável) nos campos indexados
+  5. Combina: score fuzzy + boost por tipo (ativo > ordem > funcionário > fornecedor) + filtros exatos
+  6. Retorna resultados unificados paginados com highlight do termo
+* **Regras:** BR-11, BR-12, BR-13, NFR-P02
+* **API:** `BuscaController.global()`, `FuzzySearchService`, `LevenshteinDistance`
+
+### UC-30 — Busca Fuzzy Específica por Entidade
+* **Ator Primário:** Usuário em tela específica (ex.: seleção de ativo em ordem)
+* **Fluxo Principal:** Modal de seleção → campo busca → `GET /api/v1/busca/ativos?q=...&filialId=...` → retorna apenas ativos com score fuzzy
+* **Regras:** BR-11, BR-12, BR-13
+
+### UC-31 — Configuração de Threshold Fuzzy (Admin)
+* **Ator Primário:** Admin Global
+* **Fluxo Principal:** Configuração → "Busca" → ajusta similaridade mínima (0.5–0.9, default 0.7), campos indexados por entidade, pesos de boost
+* **Persiste:** `application.properties` / banco (tabela config) → reload runtime via `@RefreshScope`
+
+---
+
+## Domínio: Segurança & Aegis Shield (RBAC Granular + Multi-tenancy)
+
+### UC-32 — Login & Autenticação (JWT + Refresh)
+* **Ator Primário:** Qualquer usuário
+* **Fluxo Principal:**
+  1. Tela login → email + senha → `POST /api/v1/auth/login`
+  2. Backend: `AuthenticationManager` → valida → `JwtTokenProvider.generateToken(usuario, roles, filialId)` → access token (15 min) + refresh token (7 dias, HttpOnly cookie)
+  3. Frontend: `authInterceptor` armazena access token (memória) + refresh cookie; anexa `Authorization: Bearer <token>` em todas requisições
+  4. Expiração access token → `authInterceptor` detecta 401 → `POST /api/v1/auth/refresh` (cookie) → novo access token → retry original request (1x)
+  5. Falha refresh → limpa armazenamento → redirect login
+* **Regras:** BR-15, NFR-SEC02, NFR-SEC03
+* **API:** `AuthController.login()`, `AuthController.refresh()`, `JwtTokenProvider`, `SecurityConfig`
+
+### UC-33 — Gerenciar Roles & Permissions (Matriz Aegis Shield)
+* **Ator Primário:** Admin Global
+* **Fluxo Principal:**
+  1. "Admin → Roles & Permissions" → matriz visual: Roles (linhas) × Permissions (colunas) × Contexto (Filial/Global)
+  2. **Roles padrão:** ADMIN (global), GESTOR (filial), TECNICO (próprio), USER (leitura), AUDITOR (leitura + auditoria)
+  3. **Permissions granulares:** `ATIVO_CRIAR`, `ATIVO_LER`, `ATIVO_ATUALIZAR`, `ATIVO_EXCLUIR`, `ORDEM_CRIAR`, `ORDEM_INICIAR`, `ORDEM_APROVAR`, `ORDEM_CONCLUIR`, `ORDEM_CANCELAR`, `ORDEM_LER_TODAS`, `RELATORIO_GERAR`, `CONFIG_GERENCIAR`, `AUDITORIA_LER`
+  4. **Contexto:** Global (ADMIN) ou Filial (GESTOR, TECNICO, USER, AUDITOR)
+  5. Edita matriz → `PUT /api/v1/admin/roles/{role}/permissions` → valida consistência (ex.: TECNICO não pode ter `ORDEM_APROVAR`)
+* **Regras:** BR-13, BR-14, NFR-SEC03, NFR-SEC04
+* **API:** `RoleController`, `PermissionController`, `AegisShieldPermissionEvaluator`
+
+### UC-34 — Gerenciar Usuários (Provisionamento + Roles + Filial)
+* **Ator Primário:** Admin Global / Admin Cadastros (por filial)
+* **Fluxo Principal:**
+  1. "Admin → Usuários" → lista paginada (multi-tenancy: admin global vê todos; admin filial vê só sua filial)
+  2. **Criar:** Email, nome, senha temporária, role(s), filial(es) → `POST /api/v1/usuarios` → provisiona `Usuario` + `Funcionario` (opcional) → envia email boas-vindas com link primeiro acesso
+  3. **Editar:** Roles, filial, status (ativo/inativo), reset senha
+  4. **Excluir/Inativar:** Soft delete (status INATIVO) — mantém auditoria
+* **Regras:** BR-13, BR-14, BR-15, BR-16, NFR-SEC04
+* **API:** `UsuarioController`, `UsuarioService`
+
+### UC-35 — Multi-tenancy: Troca de Contexto de Filial (Admin Global)
+* **Ator Primário:** Admin Global
+* **Fluxo Principal:**
+  1. Header: seletor de filial (apenas ADMIN global vê todas)
+  2. Troca filial → `MultiTenancyFilter` define `tenantId` no Hibernate Filter → todas queries subsequentes filtradas
+  3. UI reflete dados da filial selecionada
+* **Regras:** BR-13, NFR-SEC04, NFR-S03
+* **API:** `MultiTenancyFilter` + `TenantContextHolder`
+
+### UC-36 — Auditoria de Acessos & Alterações (Envers)
+* **Ator Primário:** Auditor / Compliance / Admin Global
+* **Fluxo Principal:**
+  1. "Auditoria" → `GET /api/v1/auditoria?entidade=Ativo&id=123&page=0&size=50`
+  2. Retorna timeline: revisão, timestamp, usuário, ação (CREATE/UPDATE/DELETE), diff campo a campo (antes/depois), IP, user-agent
+  3. Filtros: entidade, ID, usuário, período, ação
+  4. Exporta PDF/CSV (assinado digitalmente para evidência legal)
+* **Regras:** BR-16, NFR-C02, NFR-C04, NFR-C05
+* **API:** `AuditoriaController`, `EnversRevisionRepository`
+
+### UC-37 — LGPD: Direito ao Esquecimento / Portabilidade
+* **Ator Primário:** Titular dos dados (Usuário) / DPO
+* **Fluxo Principal:**
+  1. Usuário logado → "Minha Conta → Privacidade" → "Solicitar Exclusão dos Meus Dados"
+  2. `POST /api/v1/usuarios/me/solicitar-exclusao` → cria tarefa para DPO (workflow futuro) OU executa imediato se automatizado:
+     - Anonimiza dados pessoais em `Usuario` (nome → "USUARIO_ANONIMIZADO_{hash}", email → hash@anonymized.local)
+     - Mantém `Auditoria` (Envers) com hash do usuário original (rastreabilidade legal)
+     - Revoga tokens, invalida sessões
+  3. "Exportar Meus Dados" → `GET /api/v1/usuarios/me/exportar` → JSON com todos dados do titular (ordens, ativos responsáveis, health checks, auditoria)
+* **Regras:** NFR-C01, NFR-C02, BR-16
+* **API:** `UsuarioController.solicitarExclusao()`, `UsuarioController.exportar()`
+
+### UC-38 — Teste de Penetração & Validação de Segurança (Contínuo)
+* **Ator Primário:** Segurança da Informação / Pipeline CI
+* **Fluxo Principal:**
+  1. CI: OWASP Dependency Check + SpotBugs + Checkstyle + Semgrep
+  2. Staging: DAST (OWASP ZAP) + SAST (SonarQube/CodeQL)
+  3. Pré-prod: Pen test automatizado (auth bypass, IDOR, multi-tenancy leak, injection)
+  4. Falha crítica/alta = block deploy
+* **Regras:** NFR-SEC10, NFR-M03
+
+---
+
+## Domínio: Relatórios & QR Code / PDF
+
+### UC-39 — Gerar Termo de Responsabilidade (PDF Assinado)
+* **Ator Primário:** Gestor / Técnico (no ato de alocação/transferência)
+* **Fluxo Principal:**
+  1. Em ativo (UC-06, UC-08 transferência) → "Gerar Termo"
+  2. `POST /api/v1/relatorios/termo-responsabilidade` → payload: ativoId, responsavelId, tipo (ALOCACAO/TRANSFERENCIA/BAIXA), observações
+  3. Backend: `PdfGenerator.gerarTermo()` → template Thymeleaf/Flying Saucer → PDF com: dados ativo, responsável, filial, data, QR Code de verificação, hash integridade
+  4. **Assinatura digital:** Integração ICP-Brasil (futuro) ou assinatura eletrônica avançada (gov.br / certificado A1) — placeholder v1: campo assinatura manual + testemunha
+  5. Retorna PDF (base64 ou stream) → frontend abre em nova aba / download
+  6. Auditoria: geração de termo registrada
+* **Regras:** BR-17, BR-16, NFR-P04, NFR-C03
+* **API:** `RelatorioController.gerarTermoResponsabilidade()`, `PdfGenerator`
+
+### UC-40 — Gerar Etiquetas QR Code (Unitário + Lote)
+* **Ator Primário:** Gestor / Técnico (inventário)
+* **Fluxo Principal:**
+  1. **Unitário:** Em ativo → "Imprimir Etiqueta" → `GET /api/v1/ativos/{id}/qr-code` → retorna SVG/PNG
+  2. **Lote:** "Relatórios → Etiquetas em Lote" → seleciona filtro (filial, tipo, status) → `POST /api/v1/relatorios/etiquetas-lote` → `QRCodeGenerator.gerarLote()` → ZIP com SVGs ou PDF pronto para impressão (A4, 24 etiquetas/folha)
+  3. QR Code contém: `https://aegis1.com/public/ativo/{tag}?h={hash}` → página pública read-only (dados básicos + status + termo)
+* **Regras:** BR-18, NFR-P04
+* **API:** `RelatorioController.gerarEtiquetasLote()`, `QRCodeGenerator`
+
+### UC-41 — Dashboard Analytics (Drill-down + Alertas Tempo Real)
+* **Ver UC-19** — já coberto
+
+### UC-42 — Relatórios de Compliance (NR-10/12, LGPD, ISO 27001)
+* **Ator Primário:** Compliance / Auditor / Gestor
+* **Fluxo Principal:**
+  1. "Relatórios → Compliance" → seleciona tipo: NR-10/12 (ordens com checklist), LGPD (solicitações exclusão/exportação), ISO 27001 (acessos, auditoria, incidentes)
+  2. `GET /api/v1/relatorios/compliance?tipo=NR12&periodo=2025-01` → PDF estruturado com evidências
+  3. Assinatura digital do responsável pelo relatório
+* **Regras:** NFR-C03, NFR-C04, NFR-C05, BR-16
+* **API:** `RelatorioController.compliance()`
+
+---
+
+## Domínio: Auditoria & Compliance
+
+### UC-43 — Consultar Trilha de Auditoria Completa (Envers)
+* **Ver UC-36** — já coberto
+
+### UC-44 — Relatório de Acessos Negados / Tentativas de Vazamento (Multi-tenancy)
+* **Ator Primário:** Auditor / Segurança / Admin Global
+* **Fluxo Principal:**
+  1. `GET /api/v1/auditoria/acessos-negados?periodo=24h` → logs de `AccessDeniedException` + tentativas cross-tenant (MultiTenancyFilter block)
+  2. Alertas automáticos se > 10/min (NFR-O04)
+  3. Integração SIEM (Syslog/Elastic) para correlação
+* **Regras:** NFR-SEC04, NFR-O04, NFR-C04
+
+### UC-45 — Validação de Integridade de Dados (Checksums + Auditoria)
+* **Ator Primário:** Sistema (batch semanal) / Auditor
+* **Fluxo Principal:**
+  1. Job semanal calcula checksums (SHA-256) de dados críticos: ativos, ordens, usuários, auditoria
+  2. Compara com baseline armazenado em tabela `integridade_checksum`
+  3. Divergência → alerta crítico + incidente de segurança
+  4. Relatório de integridade assinado digitalmente
+* **Regras:** BR-16, NFR-C04, NFR-C05
+
+---
+
+## Rastreabilidade Use Cases ↔ Artefatos
+
+| UC | BRD Regras | NFR | API Spec | State Machine | Testes |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| UC-01 a UC-05 | BR-04, BR-13, BR-14 | NFR-SEC04, NFR-S03 | `/api/v1/filiais`, `/departamentos`, `/fornecedores`, `/funcionarios`, `/tipos-ativo` | — | Integration: *ControllerIT |
+| UC-06 a UC-12 | BR-01,02,03,08,17,18 | NFR-P01,03,04, NFR-SEC04 | `/api/v1/ativos`, `/hardware`, `/relatorios/custo-total` | `state-machines.md#ativo` | Integration: AtivoControllerIT, HardwareControllerIT |
+| UC-13 a UC-20 | BR-05,06,07,08,13,14 | NFR-P01, NFR-S02, NFR-SEC04, NFR-O03,04 | `/api/v1/ordens`, `/dashboard/ordens` | `state-machines.md#solicitacaomanutencao` | Integration: OrdemControllerIT, SlaSchedulerIT |
+| UC-21 a UC-24 | BR-09, BR-16 | NFR-A05, NFR-S02 | `/api/v1/preventivas`, `/relatorios/preventiva-aderencia` | `state-machines.md#manutencaopreventiva` | Integration: PreventivaSchedulerIT |
+| UC-25 a UC-28 | BR-10, BR-16 | NFR-P03, NFR-O04 | `/api/v1/health-check`, `/dashboard/preditiva`, `/previsao-falha` | `state-machines.md#healthcheck` | Unit: ManutencaoPreditivaServiceTest, HealthCheckServiceTest |
+| UC-29 a UC-31 | BR-11, BR-12, BR-13 | NFR-P02, NFR-S03 | `/api/v1/busca` | — | Unit: FuzzySearchServiceTest, LevenshteinDistanceTest; Integration: BuscaControllerIT |
+| UC-32 a UC-38 | BR-13,14,15,16 | NFR-SEC01-10, NFR-C01-05 | `/api/v1/auth`, `/admin/roles`, `/admin/usuarios`, `/auditoria` | `state-machines.md#usuario` | Integration: SecurityConfigIT, AegisShieldTest, MultiTenancyIT |
+| UC-39 a UC-42 | BR-17,18, BR-16 | NFR-P04, NFR-C03 | `/api/v1/relatorios/termo`, `/qr-code`, `/etiquetas-lote`, `/compliance` | — | Integration: RelatorioControllerIT, QRCodeGeneratorTest, PdfGeneratorTest |
+| UC-43 a UC-45 | BR-16 | NFR-C02,04,05, NFR-O04 | `/api/v1/auditoria` | — | Integration: AuditoriaControllerIT, IntegridadeChecksumIT |
+
+---
+
+*Documento regenerado com base em análise AST completa do backend Java (domain, service, controller, security, predictive, search, audit, report) + frontend Vue. Substitui versão 1.0 que continha apenas visão frontend.*
