@@ -23,11 +23,18 @@ metadata:
   labels:
     app: aegis-app
 type: Opaque
+# NOTE: Do NOT commit real secret values here. Manage this Secret out-of-band via
+# Sealed Secrets (kubeseal) or External Secrets Operator, or create it manually:
+#   kubectl -n aegis create secret generic aegis-app-secrets \
+#     --from-literal=SPRING_DATASOURCE_URL=... \
+#     --from-literal=SPRING_DATASOURCE_USERNAME=... \
+#     --from-literal=SPRING_DATASOURCE_PASSWORD=... \
+#     --from-literal=JWT_SECRET=...
 stringData:
-  SPRING_DATASOURCE_URL: "jdbc:mysql://aegis-mysql:3306/aegis-patrimonio?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true"
-  SPRING_DATASOURCE_USERNAME: "root"
-  SPRING_DATASOURCE_PASSWORD: "Admin123"
-  JWT_SECRET: "change-me-in-prod"
+  SPRING_DATASOURCE_URL: "<set-via-sealed-secrets-or-external-secrets>"
+  SPRING_DATASOURCE_USERNAME: "<set-via-sealed-secrets-or-external-secrets>"
+  SPRING_DATASOURCE_PASSWORD: "<set-via-sealed-secrets-or-external-secrets>"
+  JWT_SECRET: "<set-via-sealed-secrets-or-external-secrets>"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -124,7 +131,10 @@ spec:
           imagePullPolicy: IfNotPresent
           env:
             - name: MYSQL_ROOT_PASSWORD
-              value: Admin123
+              valueFrom:
+                secretKeyRef:
+                  name: aegis-app-secrets
+                  key: SPRING_DATASOURCE_PASSWORD
             - name: MYSQL_DATABASE
               value: aegis-patrimonio
           ports:

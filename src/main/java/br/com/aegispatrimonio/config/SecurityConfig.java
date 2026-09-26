@@ -69,13 +69,24 @@ public class SecurityConfig {
                         .requestMatchers(new AntPathRequestMatcher("/api/auth/**")).permitAll()
                         // Protected API
                         .requestMatchers(new AntPathRequestMatcher("/api/**")).authenticated()
+                        // Actuator: only health probes are public (k8s/docker liveness/readiness);
+                        // everything else (prometheus, metrics, env, ...) requires ROLE_ADMIN
+                        .requestMatchers(new AntPathRequestMatcher("/actuator/health/**")).permitAll()
+                        .requestMatchers(new AntPathRequestMatcher("/actuator/**")).hasRole("ADMIN")
                         // Public/System
                         .requestMatchers(new AntPathRequestMatcher("/swagger-ui/**")).permitAll()
                         .requestMatchers(new AntPathRequestMatcher("/v3/api-docs/**")).permitAll()
-                        .requestMatchers(new AntPathRequestMatcher("/actuator/**")).permitAll()
                         .requestMatchers(new AntPathRequestMatcher("/error/**")).permitAll()
-                        // Allow everything else (SPA routing + Static Resources)
-                        .anyRequest().permitAll())
+                        // Embedded SPA (served from classpath:/static): shell, assets and PWA files.
+                        // SPA routes (e.g. /dashboard) are forwarded to /index.html by SpaWebFilter.
+                        .requestMatchers(new AntPathRequestMatcher("/")).permitAll()
+                        .requestMatchers(new AntPathRequestMatcher("/index.html")).permitAll()
+                        .requestMatchers(new AntPathRequestMatcher("/assets/**")).permitAll()
+                        .requestMatchers(new AntPathRequestMatcher("/favicon.ico")).permitAll()
+                        .requestMatchers(new AntPathRequestMatcher("/manifest.webmanifest")).permitAll()
+                        .requestMatchers(new AntPathRequestMatcher("/pwa-*.png")).permitAll()
+                        // Default deny: anything not explicitly allowed above requires authentication
+                        .anyRequest().authenticated())
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo
                                 .userService(customOAuth2UserService))
