@@ -1,190 +1,529 @@
-# Operations Runbook & System Maintenance Guide — Aegis1 Módulo de Manutenção
+# Operations Runbook & System Maintenance Guide — Aegis1
 
-> **Owner:** Eng Lead / DevOps · **Última revisão:** 15/01/2025
-> **Sistema de alerta:** [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] Premissa: PagerDuty/Opsgenie integrado ao Datadog/New Relic/Sentry · **Canal de incidentes:** #incidents (Slack)
-
-## 1. System Overview
-* **Componentes críticos:**
-  * **Frontend Estático (Aegis1):** Aplicação vanilla JS (ES modules) servida via CDN — bundle em `frontend/dist/` gerado por Vite (assumido por convenção). Entry point: `frontend/src/main.js`.
-  * **Camada de API (frontend/src/services/api.js):** Cliente HTTP único para comunicação com backend externo (não gerenciado neste repositório). Função `request` (complexidade ciclomática 13) centraliza chamadas, autenticação (Bearer token em `localStorage`), tratamento de erros e refresh de token.
-  * **Dependência UI:** `@popperjs/core` (tooltips/popovers) — única dependência de produção.
-* **Diagrama de arquitetura:** Ver `system-architecture.md` (se existir) — arquitetura frontend-only + CDN + backend externo via REST.
-* **Dependências externas críticas:**
-  * **Backend API (fora do escopo deste repo):** Endpoints consumidos — `/auth/login`, `/auth/refresh`, `/ordens`, `/ativos`, `/custos`, `/dashboard`. Contratos validados via Pact (consumer-side). Base URL injetada via `VITE_API_BASE_URL`.
-  * **CDN/Hosting Estático:** [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] Premissa: GitHub Pages / Netlify / Vercel / S3+CloudFront — swap Blue-Green via alteração de origin/path.
-  * **Identity Provider (SSO/VPN):** Acesso a Staging protegido por VPN/SSO corporativo.
-  * **Monitoramento/APM:** [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] Premissa: Datadog/New Relic/Sentry configurado para RUM (Real User Monitoring) + error tracking frontend.
-
-## 2. Monitoring & System Health Check
-| Métrica | Ferramenta | Threshold Saudável | Threshold de Alerta |
-| :--- | :--- | :--- | :--- |
-| Latência P95 (carregamento página / TTI) | Datadog/New Relic RUM | < 800 ms | > 1.5 s |
-| Taxa de erro JS (exceções não tratadas) | Sentry / Datadog RUM | < 0.5% sessões | > 2% sessões |
-| Taxa de erro HTTP 5xx (chamadas `api.js`) | Datadog/New Relic (frontend → backend) | < 0.5% | > 1% |
-| Disponibilidade CDN (health check `index.html`) | Uptime monitor (Pingdom/Datadog Synthetic) | 100% | < 99.9% (5 min) |
-| Tempo de build CI (GitHub Actions) | GitHub Actions Insights | < 10 min (Stages 1-3) | > 15 min |
-| Cobertura de testes (CI) | Vitest + Coverage | ≥ 85% statements / 80% branches | < mínimos definidos no Deployment Plan |
-
-* **Dashboards principais:**
-  * **Frontend Health (RUM):** Latência, erros JS, Core Web Vitals, sessões ativas — [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] Link: `https://datadoghq.com/dashboard/aegis1-frontend`
-  * **CI/CD Pipeline:** Status builds, tempo por stage, taxa de sucesso — `https://github.com/<org>/<repo>/actions`
-  * **Backend API (consumido):** Latência, erro rate, throughput — responsabilidade do Backend Lead; frontend alerta apenas em erro 5xx/401 inesperado.
-* **Health check endpoint:** `GET https://aegis1.exemplo.com/` (retorna `index.html` 200 OK) — validado em Stage 4 (Staging) e Stage 5 (Production) do Deployment Plan.
-* **Métricas específicas de banco:** Não aplicável — este repositório não possui banco de dados. Ver `db-performance-recovery` (se existir no projeto backend).
-
-## 3. On-Call & Escalation
-| Nível | Papel | Tempo de resposta esperado | Condições de ativação |
-| :--- | :--- | :--- | :--- |
-| L1 | On-call Engineer (rotação semanal) | 15 min (horário comercial) / 30 min (fora horário) | Alerta P1: CDN down, erro JS > 2%, build CI falhando em `main`, staging deploy falhou |
-| L2 | Tech Lead / Eng Lead | 30 min | L1 não resolve em 30 min OU incidente P0: vazamento de token (`localStorage`), `custoTotalPorAtivo` divergente, rollback necessário |
-| L3 | Engineering Manager / Incident Commander | 1 h | Incidente se estende > 1 h, impacto multi-time, decisão de rollback de produção, comunicação externa necessária |
-
-* **Rotação on-call:** Definida no calendário compartilhado (Google Calendar/Outlook) — handoff às segundas 10h BRT.
-* **Runbook de handoff:** Checklist em `docs/oncall-handoff.md` (a criar) — inclui dashboards, contatos backend, chaves de deploy staging/prod.
-
-## 4. Failure Recovery Procedures
-
-### Incident Type 1: CDN / Hosting Estático Indisponível (P0)
-* **Symptom:** Health check `GET /` falha (timeout ou 5xx) → alerta sintético Datadog/Pingdom dispara; usuários veem página em branco ou erro 502/503.
-* **Possíveis Causas:**
-  1. Provedor CDN com outage (Netlify/Vercel/GitHub Pages/S3+CloudFront)
-  2. Deploy ruim propagado (arquivos corrompidos, `index.html` ausente)
-  3. Certificado TLS expirado / configuração DNS incorreta
-  4. Limite de banda/quotas excedido (plano gratuito)
-* **Diagnóstico:**
-  1. Verificar status page do provedor CDN (ex: `www.netlifystatus.com`, `www.githubstatus.com`).
-  2. Acessar URL de staging (`https://staging-aegis1.exemplo.com`) — se staging sobe, problema é produção/CDN.
-  3. Verificar último deploy em GitHub Actions → aba "Deployments" → confirmar artifact `frontend/dist/` gerado corretamente.
-  4. `curl -I https://aegis1.exemplo.com/` → checar headers `x-nf-request-id`, `cf-ray`, `x-vercel-id` para identificar edge.
-* **Remediation:**
-  1. **Rollback imediato (alvo < 2 min):** No painel do provedor CDN, reverter para versão anterior (`sha-<previous>` ou tag `vX.Y.Z-1`). Ver Deployment Plan §5 — Blue-Green swap via origin/path.
-  2. Se rollback CDN falhar: Disparar workflow `cd-production.yml` com `workflow_dispatch` + `ref: vX.Y.Z-1` (tag anterior) → rebuild + redeploy.
-  3. Se provedor CDN down: Atualizar DNS (CNAME) para provedor alternativo (ex: Netlify → Vercel) — requer configuração prévia de multi-provider [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA].
-  4. Comunicar no `#incidents`: "Rollback iniciado, ETA 2 min".
-* **Verificação pós-remediação:** Health check `GET /` retorna 200; smoke test Playwright (login → lista ordens → detalhe → logout) passa em produção; RUM mostra 0% erro JS.
-* **Severidade típica:** P0
-
-### Incident Type 2: Erro JavaScript em Massa / Regressão de Build (P1)
-* **Symptom:** Sentry/Datadog RUM alerta: taxa de erro JS > 2% nas últimas 5 min; stack trace aponta para `api.js:request` ou chunk Vite específico; usuários reportam "tela branca" ou "botões não funcionam".
-* **Possíveis Causas:**
-  1. Novo deploy (`main` merge) introduziu bug em `api.js` (ex: tratamento de 401/refresh token quebrado, `console.error` residual expõe stack).
-  2. Chunk Vite com hash alterado não carregado (cache CDN stale + `index.html` novo).
-  3. Backend API alterou contrato (breaking change) — Pact consumer tests não pegaram (provider não verificou).
-  4. Variável de ambiente `VITE_API_BASE_URL` incorreta no build de produção.
-* **Diagnóstico:**
-  1. Abrir Sentry → filtrar por `release: sha-<current>` → ver top errors + affected users.
-  2. Verificar `Network` tab em sessão afetada: requests para `VITE_API_BASE_URL` retornando 401/404/500? CORS error?
-  3. Comparar `index.html` atual vs anterior: hashes dos chunks JS/CSS batem?
-  4. Rodar `npm run build` local + `npm run preview` → reproduzir?
-* **Remediation:**
-  1. **Rollback de deploy (alvo < 5 min):** Mesmo procedimento do Incident Type 1 — reverter CDN para `sha-<previous>`.
-  2. Se bug é em `api.js:request` (complexidade 13): Hotfix em branch `hotfix/<desc>`, PR com review acelerado, CI verde → `workflow_dispatch` production com tag `vX.Y.Z+1` (patch).
-  3. Se contrato backend quebrado: Coordenar com Backend Lead → rollback backend OU deploy frontend com fallback graceful (ex: mostrar toast "serviço indisponível" em vez de crash).
-  4. Limpar cache CDN (purge) se `index.html` novo aponta para chunks inexistentes — token `CDN_PURGE_TOKEN` em GitHub Secrets.
-* **Verificação pós-remediação:** Taxa erro JS < 0.5% por 15 min consecutivos; jornada crítica (login → ordem → custo) funcional em staging e prod.
-* **Severidade típica:** P1 (P0 se vazamento de token em console/error tracking)
-
-### Incident Type 3: Falha de Autenticação / Token Expirado em Loop (P1)
-* **Symptom:** Usuários logados redirecionados para login repetidamente; `api.js:request` loga `console.error` (linha 26) com "401 Unauthorized" em loop; `localStorage.token` presente mas inválido.
-* **Possíveis Causas:**
-  1. Backend rotacionou signing key JWT sem aviso → tokens existentes invalidados.
-  2. Lógica de refresh token em `api.js:request` (linhas 36-80) falha: request de refresh retorna 401 → loop infinito.
-  3. Relógio do cliente dessincronizado (raro) → token considerado expirado prematuramente.
-* **Diagnóstico:**
-  1. Verificar `api.js:request` fluxo: `try { response } catch (401) → refreshToken() → retry original`. Checar se `refreshToken()` limpa `localStorage` em falha.
-  2. Inspect `localStorage` no DevTools: `token`, `refreshToken` presentes? Expiração (`exp` claim) decodificada (jwt.io) condiz?
-  3. Verificar logs backend (responsabilidade Backend Lead) — rota `/auth/refresh` retornando 200 ou 401?
-* **Remediation:**
-  1. **Kill switch imediato:** Se feature flag implementada (ver Deployment Plan §3), desabilitar `autoRefreshToken` via `localStorage.setItem('feature:autoRefresh', 'false')` — força re-login limpo.
-  2. Deploy hotfix corrigindo loop em `api.js:request` (adicionar `maxRetries`, backoff, clear storage em falha definitiva).
-  3. Comunicar usuários: "Sessão expirada, por favor faça login novamente" — banner via `sessionStorage` flag.
-* **Verificação pós-remediação:** Fluxo login → acesso ordens → refresh automático (após 14 min) funciona sem loop; 0 erros 401 em 30 min.
-* **Severidade típica:** P1
-
-### Incident Type 4: Pipeline CI/CD Bloqueado (P2)
-* **Symptom:** GitHub Actions `ci.yml` falha em `main` → merge bloqueado; stages: Static Analysis (ESLint/Semgrep), Testes (Vitest/Pact), Build.
-* **Possíveis Causas:**
-  1. `console.error`/`console.log` residual em `api.js` (linhas 26, 49, 52) → Semgrep finding crítico.
-  2. Cobertura de testes abaixo do threshold (85% statements / 80% branches).
-  3. Contrato Pact não gerado / quebrado (mudança em `api.js` sem atualizar consumer test).
-  4. `npm audit` vulnerabilidade `high`/`critical` em `@popperjs/core` ou dependência transitiva.
-* **Diagnóstico:**
-  1. Abrir run falho → logs por stage.
-  2. Stage 1: `npm run lint` output → corrigir ESLint/Semgrep.
-  3. Stage 2: `npm run test:coverage` → ver `coverage/lcov-report/index.html` (artifact CI).
-  4. Stage 3: `npm run build` → erro Vite (ex: `import.meta.env.VITE_API_BASE_URL` undefined).
-* **Remediation:**
-  1. Fix no código → push para `main` (ou reverter commit problemático `git revert <sha>`).
-  2. Se `npm audit`: `npm audit fix` ou atualizar `@popperjs/core` para versão patched.
-  3. Se Pact: Atualizar `pacts/*.json` rodando `npm run test:contract` local → commit contratos.
-* **Verificação pós-remediação:** CI verde em `main`; artifact `frontend/dist/` gerado; contratos Pact em `pacts/`.
-* **Severidade típica:** P2 (bloqueia deploy, mas produção roda versão anterior)
-
-## 5. Backup & Rollback Protocol
-> Este projeto **não possui banco de dados** (ver Stack real: "nenhum motor de banco conhecido"). Estratégia de backup/RPO/RTO de banco vive no repositório backend (se houver artefato `db-performance-recovery` lá). Esta seção cobre **apenas rollback da aplicação frontend/deploy**.
-
-* **Rollback de deploy (Produção):**
-  * **Mecanismo:** Blue-Green via CDN — alterar origin/path para versão anterior (`sha-<previous>` ou tag `vX.Y.Z-1`).
-  * **Comando/Procedimento:**
-    1. GitHub Actions → workflow `cd-production.yml` → `Run workflow` → `ref: vX.Y.Z-1` (tag anterior) OU `sha: <short-sha-anterior>`.
-    2. Alternativa (provedor CDN): Painel Netlify/Vercel/CloudFront → "Rollback to previous deploy" / "Promote previous deployment".
-  * **Tempo alvo:** < 2 min (execução) + < 3 min (verificação health check + smoke) = **< 5 min total** (conforme Deployment Plan §5).
-* **Rollback de deploy (Staging):** Automático — novo merge em `main` sobrescreve; para reverter, `git revert <sha>` + push `main` ou re-run workflow `cd-staging.yml` com commit anterior.
-* **Backup de configuração/infraestrutura (fora do banco):**
-  * **GitHub Actions Secrets:** `STAGING_DEPLOY_KEY`, `PROD_DEPLOY_KEY`, `CDN_PURGE_TOKEN`, `VITE_API_BASE_URL` (por env), `VITE_SENTRY_DSN` — backup via export manual trimestral (responsável: Eng Lead) → armazenado em 1Password/cofre da equipe.
-  * **Workflows CI/CD:** Versionados no repo (`.github/workflows/*.yml`) — backup = clone do repo.
-  * **Configuração CDN/DNS:** [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] Premissa: Terraform/CloudFormation ou configuração manual documentada em `infra/` (fora deste repo) — backup via state file versionado.
-
-## 6. Maintenance Windows
-* **Janela padrão:** Terça a quinta, 10h–16h BRT (conforme Deployment Plan §5 — janela de deploy produção). **Não há janela de manutenção noturna/semanal** — aplicação estática sem downtime para deploy (Blue-Green).
-* **Comunicação prévia necessária:**
-  * **Deploy produção (features visíveis):** Aviso no `#releases` (Slack) + changelog atualizado **antes** do `workflow_dispatch` — mínimo 30 min (bake time staging).
-  * **Hotfix P0 (bypass staging):** Comunicação **pós-deploy** imediata no `#incidents` + `#releases` — template: "Hotfix vX.Y.Z+1 deployado: [resumo]. Rollback: tag vX.Y.Z."
-  * **Manutenção infraestrutura CDN/DNS:** 48h antecedência via e-mail + Slack `#infra` — coordenar com DevOps.
-
-## 7. Runbook de Rotina (Checklists Operacionais)
-- [ ] **Diário (início do dia útil):** Verificar dashboard "Frontend Health" — latência P95 < 800 ms, erro JS < 0.5%, sessões ativas dentro do esperado; checar CI `main` último run verde.
-- [ ] **Diário (fim do dia):** Confirmar nenhum alerta P0/P1 aberto no PagerDuty/Opsgenie; revisar Sentry "New Issues" nas últimas 24h.
-- [ ] **Semanal (segunda 10h BRT — handoff on-call):** Rodar checklist `docs/oncall-handoff.md` — dashboards, segredos, contatos backend, último deploy prod (tag/sha), PRs abertos críticos.
-- [ ] **Semanal:** Revisar alertas silenciados no Datadog/Sentry — remover silenciamentos > 7 dias sem resolução.
-- [ ] **Mensal (primeira terça):** Revisão de custos CDN/hosting + GitHub Actions minutes — comparar com baseline; rotacionar `STAGING_DEPLOY_KEY` / `PROD_DEPLOY_KEY` se > 90 dias (conforme Deployment Plan §8).
-- [ ] **Por release (features visíveis):** Pós-deploy verification checklist (Deployment Plan §7) — health checks, métricas negócio, error rate < 0.5% 60 min, P95 < 800 ms 60 min, smoke tests 30 min, comunicação `#releases` + changelog.
-
-## 8. Post-Incident Process
-* **Postmortem obrigatório para:** Severidade **P0 e P1** (conforme Deployment Plan §7 + §8 — P0: erro > 1%, vazamento token, divergência custo; P1: regressão JS, auth loop).
-* **Template de postmortem:** `docs/postmortem-template.md` (a criar) — seções obrigatórias:
-  1. **Resumo executivo** (impacto, duração, usuários afetados)
-  2. **Linha do tempo** (UTC + BRT) — detecção, diagnóstico, remediação, verificação
-  3. **Causa raiz** (5 Whys) — ex: "console.error residual não removido → Semgrep bloqueou CI → hotfix feito às pressas sem teste de contrato → breaking change backend não detectado"
-  4. **Ações de follow-up** (Jira/GitHub Issues) — owner, prazo, prioridade
-     * Ex: "Remover console.* residuals em api.js" (Dev, 0.5h, P1)
-     * Ex: "Refatorar api.js:request complexidade 13 → funções menores" (Dev, 4h, P2)
-     * Ex: "Implementar feature flag para kill switch auth" (Dev, 8h, P2)
-  5. **Lições aprendidas / Melhorias de processo**
-* **Prazo para publicar postmortem:** **5 dias úteis** após resolução do incidente — publicado em Confluence/Notion/GitHub Wiki + link no `#incidents` e `#releases`.
-* **Revisão de postmortems:** Mensal na retro de engenharia — métricas: MTTR, recorrência, % ações concluídas no prazo.
-
-## 9. Contacts & Escalation Paths
-| Sistema/Serviço | Responsável | Contato de Emergência |
-| :--- | :--- | :--- |
-| **Frontend Aegis1 (este repo)** | Eng Lead / On-call Engineer | Slack DM @oncall + PagerDuty rotation "aegis1-frontend" |
-| **Backend API (consumido)** | Backend Lead | Slack #backend-oncall + PagerDuty "aegis1-backend" |
-| **CDN / Hosting (Produção)** | DevOps / Cloud Engineer | [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] Premissa: PagerDuty "cdn-provider" + e-mail suporte enterprise |
-| **CDN / Hosting (Staging)** | DevOps | Slack #infra-staging |
-| **Identity Provider (SSO/VPN)** | SecOps / IT | Slack #it-support + telefone plantão |
-| **Monitoramento (Datadog/New Relic/Sentry)** | Eng Lead | Slack @eng-lead + PagerDuty "observability" |
-| **GitHub Actions / Secrets** | Eng Lead / DevOps | Slack #devops + GitHub org admin |
-| **Pact Broker (se usado)** | Backend Lead | Slack #backend-contracts |
+> **Versão:** 2.0 · **Owner:** DevOps / SRE / Tech Leads · **Última revisão:** 2025-01-15
+> **Sistema de Alerta:** Prometheus Alertmanager → PagerDuty (Critical) / Slack #alerts (Warning) / Email (Info)
+> **Canal de Incidentes:** #incidents (Slack) + PagerDuty Escalation Policy
+> **Base:** System Architecture v2.0 + Deployment Plan v2.0 + Security Policies v2.0 + NFR v2.0
 
 ---
 
-**Rastreabilidade com Deployment Plan (CI/CD & Release Plan):**
-* Seção 2 (Monitoring) ↔ Deployment Plan §7 (Post-Deploy Verification: error rate, P95, health checks)
-* Seção 4.1 (CDN Down) ↔ Deployment Plan §5 (Rollback Strategy: Blue-Green swap < 2 min)
-* Seção 4.2 (JS Error/Regressão) ↔ Deployment Plan §2 Stage 2 (Coverage thresholds) + §3 (Build & Tagging) + §5 (Rollback)
-* Seção 4.3 (Auth Loop) ↔ Deployment Plan §3 (Feature Flags — kill switch) + §8 (Secrets: VITE_API_BASE_URL)
-* Seção 4.4 (CI Bloqueado) ↔ Deployment Plan §2 Stages 1-3 (Blocking criteria) + §9 Checklist (Remove console.*, Refactor api.js)
-* Seção 5 (Rollback Protocol) ↔ Deployment Plan §5 (Rollback Strategy) + §8 (Secrets rotation)
-* Seção 6 (Maintenance Windows) ↔ Deployment Plan §5 (Deploy window: Ter-Qui 10-16h BRT)
-* Seção 7 (Rotina) ↔ Deployment Plan §7 (Post-Deploy Verification) + §8 (Secrets rotation 90 dias)
-* Seção 8 (Post-Incident) ↔ Deployment Plan §7 (Critérios de saída) + §8 (Bug Severity P0/P1)
+## 1. System Overview
+
+### 1.1 Componentes Críticos
+
+| Componente | Tecnologia | Health Check | Criticidade |
+| :--- | :--- | :--- | :--- |
+| **Frontend (SPA/PWA)** | Vue 3 + Vite + Nginx (Static) | `GET /` → 200 OK + `index.html` | **P0** |
+| **Backend API** | Spring Boot 3.3 (Java 21) | `GET /actuator/health/liveness` + `readiness` | **P0** |
+| **Auth Service** | Spring Security + JWT RS256 | `GET /actuator/health` + `/auth/me` | **P0** |
+| **MySQL 8.0 Primary** | RDS/Cloud SQL (Multi-AZ) | `SELECT 1` + Replication Lag < 1s | **P0** |
+| **MySQL Read Replicas** | RDS/Cloud SQL | `SELECT 1` + Lag < 1s | **P1** |
+| **Redis Cluster** | ElastiCache / Memorystore | `PING` + Memory < 80% | **P1** |
+| **Object Storage (S3/MinIO)** | S3 / GCS / MinIO | `HEAD /bucket/health` | **P1** |
+| **K8s Cluster** | EKS/GKE/AKS 1.28+ | `kubectl get nodes` + ComponentStatus | **P0** |
+| **Ingress Controller** | NGINX Ingress | `GET /healthz` | **P0** |
+| **Observabilidade** | Prometheus/Grafana/Tempo/Loki/Sentry | `GET /-/healthy` | **P1** |
+
+### 1.2 Dependências Externas Críticas
+
+| Dependência | SLA | Contato | Runbook Específico |
+| :--- | :--- | :--- | :--- |
+| **Cloud Provider (AWS/GCP/Azure)** | 99.99% | Enterprise Support | `runbooks/cloud-provider-outage.md` |
+| **DNS (Route53/Cloud DNS)** | 100% | DNS Team | `runbooks/dns-failover.md` |
+| **TLS Certificates (Let's Encrypt/Vault)** | Auto-renewal | cert-manager | `runbooks/tls-cert-renewal.md` |
+| **Vault / Secrets Manager** | 99.9% | Security Team | `runbooks/vault-outage.md` |
+| **SMTP / Push Gateway (FCM/APNs)** | 99.9% | Notification Team | `runbooks/notification-outage.md` |
+
+---
+
+## 2. Monitoring & System Health Check
+
+### 2.1 Golden Signals (Prometheus + Grafana)
+
+| Métrica | Target Saudável | Alerta Warning | Alerta Critical | Dashboard |
+| :--- | :--- | :--- | :--- | :--- |
+| **Latência P95 API** | < 500ms | > 800ms (5min) | > 2s (5min) | Golden Signals / API Latency |
+| **Throughput (RPS)** | > 100 | < 50 (5min) | < 10 (5min) | Golden Signals / Traffic |
+| **Error Rate (5xx)** | < 0.1% | > 1% (5min) | > 5% (5min) | Golden Signals / Errors |
+| **Saturation (CPU/Mem)** | < 70% | > 80% (5min) | > 90% (5min) | Golden Signals / Saturation |
+| **JVM Heap Usage** | < 70% | > 85% (5min) | > 95% (5min) | JVM Metrics |
+| **DB Connections (HikariCP)** | < 70% pool | > 85% (5min) | > 95% (5min) | DB Pool |
+| **Redis Memory** | < 70% | > 85% (5min) | > 95% (5min) | Redis Metrics |
+| **K8s Pod Restarts** | 0/hr | > 5/hr | > 20/hr | K8s Overview |
+
+### 2.2 Business KPIs (Grafana)
+
+| Métrica | Target | Alerta | Dashboard |
+| :--- | :--- | :--- | :--- |
+| **Ordens Criadas/hora** | > 10 | < 1/hr (30min) | Business KPIs |
+| **Taxa Conclusão Ordens** | > 90% | < 70% (1h) | Business KPIs |
+| **custoTotalPorAtivo Atualizado** | 100% ordens concluídas | Atraso > 15min | Business KPIs |
+| **Aderência Preventiva** | > 80% | < 60% (diário) | Preventiva |
+| **Alertas Preditivos Ativos** | < 50 | > 100 | Preditiva |
+| **Login Success Rate** | > 99% | < 95% (15min) | Auth |
+| **Refresh Token Fail Rate** | < 0.1% | > 1% (15min) | Auth |
+
+### 2.3 Security Alerts (Alertmanager)
+
+| Alerta | Condição | Severidade | Runbook |
+| :--- | :--- | :--- | :--- |
+| **Cross-Tenant Leak** | `acessos_negados_total > 10/min` | **Critical** | `runbooks/cross-tenant-leak.md` |
+| **Brute Force Login** | `login_failed_total{ip} > 5/15min` | **Warning** | `runbooks/brute-force.md` |
+| **Refresh Token Replay** | `refresh_token_reused_total > 0` | **Critical** | `runbooks/token-replay.md` |
+| **Preditiva Threshold** | `previsao_falha_probabilidade > 0.9` | **Warning** | `runbooks/predictive-alert.md` |
+| **SLA Breach** | `ordem_sla_breach_total > 0` | **Warning** | `runbooks/sla-breach.md` |
+| **Audit Tamper** | `envers_revision_deleted_total > 0` | **Critical** | `runbooks/audit-tamper.md` |
+| **Container Vuln** | `trivy_critical_vulnerabilities > 0` | **Critical** | `runbooks/container-vuln.md` |
+
+---
+
+## 3. On-Call & Escalation
+
+### 3.1 Rotação & Responsabilidades
+
+| Nível | Papel | Tempo Resposta | Condições Ativação | Contato |
+| :--- | :--- | :--- | :--- | :--- |
+| **L1** | On-Call Engineer (Rotação Semanal) | 15 min (comercial) / 30 min (fora) | Alertas Warning/Critical (PagerDuty); CDN down; Error rate > 1%; Build CI falhando `main`; Staging deploy falhou | Slack #oncall + PagerDuty |
+| **L2** | Tech Lead / Eng Lead (Backend/Frontend/Infra) | 30 min | L1 não resolve em 30 min; Incidente P0 (Cross-tenant leak, Token replay, DB down, Rollback necessário); Security Incident | Slack #oncall-leads + Phone |
+| **L3** | Engineering Manager / Incident Commander | 1 hora | Incidente > 1h; Impacto multi-time; Decisão rollback produção; Comunicação externa (clientes, imprensa, reguladores) | Phone + Email Executivo |
+
+### 3.2 Rotação On-Call
+
+- **Semanal:** Segunda 10h BRT → Próxima Segunda 10h BRT
+- **Handoff:** Checklist `docs/oncall-handoff.md` (Dashboards, Contatos Backend, Chaves Deploy Staging/Prod, Incidentes Abertos, Mudanças Recentes)
+- **Escalação Automática:** PagerDuty Escalation Policy (L1 → L2 em 30min → L3 em 1h)
+
+---
+
+## 4. Failure Recovery Procedures
+
+### 4.1 Incident Type 1: Frontend/CDN Indisponível (P0)
+
+**Sintoma:** Health check `GET /` falha (timeout/5xx) → Alerta sintético; Usuários veem página em branco/502/503.
+
+**Possíveis Causas:**
+1. Provedor CDN outage (CloudFront, Cloudflare, Netlify, Vercel)
+2. Deploy ruim (arquivos corrompidos, `index.html` ausente)
+3. Certificado TLS expirado / DNS incorreto
+4. Limite banda/quotas excedido
+
+**Diagnóstico:**
+1. Status page provedor CDN (`cloudfront-status.aws.amazon.com`, `cloudflarestatus.com`)
+2. Staging acessível? (`https://staging-aegis1.empresa.com`) → Isola problema prod
+3. Último deploy GitHub Actions → Artifact `frontend/dist/` gerado corretamente?
+4. `curl -I https://aegis1.empresa.com/` → Headers `x-amz-cf-id`, `cf-ray`, `x-vercel-id`
+
+**Remediação:**
+1. **Rollback Imediato (< 2 min):** Painel CDN → Reverter versão anterior (`sha-<previous>` ou tag `vX.Y.Z-1`) — Blue-Green swap origin/path
+2. **Rollback Deploy:** `workflow_dispatch` `cd-production.yml` com `ref: vX.Y.Z-1` → Rebuild + Redeploy
+3. **Failover CDN:** Atualizar DNS CNAME para provedor alternativo (configuração prévia multi-provider)
+4. **Comunicação:** `#incidents`: "Rollback iniciado, ETA 2 min"
+
+**Verificação Pós-Remediação:** Health check 200; Smoke test Playwright (Login → Lista Ordens → Detalhe → Logout) passa; RUM 0% erro JS.
+
+---
+
+### 4.2 Incident Type 2: Backend API Indisponível / Degradado (P0)
+
+**Sintoma:** `GET /actuator/health/liveness` falha; Latência P95 > 2s; Error Rate 5xx > 5%; Alertas Golden Signals Critical.
+
+**Possíveis Causas:**
+1. Pod(s) Backend CrashLoopBackOff / OOMKilled / Crash
+2. MySQL Primary Down / Replication Lag Alto / Connection Pool Exhausted
+3. Redis Down / Memory Pressure / Connection Limit
+4. K8s Node Pressure (Disk/CPU/Memory) / Node NotReady
+5. Deploy Ruim (Imagem quebrada, ConfigMap/Secret errado, Migration Flyway Falhou)
+
+**Diagnóstico:**
+1. `kubectl get pods -n aegis1-prod -o wide` → Status, Restarts, Node, Events
+2. `kubectl logs -n aegis1-prod -l app=aegis1-backend --tail=100` → Stack traces, OOM, Flyway errors
+3. `kubectl get events -n aegis1-prod --sort-by=.metadata.creationTimestamp` → Recent events
+4. `kubectl top pods -n aegis1-prod` → CPU/Memory usage
+5. MySQL: `SHOW PROCESSLIST;` + `SHOW ENGINE INNODB STATUS;` + Replication Lag (`Seconds_Behind_Master`)
+6. Redis: `INFO memory` + `CLIENT LIST` + `SLOWLOG GET 10`
+
+**Remediação:**
+1. **Pod Crash/Restart:** `kubectl delete pod <pod-name> -n aegis1-prod` (HPA recria) — Se OOM: Increase memory limit + JVM `-XX:MaxRAMPercentage=75`
+2. **MySQL Primary Down:** Failover automático (RDS/Cloud SQL) → Verificar Read Replica promovida; `kubectl rollout restart deployment/aegis1-backend -n aegis1-prod` (reconecta)
+3. **Redis Down:** Failover automático (ElastiCache/Memorystore) → `kubectl rollout restart deployment/aegis1-backend` (reconecta)
+4. **Deploy Ruim:** `argocd app rollback aegis1-prod <revision-anterior>` (< 2 min) — Verifica `argocd app history aegis1-prod`
+7. **Node Pressure:** `kubectl cordon <node>` + `kubectl drain <node> --ignore-daemonsets --delete-emptydir-data` → Pods evicted → HPA escala em outros nodes
+
+**Verificação:** Health checks 200; Latência P95 < 500ms; Error Rate < 0.1%; Business KPIs normais.
+
+---
+
+### 4.3 Incident Type 3: Cross-Tenant Data Leak (P0 - Security Critical)
+
+**Sintoma:** Alerta `acessos_negados_total > 10/min` + Logs `MultiTenancyFilter` bloqueio cross-tenant + Auditoria Envers mostra acesso indevido.
+
+**Diagnóstico:**
+1. `kubectl logs -n aegis1-prod -l app=aegis1-backend | grep "CROSS_TENANT_ATTEMPT"` → IP, User, Filial Origem, Filial Alvo, Timestamp
+2. `kubectl exec -n aegis1-prod deploy/aegis1-backend -- curl -s localhost:8080/actuator/auditevents | jq '.events[] | select(.principal=="<user>")'`
+3. Verificar se `@Filter` faltando em nova entidade (ArchUnit test falhou?)
+
+**Remediação:**
+1. **Bloqueio Imediato:** Revogar tokens usuário (`DELETE FROM refresh_token WHERE usuario_id = ?`); Bloquear IP no WAF/Gateway
+2. **Isolamento:** `kubectl label namespace aegis1-prod quarantine=true` (NetworkPolicy deny all exceto monitoring)
+3. **Investigação:** Identificar entidade sem `@Filter` → Hotfix `git commit --amend` + `argocd app sync aegis1-prod` (hotfix branch)
+4. **Notificação:** DPO + Legal + Affected Filials (se dados expostos) — LGPD 48h
+
+**Verificação:** Testes Cross-tenant CI passam; Auditoria Envers mostra apenas acessos autorizados; Alerta cessa.
+
+---
+
+### 4.4 Incident Type 4: Refresh Token Replay / Token Compromise (P0 - Security Critical)
+
+**Sintoma:** Alerta `refresh_token_reused_total > 0` + Múltiplos 401 em sequência + Usuários reportam logout inesperado.
+
+**Diagnóstico:**
+1. `SELECT * FROM refresh_token WHERE used_at IS NOT NULL AND revoked = false ORDER BY used_at DESC LIMIT 20;` → Tokens reutilizados
+2. `kubectl logs -n aegis1-prod -l app=aegis1-backend | grep "REFRESH_TOKEN_REPLAY"` → User, IP, User-Agent, Timestamp
+3. Verificar `authInterceptor` frontend: Mutex funcionando? `Promise` queue?
+
+**Remediação:**
+1. **Revogação Massiva:** `UPDATE refresh_token SET revoked = true, revoked_at = NOW(), revoked_reason = 'SECURITY_INCIDENT_TOKEN_REPLAY' WHERE usuario_id IN (SELECT DISTINCT usuario_id FROM refresh_token WHERE used_at IS NOT NULL AND revoked = false);`
+2. **Forçar Re-login:** Frontend detecta 401 refresh → Limpa Pinia + Cookie → Redirect `/login` com mensagem "Sessão expirada por segurança, faça login novamente"
+3. **Rotação Chaves JWT (se chave comprometida):** `kubectl create secret generic jwt-keys --from-file=private.pem=new-private.pem --from-file=public.pem=new-public.pem -n aegis1-prod --dry-run=client -o yaml | kubectl apply -f -` → `argocd app sync aegis1-prod` (restart pods)
+4. **Comunicação:** `#incidents` + Email usuários afetados (se dados sensíveis acessados)
+
+**Verificação:** Alerta cessa; Novos logins geram tokens com nova chave; Auditoria Envers registra revogação.
+
+---
+
+### 4.5 Incident Type 5: MySQL Primary Down / Replication Lag Crítico (P0)
+
+**Sintoma:** `actuator/health` DOWN (db); Latência queries > 5s; Replication Lag > 60s; Alertas DB Critical.
+
+**Diagnóstico:**
+1. Cloud Provider Console (RDS/Cloud SQL) → Status Primary, Failover Status, CPU/Storage/IOPS
+2. `kubectl exec -n aegis1-prod deploy/aegis1-backend -- mysql -h $MYSQL_HOST -u $MYSQL_USER -p$MYSQL_PASSWORD -e "SHOW SLAVE STATUS\G"` (se replica)
+3. `SHOW PROCESSLIST;` → Long running queries, Locks, Deadlocks
+4. `SHOW ENGINE INNODB STATUS;` → Deadlocks recentes, Buffer Pool, Log Flush
+
+**Remediação:**
+1. **Failover Automático (RDS/Cloud SQL):** Verificar se failover ocorreu → Novo Primary promovido → `kubectl rollout restart deployment/aegis1-backend -n aegis1-prod` (reconecta novo endpoint)
+2. **Failover Manual (se auto falhou):** `aws rds failover-db-instance --db-instance-identifier aegis1-prod-primary` / `gcloud sql instances failover aegis1-prod-primary`
+3. **Lag Alto (> 60s):** `STOP SLAVE;` → `START SLAVE;` (se replicação parou); Verificar `Seconds_Behind_Master`; Se persistir: `SET GLOBAL innodb_flush_log_at_trx_commit = 2;` (temporário, performance) → Investigar queries lentas (`pt-query-digest` / `sys.schema_table_statistics`)
+4. **Connection Pool Exhausted:** `kubectl scale deployment aegis1-backend -n aegis1-prod --replicas=10` (temporário) → Aumentar `spring.datasource.hikari.maximum-pool-size` (ConfigMap) → `argocd app sync`
+
+**Verificação:** Health check UP; Lag < 1s; Latência P95 < 500ms; Pool connections < 70%.
+
+---
+
+### 4.6 Incident Type 6: Flyway Migration Failure / Schema Corruption (P0)
+
+**Sintoma:** Backend falha startup (`FlywayException: Migration failed`); `actuator/health` DOWN; Logs mostram `SQL State: 42000` / `Checksum mismatch`.
+
+**Diagnóstico:**
+1. `kubectl logs -n aegis1-prod deploy/aegis1-backend | grep -A 20 "Flyway"` → Migration falha, SQL, Checksum
+2. `flyway info` (via `kubectl exec` ou local apontando prod DB) → Status migrations
+3. Verificar `flyway_schema_history` → `checksum`, `success`, `installed_rank`
+
+**Remediação:**
+1. **Checksum Mismatch (Dev/Staging Only):** `./mvnw flyway:repair` (APENAS DEV/STAGING — NUNCA PROD) → Recalcula checksums
+2. **Migration Failed (Prod):** 
+   - Se `success=false` e `undo` disponível: `flyway undo` (requer migration `U{versao}__rollback.sql`)
+   - Se `success=false` e sem undo: **Hotfix SQL** → Criar `V{next}__fix_{issue}.sql` corrigindo problema → `argocd app sync` (Flyway aplica automaticamente)
+   - Se schema corrompido irrecuperável: **Restore PITR** (Point-in-Time Recovery) → `aws rds restore-db-instance-to-point-in-time` / `gcloud sql backups restore` → Novo endpoint → Update K8s Secret → `argocd app sync`
+3. **Baseline Perdido:** `flyway baseline` (apenas se DB vazio ou primeira vez)
+
+**Verificação:** `flyway info` → Todas migrations `success=true`; Backend startup OK; `actuator/health` UP.
+
+---
+
+### 4.7 Incident Type 7: LGPD Data Breach / Anonimização Falha (P0 - Compliance Critical)
+
+**Sintoma:** Alerta DPO/Legal; Usuário reporta dados PII expostos; Auditoria Envers mostra PII não anonimizada após solicitação exclusão.
+
+**Diagnóstico:**
+1. `SELECT * FROM usuario WHERE status = 'INATIVO' AND (nome NOT LIKE 'USUARIO_ANON_%' OR email NOT LIKE '%@anonymized.local');` → Usuários não anonimizados
+2. `SELECT * FROM revisao_info WHERE tipo_revisao = 'ANONIMIZACAO' ORDER BY timestamp DESC LIMIT 10;` → Últimas anonimizações
+3. Verificar `LgpdService.anonimizar()` logs → Erro transação, hash geração, Envers revision
+
+**Remediação:**
+1. **Anonimização Forçada (Manual):** `UPDATE usuario SET nome = CONCAT('USUARIO_ANON_', SUBSTRING(SHA2(CONCAT('salt', id), 256), 1, 8)), email = CONCAT(SUBSTRING(SHA2(CONCAT('salt', id), 256), 1, 8), '@anonymized.local'), cpf = NULL, telefone = NULL, status = 'INATIVO' WHERE id = <usuario_id>;`
+2. **Envers Revision:** Inserir manual em `revisao_info` + `usuario_AUD` com `revtype = 2` (MOD) + `tipo_revisao = 'ANONIMIZACAO_FORCADA'` + `hash_correlacao`
+3. **Revogação Tokens:** `DELETE FROM refresh_token WHERE usuario_id = <usuario_id>;`
+4. **Notificação DPO/Legal:** Relatório incidente + Ações corretivas + Prazo 48h (LGPD Art. 48)
+
+**Verificação:** Usuário anonimizado no estado atual; Envers preserva histórico original + hash correlação; Tokens revogados; DPO confirma conformidade.
+
+---
+
+### 4.8 Incident Type 8: Preditiva False Positive Storm / Model Drift (P1)
+
+**Sintoma:** Dezenas de alertas `preditiva.alerta` em minutos; Ordens preditivas auto-criadas em massa; Dashboard Preditiva saturado.
+
+**Diagnóstico:**
+1. `SELECT COUNT(*) FROM previsao_falha WHERE status = 'ATIVA' AND probabilidade > 0.8 AND data_prevista < DATE_ADD(NOW(), INTERVAL 30 DAY);` → Count alto
+2. Verificar `ManutencaoPreditivaService` logs → `rQuadrado` baixo (< 0.5), outliers SMART, threshold muito sensível
+3. Verificar `HealthCheckService` thresholds (`thresholdCritico`, `thresholdAtencao`) por tipo disco
+
+**Remediação:**
+1. **Threshold Conservador Imediato:** `UPDATE configuracao SET valor = '0.9' WHERE chave = 'preditiva.probabilidade.minima';` + `UPDATE configuracao SET valor = '60' WHERE chave = 'preditiva.horizonte.maximo.dias';` (via ConfigMap/DB)
+2. **Desabilitar Ordem Auto Temporária:** `UPDATE configuracao SET valor = 'false' WHERE chave = 'preditiva.ordem.auto.habilitada';` (Feature Flag)
+3. **Recalibração Modelo:** Job manual `ManutencaoPreditivaService.recalibrarModelos()` (remove outliers, re-treina OLS)
+4. **Limpeza Alertas Falsos:** `UPDATE previsao_falha SET status = 'EXPIRADA' WHERE status = 'ATIVA' AND probabilidade < 0.9;`
+
+**Verificação:** Alertas param; Novas previsões com threshold conservador; Modelo recalibrado (R² > 0.7).
+
+---
+
+## 5. Routine Maintenance Procedures
+
+### 5.1 Daily (Automatizado via Cron/K8s CronJob)
+
+| Task | Comando/Script | Verificação |
+| :--- | :--- | :--- |
+| **Backup MySQL** | Automated (RDS/Cloud SQL) | Verificar `aws rds describe-db-snapshots` / `gcloud sql backups list` |
+| **Flyway Migrations Check** | `./mvnw flyway:info` (CI) | Nenhuma migration pendente em prod |
+| **Integridade Checksums** | `IntegridadeChecksumService.verificar()` (Job 03:00) | Alerta se divergência |
+| **Preditiva Batch** | `ManutencaoPreditivaScheduler` (02:00) | Previsões geradas, alertas criados |
+| **Preventiva Scheduler** | `PreventivaScheduler` (15min) | Ordens geradas, notificações enviadas |
+| **SLA Escalation** | `SlaSchedulerService` (Diário 06:00) | Notificações enviadas, auditoria registrada |
+| **Limpeza Refresh Tokens Expirados** | `DELETE FROM refresh_token WHERE expiracao < NOW();` | Linhas afetadas > 0 |
+| **Log Rotation / Retention** | Logback/Loki retention policies | Loki retention 30d, Envers 7 anos |
+
+### 5.2 Weekly
+
+| Task | Responsável | Verificação |
+| :--- | :--- | :--- |
+| **Test Restore MySQL** | DBA/DevOps | Restore PITR point-in-time → Validação schema + dados amostrais |
+| **Integridade Checksums Report** | DevOps | Relatório `integridade_checksum` comparado baseline |
+| **Certificate Expiry Check** | DevOps/Security | `cert-manager` certificates > 30 dias expiração |
+| **Dependency Updates Review** | Tech Leads | Dependabot/Renovate PRs revisados + merged |
+| **Capacity Planning** | DevOps | K8s HPA metrics, DB CPU/Storage, Redis Memory → Scaling decisions |
+| **Security Scan Review** | Security | Trivy/DepCheck/ZAP reports → Remediação Critical/High |
+
+### 5.3 Monthly
+
+| Task | Responsável | Verificação |
+| :--- | :--- | :--- |
+| **Disaster Recovery Drill** | DevOps/SRE | Failover MySQL + Restore PITR + K8s Cluster Recreate (Staging) → RTO/RPO validados |
+| **Pen Test / Security Review** | Security | ZAP/CodeQL reports + Manual review → Remediação 30d |
+| **Capacity Planning Review** | DevOps/Tech Leads | Trends 90d (CPU, Mem, DB, Storage, Network) → Forecast 90d |
+| **Runbook Review & Update** | SRE/Tech Leads | Todos runbooks testados + atualizados + versionados |
+| **Compliance Audit** | DPO/Compliance | LGPD (solicitações atendidas), NR-10/12 (termos assinados), ISO 27001 (controles) |
+| **Cost Optimization (FinOps)** | DevOps/Finance | Custos por serviço/ambiente/time → Rightsizing, Reserved Instances, Savings Plans |
+
+---
+
+## 6. Deployment & Rollback Quick Reference
+
+### 6.1 Deploy Staging (Automático `develop`)
+```bash
+# Via ArgoCD (auto-sync develop branch)
+argocd app sync aegis1-staging --prune
+# Ou GitHub Actions: workflow_dispatch cd-staging.yml
+```
+
+### 6.2 Deploy Production (Manual `main` tag)
+```bash
+# 1. Tag release
+git tag -s v1.0.0 -m "Release v1.0.0"
+git push origin v1.0.0
+
+# 2. ArgoCD Sync (manual approval)
+argocd app sync aegis1-prod --prune
+
+# 3. Verificar
+argocd app wait aegis1-prod --health --timeout 300
+kubectl get pods -n aegis1-prod -l app=aegis1-backend
+curl -f https://aegis1.empresa.com/actuator/health/liveness
+```
+
+### 6.3 Rollback Production (< 2 min)
+```bash
+# Via ArgoCD (revision anterior)
+argocd app rollback aegis1-prod <revision-anterior>
+
+# Ou kubectl (se ArgoCD indisponível)
+kubectl rollout undo deployment/aegis1-backend -n aegis1-prod
+kubectl rollout undo deployment/aegis1-frontend -n aegis1-prod
+
+# Verificar
+kubectl rollout status deployment/aegis1-backend -n aegis1-prod --timeout=120s
+curl -f https://aegis1.empresa.com/actuator/health/liveness
+```
+
+### 6.4 Hotfix Production (P0 Bypass Staging)
+```bash
+# 1. Branch hotfix de main
+git checkout main && git pull
+git checkout -b hotfix/1.0.1-jwt-refresh-race
+
+# 2. Fix + Testes locais
+./mvnw clean verify -DskipITs=false
+cd frontend && pnpm test:coverage && pnpm build
+
+# 3. PR main → CI verde → Merge → Tag
+git tag -s v1.0.1 -m "Hotfix: JWT refresh race condition"
+git push origin v1.0.1
+
+# 4. Deploy Prod (manual approval)
+argocd app sync aegis1-prod --prune
+```
+
+---
+
+## 7. Communication Templates
+
+### 7.1 Incident Declaration (Slack #incidents)
+```
+🚨 INCIDENT DECLARED: [P0/P1] - [Título Curto]
+**Severity:** P0/P1
+**Started:** <timestamp> BRT
+**Impact:** <Descrição impacto usuários/negócio>
+**Status:** Investigating
+**Commander:** @<oncall-engineer>
+**Channel:** #incidents (thread)
+**Runbook:** docs/05-operations/runbooks/<runbook-id>.md
+```
+
+### 7.2 Status Update (A cada 15-30 min)
+```
+🔄 UPDATE: [Incident ID] - [Status]
+**Progress:** <O que foi feito>
+**Next Steps:** <Próximas ações>
+**ETA Resolution:** <Estimativa>
+**Impact Update:** <Mudança no impacto>
+```
+
+### 7.3 Resolution (Final)
+```
+✅ RESOLVED: [Incident ID] - [Título]
+**Root Cause:** <Causa raiz (5 Whys)>
+**Resolution:** <Ações corretivas>
+**Prevention:** <Ações preventivas (runbook update, code fix, process change)>
+**Timeline:** Detectado <T1> → Declarado <T2> → Mitigado <T3> → Resolvido <T4>
+**Post-Mortem:** Agendado para <data> (link Confluence/Notion)
+```
+
+### 7.4 Post-Mortem Template (Confluence/Notion)
+```markdown
+# Post-Mortem: [Incident ID] - [Título]
+
+## Resumo Executivo
+- **Incidente:** [ID] - [Título]
+- **Severidade:** P0/P1
+- **Duração:** <Xh Ym> (Detecção → Resolução)
+- **Impacto:** <Usuários afetados, receita, SLA, compliance>
+
+## Linha do Tempo
+| Timestamp (BRT) | Evento | Ação | Responsável |
+| :--- | :--- | :--- | :--- |
+
+## Análise Causa Raiz (5 Whys)
+1. **Por que?** → Resposta
+2. **Por que?** → Resposta
+3. **Por que?** → Resposta
+4. **Por que?** → Resposta
+5. **Por que?** → Causa Raiz
+
+## Ações Corretivas (Imediatas)
+- [ ] Ação 1 (Owner, Prazo)
+- [ ] Ação 2 (Owner, Prazo)
+
+## Ações Preventivas (Long-term)
+- [ ] Ação 1 (Owner, Prazo, Ticket Jira)
+- [ ] Ação 2 (Owner, Prazo, Ticket Jira)
+
+## Lições Aprendidas
+- O que funcionou bem
+- O que pode melhorar
+- Gaps em runbooks/monitoramento/processos
+
+## Métricas de Impacto
+- Usuários afetados: X
+- Receita impactada: R$ Y
+- SLA violado: Z%
+- Dados expostos: Sim/Não (LGPD)
+
+## Anexos
+- Logs relevantes
+- Dashboards screenshots
+- Comunicações Slack/Email
+```
+
+---
+
+## 8. Quick Reference Cards
+
+### 8.1 Comandos Essenciais K8s
+```bash
+# Status geral
+kubectl get all -n aegis1-prod
+kubectl get pods -n aegis1-prod -o wide
+
+# Logs
+kubectl logs -n aegis1-prod -l app=aegis1-backend --tail=100 -f
+kubectl logs -n aegis1-prod -l app=aegis1-frontend --tail=50
+
+# Restart / Rollout
+kubectl rollout restart deployment/aegis1-backend -n aegis1-prod
+kubectl rollout status deployment/aegis1-backend -n aegis1-prod --timeout=120s
+kubectl rollout undo deployment/aegis1-backend -n aegis1-prod
+
+# Scale
+kubectl scale deployment aegis1-backend -n aegis1-prod --replicas=10
+
+# Debug
+kubectl exec -n aegis1-prod deploy/aegis1-backend -- jcmd <pid> GC.heap_dump /tmp/heap.hprof
+kubectl exec -n aegis1-prod deploy/aegis1-backend -- mysql -h $MYSQL_HOST -u $MYSQL_USER -p$MYSQL_PASSWORD -e "SHOW PROCESSLIST;"
+
+# ArgoCD
+argocd app get aegis1-prod
+argocd app sync aegis1-prod --prune
+argocd app rollback aegis1-prod <revision>
+argocd app history aegis1-prod
+```
+
+### 8.2 MySQL Emergency Commands
+```bash
+# Conectar (via kubectl exec no pod backend ou bastion)
+mysql -h $MYSQL_HOST -u $MYSQL_USER -p$MYSQL_PASSWORD aegis1
+
+# Processos / Locks / Deadlocks
+SHOW PROCESSLIST;
+SHOW ENGINE INNODB STATUS\G
+SELECT * FROM performance_schema.data_locks\G
+SELECT * FROM performance_schema.data_lock_waits\G
+
+# Replication
+SHOW SLAVE STATUS\G
+STOP SLAVE; START SLAVE;
+
+# Flyway
+SELECT * FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 10;
+
+# Auditoria Envers
+SELECT * FROM revisao_info ORDER BY timestamp DESC LIMIT 20;
+SELECT * FROM usuario_AUD WHERE rev = <revision_id>;
+
+# Integridade
+SELECT * FROM integridade_checksum ORDER BY verificado_em DESC LIMIT 5;
+```
+
+---
+
+## 9. Rastreabilidade Runbooks ↔ Artefatos
+
+| Runbook | System Arch | Deployment Plan | Security Policies | Risk Register | Código/Config |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `cross-tenant-leak.md` | §7.3 | §5 (Rollback) | §2.1, §5.2 | RISK-003 | `MultiTenancyFilter`, `@Filter`, `AegisShield` |
+| `token-replay.md` | §7.1 | §5 (Rollback) | §4.1 | RISK-004 | `JwtTokenProvider`, `RefreshTokenRepository`, `authInterceptor` |
+| `brute-force.md` | §7.1 | — | §5.1 | — | `RateLimitFilter`, `SecurityConfig` |
+| `predictive-alert.md` | §9.2 | — | §5.2 | RISK-002 | `ManutencaoPreditivaService`, `HealthCheckService` |
+| `sla-breach.md` | §6 (Ordens) | — | — | — | `SlaSchedulerService`, `NotificationService` |
+| `audit-tamper.md` | §6 (Audit) | — | §3.3 | RISK-010 | `Envers`, `CustomRevisionListener`, `IntegridadeChecksumService` |
+| `container-vuln.md` | §12 (Supply Chain) | §6 (Security Scan) | §6 | RISK-007, 013 | `Dockerfile*`, `trivy`, `cosign`, `syft` |
+| `cross-tenant-leak.md` | §7.3 | §5 (Rollback) | §2.1, §5.2 | RISK-003 | `MultiTenancyFilter`, `@Filter`, `AegisShield` |
+| `dr-failover.md` | §10 (Deployment) | §7 (DR) | §6 (Infra) | RISK-009 | `k8s/`, `terraform/`, `RDS/Cloud SQL` |
+| `tls-cert-renewal.md` | §10 (Infra) | — | §6 | — | `cert-manager`, `ClusterIssuer`, `Certificate` |
+| `vault-outage.md` | §10 (Secrets) | — | §6 | — | `External Secrets Operator`, `Vault Agent` |
+| `flyway-repair.md` | §6 (Data) | — | — | RISK-012 | `Flyway`, `V*__*.sql`, `U*__*.sql` |
+
+---
+
+*Documento regenerado completamente com base em System Architecture v2.0 + Deployment Plan v2.0 + Security Policies v2.0 + Risk Register v2.0 + NFR v2.0. Substitui versão 1.0 que continha apenas runbooks frontend vanilla JS + CDN estático.*

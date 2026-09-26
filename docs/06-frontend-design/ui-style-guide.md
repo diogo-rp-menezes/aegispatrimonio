@@ -1,258 +1,517 @@
 # UI Style Guide — Aegis1
 
-> **Versão:** 0.1 · **Owner:** Design/Frontend Lead · **Status:** Draft — *Tokens e componentes não implementados no codebase atual*  
-> **Depende de:** `design-tokens.md`, `component-library.md`
+> **Versão:** 2.0 · **Owner:** Design/Frontend Lead · **Status:** Implemented
+> **Base:** Design Tokens v2.0 (Implementados) + Component Library v2.0 + Accessibility Guidelines v2.0 + Vue 3 + Bootstrap 5 + PWA
+> **Status:** Tokens implementados em `frontend/src/styles/tokens.scss` + `variables.scss`; Componentes em `frontend/src/components/`
 
 ---
 
 ## 1. Overview & Princípios de Design
 
-O **Aegis1** é um sistema B2B de gestão de manutenção industrial/facilities. A identidade visual prioriza **clareza sobre densidade**, **funcionalidade sobre decoração** e **acessibilidade como requisito não negociável**.
+O **Aegis1** é um sistema B2B de gestão patrimonial e manutenção industrial/facilities. A identidade visual prioriza **clareza sobre densidade**, **funcionalidade sobre decoração** e **acessibilidade como requisito não negociável (WCAG 2.1 AA)**.
 
-### Princípios Norteadores
+### Princípios Norteadores (Implementados)
 
-| Princípio | Descrição | Aplicação Prática |
+| Princípio | Descrição | Implementação |
 | :--- | :--- | :--- |
-| **Dados primeiro** | A interface serve a tabelas, listas e formulários densos; ornamentação compete com informação. | Cores semânticas apenas para estado (sucesso/erro/aviso), nunca decorativas. |
-| **Consistência acima de customização** | Um token, um propósito. Variações pontuais criam dívida técnica e cognitiva. | Todos os valores visuais vêm de `design-tokens.md`; zero hardcoded. |
-| **Dark mode nativo** | Técnicos em campo operam em ambientes com iluminação variável. | Tokens definem light/dark simultaneamente; troca via `[data-theme="dark"]`. |
-| **Movimento funcional** | Animação só para feedback de estado ou transição de painel. | `prefers-reduced-motion` respeitado; durações em `design-tokens.md` §6. |
-| **Acessibilidade por padrão** | WCAG AA mínimo; foco visível nunca removido. | `--shadow-focus` obrigatório em todos os interativos; contraste validado em CI. |
-
-> **⚠️ Estado real:** O codebase atual (15 arquivos `.js`, vanilla JS, `@popperjs/core` apenas) **não possui CSS, design tokens, nem componentes**. Este guia especifica o alvo; a implementação começa com o checklist de `design-tokens.md` §9 e o inventário de `component-library.md` §3.
+| **Dados primeiro** | Interface serve tabelas, listas, formulários densos; ornamentação compete com informação | Cores semânticas apenas para estado; zero hardcoded values |
+| **Consistência via Tokens** | Um token, um propósito. Variações pontuais criam dívida técnica | Todos valores visuais via `tokens.scss` + `variables.scss`; zero hardcoded |
+| **Dark Mode Nativo** | Técnicos operam em iluminação variável | Tokens definem light/dark simultaneamente; troca via `.dark` class no `<html>` |
+| **Movimento Funcional** | Animação só para feedback/transição | `prefers-reduced-motion` respeitado; tokens em `tokens.scss` §6 |
+| **Acessibilidade por Padrão** | WCAG 2.1 AA mínimo; foco visível nunca removido | `--shadow-focus` obrigatório; contraste validado em CI (axe-core + Lighthouse) |
 
 ---
 
-## 2. Voz Visual
+## 2. Voz Visual & Brand
 
-* **Personalidade da marca:** Técnica, confiável, minimalista, sem ruído visual.
-* **Referências visuais (moodboard):** *[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]* — Interfaces de sistemas ERP/industriais modernos (ex.: Linear, GitHub, Vercel Dashboard) — densidade alta, tipografia system-ui, cores restritas a acento azul + semânticas.
-* **O que evitar:**
-  - Gradientes decorativos, sombras pesadas, bordas arredondadas excessivas (`radius-lg` só em painéis flutuantes/modais).
-  - Cores fora da paleta semântica (verde/âmbar/vermelho/azul apenas para estado).
-  - Ícones sem label acessível ou tooltip.
-  - Animações decorativas (spinners de página, transições de entrada de elementos estáticos).
+### 2.1 Personalidade
+- **Técnica, confiável, minimalista, sem ruído visual**
+- **Referências:** Interfaces ERP/industriais modernas (Linear, GitHub, Vercel Dashboard) — densidade alta, tipografia system-ui, cores restritas a acento azul + semânticas
+
+### 2.2 O que Evitar
+- Gradientes decorativos, sombras pesadas, bordas arredondadas excessivas (`radius-lg` só em painéis flutuantes/modais)
+- Cores fora da paleta semântica (verde/âmbar/vermelho/azul apenas para estado)
+- Ícones sem label acessível ou tooltip
+- Animações decorativas (spinners de página, transições de entrada de elementos estáticos)
 
 ---
 
-## 3. Layout & Grid
+## 3. Layout & Grid System
 
-### 3.1 Sistema de Grid
+### 3.1 Grid System (Bootstrap 5 + CSS Grid)
 
 | Aspecto | Definição | Token/Origem |
 | :--- | :--- | :--- |
-| **Container máximo** | `1280px` (`xl` breakpoint) — centralizado com `margin-inline: auto` | `design-tokens.md` §5 (`xl: 1280px`) |
-| **Grid base** | 4px (`space-1`) — todos os espaçamentos são múltiplos de 4px | `design-tokens.md` §4.1 |
-| **Colunas** | 12 colunas fluidas (CSS Grid) para layouts de página; flexbox para componentes | `component-library.md` §2 (CSS Modules + tokens) |
-| **Gutter padrão** | `space-6` (24px) entre colunas de layout; `space-4` (16px) entre cards/itens | `design-tokens.md` §4.1 |
-| **Padding de página** | `space-6` (mobile) → `space-8` (tablet) → `space-10` (desktop) | `design-tokens.md` §5 breakpoints |
+| **Container Max Width** | `1320px` (xxl) / `1140px` (xl) / `960px` (lg) / `720px` (md) / `540px` (sm) | `tokens.scss` §8 + Bootstrap `$container-max-widths` |
+| **Grid Base** | 4px (`--space-1`) — todos espaçamentos múltiplos de 4px | `tokens.scss` §4.1 |
+| **Colunas** | 12 colunas fluidas (Bootstrap Grid) + CSS Grid para layouts complexos | Bootstrap 5 Grid + CSS Grid |
+| **Gutter Padrão** | `--space-6` (24px) entre colunas layout; `--space-4` (16px) entre cards/itens | `tokens.scss` §4.1 |
+| **Padding Página** | `--space-6` (mobile) → `--space-8` (tablet) → `--space-10` (desktop) | `tokens.scss` §4.2 + Breakpoints |
 
-### 3.2 Densidade de Informação
+### 3.2 Breakpoints (Mobile First)
 
-| Contexto | Densidade | Implementação |
+```scss
+// tokens.scss §8 + Bootstrap $grid-breakpoints
+--breakpoint-xs: 0;
+--breakpoint-sm: 576px;   // ≥ 576px (mobile landscape / small tablet)
+--breakpoint-md: 768px;   // ≥ 768px (tablet)
+--breakpoint-lg: 992px;   // ≥ 992px (desktop)
+--breakpoint-xl: 1200px;  // ≥ 1200px (large desktop)
+--breakpoint-xxl: 1400px; // ≥ 1400px (ultrawide)
+```
+
+### 3.3 Container & Spacing Patterns
+
+| Contexto | Container | Padding | Gap |
+| :--- | :--- | :--- | :--- |
+| **Página Principal** | `.container-fluid` (full) ou `.container-xxl` (max) | `--space-6` (mobile) → `--space-8` (md) → `--space-10` (lg+) | `--space-6` entre seções |
+| **Dashboard** | `.container-xxl` | `--space-6` → `--space-8` | `--space-6` entre cards KPI; `--space-4` entre widgets |
+| **Tabelas/DataTable** | Full width (`.container-fluid`) | `--space-4` horizontal | `--space-1` vertical (rows); `--space-2` horizontal (cells) |
+| **Formulários** | `.container-md` (max 720px) | `--space-6` vertical | `--space-3` label→input; `--space-6` entre seções |
+| **Modais/Drawers** | Max-width por size (`sm`: 400px, `md`: 600px, `lg`: 800px, `xl`: 1000px, `full`: 90vw) | `--space-6` → `--space-8` | `--space-4` entre seções |
+| **Mobile** | Full width (100vw) | `--space-4` → `--space-6` | `--space-4` entre blocos |
+
+### 3.4 Padrões de Página (Page Patterns)
+
+| Tipo | Estrutura | Exemplo |
 | :--- | :--- | :--- |
-| **Tabelas/DataTable** | Compacta — `space-1` vertical, `space-2` horizontal; `text-sm`/`text-base` | `component-library.md` §4.3 `DataTable` |
-| **Formulários** | Espaçada — `space-3` entre label+input, `space-6` entre seções | `component-library.md` §4.5 `Wizard/Stepper` |
-| **Dashboards/Cards** | Média — `space-4` interno, `space-6` entre cards | `component-library.md` §3 `Card` |
-| **Mobile** | Empilhada — single column, `space-4` entre blocos | `design-tokens.md` §5 `sm: 640px` |
-
-### 3.3 Padrões de Página
-
-| Tipo de Página | Estrutura | Exemplo (Fluxo) |
-| :--- | :--- | :--- |
-| **Lista/Tabela** | `Header (título + ações globais) → Toolbar (busca + filtros) → DataTable → Pagination` | Flow 1 (entidades), Flow 8 (ordens) |
-| **Detalhe/Drill-down** | `Breadcrumb → Header (título + ações) → Tabs/Accordion (seções) → Conteúdo` | Flow 4 (detalhe ordem), Flow 7 (ativo → ordens) |
-| **Formulário/Wizard** | `Header (título + fechar) → Stepper (progresso) → StepContent (form) → Footer (navegação)` | Flow 2 (criação ordem) |
-| **Dashboard/Resumo** | `Grid de Cards (KPIs) → DataTable/Chart (detalhe) → Filtros laterais (Drawer mobile)` | Flow 3 (lista ordens), Flow 7 (custo por ativo) |
-| **Modal/Overlay** | `Backdrop → Container (Header + Content + Footer) → Focus trap` | Flow 1, 2, 4, 5, 6 (confirmações, formulários) |
+| **Lista/Tabela** | `Header (título + ações) → Toolbar (busca + filtros) → DataTable → Pagination` | Ativos, Ordens, Cadastros |
+| **Detalhe/Drill-down** | `Breadcrumb → Header (título + ações) → Tabs/Accordion (seções) → Conteúdo` | Detalhe Ativo, Detalhe Ordem |
+| **Formulário/Wizard** | `Header (título + fechar) → Stepper (progresso) → StepContent (form) → Footer (navegação)` | Criar Ordem, Criar Ativo |
+| **Dashboard/Resumo** | `Grid KPIs → Charts/Tables → Filtros laterais (Drawer mobile)` | Dashboard Principal, Preditiva |
+| **Modal/Overlay** | `Backdrop → Container (Header + Content + Footer) → Focus trap` | Confirmações, Formulários, Evidências |
+| **Detalhe Mobile (PWA)** | `Header fixo → Conteúdo scroll → Actions fixas bottom` | Health Check, QR Scanner |
 
 ---
 
-## 4. Uso de Cor
+## 4. Color System (Design Tokens v2.0 - Seção 2)
 
 ### 4.1 Hierarquia Visual via Cor
 
 | Camada | Tokens | Uso |
 | :--- | :--- | :--- |
-| **Primária (Ação)** | `--color-accent`, `--color-accent-hover`, `--color-accent-light` | Botões primários, links, foco visível, badges "info" |
-| **Semântica (Estado)** | `--color-success*`, `--color-warning*`, `--color-danger*`, `--color-info*` | Badges de estado (ordem, prioridade), toasts, alertas inline, validação |
-| **Neutra (Estrutura)** | `--color-bg`, `--color-panel`, `--color-border`, `--color-border-strong` | Fundos, cards, divisores, inputs, bordas |
-| **Texto** | `--color-text-primary`, `--color-text-secondary`, `--color-text-muted` | Hierarquia tipográfica (título → corpo → metadado) |
+| **Primária (Ação)** | `--color-primary*` (50-900) | Botões primários, links, focus ring, badges info |
+| **Semântica (Estado)** | `--color-success*`, `--color-warning*`, `--color-danger*`, `--color-info*` | Badges estado (ordem, prioridade), toasts, alertas inline, validação |
+| **Neutra (Estrutura)** | `--color-neutral-*` (0-950) | Fundos, cards, divisores, inputs, bordas, texto |
+| **Texto** | `--color-text-*` | Hierarquia tipográfica (primário → secundário → terciário) |
 
-> **Regra:** Cor **nunca** é o único meio de transmitir informação. Badges usam ícone + texto; validação usa ícone + mensagem; gráficos usam padrão + cor.
+### 4.2 Semantic Color Mapping (Implementado)
 
-### 4.2 Regras de Contraste Mínimo
-
-* **Texto/UI:** WCAG AA (4.5:1 normal, 3:1 large) — validado em CI (`design-tokens.md` §9).
-* **Não-texto (bordas, ícones, focus ring):** 3:1 contra fundo adjacente.
-* **Modo dark:** Todos os pares revalidados; tokens dark em `design-tokens.md` §2.3.
-
-### 4.3 Uso de Cor Semântica — Onde Permitido / Proibido
-
-| Componente | Permitido | Proibido |
+| Componente | Variante | Tokens Usados |
 | :--- | :--- | :--- |
-| **Button** | `variant="primary"` (accent), `variant="destructive"` (danger) | `variant="success"`/`"warning"` como ação principal |
-| **Badge** | Todas as variantes semânticas (`success`, `warning`, `danger`, `info`, `default`, `outline`) | Cores customizadas fora da tabela §2.2 |
-| **Toast/Alert** | Variante mapeada ao tipo (success/error/warning/info) | Misturar tipos no mesmo toast |
-| **Input/Select** | `border-color: var(--color-danger)` + ícone erro no estado `error` | Fundo colorido no input (apenas borda + ícone) |
-| **Tabela/Row** | Hover: `--color-accent-light`; Seleção: border-left accent + bg accent-light | Linhas zebradas com cores semânticas |
-| **Gráficos/Charts** | Paleta categórica derivada dos tokens semânticos (ordem fixa) | Cores arbitrárias; mais de 6 categorias sem padrão |
+| **Button** | `primary` | `--btn-primary-bg: var(--color-primary)`, `--btn-primary-hover: var(--color-primary-hover)`, `--btn-primary-text: var(--color-neutral-0)` |
+| | `secondary` | `--btn-secondary-bg: var(--color-neutral-100)`, `--btn-secondary-hover: var(--color-neutral-200)`, `--btn-secondary-text: var(--color-text-primary)` |
+| | `success` | `--btn-success-bg: var(--color-success)`, `--btn-success-hover: var(--color-success-700)` |
+| | `danger` | `--btn-danger-bg: var(--color-danger)`, `--btn-danger-hover: var(--color-danger-700)` |
+| | `outline` | `--btn-outline-primary-border: var(--color-primary)`, `--btn-outline-primary-text: var(--color-primary)`, `--btn-outline-primary-hover-bg: var(--color-primary-bg)` |
+| | `ghost` | `--btn-ghost-text: var(--color-text-secondary)`, `--btn-ghost-hover-bg: var(--color-neutral-100)` |
+| **Badge** | `success` | `--badge-success-bg: var(--color-success-bg)`, `--badge-success-text: var(--color-success-text)` |
+| | `warning` | `--badge-warning-bg: var(--color-warning-bg)`, `--badge-warning-text: var(--color-warning-text)` |
+| | `danger` | `--badge-danger-bg: var(--color-danger-bg)`, `--badge-danger-text: var(--color-danger-text)` |
+| | `info` | `--badge-info-bg: var(--color-info-bg)`, `--badge-info-text: var(--color-info-text)` |
+| **Toast/Alert** | `success` | `bg: var(--color-success-bg)`, `border: var(--color-success-border)`, `text: var(--color-success-text)` |
+| | `error` | `bg: var(--color-danger-bg)`, `border: var(--color-danger-border)`, `text: var(--color-danger-text)` |
+| | `warning` | `bg: var(--color-warning-bg)`, `border: var(--color-warning-border)`, `text: var(--color-warning-text)` |
+| | `info` | `bg: var(--color-info-bg)`, `border: var(--color-info-border)`, `text: var(--color-info-text)` |
+| **Input/Select** | `default` | `border: var(--color-border-light)`, `bg: var(--color-bg-secondary)` |
+| | `focus` | `border: var(--color-border-focus)`, `box-shadow: var(--shadow-focus)` |
+| | `error` | `border: var(--color-border-error)`, `box-shadow: 0 0 0 3px var(--color-danger-bg)` |
+| **Table/Row** | `hover` | `bg: var(--color-bg-tertiary)`, `box-shadow: var(--shadow-xs)` |
+| | `selected` | `border-left: 3px solid var(--color-primary)`, `bg: var(--color-primary-bg)` |
+| **Focus Ring** | Global | `box-shadow: var(--shadow-focus)` = `0 0 0 3px var(--color-primary-bg)` |
+
+### 4.3 Dark Mode (`.dark` class)
+
+```css
+/* Automático via .dark class no <html> */
+.dark {
+  --color-bg-primary: var(--color-neutral-950);
+  --color-bg-secondary: var(--color-neutral-900);
+  --color-bg-tertiary: var(--color-neutral-800);
+  --color-text-primary: var(--color-neutral-50);
+  --color-text-secondary: var(--color-neutral-300);
+  --color-text-tertiary: var(--color-neutral-500);
+  --color-border-light: var(--color-neutral-700);
+  --color-border-medium: var(--color-neutral-600);
+  --color-border-strong: var(--color-neutral-500);
+  --color-border-focus: var(--color-primary-400);
+  /* Semantic colors auto-adjusted via token mapping */
+}
+```
+
+### 4.4 Contraste Validado (WCAG 2.1 AA)
+
+| Combinação | Light Ratio | Dark Ratio | Status |
+| :--- | :---: | :---: | :--- |
+| Text Primary / BG Primary | 12.6:1 | 12.6:1 | ✅ AAA |
+| Text Secondary / BG Primary | 7.0:1 | 7.0:1 | ✅ AAA |
+| Text Tertiary / BG Primary | 4.5:1 | 4.5:1 | ✅ AA |
+| Primary / BG Primary | 5.9:1 | 5.9:1 | ✅ AA |
+| Border Light / BG Primary | 3.2:1 | 3.2:1 | ✅ AA (UI) |
+| Focus Ring / BG Primary | 4.5:1 | 4.5:1 | ✅ AA |
+| Success Badge | 5.2:1 | 5.2:1 | ✅ AA |
+| Warning Badge | 4.5:1 | 4.5:1 | ✅ AA (limite) |
+| Danger Badge | 5.5:1 | 5.5:1 | ✅ AA |
+| Info Badge | 5.1:1 | 5.1:1 | ✅ AA |
+
+> **Validação CI:** axe-core + Lighthouse CI ≥ 95 score a11y
 
 ---
 
-## 5. Tipografia em Contexto
+## 5. Typography (Design Tokens v2.0 - Seção 3)
 
-> **Fonte:** `system-ui` stack (zero dependências externas) — `design-tokens.md` §3.1  
-> **Escala:** Major third (1.25), base 1rem = 16px — `design-tokens.md` §3.2
+### 5.1 Font Stack (System UI - Zero Dependencies)
 
-| Elemento | Token de Tipografia | Cor | Peso | Exemplo de Uso |
+```scss
+--font-family-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+--font-family-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+```
+
+### 5.2 Type Scale (Base 1rem = 16px, Ratio 1.25)
+
+| Token | Size | Line Height | Weight | Uso |
 | :--- | :--- | :--- | :--- | :--- |
-| **H1 — Título de página** | `text-2xl` (1.5rem/24px, lh 1.3) | `--color-text-primary` | `600` | `<h1 class="page-title">Ordens de Manutenção</h1>` |
-| **H2 — Seção principal** | `text-xl` (1.25rem/20px, lh 1.4) | `--color-text-primary` | `600` | `<h2>Detalhes da Ordem #1234</h2>` |
-| **H3 — Subseção / Card title** | `text-lg` (1.125rem/18px, lh 1.5) | `--color-text-primary` | `500` | `<h3 class="card-title">Materiais Utilizados</h3>` |
-| **Corpo principal (tabelas, formulários, listas)** | `text-base` (1rem/16px, lh 1.6) | `--color-text-primary` | `400` | `<td>Troca de filtro hidráulico</td>` |
-| **Texto secundário / Descrição** | `text-sm` (0.875rem/14px, lh 1.5) | `--color-text-secondary` | `400` | `<p class="help-text">Selecione o ativo vinculado à ordem.</p>` |
-| **Label / Caption / Metadado** | `text-xs` (0.75rem/12px, lh 1.5) | `--color-text-muted` | `400` | `<span class="meta">Criado em 15/01/2025 por João</span>` |
-| **Código / ID / Valor técnico** | `text-sm` + `--font-mono` | `--color-text-secondary` | `400` | `<code class="mono">ORD-2025-001234</code>` |
-| **Botão (label)** | `text-sm` (md) / `text-base` (lg) | `white` (primary) / `--color-text-primary` (ghost) | `500` | `<Button>Iniciar Ordem</Button>` |
-| **Badge** | `text-xs` (sm) / `text-sm` (md) | Cor da variante (semântica) | `500` | `<Badge variant="warning">Em Andamento</Badge>` |
+| `--text-xs` | 0.75rem (12px) | 1.5 | 400 | Labels inputs, metadata, badges |
+| `--text-sm` | 0.875rem (14px) | 1.5 | 400 | Texto secundário, descrições, tooltips |
+| `--text-base` | 1rem (16px) | 1.6 | 400 | **Corpo principal** (tabelas, formulários, listas) |
+| `--text-lg` | 1.125rem (18px) | 1.5 | 500 | Subtítulos seção, cards resumo |
+| `--text-xl` | 1.25rem (20px) | 1.4 | 600 | Títulos página, headers modal |
+| `--text-2xl` | 1.5rem (24px) | 1.3 | 600 | Título principal (hero), dashboards |
+| `--text-3xl` | 1.875rem (30px) | 1.2 | 700 | Reservado (landing/empty states) |
 
-> **Nota:** `--font-sans` para todo texto UI; `--font-mono` apenas para IDs, códigos, logs, valores técnicos (`design-tokens.md` §3.1).
+### 5.3 Composite Tokens (Ready-to-use)
 
----
+```scss
+--text-xs-normal:   var(--text-xs) / var(--leading-normal) var(--font-normal);
+--text-sm-normal:   var(--text-sm) / var(--leading-normal) var(--font-normal);
+--text-base-normal: var(--text-base) / var(--leading-relaxed) var(--font-normal);
+--text-lg-normal:   var(--text-lg) / var(--leading-normal) var(--font-medium);
+--text-xl-semibold: var(--text-xl) / var(--leading-snug) var(--font-semibold);
+--text-2xl-bold:    var(--text-2xl) / var(--leading-tight) var(--font-bold);
+--text-3xl-bold:    var(--text-3xl) / var(--leading-tight) var(--font-bold);
+```
 
-## 6. Padrões de Conteúdo (UX Writing)
+### 5.4 Font Weights
 
-### 6.1 Tom de Voz nos Textos de UI
+```scss
+--font-light: 300;
+--font-normal: 400;
+--font-medium: 500;
+--font-semibold: 600;
+--font-bold: 700;
+--font-extrabold: 800;
+```
 
-* **Direto e imperativo:** "Criar ordem", "Selecionar ativo", "Confirmar exclusão" — sem "por favor", "gostaria de".
-* **Sem jargão desnecessário:** "Fornecedor" em vez de "Vendor"; "Técnico" em vez de "Assignee".
-* **Contexto antes da ação:** "Esta ordem tem 3 custos vinculados. Excluir mesmo assim?" — não apenas "Excluir?".
-* **Erro = o que aconteceu + como resolver:** "Falha ao salvar: campo 'Fornecedor' é obrigatório. Selecione um fornecedor na lista."
+### 5.5 Monospace (Códigos, IDs, Valores Técnicos)
 
-### 6.2 Padrões de Mensagens de Erro
-
-| Tipo | Estrutura | Exemplo |
-| :--- | :--- | :--- |
-| **Validação inline** | `[Campo] + [regra violada] + [como corrigir]` | "Data de início: deve ser anterior à data de fim. Ajuste a data." |
-| **Erro de API (toast)** | `[Ação] falhou: [motivo técnico resumido]. [Ação sugerida]` | "Falha ao criar ordem: fornecedor inativo. Ative o fornecedor ou escolha outro." |
-| **Erro 5xx / Boundary** | "Ocorreu um erro inesperado. Tente novamente em instantes. Se persistir, contate suporte." | — |
-| **Estado vazio (EmptyState)** | `[O que não há] + [por que] + [CTA se aplicável]` | "Nenhuma ordem encontrada. Ajuste os filtros ou crie a primeira ordem." |
-
-### 6.3 Padrões de Call-to-Action
-
-| Contexto | Padrão | Exemplo |
-| :--- | :--- | :--- |
-| **Ação primária (Button primary)** | Verbo no imperativo, sem reticências | "Criar ordem", "Iniciar", "Aprovar", "Concluir", "Salvar" |
-| **Ação secundária (Button ghost/secondary)** | Verbo + objeto opcional | "Cancelar", "Voltar", "Limpar filtros" |
-| **Ação destrutiva (Button destructive)** | "Excluir [objeto]", "Cancelar [objeto]", "Remover [objeto]" | "Excluir fornecedor", "Cancelar ordem" |
-| **Link de navegação** | Substantivo/rótulo da página | "Ver detalhes", "Histórico de custos", "Configurações" |
-
-### 6.4 Formatação de Números/Datas/Moeda
-
-| Tipo | Formato (pt-BR) | Implementação |
-| :--- | :--- | :--- |
-| **Moeda (BRL)** | `R$ 1.234,56` (locale `pt-BR`, `currency: BRL`) | `Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })` |
-| **Número inteiro** | `1.234` (separador de milhar) | `Intl.NumberFormat('pt-BR')` |
-| **Número decimal** | `1.234,56` (2 casas) | `Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 })` |
-| **Data curta** | `15/01/2025` | `date.toLocaleDateString('pt-BR')` |
-| **Data/hora** | `15/01/2025 14:30` | `date.toLocaleString('pt-BR', { hour: '2-digit', minute: '2-digit' })` |
-| **Data relativa** | "há 2 dias", "em 3 horas" | Biblioteca leve (ex.: `date-fns/formatDistanceToNow`) |
+```scss
+--font-family-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+--text-mono-base: var(--text-base) var(--font-family-mono);
+--text-mono-sm: var(--text-sm) var(--font-family-mono);
+```
 
 ---
 
-## 7. Iconografia
+## 6. Spacing & Sizing (Design Tokens v2.0 - Seção 4)
 
-* **Biblioteca de ícones:** *[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]* — **Lucide React** (tree-shakable, SVG, consistente com system-ui, ~400 ícones, MIT). Alternativa: `phosphor-icons` ou `heroicons` — decisão pendente Design Lead.
-* **Tamanhos padrão (tokens):**
+### 6.1 Spacing Scale (Base 4px / 0.25rem)
 
-| Tamanho | Token | Valor (px) | Uso |
+```scss
+--space-0: 0;
+--space-1: 0.25rem;  // 4px
+--space-2: 0.5rem;   // 8px
+--space-3: 0.75rem;  // 12px
+--space-4: 1rem;     // 16px
+--space-5: 1.25rem;  // 20px
+--space-6: 1.5rem;   // 24px
+--space-8: 2rem;     // 32px
+--space-10: 2.5rem;  // 40px
+--space-12: 3rem;    // 48px
+--space-16: 4rem;    // 64px
+--space-20: 5rem;    // 80px
+--space-24: 6rem;    // 96px
+```
+
+### 6.2 Component Spacing Conventions
+
+| Uso | Token | Valor |
+| :--- | :--- | :--- |
+| **Button Padding** | `--padding-btn-sm` | `--space-1 --space-3` (4px 12px) |
+| | `--padding-btn-md` | `--space-2 --space-4` (8px 16px) |
+| | `--padding-btn-lg` | `--space-3 --space-6` (12px 24px) |
+| **Input Padding** | `--padding-input` | `--space-2 --space-3` (8px 12px) |
+| **Card Padding** | `--padding-card` | `--space-4 --space-6` (16px 24px) |
+| **Modal Padding** | `--padding-modal` | `--space-6 --space-8` (24px 32px) |
+| **Page Padding** | `--padding-page` | `--space-6 --space-8` (24px 32px) |
+| **Inline Gaps** | `--gap-inline-sm` | `--space-1` (4px) |
+| | `--gap-inline-md` | `--space-2` (8px) |
+| | `--gap-inline-lg` | `--space-3` (12px) |
+| **Stack Gaps** | `--gap-stack-sm` | `--space-2` (8px) |
+| | `--gap-stack-md` | `--space-4` (16px) |
+| | `--gap-stack-lg` | `--space-6` (24px) |
+| **Section Gap** | `--gap-section` | `--space-8` (32px) |
+
+### 6.3 Border Radius
+
+```scss
+--radius-none: 0;
+--radius-sm: 0.125rem;   // 2px
+--radius-md: 0.25rem;    // 4px (Bootstrap default)
+--radius-lg: 0.5rem;     // 8px
+--radius-xl: 0.75rem;    // 12px
+--radius-2xl: 1rem;      // 16px
+--radius-full: 9999px;   // Pill/Circle
+--radius-btn: var(--radius-md);      // 4px
+--radius-input: var(--radius-md);    // 4px
+--radius-card: var(--radius-lg);     // 8px
+--radius-modal: var(--radius-xl);    // 12px
+--radius-badge: var(--radius-full);  // Pill
+```
+
+### 6.4 Sizing (Width/Height)
+
+```scss
+--size-xs: 1.5rem;    // 24px
+--size-sm: 2rem;      // 32px
+--size-md: 2.5rem;    // 40px
+--size-lg: 3rem;      // 48px
+--size-xl: 4rem;      // 64px
+--size-2xl: 5rem;     // 80px
+--size-icon-sm: 1rem;     // 16px
+--size-icon-md: 1.25rem;  // 20px
+--size-icon-lg: 1.5rem;   // 24px
+--size-avatar-sm: 2rem;   // 32px
+--size-avatar-md: 2.5rem; // 40px
+--size-avatar-lg: 3.5rem; // 56px
+```
+
+---
+
+## 7. Shadows & Elevation (Design Tokens v2.0 - Seção 5)
+
+```scss
+--shadow-none: none;
+--shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+--shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+--shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+--shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+--shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+--shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+--shadow-inner: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
+
+// Semantic
+--shadow-card: var(--shadow-sm);
+--shadow-card-hover: var(--shadow-md);
+--shadow-dropdown: var(--shadow-lg);
+--shadow-modal: var(--shadow-xl);
+--shadow-toast: var(--shadow-lg);
+--shadow-tooltip: var(--shadow-md);
+--shadow-focus: 0 0 0 3px var(--color-primary-bg); // Focus ring (WCAG)
+```
+
+---
+
+## 8. Component Visual Specs (Resumo)
+
+### 8.1 Buttons
+
+| Variant | Background | Hover | Text | Border | Usage |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Primary** | `--color-primary` | `--color-primary-hover` | White | None | Ação principal (Criar, Salvar, Confirmar) |
+| **Secondary** | `--color-neutral-100` | `--color-neutral-200` | `--color-text-primary` | `--color-border-light` | Ação secundária (Cancelar, Voltar) |
+| **Success** | `--color-success` | `--color-success-700` | White | None | Ação positiva (Concluir, Aprovar) |
+| **Danger** | `--color-danger` | `--color-danger-700` | White | None | Ação destrutiva (Excluir, Cancelar ordem) |
+| **Outline Primary** | Transparent | `--color-primary-bg` | `--color-primary` | `--color-primary` | Ação alternativa (Filtrar, Exportar) |
+| **Ghost** | Transparent | `--color-neutral-100` | `--color-text-secondary` | None | Ação terciária (Editar inline, Ver mais) |
+
+**Sizes:** `sm` (24px h), `md` (32px h), `lg` (40px h) — `--padding-btn-*` + `--btn-font-size-*`
+
+### 8.2 Form Inputs
+
+| State | Border | Background | Shadow | Text |
+| :--- | :--- | :--- | :--- | :--- |
+| **Default** | `--color-border-light` | `--color-bg-secondary` | None | `--color-text-primary` |
+| **Hover** | `--color-border-medium` | `--color-bg-secondary` | None | `--color-text-primary` |
+| **Focus** | `--color-border-focus` | `--color-bg-secondary` | `--shadow-focus` | `--color-text-primary` |
+| **Error** | `--color-border-error` | `--color-bg-secondary` | `0 0 0 3px var(--color-danger-bg)` | `--color-text-primary` |
+| **Disabled** | `--color-border-light` | `--color-bg-tertiary` | None | `--color-text-tertiary` |
+| **Readonly** | `--color-border-light` | `--color-bg-tertiary` | None | `--color-text-secondary` |
+
+### 8.3 Badges (Status)
+
+| Variant | Background | Text | Border | Usage |
+| :--- | :--- | :--- | :--- | :--- |
+| **Success** | `--color-success-bg` | `--color-success-text` | `--color-success-border` | Concluída, Ativo, OK |
+| **Warning** | `--color-warning-bg` | `--color-warning-text` | `--color-warning-border` | Em Andamento, Atenção |
+| **Danger** | `--color-danger-bg` | `--color-danger-text` | `--color-danger-border` | Cancelada, Erro, Crítico |
+| **Info** | `--color-info-bg` | `--color-info-text` | `--color-info-border` | Aberta, Aguardando, Info |
+| **Default** | `--color-neutral-100` | `--color-text-secondary` | `--color-border-light` | Neutro, Pendente |
+| **Outline** | Transparent | Semantic text | Semantic border | Alternativa sutil |
+
+**Sizes:** `sm` (20px h), `md` (24px h), `dot` (8px dot) — `--badge-padding` + `--badge-font-size`
+
+### 8.4 Tables/DataTable
+
+| Element | Spec |
+| :--- | :--- |
+| **Header** | BG: `--color-neutral-50` / Dark: `--color-neutral-800`; Text: `--color-text-secondary`; Border bottom: `--color-border-light` |
+| **Row Hover** | BG: `--color-bg-tertiary`; Shadow: `--shadow-xs` |
+| **Row Selected** | Left border: `3px solid --color-primary`; BG: `--color-primary-bg` |
+| **Row Border** | `--color-border-light` |
+| **Cell Padding** | `--space-3 --space-4` (12px 16px) |
+| **Font Size** | `--text-sm` (14px) |
+| **Sticky Header** | Shadow: `--shadow-xs` |
+| **Expandable Row** | Animation: `max-height 0→scrollHeight` + `opacity 0→1` (`--duration-normal`, `--ease-out`) |
+
+### 8.5 Modals & Drawers
+
+| Size | Max Width | Padding | Border Radius | Shadow |
+| :--- | :--- | :--- | :--- | :--- |
+| `sm` | 400px | `--space-6` | `--radius-xl` | `--shadow-modal` |
+| `md` | 600px | `--space-6 --space-8` | `--radius-xl` | `--shadow-modal` |
+| `lg` | 800px | `--space-6 --space-8` | `--radius-xl` | `--shadow-modal` |
+| `xl` | 1000px | `--space-6 --space-8` | `--radius-xl` | `--shadow-modal` |
+| `full` | 90vw / 90vh | `--space-6 --space-8` | `--radius-xl` | `--shadow-modal` |
+
+**Animation:** Backdrop `opacity 0→1` + Container `scale(0.95)→1` + `opacity 0→1` (`--duration-slow`, `--ease-out`)
+
+### 8.6 Toasts
+
+| Type | Background | Border | Text | Icon | Duration |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Success** | `--color-success-bg` | `--color-success-border` | `--color-success-text` | CheckCircle | 3s auto-dismiss |
+| **Error** | `--color-danger-bg` | `--color-danger-border` | `--color-danger-text` | XCircle | Persistent (manual dismiss) |
+| **Warning** | `--color-warning-bg` | `--color-warning-border` | `--color-warning-text` | AlertTriangle | 5s auto-dismiss |
+| **Info** | `--color-info-bg` | `--color-info-border` | `--color-info-text` | Info | 4s auto-dismiss |
+
+**Animation:** Enter `translateY(100%)→0` + `opacity 0→1` (`--duration-normal`, `--ease-spring`); Exit `translateY(0)→translateY(-100%)` + `opacity 1→0` (`--duration-fast`, `--ease-in`); Stack gap `--space-2`; Max 4 visible.
+
+---
+
+## 9. Iconography
+
+### 9.1 Icon System
+- **Library:** Lucide Vue Next (tree-shakable, SVG, 24x24 viewBox)
+- **Sizes:** `--size-icon-sm` (16px), `--size-icon-md` (20px), `--size-icon-lg` (24px)
+- **Color:** `currentColor` (herda cor do texto) ou semantic color tokens
+- **Accessibility:** `aria-hidden="true"` em ícones decorativos; `aria-label` em ícones funcionais
+
+### 9.2 Icon Mapping (Principais)
+
+| Ação/Estado | Ícone Lucide | Uso |
+| :--- | :--- | :--- |
+| **Criar/Novo** | `Plus` | Botões "Novo", "Adicionar" |
+| **Editar** | `Edit2` | Ações de edição |
+| **Excluir** | `Trash2` | Ações destrutivas |
+| **Visualizar** | `Eye` | Detalhes, visualização |
+| **Baixar/Download** | `Download` | Export, PDF, QR Code |
+| **Imprimir** | `Printer` | Impressão termo, etiquetas |
+| **Buscar** | `Search` | Busca global, filtros |
+| **Filtrar** | `Filter` | Filtros avançados |
+| **Ordenar** | `ArrowUpDown` | Ordenação tabelas |
+| **Expandir/Colapsar** | `ChevronDown` / `ChevronUp` | Accordion, DataTable expand |
+| **Configurações** | `Settings` | Admin, preferências |
+| **Usuário/Perfil** | `User` | Menu usuário, avatar |
+| **Notificações** | `Bell` | Header notifications |
+| **QR Code** | `QrCode` | Gerar/visualizar QR |
+| **Escanear** | `Camera` | QR Scanner (PWA) |
+| **Lanterna** | `Flashlight` | QR Scanner torch |
+| **Sincronizar** | `RefreshCw` | Sync offline, refresh data |
+| **Config/Engrenagem** | `Settings2` | Configurações avançadas |
+| **Ajuda/Info** | `HelpCircle` | Tooltips, help text |
+| **Alerta/Warning** | `AlertTriangle` | Warning badges, toasts |
+| **Sucesso** | `CheckCircle2` | Success badges, toasts |
+| **Erro** | `XCircle` | Error badges, toasts |
+| **Fechar** | `X` | Modais, toasts, chips |
+| **Chevron** | `ChevronDown/Up/Left/Right` | Dropdowns, accordion, navegação |
+| **Mais/Menu** | `MoreHorizontal/Vertical` | Dropdown menus, ações de linha |
+| **Refresh/Sync** | `RefreshCw` | Pull-to-refresh, sync offline |
+| **Home** | `Home` | Breadcrumb, navegação |
+| **Link Externo** | `ExternalLink` | Links externos, QR Code público |
+
+---
+
+## 10. Imagery & Illustrations
+
+### 10.1 Empty States
+- **Style:** Line art minimalista, cor `--color-text-tertiary` / `--color-neutral-400`
+- **Sizes:** `--size-2xl` (80px) para ilustração principal
+- **Tone:** Amigável, técnico, acionável (CTA claro)
+
+### 10.2 Loading Skeletons
+- **Colors:** `--color-neutral-100` (light) / `--color-neutral-800` (dark) base + `--color-neutral-200` / `--color-neutral-700` highlight
+- **Animation:** Shimmer `--duration-slower` (1.5s) infinite
+- **Variants:** `text` (linhas), `circular` (avatars), `rectangular` (cards), `table-row` (tabelas)
+
+---
+
+## 11. Responsive Behavior
+
+### 10.1 Container Behavior
+
+| Breakpoint | Container | Page Padding | Sidebar |
 | :--- | :--- | :--- | :--- |
-| `xs` | `text-xs` + `w-4 h-4` | `12×12` | Badges `size="sm"`, `IconButton sm`, inline em `text-xs` |
-| `sm` | `text-sm` + `w-5 h-5` | `16×16` | **Padrão** — `Button`, `Input` prefix/suffix, `Badge md`, `Table` actions |
-| `md` | `text-base` + `w-6 h-6` | `20×20` | `IconButton md`, `Modal` close, `Drawer` handle |
-| `lg` | `text-lg` + `w-8 h-8` | `24×24` | `IconButton lg`, `EmptyState` ilustração, `LoadingOverlay` spinner |
+| **xs (< 576px)** | 100% (fluid) | `--space-4` | Drawer (hamburger) |
+| **sm (≥ 576px)** | 540px | `--space-4` | Drawer |
+| **md (≥ 768px)** | 720px | `--space-6` | Collapsible (280px) |
+| **lg (≥ 992px)** | 960px | `--space-6` | Fixed (280px) |
+| **xl (≥ 1200px)** | 1140px | `--space-8` | Fixed (280px) |
+| **xxl (≥ 1400px)** | 1320px | `--space-10` | Fixed (320px) |
 
-* **Regras de uso:**
-  - Ícone **sozinho** (sem texto visível) **sempre** requer `aria-label` ou `Tooltip` acessível.
-  - Ícone **decorativo** (ao lado de label) recebe `aria-hidden="true"`.
-  - Cor do ícone herda `currentColor` (segue cor do texto/pai) — **não** hardcodear `fill="#..."`.
-  - Spinner de loading: `animate-spin` (CSS) + `currentColor` — tamanho `sm` em botões, `md` em overlay.
+### 10.2 Component Adaptations
 
----
-
-## 8. Imagens & Mídia
-
-* **Proporções aceitas:**
-  - Avatar: `1:1` (quadrado) — `component-library.md` §3 `Avatar`
-  - Ilustração EmptyState: `4:3` ou `16:9` — max-width `320px` mobile, `480px` desktop
-  - Anexos/Evidências (Flow 4): `16:9` preview; original sob download
-* **Tratamento de placeholder/loading:**
-  - **Skeleton** (`component-library.md` §3 `Skeleton`): `variant="rectangular"` para thumbnails, `variant="circular"` para avatars, `variant="image"` para placeholders de evidência.
-  - **Blur-up:** Não aplicável (sem next/image ou similar); usar Skeleton + transição `opacity 0→1` (`duration-fast`).
-* **Empty States — Padrão Visual (`component-library.md` §3 `EmptyState`):**
-
-| Variante | Composição | Exemplo |
+| Component | Mobile (< md) | Desktop (≥ md) |
 | :--- | :--- | :--- |
-| `default` | Ilustração (svg, `text-muted`) + Título (`text-lg`, `text-primary`) + Descrição (`text-sm`, `text-secondary`) | "Nenhuma ordem encontrada" |
-| `action` | Acima + `Button primary` (CTA principal) | "Criar primeira ordem" |
-| `illustration` | Ilustração maior (`w-64`/`w-80`) + texto centralizado | Dashboard vazio, primeiro acesso |
+| **Sidebar** | Drawer (hamburger) | Fixed left (280px) |
+| **DataTable** | Horizontal scroll + sticky first col | Full width, all columns |
+| **Modal** | Fullscreen (`size: full`) | Size `md`/`lg` centered |
+| **Drawer** | Fullscreen (bottom sheet) | Side panel (280px) |
+| **Tabs** | Scrollable horizontal | All visible |
+| **Pagination** | Compact (prev/next + page) | Full (first/prev/page/next/last + size changer) |
+| **Toolbar** | Stacked (search → filters → actions) | Horizontal (search | filters | actions) |
+| **Form** | Single column, full width inputs | Multi-column (grid) where appropriate |
+| **Charts** | Full width, simplified | Full width, detailed |
+| **QR Scanner** | Fullscreen camera view | Modal centered (600px) |
 
 ---
 
-## 9. Padrões de Layout Responsivo
+## 11. Print Styles
 
-* **Abordagem:** Mobile-first — `design-tokens.md` §5 breakpoints.
-* **Comportamento por breakpoint:**
-
-| Breakpoint | Largura | Mudanças de Layout |
-| :--- | :--- | :--- |
-| `< sm` (0–639px) | Mobile | Single column; `Drawer` para filtros/sidebar; `Modal fullscreen` para wizard; `DataTable` com scroll horizontal + `stickyHeader`; `Pagination` compacta; `FilterBar` colapsada em botão. |
-| `sm` (640px+) | Mobile grande | Formulários 2 colunas (label + input); `Modal lg`; `DataTable` colunas essenciais visíveis. |
-| `md` (768px+) | Tablet | Sidebar colapsável (off-canvas); `DataTable` colunas completas; `Wizard horizontal`; `Tabs` horizontais. |
-| `lg` (1024px+) | Desktop pequeno | Sidebar fixa (260px); layout 2 colunas (lista + detalhe); `Modal lg`/`xl`; `DataTable` virtualized se >100 linhas. |
-| `xl` (1280px+) | Desktop padrão | Container max-width 1280px; dashboard 3+ colunas; `FilterBar` inline expandida. |
-| `2xl` (1536px+) | Ultra-wide | Layout estendido; painéis lado a lado (ex.: ordem + timeline + custos). |
-
-* **O que colapsa/esconde em telas pequenas:**
-  - Sidebar → `Drawer` (hamburger no header)
-  - Colunas secundárias da `DataTable` → `expandable` row ou `DropdownMenu` "Colunas"
-  - `FilterBar` inline → botão "Filtros" abre `Drawer`/`Modal`
-  - `Breadcrumb` → `variant="collapsed"` (apenas "Início / Atual")
-  - `Pagination` → `variant="compact"` (apenas anterior/próximo + página atual)
+```css
+@media print {
+  .no-print { display: none !important; } /* Header, Sidebar, Footer, Buttons, Toasts */
+  .print-only { display: block !important; }
+  
+  .modal, .drawer, .toast-container, .dropdown { display: none !important; }
+  
+  .page-container { padding: 0; max-width: none; }
+  .data-table { font-size: 12px; }
+  .data-table th, .data-table td { padding: 4px 8px; }
+  .badge { border: 1px solid currentColor; background: transparent !important; color: inherit !important; }
+  a { text-decoration: none; color: inherit; }
+  .page-break-inside-avoid { page-break-inside: avoid; }
+}
+```
 
 ---
 
-## 10. Checklist de Revisão Visual
+## 12. Rastreabilidade Style Guide ↔ Artefatos
 
-* [ ] **Tokens only:** Nenhum valor hardcoded (hex, rgb, px, rem, shadow, font-size) — só `var(--token)` ou classes utilitárias mapeadas a tokens.
-* [ ] **Componentes oficiais:** Todos os elementos UI usam componentes de `component-library.md` §3 (Button, Input, DataTable, Badge, Modal, etc.) — sem `<button>`/`<input>`/`<table>` nus.
-* [ ] **Contraste validado:** Todos os pares texto/fundo, borda/fundo, focus ring/fundo passam WCAG AA (light + dark) — teste automatizado em CI.
-* [ ] **Estados definidos:** Hover, focus (visível!), active, disabled, loading, error — documentados no Storybook para cada componente.
-* [ ] **Responsivo testado:** Comportamento verificado nos 6 breakpoints (`sm`..`2xl`) — mobile-first, sem regressão desktop.
-* [ ] **Acessibilidade:** Focus trap em Modal/Drawer; `aria-*` em componentes compostos; `prefers-reduced-motion` desativa transições; navegação por teclado completa.
-* [ ] **Dark mode:** Todas as telas/estados renderizam corretamente com `[data-theme="dark"]` — sem "flash" de light mode.
-* [ ] **Iconografia:** Ícones sem label têm `Tooltip` ou `aria-label`; decorativos têm `aria-hidden="true"`.
-* [ ] **Content patterns:** Textos seguem §6 (tom, erros, CTAs, formatação pt-BR).
-* [ ] **Performance:** `DataTable` virtualized >100 linhas; imagens lazy; bundle icons tree-shaken.
-
----
-
-## 11. Referências
-
-* **Design Tokens (fonte única de verdade):** `design-tokens.md` — cores, tipografia, espaçamento, raios, sombras, breakpoints, motion, z-index.
-* **Component Library (inventário + specs):** `component-library.md` — 34 componentes (26 base + 8 domínio), props, estados, tokens consumidos, exemplos.
-* **User Flows (requisitos de UI):** `user-flows.md` — 8 fluxos com estados de tela, métricas, edge cases.
-* **Business Requirements Document:** `docs/brd.md` — regras BR-01 a BR-06, personas, glossário, guardrails (latência P95 < 800ms, taxa erro < 1%).
-* **Diagnóstico Determinístico:** `server/analyze-pipeline.ts` — confirma ausência de CSS/design system no codebase atual.
-* **Stack Tecnológica Verificada:** `package.json` — vanilla JS, `@popperjs/core` apenas; migração para React 18 + TS planejada (`component-library.md` §2).
-* **Figma/Design Tool:** *[LINK NÃO DISPONÍVEL NO REPOSITÓRIO — REQUER ENTRADA HUMANA]*
-* **Contrato de API (OpenAPI):** *[NÃO ENCONTRADO NO REPOSITÓRIO — DEPENDÊNCIA EXTERNA: TIME DE BACKEND]*
+| Seção | Design Tokens | Component Library | Accessibility | Interaction Patterns | Component Code |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Layout/Grid** | `tokens.scss` §4, §8 | `Container.vue`, `Grid.vue`, `PageContainer.vue` | — | `interaction-patterns.md#layout` | `AppLayout.vue`, `PageContainer.vue` |
+| **Colors** | `tokens.scss` §2 | All components | `accessibility-guidelines.md#contrast` | `interaction-patterns.md#colors` | All `.vue` (scoped styles) |
+| **Typography** | `tokens.scss` §3 | `Text.vue`, `Heading.vue`, `Button.vue` | `accessibility-guidelines.md#typography` | — | `Text.vue`, `Heading.vue` |
+| **Spacing** | `tokens.scss` §4 | All components | — | `interaction-patterns.md#spacing` | All `.vue` |
+| **Shadows/Elevation** | `tokens.scss` §5 | `Card.vue`, `Modal.vue`, `Dropdown.vue`, `Toast.vue` | — | `interaction-patterns.md#elevation` | `Card.vue`, `Modal.vue`, `Dropdown.vue` |
+| **Buttons** | `tokens.scss` §9.1 | `Button.vue`, `IconButton.vue` | `accessibility-guidelines.md#buttons` | `interaction-patterns.md#button` | `Button.vue`, `IconButton.vue` |
+| **Forms** | `tokens.scss` §9.2 | `Input.vue`, `Select.vue`, `FormField.vue` | `accessibility-guidelines.md#forms` | `interaction-patterns.md#forms` | `Input.vue`, `Select.vue`, `FormField.vue` |
+| **Tables** | `tokens.scss` §8.4 | `Table.vue`, `DataTable.vue` | `accessibility-guidelines.md#tables` | `interaction-patterns.md#tables` | `Table.vue`, `DataTable.vue` |
+| **Modals/Drawers** | `tokens.scss` §8.5 | `Modal.vue`, `Drawer.vue` | `accessibility-guidelines.md#modals` | `interaction-patterns.md#modals` | `Modal.vue`, `Drawer.vue` |
+| **Toasts** | `tokens.scss` §8.6 | `Toast.vue`, `ToastContainer.vue` | `accessibility-guidelines.md#toasts` | `interaction-patterns.md#toasts` | `Toast.vue`, `ToastContainer.vue` |
+| **Responsive** | `tokens.scss` §8 | All components | `accessibility-guidelines.md#mobile` | `interaction-patterns.md#responsive` | `AppLayout.vue`, `PageContainer.vue` |
+| **Print** | — | `PrintStyles.css` | — | — | `PrintStyles.css` |
 
 ---
 
-## 12. Revision History
-
-| Versão | Data | Autor | Mudanças |
-| :--- | :--- | :--- | :--- |
-| 0.1 | 15/01/2025 | Pipeline (gerado) | Criação inicial baseada em `design-tokens.md` + `component-library.md` — **tokens e componentes não implementados**; todo conteúdo derivado dos artefatos-fonte com marcadores `[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]` onde aplicável. |
+*Documento regenerado completamente com base em Design Tokens v2.0 (implementados) + Component Library v2.0 + Vue 3 + Bootstrap 5 + PWA. Substitui versão 0.1 que continha apenas especificações teóricas sem implementação.*

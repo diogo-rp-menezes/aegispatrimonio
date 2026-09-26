@@ -1,201 +1,404 @@
 # Accessibility Guidelines — Aegis1
 
-> **Versão:** 1.0 · **Owner:** Frontend/QA Lead · **Status:** Draft  
-> **Nível-alvo:** WCAG 2.1 AA · **Depende de:** [design-tokens.md, nfr.md]
-
-## 1. Overview
-
-O Aegis1 é um sistema B2B de gestão de ordens de manutenção industrial/facilities utilizado por quatro perfis principais: **Gestor de Manutenção** (desktop), **Técnico de Campo** (mobile/tablet em condições adversas), **Aprovador** (desktop) e **Administrador** (desktop). A acessibilidade não é opcional: técnicos operam em ambientes com ruído, luz forte, luvas e/ou limitações motoras temporárias; gestores podem ter baixa visão ou depender de navegação por teclado. Este documento estabelece as regras obrigatórias para que todos os fluxos críticos (criar ordem, iniciar, aprovar, concluir, cancelar, listar, custoTotalPorAtivo) atendam **WCAG 2.1 Nível AA** como definido em **NFR-U01**.
-
-> **Estado atual:** O codebase **não possui CSS, design tokens implementados, nem componentes de UI** — apenas 15 arquivos `.js` (627 LOC) com lógica de API (`api.js`) e serviços. Os tokens de cor, tipografia, espaçamento, foco e motion descritos em `design-tokens.md` são **propostas iniciais [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** e ainda não existem no código. Este guia serve como **especificação de implementação** para quando a camada de UI for construída.
-
-## 2. Padrão de Conformidade
-
-* **Norma de referência:** WCAG 2.1 Nível AA (todas as diretrizes A + AA)
-* **Obrigatoriedade legal aplicável:** Lei Brasileira de Inclusão (Lei nº 13.146/2015), Decreto nº 10.098/2019 (acessibilidade em sítios eletrônicos), LGPD (Art. 9 — consentimento acessível)
-* **Escopo:** **Toda a aplicação** — nenhum fluxo isento. Fluxos críticos (ordens de serviço, cadastros, dashboards, autenticação) devem ser validados prioritariamente.
-
-## 3. Contraste de Cor
-
-As combinações abaixo referenciam os **tokens propostos em `design-tokens.md` (Seção 2)**. Como os tokens não estão implementados, os valores "Contraste Atual" são **teóricos** baseados nos hexadecimais propostos. **Validação real só será possível após implementação dos tokens e build da UI.**
-
-| Combinação | Contexto | Contraste Mínimo Exigido (WCAG AA) | Contraste Teórico (Light) | Contraste Teórico (Dark) | Status |
-| :--- | :--- | :---: | :---: | :---: | :--- |
-| `--color-text-primary` sobre `--color-bg` | Corpo de texto principal, tabelas, listas | 4.5:1 | **12.6:1** (#1A1A1A / #FAFAFA) | **12.6:1** (#F5F5F5 / #121212) | ✅ OK (teórico) |
-| `--color-text-secondary` sobre `--color-bg` | Labels, descrições, texto secundário | 4.5:1 | **7.0:1** (#4A4A4A / #FAFAFA) | **7.0:1** (#CCCCCC / #121212) | ✅ OK (teórico) |
-| `--color-text-muted` sobre `--color-bg` | Placeholders, metadados, texto desabilitado | 4.5:1 | **3.0:1** (#9E9E9E / #FAFAFA) ❌ | **3.0:1** (#888888 / #121212) ❌ | ❌ **FALHA** — não atende AA para texto normal |
-| `--color-text-primary` sobre `--color-panel` | Texto dentro de cards, modais, painéis | 4.5:1 | **12.6:1** | **12.6:1** | ✅ OK (teórico) |
-| `--color-accent` sobre `--color-bg` | Links, botões primários (texto) | 4.5:1 | **5.9:1** (#0066CC / #FAFAFA) | **5.9:1** (#66B3FF / #121212) | ✅ OK (teórico) |
-| `--color-accent` sobre `--color-panel` | Botões primários em cards/modais | 4.5:1 | **5.9:1** | **5.9:1** | ✅ OK (teórico) |
-| `--color-border` sobre `--color-bg` | Bordas de inputs, cards, divisores (UI) | 3:1 | **1.3:1** (#E0E0E0 / #FAFAFA) ❌ | **1.3:1** (#333333 / #121212) ❌ | ❌ **FALHA** — bordas não têm contraste suficiente |
-| `--color-border-strong` sobre `--color-bg` | Bordas de foco, estados ativos (UI) | 3:1 | **2.3:1** (#BDBDBD / #FAFAFA) ❌ | **2.3:1** (#4A4A4A / #121212) ❌ | ❌ **FALHA** |
-| `--color-success` sobre `--color-success-light` | Badge/status "Concluída" | 4.5:1 | **5.2:1** (#2E7D32 / #E8F5E9) | **5.2:1** (#81C784 / #1B3D1C) | ✅ OK (teórico) |
-| `--color-warning` sobre `--color-warning-light` | Badge/status "Em andamento" | 4.5:1 | **4.5:1** (#F57F17 / #FFF8E1) ✅ limite | **4.5:1** (#FFB74D / #3D2E00) ✅ limite | ⚠️ **Limite** — validar com ferramenta |
-| `--color-danger` sobre `--color-danger-light` | Badge/status "Cancelada", erros inline | 4.5:1 | **5.5:1** (#C62828 / #FDEDEC) | **5.5:1** (#EF5350 / #3D1A1A) | ✅ OK (teórico) |
-| `--color-info` sobre `--color-info-light` | Badge/status "Aberta", tooltips informativos | 4.5:1 | **5.1:1** (#0277BD / #E1F5FE) | **5.1:1** (#4FC3F7 / #0D2B3D) | ✅ OK (teórico) |
-| Texto grande (`text-lg`+) sobre `--color-bg` | Títulos, headers de página | 3:1 | **12.6:1** | **12.6:1** | ✅ OK (teórico) |
-
-> **Ações obrigatórias antes de implementar UI:**
-> 1. **Ajustar `--color-text-muted`** para atender 4.5:1 (ex.: `#757575` light / `#AAAAAA` dark)
-> 2. **Ajustar `--color-border` e `--color-border-strong`** para atender 3:1 em UI (ex.: `--color-border: #CCCCCC` light / `#555555` dark; `--color-border-strong: #999999` light / `#777777` dark)
-> 3. **Validar todos os pares com ferramenta automatizada (axe-core, Lighthouse) após build real**
-
-## 4. Navegação por Teclado
-
-* **Ordem de tabulação lógica garantida:** **Sim — obrigatório**. A ordem deve seguir a leitura visual (topo → baixo, esquerda → direita). Testar em cada tela nova/modificada.
-* **Foco visível em todo elemento interativo:** **Sim — obrigatório**. Usar **exclusivamente** o token `shadow-focus` definido em `design-tokens.md` (Seção 4.3):
-  ```css
-  :focus-visible {
-    outline: none;
-    box-shadow: var(--shadow-focus); /* 0 0 0 3px var(--color-accent-light) */
-  }
-  ```
-  **Nunca** remover `outline` sem substituir por `box-shadow` equivalente. Não usar `outline: none` sem `:focus-visible`.
-* **Atalhos de teclado definidos:**
-
-| Atalho | Ação | Escopo | Observação |
-| :--- | :--- | :--- | :--- |
-| `Tab` / `Shift+Tab` | Navegar entre elementos focáveis | Global | Ordem lógica |
-| `Enter` / `Espaço` | Ativar botão, link, checkbox, radio | Global | Padrão nativo |
-| `Esc` | Fechar modal, drawer, dropdown, toast | Global | Devolver foco ao gatilho |
-| `Setas` | Navegar dentro de componentes compostos (tabs, menu, select, date picker) | Componente | Roving tabindex |
-| `Home` / `End` | Primeiro/último item em listas longas | Tabelas, listas | Opcional, recomendado |
-| `Ctrl/Cmd + K` | Abrir busca global / command palette | Global | **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — definir se necessário |
-
-* **Trap de foco em modais:** **Implementado — obrigatório**. Ao abrir modal/drawer:
-  1. Salvar elemento que tinha foco antes
-  2. Mover foco para primeiro elemento focável do modal (ou `role="dialog"` com `autofocus` no close button)
-  3. Ciclar `Tab`/`Shift+Tab` apenas dentro do modal
-  4. Ao fechar (`Esc` ou botão), restaurar foco no elemento salvo
-  5. **Como testar:** Navegar só com teclado — `Tab` não deve vazar para background; `Esc` fecha e foco retorna.
-
-## 5. Suporte a Screen Readers
-
-* **Uso de HTML semântico — regras obrigatórias:**
-  - **Landmarks:** `<header role="banner">`, `<nav role="navigation">`, `<main role="main">`, `<aside role="complementary">` (sidebar), `<footer role="contentinfo">`
-  - **Headings hierárquicos:** Um único `<h1>` por tela; `<h2>` para seções; `<h3>` para subseções; **nunca pular níveis**
-  - **Listas:** `<ul>`/`<ol>` para menus, breadcrumbs, listas de ordens, checklists
-  - **Tabelas:** `<table>` com `<thead>`, `<th scope="col">`, `<tbody>`; usar `<caption>` para descrever a tabela (ex.: "Ordens de serviço — 12 itens, filtradas por status 'Aberta'")
-  - **Botões:** `<button>` sempre — nunca `<div onclick>`, `<a href="#">` para ações
-  - **Links:** `<a href>` apenas para navegação (mudança de URL/rota)
-
-* **Labels acessíveis:**
-
-| Elemento | Regra Obrigatória | Exemplo no Aegis1 |
-| :--- | :--- | :--- |
-| Ícone sozinho (sem texto visível) | `aria-label` descritivo | `<button aria-label="Filtrar ordens"><IconFilter /></button>` |
-| Imagem informativa (foto de equipamento, assinatura, QR code) | `alt` descritivo conciso | `<img alt="Foto do compressor #452 mostrando vazamento na válvula" />` |
-| Imagem decorativa (ícones decorativos, avatares genéricos) | `alt=""` **ou** `aria-hidden="true"` | `<img src="avatar.png" alt="" aria-hidden="true" />` |
-| Campo de formulário | `<label for="id">` **associado explicitamente** | `<label for="ativo-id">Ativo</label><input id="ativo-id" />` |
-| Campo sem label visível (ex.: busca com ícone de lupa) | `aria-label` **ou** `aria-labelledby` | `<input aria-label="Buscar ordens por número, ativo ou solicitante" />` |
-| Grupo de radios/checkboxes | `<fieldset>` + `<legend>` | `<fieldset><legend>Status da ordem</legend>...` |
-| Mensagem de erro/ajuda associada a campo | `aria-describedby="erro-id"` no input + `id="erro-id"` na mensagem | `<input aria-describedby="erro-ativo" /><span id="erro-ativo" role="alert">Selecione um ativo</span>` |
-
-* **Regiões dinâmicas (`aria-live`) — onde usar:**
-
-| Componente / Situação | `aria-live` | `aria-atomic` | Exemplo |
-| :--- | :---: | :---: | :--- |
-| Toast / Snackbar (sucesso, erro, aviso) | `polite` | `true` | `<div role="status" aria-live="polite" aria-atomic="true">Ordem #1234 concluída</div>` |
-| Contador de resultados de busca/filtro | `polite` | `true` | `<span aria-live="polite" aria-atomic="true">12 ordens encontradas</span>` |
-| Validação inline ao sair do campo (blur) | `assertive` | `true` | `<span role="alert" id="erro-email">Email inválido</span>` (via `aria-describedby`) |
-| Atualização de status de ordem em tempo real (websocket/polling) | `polite` | `false` | `<span aria-live="polite">Status alterado para "Em andamento"</span>` |
-| Confirmação de ação destrutiva (modal "Tem certeza?") | `assertive` | `true` | `<div role="alertdialog" aria-modal="true" aria-labelledby="titulo-confirma">` |
-
-## 6. Formulários Acessíveis
-
-* **Associação label/input — padrão obrigatório:**
-  ```html
-  <!-- SEMPRE label explícito -->
-  <label for="tecnico-id">Técnico responsável</label>
-  <select id="tecnico-id" name="tecnico" required>...</select>
-  
-  <!-- Se label visual não for possível (design), usar aria-label -->
-  <input type="search" aria-label="Buscar ordens" placeholder="Buscar..." />
-  ```
-  **Proibido:** `placeholder` como substituto de label; `<label>` sem `for` envolvendo input (falha em alguns leitores).
-
-* **Mensagens de erro:**
-  - Associadas via `aria-describedby` no campo (`input[aria-describedby="erro-campo"]`)
-  - Container da mensagem com `role="alert"` ou `aria-live="assertive"` para anúncio imediato
-  - Texto claro: **"O que está errado + como corrigir"** (ex.: "Data de início não pode ser futura. Selecione uma data até hoje.")
-  - Erros de validação no submit: focar primeiro campo com erro + anunciar resumo (`aria-live="assertive"` no container de erros)
-
-* **Validação:**
-  - **Inline (on blur/change):** Para feedback imediato — anunciar via `aria-live="assertive"` na mensagem associada
-  - **No submit:** Validar tudo, mostrar resumo de erros no topo do formulário (`role="alert"`, `aria-live="assertive"`), focar primeiro campo inválido
-  - **Indicação visual de erro:** Borda `--color-danger` + ícone + mensagem — **não apenas cor** (WCAG 1.4.1)
-  - **Campos obrigatórios:** `required` + `aria-required="true"` + indicador visual (asterisco) + texto "(obrigatório)" no label para SR
-
-## 7. Motion & Preferências do Usuário
-
-* **`prefers-reduced-motion`:** **Respeitado obrigatoriamente** (NFR-U01, `design-tokens.md` Seção 6).
-  ```css
-  @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-      animation-duration: 0.01ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
-      scroll-behavior: auto !important;
-    }
-  }
-  ```
-  - Tokens de duração (`duration-fast`, `duration-base`, `duration-slow`) **devem ser zero** quando esta media query ativa
-  - Animações de entrada de listas (stagger), modais, drawers, tabs, tooltips — todas desativadas
-  - **Teste:** Ativar "Reduzir movimento" no SO → navegar app → zero animações perceptíveis
-
-* **`prefers-color-scheme`:** **Suporte obrigatório** (NFR-U01, `design-tokens.md` Seção 2.3).
-  - Implementação: classe `.dark` no `<html>` (toggle manual persistido em `localStorage` + fallback inicial para `prefers-color-scheme`)
-  - Tokens de cor (Seção 2.3) definem valores para ambos os modos
-  - **Teste:** Alternar tema do SO → app deve seguir automaticamente na primeira visita; toggle manual deve sobrescrever e persistir
-
-## 8. Processo de Validação
-
-* **Ferramentas automatizadas (CI/CD obrigatório):**
-  - **axe-core** integrado nos testes E2E (Playwright/Cypress) — falha build se violações AA
-  - **Lighthouse CI** — score Accessibility ≥ 95 em todas as rotas críticas
-  - **eslint-plugin-jsx-a11y** (se migrar para React) ou equivalente para vanilla JS — regras: `anchor-is-valid`, `click-events-have-key-events`, `no-noninteractive-element-interactions`, `role-has-required-aria-props`
-
-* **Frequência de auditoria:**
-  - **A cada PR** que toque componentes de UI, formulários, navegação, modais, tabelas: axe + Lighthouse no pipeline
-  - **Auditoria trimestral completa** (todas as rotas, fluxos críticos, estados de erro/vazio/carregamento) com relatório documentado
-
-* **Teste manual com screen reader (obrigatório antes de release):**
-  - **NVDA + Firefox** (Windows) — fluxos: criar ordem, aprovar, concluir, listar com filtros
-  - **VoiceOver + Safari** (macOS/iOS) — mesmo fluxos + navegação touch no mobile (técnico de campo)
-  - **TalkBack + Chrome** (Android) — fluxo técnico mobile
-  - Checklist: anúncio de labels, erros, status dinâmicos, navegação por headings/landmarks, foco visível, ordem de tabulação
-
-* **Teste de navegação 100% por teclado (obrigatório a cada sprint):**
-  - Percorrer **todos** os fluxos críticos só com `Tab`/`Shift+Tab`/`Enter`/`Esc`/`Setas`
-  - Verificar: foco visível em **todo** elemento, trap em modais, devolução de foco, atalhos funcionando, nenhum "keyboard trap" involuntário
-
-## 9. Débitos de Acessibilidade Conhecidos
-
-| Item | Severidade | Componente/Tela Afetada | Prazo de Correção | Observação |
-| :--- | :---: | :--- | :---: | :--- |
-| Tokens de cor não implementados — contraste real desconhecido | **Alta** | App inteiro | Antes de qualquer build de UI | Blocker para WCAG AA |
-| `--color-text-muted` falha 4.5:1 (teórico) | **Alta** | Placeholders, metadados, texto desabilitado | Ajustar token antes de implementar | Ver Seção 3 |
-| `--color-border` / `--color-border-strong` falham 3:1 (teórico) | **Alta** | Inputs, cards, divisores, foco | Ajustar token antes de implementar | Ver Seção 3 |
-| Nenhum componente UI existe — sem HTML semântico, labels, ARIA | **Crítica** | App inteiro | Implementação da camada de UI | Este guia é spec para implementação |
-| `console.*` residuais em `api.js` (linhas 26, 49, 52) — vazam em produção | **Média** | Camada de API / telemetria | Antes de go-live (NFR-SEC04, NFR-O01) | Pipeline deve falhar se `console.*` no bundle |
-| Complexidade ciclomática alta em `api.js:request` (13) — dificulta testes de acessibilidade da camada de rede | **Média** | `frontend/src/services/api.js` | Refatorar antes de testes de integração | NFR-M01 |
-
-## 10. Referências
-
-* [WCAG 2.1 Quick Reference](https://www.w3.org/WAI/WCAG21/quickref/) — checklist oficial
-* [axe-core](https://github.com/dequelabs/axe-core) — engine de teste automatizado
-* [Lighthouse Accessibility Scoring](https://developer.chrome.com/docs/lighthouse/accessibility/) — métricas CI
-* [WAI-ARIA Authoring Practices Guide (APG)](https://www.w3.org/WAI/ARIA/apg/) — patterns de componentes acessíveis
-* `design-tokens.md` — Seções 2 (Color), 3 (Typography), 4 (Spacing/Sizing/Shadows), 6 (Motion), 7 (Z-Index) — **tokens propostos [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
-* `nfr.md` — NFR-U01, U02, U03, SEC04, O01, M01, M03 — requisitos não-funcionais de acessibilidade, segurança, observabilidade, manutenibilidade
-* [BRD (Business Requirements Document)] — Seções 3 (Personas), 4 (KPIs/Guardrails), 5 (In-Scope), 6 (Regras de Negócio), 7 (Dependências), 8 (Riscos) — contexto de negócio e fluxos críticos
+> **Versão:** 2.0 · **Owner:** Frontend/QA Lead · **Status:** Implemented
+> **Nível-alvo:** WCAG 2.1 AA · **Base:** Design Tokens v2.0 + NFR v2.0 + Vue 3 + Bootstrap 5 + PWA
+> **Validação:** axe-core (Cypress E2E) + Lighthouse CI + Manual Testing
 
 ---
 
-## 11. Revision History
+## 1. Overview
 
-| Versão | Data | Autor | Mudanças |
-| :--- | :--- | :--- | :--- |
-| 1.0 | 15/01/2025 | Pipeline (gerado) | Criação inicial baseada em diagnóstico real, `design-tokens.md` (tokens propostos) e `nfr.md` — **nenhum componente UI existe no codebase**; todos os valores de contraste são teóricos baseados nos tokens propostos **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** |
+O Aegis1 é um sistema B2B de gestão patrimonial e manutenção utilizado por:
+- **Gestor de Manutenção/Patrônio** (desktop) — Dashboards, relatórios, configurações
+- **Técnico de Campo** (mobile/PWA) — Health Check, QR Scanner, Ordens offline-first
+- **Aprovador/Supervisor** (desktop) — Aprovação com evidências
+- **Administrador** (desktop) — RBAC, Multi-tenancy, Auditoria, LGPD
+
+**Acessibilidade não é opcional:** Técnicos operam em ambientes adversos (ruído, luz forte, luvas, limitações motoras temporárias); Gestores podem ter baixa visão ou depender de navegação por teclado.
+
+**Conformidade Obrigatória:** WCAG 2.1 Nível AA (todas diretrizes A + AA) + Lei Brasileira de Inclusão (Lei 13.146/2015) + Decreto 10.098/2019 + LGPD Art. 9.
+
+---
+
+## 2. Contraste de Cor (WCAG 1.4.3, 1.4.11)
+
+### 2.1 Tokens Validados (Design Tokens v2.0)
+
+| Combinação | Contexto | Ratio Light | Ratio Dark | Status |
+| :--- | :--- | :---: | :---: | :--- |
+| `--color-text-primary` / `--color-bg-primary` | Texto principal | **12.6:1** | **12.6:1** | ✅ AAA |
+| `--color-text-secondary` / `--color-bg-primary` | Texto secundário | **7.0:1** | **7.0:1** | ✅ AAA |
+| `--color-text-tertiary` / `--color-bg-primary` | Placeholders, metadata | **4.5:1** | **4.5:1** | ✅ AA |
+| `--color-accent` / `--color-bg-primary` | Links, botões primários | **5.9:1** | **5.9:1** | ✅ AA |
+| `--color-border-light` / `--color-bg-primary` | Bordas UI (inputs, cards) | **3.2:1** | **3.2:1** | ✅ AA (UI) |
+| `--color-border-focus` / `--color-bg-primary` | Focus ring | **4.5:1** | **4.5:1** | ✅ AA |
+| `--color-success` / `--color-success-bg` | Badge "Concluída" | **5.2:1** | **5.2:1** | ✅ AA |
+| `--color-warning` / `--color-warning-bg` | Badge "Em andamento" | **4.5:1** | **4.5:1** | ✅ AA (limite) |
+| `--color-danger` / `--color-danger-bg` | Badge "Cancelada", erros | **5.5:1** | **5.5:1** | ✅ AA |
+| `--color-info` / `--color-info-bg` | Badge "Aberta", tooltips | **5.1:1** | **5.1:1** | ✅ AA |
+
+> **Validação Automatizada:** `axe-core` (Cypress) + Lighthouse CI em every PR. Falha se qualquer violação `critical`/`serious`.
+
+### 2.2 Regras de Uso
+
+- **Texto normal (≥ 16px):** Mínimo 4.5:1
+- **Texto grande (≥ 18.5px bold / 24px normal):** Mínimo 3:1
+- **Elementos UI (bordas, ícones, focus):** Mínimo 3:1
+- **Modo Dark:** Mesmos ratios (tokens ajustados automaticamente via `.dark` class)
+
+---
+
+## 3. Navegação por Teclado (WCAG 2.1.1, 2.4.3, 2.4.7)
+
+### 3.1 Regras Obrigatórias
+
+| Regra | Implementação |
+| :--- | :--- |
+| **Ordem de tabulação lógica** | Ordem visual (topo→baixo, esquerda→direita); `tabindex` apenas 0 ou -1; nunca > 0 |
+| **Foco visível** | `:focus-visible { outline: none; box-shadow: var(--shadow-focus); }` — **Nunca** `outline: none` sem `:focus-visible` |
+| **Skip Link** | Primeiro elemento focável: `<a href="#main-content" class="skip-link">Pular para conteúdo principal</a>` (visível no foco) |
+| **Trap de foco em modais** | `focus-trap` (VueUse `useFocusTrap`) — foco cicla dentro do modal; `Esc` fecha + restaura foco no gatilho |
+| **Roving tabindex** | Em componentes compostos (tabs, menu, select, date picker): `tabindex="0"` no ativo, `-1` nos outros; setas navegam |
+
+### 3.2 Atalhos de Teclado Globais
+
+| Atalho | Ação | Escopo |
+| :--- | :--- | :--- |
+| `Tab` / `Shift+Tab` | Navegar elementos focáveis | Global |
+| `Enter` / `Espaço` | Ativar botão, link, checkbox, radio | Global |
+| `Esc` | Fechar modal, drawer, dropdown, toast | Global |
+| `Setas` | Navegar dentro de componentes compostos | Componente |
+| `Home` / `End` | Primeiro/último item | Tabelas, listas |
+| `Ctrl/Cmd + K` | Busca global (Command Palette) | Global |
+| `Ctrl/Cmd + /` | Ajuda / Atalhos | Global |
+
+---
+
+## 4. Suporte a Screen Readers (WCAG 1.3.1, 4.1.2)
+
+### 4.1 HTML Semântico Obrigatório
+
+```html
+<!-- Landmarks -->
+<header role="banner">        <!-- Header global -->
+<nav role="navigation">       <!-- Navegação principal -->
+<main role="main" id="main-content">  <!-- Conteúdo principal (target do skip link) -->
+<aside role="complementary">  <!-- Sidebar / drawer -->
+<footer role="contentinfo">   <!-- Footer -->
+
+<!-- Headings Hierárquicos -->
+<h1>Título da Página</h1>      <!-- Único por tela -->
+<h2>Seção Principal</h2>
+<h3>Subseção</h3>
+
+<!-- Listas -->
+<nav aria-label="Navegação principal">
+  <ul>...</ul>
+</nav>
+
+<!-- Tabelas Acessíveis -->
+<table>
+  <caption>Ordens de Serviço — 12 itens, filtradas por "Aberta"</caption>
+  <thead>
+    <tr>
+      <th scope="col">Número</th>
+      <th scope="col">Ativo</th>
+      <th scope="col">Status</th>
+    </tr>
+  </thead>
+  <tbody>...</tbody>
+</table>
+```
+
+### 4.2 Labels e Descrições
+
+| Elemento | Regra | Exemplo Aegis1 |
+| :--- | :--- | :--- |
+| **Input** | `<label for="id">` visível + `id` no input | `<label for="ativo-tag">Tag do Ativo</label><input id="ativo-tag">` |
+| **Ícone sem texto** | `aria-label` descritivo | `<button aria-label="Escanear QR Code do ativo"><QRCodeIcon /></button>` |
+| **Ícone decorativo** | `aria-hidden="true"` + `focusable="false"` | `<IconCheck aria-hidden="true" focusable="false" />` |
+| **Live Region** | `aria-live="polite"` para toasts; `aria-live="assertive"` para alertas críticos | `<div id="toast-container" aria-live="polite" aria-atomic="true">` |
+| **Status/Estado** | `aria-pressed`, `aria-expanded`, `aria-selected`, `aria-disabled`, `aria-invalid` | `<button aria-pressed="true" aria-expanded="false">` |
+| **Descrição Complexa** | `aria-describedby="id-da-descricao"` | `<input aria-describedby="help-ativo-tag" id="ativo-tag"><span id="help-ativo-tag">Código único do ativo (ex: NB-001)</span>` |
+
+### 4.3 ARIA Patterns Implementados
+
+| Componente | Pattern | Atributos-Chave |
+| :--- | :--- | :--- |
+| **Modal/Dialog** | `role="dialog"` + `aria-modal="true"` + `aria-labelledby` + `aria-describedby` | Focus trap, `Esc` close, focus restore |
+| **Dropdown/Select** | `role="combobox"` + `aria-controls` + `aria-expanded` + `aria-activedescendant` | Roving tabindex, type-ahead |
+| **Tabs** | `role="tablist"` + `role="tab"` + `aria-selected` + `aria-controls` + `role="tabpanel"` + `aria-labelledby` | Roving tabindex, keyboard navigation |
+| **Menu** | `role="menu"` + `role="menuitem"` + `aria-orientation` | Roving tabindex, `Esc` close |
+| **Toast/Alert** | `role="status"` (polite) / `role="alert"` (assertive) + `aria-live` + `aria-atomic` | Auto-dismiss, focus management |
+| **Progress/Loading** | `role="progressbar"` + `aria-valuemin` + `aria-valuemax` + `aria-valuenow` + `aria-label` | Determinate/indeterminate |
+| **Tree/Navigation** | `role="tree"` + `role="treeitem"` + `aria-expanded` + `aria-level` | Keyboard navigation |
+
+---
+
+## 5. Formulários Acessíveis (WCAG 3.3.1, 3.3.2, 3.3.3)
+
+### 5.1 Estrutura Base
+
+```vue
+<FormField label="Tag do Ativo" for="ativo-tag" required>
+  <template #help>
+    Código único do ativo (ex: NB-001)
+  </template>
+  <template #error>
+    Tag já cadastrada. Escolha outra.
+  </template>
+  <input 
+    id="ativo-tag" 
+    type="text" 
+    v-model="form.tag" 
+    :aria-invalid="!!errors.tag"
+    :aria-describedby="errors.tag ? 'error-tag' : 'help-tag'"
+    :aria-describedby="!errors.tag ? 'help-tag' : undefined"
+  />
+  <span id="help-tag" class="form-help">Código único do ativo (ex: NB-001)</span>
+  <span id="error-tag" class="form-error" role="alert" v-if="errors.tag">{{ errors.tag }}</span>
+</FormField>
+```
+
+### 5.2 Regras de Validação
+
+| Regra | Implementação |
+| :--- | :--- |
+| **Required** | `required` + `aria-required="true"` + `aria-invalid="true"` no erro |
+| **Error Message** | `role="alert"` + `aria-live="assertive"` + `aria-describedby` no input |
+| **Success** | `aria-invalid="false"` (implícito) + ícone visual + `aria-describedby` opcional |
+| **Formato** | `type="email"`, `type="tel"`, `pattern`, `inputmode` apropriados |
+| **Autocomplete** | `autocomplete="email"`, `"tel"`, `"name"`, `"organization"`, `"street-address"` |
+
+---
+
+## 6. Touch & Mobile (WCAG 2.5.1, 2.5.5, 2.5.8)
+
+### 6.1 Touch Targets (Mínimo 44×44px / Confortável 48×48px)
+
+```scss
+// Design Tokens aplicados
+--touch-target-min: 44px;
+--touch-target-comfortable: 48px;
+
+// Aplicado em:
+.btn { min-height: var(--touch-target-comfortable); min-width: var(--touch-target-comfortable); }
+.form-input { min-height: var(--touch-target-comfortable); }
+.dropdown-trigger { min-height: var(--touch-target-comfortable); }
+.tab-trigger { min-height: var(--touch-target-comfortable); }
+```
+
+### 6.2 Gestos e Orientação
+
+- **Nenhum gesto complexo obrigatório** (pinch, swipe, drag) — alternativas por teclado/botão
+- **Orientação:** Portrait + Landscape suportados (responsivo)
+- **Pull-to-refresh:** Suportado em listas (PWA) + botão "Atualizar" acessível
+
+---
+
+## 7. Motion & Animation (WCAG 2.3.3)
+
+### 7.1 Respeito a `prefers-reduced-motion`
+
+```scss
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+```
+
+### 7.2 Tokens de Duração Reduzida
+
+```scss
+:root {
+  --duration-reduced: 0.01ms; // Effectively instant
+}
+
+// Aplicado automaticamente via @media (prefers-reduced-motion: reduce)
+```
+
+---
+
+## 8. Internacionalização & Localização (WCAG 3.1.1, 3.1.2)
+
+### 8.1 Idioma da Página
+
+```html
+<html lang="pt-BR">
+```
+
+### 8.2 Mudança de Idioma
+
+```html
+<!-- Se houver conteúdo em outro idioma -->
+<span lang="en">Maintenance Order</span>
+```
+
+### 8.3 Formatação Localizada
+
+```typescript
+// Composables para formatação
+const formatDate = (date: Date) => new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' }).format(date);
+const formatCurrency = (cents: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100);
+const formatNumber = (num: number) => new Intl.NumberFormat('pt-BR').format(num);
+```
+
+---
+
+## 9. Error Handling & Feedback (WCAG 3.3.1, 3.3.3, 4.1.3)
+
+### 9.1 Toast/Notification System
+
+```vue
+<!-- Toast Container (Live Region) -->
+<div id="toast-container" aria-live="polite" aria-atomic="true" class="toast-container">
+  <Toast v-for="toast in toasts" :key="toast.id" :toast="toast" />
+</div>
+
+<!-- Toast Component -->
+<Toast :toast="toast" role="status" :aria-live="toast.type === 'error' ? 'assertive' : 'polite'" aria-atomic="true">
+  <div :class="['toast', `toast--${toast.type}`]">
+    <Icon :name="toast.icon" aria-hidden="true" />
+    <span>{{ toast.message }}</span>
+    <button @click="dismiss" aria-label="Fechar notificação">×</button>
+  </div>
+</Toast>
+```
+
+### 9.2 Inline Errors
+
+```vue
+<FormField :error="errors.email" :error-id="'error-email'">
+  <input 
+    :aria-invalid="!!errors.email" 
+    :aria-describedby="errors.email ? 'error-email' : 'help-email'"
+  />
+  <span id="help-email" class="form-help">Seu email corporativo</span>
+  <span id="error-email" class="form-error" role="alert" v-if="errors.email">{{ errors.email }}</span>
+</FormField>
+```
+
+---
+
+## 10. Testing & Validation
+
+### 10.1 Automatizado (CI/CD)
+
+| Ferramenta | Escopo | Gate |
+| :--- | :--- | :--- |
+| **axe-core (Cypress)** | Todas páginas E2E | Fail se violações `critical`/`serious` |
+| **Lighthouse CI** | Build preview | Score A11y ≥ 95 |
+| **axe-core (Storybook)** | Componentes isolados | Zero violações |
+| **ESLint a11y plugin** | Código estático | `vuejs/accessibility` rules |
+
+### 10.2 Testes Manuais (Checklist por Release)
+
+| Teste | Ferramenta | Frequência |
+| :--- | :--- | :--- |
+| **Navegação só teclado** | Teclado only | Every Release |
+| **Screen Reader (NVDA/JAWS/VoiceOver)** | NVDA (Win), VoiceOver (Mac/iOS) | Critical Flows |
+| **Zoom 200%** | Browser zoom | Every Release |
+| **High Contrast Mode** | OS High Contrast | Every Release |
+| **Mobile Touch** | Device real (Android/iOS) | Every Release |
+| **PWA Offline** | Chrome DevTools → Application | Every Release |
+
+---
+
+## 11. Component-Specific Guidelines
+
+### 11.1 Data Tables
+
+```vue
+<table>
+  <caption>Ordens de Serviço — {{ total }} itens</caption>
+  <thead>
+    <tr>
+      <th scope="col"><ButtonIcon @click="sort('numero')" aria-label="Ordenar por Número">#</ButtonIcon></th>
+      <th scope="col"><ButtonIcon @click="sort('ativo')" aria-label="Ordenar por Ativo">Ativo</ButtonIcon></th>
+      <th scope="col"><ButtonIcon @click="sort('status')" aria-label="Ordenar por Status">Status</ButtonIcon></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr v-for="ordem in ordens" :key="ordem.id" :aria-selected="selectedIds.includes(ordem.id)">
+      <td>{{ ordem.numero }}</td>
+      <td>{{ ordem.ativo.tag }}</td>
+      <td><Badge :variant="ordem.status">{{ ordem.status }}</Badge></td>
+    </tr>
+  </tbody>
+</table>
+```
+
+### 11.2 Modals/Dialogs
+
+```vue
+<Teleport to="body">
+  <Transition name="modal">
+    <div v-if="open" class="modal-overlay" @click.self="close" role="dialog" aria-modal="true" :aria-labelledby="titleId" :aria-describedby="descId">
+      <div class="modal-content" ref="contentRef">
+        <header class="modal-header">
+          <h2 id="titleId">{{ title }}</h2>
+          <button @click="close" aria-label="Fechar modal" class="close-btn">×</button>
+        </header>
+        <div id="descId" class="modal-body"><slot /></div>
+        <footer class="modal-footer"><slot name="footer" /></footer>
+      </div>
+    </div>
+  </Transition>
+</Teleport>
+```
+
+### 11.3 QR Scanner (PWA Mobile)
+
+```vue
+<QRScanner 
+  @decode="onDecode" 
+  aria-label="Escanear QR Code do ativo. Posicione o código dentro da moldura."
+  :aria-busy="scanning"
+>
+  <template #instruction>
+    <p>Posicione o QR Code do ativo dentro da área verde</p>
+    <p class="sr-only">A câmera está ativa. Movimente o dispositivo até ouvir o bip de confirmação.</p>
+  </template>
+</QRScanner>
+```
+
+---
+
+## 12. Validation Checklist (Definition of Done por Componente)
+
+| Critério | Validação |
+| :--- | :--- |
+| **Contraste** | axe-core + Lighthouse ≥ 95 |
+| **Teclado** | Navegação completa só teclado; focus visível; skip link; trap modal |
+| **Screen Reader** | NVDA/VoiceOver: labels, landmarks, headings, live regions, ARIA |
+| **Touch** | Targets ≥ 48px; gestos alternativos; orientação ambos |
+| **Motion** | `prefers-reduced-motion` respeitado; animações essenciais apenas |
+| **Zoom 200%** | Layout não quebra; texto legível; não horizontal scroll |
+| **High Contrast** | Windows High Contrast / macOS Increase Contrast funcional |
+| **Idioma** | `lang="pt-BR"`; mudanças de idioma marcadas; formatação localizada |
+| **Erros** | Inline `role="alert"`; toast `aria-live`; `aria-invalid` + `aria-describedby` |
+| **Formulários** | Labels associados; `autocomplete`; `aria-required`; `aria-invalid` |
+
+---
+
+## 13. Rastreabilidade Acessibilidade ↔ Artefatos
+
+| Guideline | Design Tokens | UI Style Guide | Component Library | Interaction Patterns | Testes |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Contraste** | `tokens.scss` (Seção 2) | `ui-style-guide.md#colors` | `Button.vue`, `Badge.vue`, `Input.vue` | — | axe-core, Lighthouse |
+| **Teclado** | `tokens.scss` (focus ring) | `ui-style-guide.md#focus` | `Modal.vue`, `Dropdown.vue`, `Tabs.vue` | `interaction-patterns.md#keyboard` | Cypress keyboard nav |
+| **Screen Reader** | — | `ui-style-guide.md#semantics` | `Modal.vue`, `Table.vue`, `Select.vue` | `interaction-patterns.md#aria` | NVDA/VoiceOver manual |
+| **Touch/Mobile** | `tokens.scss` (touch targets) | `ui-style-guide.md#touch` | `Button.vue`, `QRScanner.vue` | `interaction-patterns.md#touch` | Device real testing |
+| **Motion** | `tokens.scss` (reduced motion) | `interaction-patterns.md#animation` | `Transition.vue`, `Toast.vue` | `interaction-patterns.md#reduced-motion` | `prefers-reduced-motion` test |
+| **Formulários** | `tokens.scss` (form tokens) | `ui-style-guide.md#forms` | `FormField.vue`, `Input.vue`, `Select.vue` | `interaction-patterns.md#forms` | axe-core forms |
+| **Zoom/High Contrast** | `tokens.scss` (relative units) | `ui-style-guide.md#zoom` | All components | — | Manual 200% zoom test |
+
+---
+
+*Documento regenerado completamente com base em Design Tokens v2.0 (implementados) + Vue 3 + Bootstrap 5 + PWA + WCAG 2.1 AA. Substitui versão 1.0 que continha apenas especificações teóricas sem implementação.*

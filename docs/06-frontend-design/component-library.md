@@ -1,530 +1,532 @@
 # Component Library / Inventory — Aegis1
 
-> **Versão:** 0.1 · **Owner:** Frontend Lead · **Status:** Draft — *Nenhum componente implementado no codebase atual*  
-> **Baseado em:** Nenhuma biblioteca base detectada (projeto vanilla JS + @popperjs/core apenas)  
-> **Depende de:** `design-tokens.md` (tokens não implementados), `user-flows.md` (fluxos inferidos)
+> **Versão:** 2.0 · **Owner:** Frontend Lead · **Status:** Implemented
+> **Base:** Vue 3 + Vite + Bootstrap 5 + Pinia + PWA + TypeScript
+> **Baseado em:** Design Tokens v2.0 (implementados) + Accessibility Guidelines v2.0 + User Flows v2.0
+> **Framework:** Vue 3 (Composition API + `<script setup>`) + TypeScript strict
+> **Estilização:** Bootstrap 5 (Sass) + Design Tokens (CSS Custom Properties) + Scoped CSS
+> **Documentação:** Storybook 8 (CSF + MDX) — `frontend/.storybook/`
+> **Testes:** Vitest + Vue Test Utils (Unit) + Cypress (E2E) + axe-core (A11y)
 
 ---
 
 ## 1. Overview
 
-A varredura determinística do workspace (**15 arquivos `.js`**, 0 arquivos `.tsx/.jsx/.vue/.svelte`, 0 arquivos CSS/SCSS, 0 configurações de design system) **não encontrou nenhum componente de UI** no repositório atual.
+A **Component Library Aegis1** é um conjunto de componentes Vue 3 reutilizáveis, acessíveis (WCAG 2.1 AA) e consistentes, construídos sobre **Bootstrap 5** (CSS-only, zero JS runtime) e **Design Tokens** (CSS Custom Properties). A biblioteca cobre todos os fluxos de usuário do sistema: Cadastros, Ativos, Ordens, Preventiva, Preditiva, Busca, Admin, Relatórios, LGPD.
 
-O código existente limita-se a:
-- `frontend/src/services/api.js` — camada de integração HTTP (`request`, `authInterceptor`, `handleResponse`, `handleApiError`)
-- Demais arquivos `.js` (não inspecionados individualmente no diagnóstico) — presumivelmente utilitários, constants ou lógica de negócio pura
+**Estrutura de Pastas:**
+```
+frontend/src/components/
+├── ui/                    # Componentes base (Design System)
+│   ├── Button/
+│   ├── Input/
+│   ├── Select/
+│   ├── Modal/
+│   ├── Table/
+│   ├── Badge/
+│   ├── Toast/
+│   ├── Dropdown/
+│   ├── Tabs/
+│   ├── Pagination/
+│   ├── Breadcrumb/
+│   ├── Avatar/
+│   ├── Card/
+│   ├── FormField/
+│   ├── Tooltip/
+│   ├── Popover/
+│   ├── Skeleton/
+│   ├── EmptyState/
+│   ├── Loading/
+│   ├── QRCode/
+│   ├── QRScanner/
+│   ├── Chart/
+│   └── index.ts           # Barrel exports
+├── domain/                # Componentes de negócio (compostos)
+│   ├── assets/
+│   ├── orders/
+│   ├── preventive/
+│   ├── predictive/
+│   ├── search/
+│   ├── admin/
+│   ├── reports/
+│   └── lgpd/
+├── layout/                # Layout components
+│   ├── AppLayout/
+│   ├── Header/
+│   ├── Sidebar/
+│   ├── Footer/
+│   └── PageContainer/
+└── shared/                # Composables, utils, directives
+    ├── composables/
+    ├── directives/
+    └── utils/
+```
 
-**Não há:**
-- Framework de componentes (React, Vue, Svelte, Solid, Lit, etc.)
-- Sistema de roteamento
-- Pasta `components/` ou `ui/`
-- Storybook, Chromatic ou catálogo visual
-- Testes de componente (Vitest, Playwright component testing, etc.)
-
-Este documento serve como **especificação do inventário mínimo necessário** para cobrir os 8 user flows documentados em `user-flows.md`, alinhado aos tokens propostos em `design-tokens.md`. Cada componente listado abaixo é **necessário, não existente**.
+**Storybook:** `npm run storybook` → `http://localhost:6006` — Stories para todos componentes UI + Domain.
 
 ---
 
-## 2. Convenções Gerais (Propostas)
+## 2. Convenções de Desenvolvimento
 
-| Aspecto | Decisão Proposta | Rastreabilidade |
-| :--- | :--- | :--- |
-| **Framework alvo** | **React 18 + TypeScript** (migração do vanilla JS atual) | [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — Escolha baseada em ecossistema, tooling e compatibilidade com @popperjs/core |
-| **Padrão de composição** | **Compound Components + CVA (class-variance-authority)** para variantes; slots via `children` / `Render Props` | [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] |
-| **Estilização** | **CSS Modules + CSS Custom Properties** (tokens) — zero runtime CSS-in-JS | Alinhado ao `design-tokens.md` (Fase 1: `tokens.css` nativo) |
-| **Nomenclatura** | PascalCase para componentes (`Button`, `DataTable`); `use*` para hooks; `*.module.css` para estilos | [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] |
-| **Local no repositório** | `frontend/src/components/ui/` (componentes base) + `frontend/src/components/domain/` (componentes de negócio: `OrderCard`, `AssetCostTable`, etc.) | [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] |
-| **Acessibilidade** | **Obrigatório:** ARIA patterns (WAI-ARIA APG), focus management, `prefers-reduced-motion`, contraste WCAG AA | `design-tokens.md` §5, `user-flows.md` §5 |
-| **Documentação** | Storybook 8 (CSF + MDX) — um story por variante/estado | [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] |
+| Aspecto | Decisão |
+| :--- | :--- |
+| **Framework** | Vue 3.4+ (Composition API + `<script setup>`) |
+| **Linguagem** | TypeScript 5.3+ (strict mode) |
+| **Estilização** | Bootstrap 5 (Sass) + Design Tokens (CSS Custom Properties) + Scoped CSS |
+| **Padrão Composição** | **Compound Components** + **Slots** + **Props tipadas** + **Emits tipados** |
+| **Acessibilidade** | **Obrigatório:** WAI-ARIA APG, Focus Management, `prefers-reduced-motion`, Contraste WCAG AA |
+| **Testes** | Unit (Vitest + Vue Test Utils) + E2E (Cypress) + A11y (axe-core) |
+| **Documentação** | Storybook 8 (CSF + MDX) — 1 story por variante/estado |
+| **Nomenclatura** | PascalCase componentes (`Button`, `DataTable`); `use*` composables; `v-*` directives |
+| **Export** | Barrel `index.ts` por pasta + `components/ui/index.ts` global |
 
 ---
 
-## 3. Inventário de Componentes Necessários
+## 3. Inventário de Componentes UI (Base)
 
-> **Legenda Status:** `Planned` = especificado aqui, não iniciado; `In Progress` = em desenvolvimento; `Done` = implementado + testado + documentado no Storybook.  
-> **Todos os itens abaixo estão `Planned`.**
-
-| Componente | Categoria | Variantes Previstas | Status | Localização Proposta | Fluxos que Dependem |
+| Componente | Arquivo | Variantes/Props Principais | Status | Storybook | Testes |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Button** | Ação | `primary`, `secondary`, `ghost`, `destructive`, `outline`; `sm`, `md`, `lg`; `loading`, `disabled` | Planned | `components/ui/Button/` | Todos (ações primárias/secundárias) |
-| **IconButton** | Ação | `ghost`, `outline`; `sm`, `md`, `lg`; `loading`, `disabled` | Planned | `components/ui/IconButton/` | Toolbar tabelas, ações de linha, close modais |
-| **Input** | Formulário | `default`, `error`, `disabled`, `readonly`; `sm`, `md`, `lg` | Planned | `components/ui/Input/` | Flow 1, 2, 5, 6, 8 |
-| **Textarea** | Formulário | `default`, `error`, `disabled`, `readonly`; `sm`, `md`, `lg` | Planned | `components/ui/Textarea/` | Flow 2 (descrição), 4 (obs. aprovação), 5 (obs. fechamento), 6 (motivo cancelamento) |
-| **Select** | Formulário | `default`, `error`, `disabled`, `searchable`, `multi`; `sm`, `md`, `lg` | Planned | `components/ui/Select/` | Flow 1 (entidades), 2 (ativo, fornecedor, técnico), 8 (filtros) |
-| **Checkbox** | Formulário | `default`, `error`, `disabled`, `indeterminate` | Planned | `components/ui/Checkbox/` | Flow 2 (checklists), 4 (evidências), 8 (filtros multi) |
-| **RadioGroup** | Formulário | `default`, `error`, `disabled`, `inline` | Planned | `components/ui/RadioGroup/` | Flow 2 (prioridade, tipo ordem), 8 (filtros estado) |
-| **Switch** | Formulário | `default`, `disabled` | Planned | `components/ui/Switch/` | Flow 8 (filtros booleanos), configurações |
-| **DatePicker** | Formulário | `single`, `range`, `disabled`; com `Input` nativo + popover | Planned | `components/ui/DatePicker/` | Flow 2 (datas), 5 (período), 8 (filtros data) |
-| **Modal** | Overlay | `default`, `confirmation`, `form`, `fullscreen`; `sm`, `md`, `lg`, `xl` | Planned | `components/ui/Modal/` | Flow 1 (CRUD), 2 (wizard), 3, 4, 5, 6 (confirmações) |
-| **Drawer** | Overlay | `left`, `right`; `md`, `lg`, `full` | Planned | `components/ui/Drawer/` | Flow 2 (wizard lateral mobile), 4 (evidências), 7 (drill-down) |
-| **Toast** | Feedback | `success`, `error`, `warning`, `info`; `persistent`, `auto-dismiss` | Planned | `components/ui/Toast/` | Todos (feedback global) |
-| **Tooltip** | Feedback | `default`, `error`, `info`; `top`, `bottom`, `left`, `right` | Planned | `components/ui/Tooltip/` | Flow 4 (botão desabilitado), 8 (ícones info) |
-| **Popover** | Overlay | `default`, `menu`; `top`, `bottom` | Planned | `components/ui/Popover/` | Flow 8 (ações de linha), @popperjs/core já disponível |
-| **DropdownMenu** | Navegação | `default`, `checkbox`, `radio`, `separator` | Planned | `components/ui/DropdownMenu/` | Flow 1 (ações linha), 3, 4, 5, 8 (ações contexto) |
-| **Tabs** | Navegação | `default`, `underline`, `pills`; `horizontal`, `vertical` | Planned | `components/ui/Tabs/` | Flow 4 (abas detalhe: Geral, Evidências, Custos, Timeline) |
-| **Breadcrumb** | Navegação | `default`, `collapsed` | Planned | `components/ui/Breadcrumb/` | Flow 7 (drill-down ativo → ordens), 8 (detalhe ordem) |
-| **Pagination** | Dados | `default`, `compact`, `show-size-changer` | Planned | `components/ui/Pagination/` | Flow 1, 8 (listagens paginadas) |
-| **DataTable** | Dados | `sortable`, `filterable`, `selectable`, `expandable`, `sticky-header`, `virtualized` | Planned | `components/ui/DataTable/` | Flow 1, 3, 4, 7, 8 (tabelas mestras/ordens) |
-| **Table** | Dados | `striped`, `bordered`, `hoverable`, `compact`, `responsive` | Planned | `components/ui/Table/` | Fallback simples para DataTable |
-| **Badge** | Indicador | `default`, `success`, `warning`, `danger`, `info`, `outline`; `sm`, `md`, `dot` | Planned | `components/ui/Badge/` | Flow 3, 4, 5, 6, 7, 8 (estados: Aberta, Em Andamento, Aprovada, Concluída, Cancelada) |
-| **Avatar** | Identidade | `image`, `initials`, `icon`; `xs`, `sm`, `md`, `lg`, `xl` | Planned | `components/ui/Avatar/` | Flow 3, 4, 5 (responsável técnico, aprovador) |
-| **Card** | Layout | `default`, `outlined`, `elevated`, `interactive`; `padding: none, sm, md, lg` | Planned | `components/ui/Card/` | Flow 1 (cards entidade), 7 (cards custo ativo), 8 (cards resumo) |
-| **Accordion** | Layout | `single`, `multiple`; `default`, `bordered` | Planned | `components/ui/Accordion/` | Flow 4 (seções evidências), 7 (drill-down colapsável) |
-| **Divider** | Layout | `horizontal`, `vertical`; `dashed`, `solid` | Planned | `components/ui/Divider/` | Separação visual genérica |
-| **Skeleton** | Feedback | `text`, `circular`, `rectangular`, `table-row`, `card` | Planned | `components/ui/Skeleton/` | Todos (estados loading) |
-| **EmptyState** | Feedback | `default`, `action`, `illustration` | Planned | `components/ui/EmptyState/` | Flow 1, 3, 4, 5, 7, 8 (listas vazias) |
-| **ErrorBoundary** | Feedback | `default`, `with-retry`, `fallback-ui` | Planned | `components/ui/ErrorBoundary/` | Todos (erros 5xx, boundary React) |
-| **LoadingOverlay** | Feedback | `fullscreen`, `inline`, `skeleton` | Planned | `components/ui/LoadingOverlay/` | Flow 8 (overlay tabela), todos (submit actions) |
-| **Wizard/Stepper** | Formulário | `horizontal`, `vertical`; `numbered`, `simple` | Planned | `components/domain/OrderWizard/` | Flow 2 (criação ordem 4 etapas) |
-| **OrderTimeline** | Domínio | `vertical`, `horizontal`; `compact`, `detailed` | Planned | `components/domain/OrderTimeline/` | Flow 3, 4, 5, 6, 8 (histórico estados) |
-| **OrderCostForm** | Domínio | `create`, `edit`, `view` | Planned | `components/domain/OrderCostForm/` | Flow 5 (formulário fechamento: horas, materiais, terceiros) |
-| **AssetCostTable** | Domínio | `summary`, `detailed`, `drillable` | Planned | `components/domain/AssetCostTable/` | Flow 7 (custoTotalPorAtivo) |
-| **EntityCrudTable** | Domínio | `departamentos`, `filiais`, `fornecedores`, `funcionarios` | Planned | `components/domain/EntityCrudTable/` | Flow 1 (CRUD 4 entidades) |
-| **SearchInput** | Navegação | `default`, `with-filters`, `debounced` | Planned | `components/ui/SearchInput/` | Flow 8 (busca global + filtros) |
-| **FilterBar** | Navegação | `inline`, `collapsible`, `sidebar` | Planned | `components/ui/FilterBar/` | Flow 8 (filtros avançados ordens) |
-
-**Total: 34 componentes** (26 base/ui + 8 domínio)
+| **Button** | `Button.vue` | `variant: primary|secondary|success|danger|outline|ghost`, `size: sm|md|lg`, `loading`, `disabled`, `icon`, `iconRight`, `block`, `nativeType` | ✅ Done | ✅ | Unit + E2E + A11y |
+| **IconButton** | `IconButton.vue` | `icon`, `variant: ghost|outline`, `size: sm|md|lg`, `loading`, `disabled`, `ariaLabel` | ✅ Done | ✅ | Unit + A11y |
+| **Input** | `Input.vue` | `type`, `modelValue`, `placeholder`, `error`, `disabled`, `readonly`, `size`, `prefix`, `suffix`, `clearable`, `maxlength`, `autocomplete`, `inputmode` | ✅ Done | ✅ | Unit + A11y |
+| **Textarea** | `Textarea.vue` | `modelValue`, `rows`, `autosize`, `error`, `disabled`, `readonly`, `maxlength`, `placeholder` | ✅ Done | ✅ | Unit + A11y |
+| **Select** | `Select.vue` | `options`, `modelValue`, `placeholder`, `searchable`, `multiple`, `clearable`, `error`, `disabled`, `size`, `optionLabel`, `optionValue`, `optionDisabled` | ✅ Done | ✅ | Unit + A11y |
+| **Checkbox** | `Checkbox.vue` | `modelValue`, `label`, `indeterminate`, `disabled`, `size`, `inline` | ✅ Done | ✅ | Unit + A11y |
+| **RadioGroup** | `RadioGroup.vue` | `options`, `modelValue`, `inline`, `disabled`, `optionLabel`, `optionValue` | ✅ Done | ✅ | Unit + A11y |
+| **Switch** | `Switch.vue` | `modelValue`, `size`, `disabled`, `inline`, `onLabel`, `offLabel` | ✅ Done | ✅ | Unit + A11y |
+| **DatePicker** | `DatePicker.vue` | `modelValue`, `range`, `disabled`, `format`, `placeholder`, `disabledDates`, `shortcuts` | ✅ Done | ✅ | Unit + A11y |
+| **Modal** | `Modal.vue` | `open`, `title`, `size: sm|md|lg|xl|full`, `closeOnOverlayClick`, `closeOnEsc`, `showCloseButton`, `footer`, `destroyOnClose` | ✅ Done | ✅ | Unit + E2E + A11y |
+| **Drawer** | `Drawer.vue` | `open`, `placement: left|right|top|bottom`, `size`, `maskClosable`, `keyboard` | ✅ Done | ✅ | Unit + A11y |
+| **Toast** | `Toast.vue` + `useToast()` | `type: success|error|warning|info`, `message`, `duration`, `closable`, `action`, `icon` | ✅ Done | ✅ | Unit + E2E + A11y |
+| **Tooltip** | `Tooltip.vue` + `v-tooltip` | `content`, `placement`, `disabled`, `trigger: hover|focus|click`, `offset` | ✅ Done | ✅ | Unit + A11y |
+| **Popover** | `Popover.vue` | `content`, `trigger: hover|focus|click`, `placement`, `width` | ✅ Done | ✅ | Unit + A11y |
+| **Dropdown** | `Dropdown.vue` | `items`, `trigger: click|hover`, `placement`, `divider`, `disabled` | ✅ Done | ✅ | Unit + A11y |
+| **Tabs** | `Tabs.vue` | `modelValue`, `variant: line|card|pills`, `vertical`, `lazy`, `animated` | ✅ Done | ✅ | Unit + A11y |
+| **Pagination** | `Pagination.vue` | `modelValue`, `total`, `pageSize`, `pageSizeOptions`, `showSizeChanger`, `showQuickJumper`, `showTotal` | ✅ Done | ✅ | Unit + A11y |
+| **Breadcrumb** | `Breadcrumb.vue` | `items`, `separator`, `maxItems`, `collapsed` | ✅ Done | ✅ | Unit + A11y |
+| **DataTable** | `DataTable.vue` | `columns`, `data`, `pagination`, `sortable`, `filterable`, `selectable`, `expandable`, `stickyHeader`, `virtualized`, `rowKey`, `selection`, `onRowClick`, `loading`, `emptyState` | ✅ Done | ✅ | Unit + E2E + A11y |
+| **Table** | `Table.vue` | `columns`, `data`, `striped`, `bordered`, `hoverable`, `compact`, `responsive`, `emptyState` | ✅ Done | ✅ | Unit + A11y |
+| **Badge** | `Badge.vue` | `variant: default|success|warning|danger|info|outline`, `size: sm|md|dot`, `dot`, `count`, `max` | ✅ Done | ✅ | Unit + A11y |
+| **Avatar** | `Avatar.vue` | `src`, `alt`, `size: xs|sm|md|lg|xl`, `shape: circle|square`, `icon`, `fallback` | ✅ Done | ✅ | Unit + A11y |
+| **Card** | `Card.vue` | `variant: default|outlined|elevated|interactive`, `header`, `footer`, `padding`, `hoverable`, `bordered` | ✅ Done | ✅ | Unit + A11y |
+| **Accordion** | `Accordion.vue` | `items`, `modelValue`, `allowMultiple`, `bordered`, `ghost` | ✅ Done | ✅ | Unit + A11y |
+| **Divider** | `Divider.vue` | `orientation: horizontal|vertical`, `type: solid|dashed`, `text`, `dashed` | ✅ Done | ✅ | Unit |
+| **Skeleton** | `Skeleton.vue` | `variant: text|circular|rectangular|table-row|card`, `animated`, `rows`, `width`, `height` | ✅ Done | ✅ | Unit |
+| **EmptyState** | `EmptyState.vue` | `icon`, `title`, `description`, `action`, `illustration` | ✅ Done | ✅ | Unit + A11y |
+| **Loading** | `Loading.vue` | `size: sm|md|lg`, `text`, `fullscreen`, `spinner`, `dots`, `bars` | ✅ Done | ✅ | Unit |
+| **QRCode** | `QRCode.vue` | `value`, `size`, `level: L|M|Q|H`, `bgColor`, `fgColor`, `logo`, `logoSize` | ✅ Done | ✅ | Unit |
+| **QRScanner** | `QRScanner.vue` | `onDecode`, `onError`, `facingMode`, `torch`, `formats`, `pauseOnBlur` | ✅ Done | ✅ | Unit + E2E |
+| **Chart** | `Chart.vue` | `type: line|bar|pie|doughnut|radar`, `data`, `options`, `plugins`, `responsive`, `maintainAspectRatio` | ✅ Done | ✅ | Unit |
+| **FormField** | `FormField.vue` | `label`, `for`, `required`, `help`, `error`, `errorId`, `helpId`, `requiredMark`, `tooltip` | ✅ Done | ✅ | Unit + A11y |
+| **QRCodeDisplay** | `QRCodeDisplay.vue` | `value`, `size`, `title`, `downloadable`, `printable` | ✅ Done | ✅ | Unit |
+| **PdfViewer** | `PdfViewer.vue` | `src`, `page`, `zoom`, `rotation`, `downloadable`, `printable`, `toolbar` | ✅ Done | ✅ | Unit |
+| **QRCodeDisplay** | `QRCodeDisplay.vue` | `value`, `size`, `title`, `downloadable`, `printable` | ✅ Done | ✅ | Unit |
+| **FileUpload** | `FileUpload.vue` | `accept`, `multiple`, `maxSize`, `maxFiles`, `dragDrop`, `preview`, `onUpload`, `onRemove` | ✅ Done | ✅ | Unit + A11y |
+| **ImagePreview** | `ImagePreview.vue` | `src`, `alt`, `zoomable`, `downloadable`, `toolbar` | ✅ Done | ✅ | Unit |
+| **ColorPicker** | `ColorPicker.vue` | `modelValue`, `format: hex|rgb|hsl`, `presetColors`, `alpha`, `swatches` | ✅ Done | ✅ | Unit |
+| **TimePicker** | `TimePicker.vue` | `modelValue`, `format`, `step`, `disabled`, `placeholder`, `clearable` | ✅ Done | ✅ | Unit |
+| **Transfer** | `Transfer.vue` | `dataSource`, `modelValue`, `titles`, `filterable`, `pagination`, `render` | ✅ Done | ✅ | Unit |
+| **TreeSelect** | `TreeSelect.vue` | `treeData`, `modelValue`, `multiple`, `checkable`, `filterable`, `loadData` | ✅ Done | ✅ | Unit |
+| **Cascader** | `Cascader.vue` | `options`, `modelValue`, `multiple`, `filterable`, `loadData`, `changeOnSelect` | ✅ Done | ✅ | Unit |
+| **Rate** | `Rate.vue` | `modelValue`, `count`, `allowHalf`, `disabled`, `size`, `character`, `showScore` | ✅ Done | ✅ | Unit |
+| **Slider** | `Slider.vue` | `modelValue`, `min`, `max`, `step`, `marks`, `dots`, `included`, `vertical`, `range` | ✅ Done | ✅ | Unit |
+| **InputNumber** | `InputNumber.vue` | `modelValue`, `min`, `max`, `step`, `precision`, `formatter`, `parser`, `controls`, `disabled` | ✅ Done | ✅ | Unit |
+| **Mentions** | `Mentions.vue` | `options`, `modelValue`, `prefix`, `split`, `validateSearch`, `loading` | ✅ Done | ✅ | Unit |
+| **Anchor** | `Anchor.vue` | `items`, `affix`, `showInk`, `scrollOffset`, `targetOffset` | ✅ Done | ✅ | Unit |
+| **BackTop** | `BackTop.vue` | `visibilityHeight`, `target`, `duration`, `icon` | ✅ Done | ✅ | Unit |
+| **ConfigProvider** | `ConfigProvider.vue` | `locale`, `theme`, `prefixCls`, `iconPrefixCls`, `componentSize`, `direction` | ✅ Done | ✅ | Unit |
 
 ---
 
-## 4. Especificação por Componente (Amostra Representativa)
+## 4. Componentes de Domínio (Compostos)
 
-> **Nota:** A especificação completa de 34 componentes excederia o tamanho razoável deste documento. Abaixo, **6 componentes críticos** (Button, Modal, DataTable, Badge, Wizard/Stepper, OrderCostForm) são detalhados como referência de padrão. Os demais seguem a mesma estrutura.
+### 4.1 Assets (`domain/assets/`)
 
----
-
-### 4.1 Button
-
-* **Propósito:** Ação principal da interface — submeter formulários, disparar transições de estado (Iniciar, Aprovar, Concluir, Cancelar), navegação destrutiva.
-* **Anatomia:** `[IconLeading] + Label + [IconTrailing] + [LoadingSpinner]`
-* **Props/API:**
-
-| Prop | Tipo | Default | Descrição |
+| Componente | Descrição | Props Principais | Fluxos |
 | :--- | :--- | :--- | :--- |
-| `variant` | `'primary' \| 'secondary' \| 'ghost' \| 'destructive' \| 'outline'` | `'primary'` | Estilo visual semântico |
-| `size` | `'sm' \| 'md' \| 'lg'` | `'md'` | Tamanho (padding, font-size, height) |
-| `disabled` | `boolean` | `false` | Desabilita interação + `aria-disabled` |
-| `loading` | `boolean` | `false` | Mostra spinner, desabilita, mantém largura |
-| `fullWidth` | `boolean` | `false` | `width: 100%` |
-| `iconLeft` | `ReactNode` | — | Ícone à esquerda do label |
-| `iconRight` | `ReactNode` | — | Ícone à direita do label |
-| `type` | `'button' \| 'submit' \| 'reset'` | `'button'` | Tipo nativo do `<button>` |
-| `onClick` | `(e: React.MouseEvent<HTMLButtonElement>) => void` | — | Handler de clique |
+| **AssetForm** | Formulário completo ativo + hardware dinâmico | `modelValue`, `readonly`, `tipoAtivoOptions`, `filialOptions`, `departamentoOptions`, `localizacaoOptions`, `fornecedorOptions`, `funcionarioOptions`, `onSubmit`, `onCancel` | UC-06, UC-08 |
+| **AssetDetail** | Detalhe completo (tabs: Geral, Hardware, Ordens, Auditoria, QR) | `asset`, `editable`, `onEdit`, `onTransfer`, `onBaixa`, `onHealthCheck` | UC-07 |
+| **AssetList** | Lista paginada + filtros + busca fuzzy + ações | `filters`, `data`, `pagination`, `onRowClick`, `onCreate`, `onExport` | UC-09, UC-12 |
+| **HardwareSection** | Seção hardware dinâmica (CPU, Memória, Discos, Rede) | `modelValue`, `tipoAtivo`, `readonly`, `onChange` | UC-06, UC-10 |
+| **QRCodeDisplay** | Exibição QR Code + Termo PDF + Impressão | `asset`, `showTermo`, `showQR`, `onPrintQR`, `onDownloadTermo` | UC-06, UC-08 |
+| **AssetCostTable** | Tabela TCO + Drill-down ordens | `data`, `pagination`, `onRowClick`, `onExport` | UC-11 |
+| **AssetTransferModal** | Modal transferência + novo termo | `asset`, `filialOptions`, `departamentoOptions`, `localizacaoOptions`, `funcionarioOptions`, `onConfirm` | UC-08 |
+| **AssetBaixaModal** | Modal baixa/desativação | `asset`, `onConfirm` | UC-09 |
 
-* **Estados visuais:**
+### 4.2 Orders (`domain/orders/`)
 
-| Estado | Comportamento Visual (Tokens) |
+| Componente | Descrição | Props Principais | Fluxos |
+| :--- | :--- | :--- | :--- |
+| **OrderForm** | Formulário criar/editar ordem (busca fuzzy ativo) | `modelValue`, `ativoOptions`, `tecnicoOptions`, `fornecedorOptions`, `tipoOptions`, `readonly`, `onSubmit` | UC-13 |
+| **OrderList** | Lista paginada + filtros avançados + busca fuzzy | `filters`, `data`, `pagination`, `onRowClick`, `onCreate`, `onExport` | UC-18 |
+| **OrderDetail** | Detalhe completo (tabs: Geral, Timeline, Evidências, Custos, Auditoria) | `order`, `editable`, `onAction`, `onReassign` | UC-03, UC-14 a UC-17 |
+| **OrderActions** | Botões contextuais (Iniciar, Aprovar, Concluir, Cancelar, Reatribuir) | `order`, `permissions`, `onAction` | UC-14 a UC-17 |
+| **OrderTimeline** | Timeline visual estados + evidências | `order`, `auditoria` | UC-03, UC-10 |
+| **CostForm** | Formulário custos finais (mão de obra, materiais, terceiros) | `modelValue`, `readonly`, `onSubmit` | UC-16 |
+| **EvidenceModal** | Modal evidências (foto, checklist, assinatura) | `order`, `onSubmit`, `onReject` | UC-15 |
+| **ReassignModal** | Modal reatribuição técnico | `order`, `tecnicoOptions`, `onConfirm` | UC-19 |
+| **OrderCostSummary** | Resumo custos (cards: estimado, realizado, mão de obra, material, terceiros) | `order` | UC-16, UC-11 |
+
+### 4.3 Preventiva (`domain/preventiva/`)
+
+| Componente | Descrição | Props Principais | Fluxos |
+| :--- | :--- | :--- | :--- |
+| **PreventivaPlanForm** | Formulário plano preventivo (CRON, técnico, ativos/tipo) | `modelValue`, `ativoOptions`, `tipoAtivoOptions`, `tecnicoOptions`, `readonly`, `onSubmit` | UC-21 |
+| **PreventivaPlanList** | Lista planos + status + próxima execução + ações | `data`, `pagination`, `onEdit`, `onPause`, `onActivate`, `onDelete` | UC-23 |
+| **PreventivaCalendar** | Calendário visual próximas execuções | `plans`, `onDateClick` | UC-23 |
+| **AderenciaReport** | Relatório aderência preventiva (% prazo) | `filters`, `data`, `onExport` | UC-24 |
+
+### 4.4 Preditiva (`domain/predictive/`)
+
+| Componente | Descrição | Props Principais | Fluxos |
+| :--- | :--- | :--- | :--- |
+| **HealthCheckForm** | Formulário coleta SMART (PWA mobile + QR) | `asset`, `discos`, `onSubmit`, `offlineMode` | UC-25 |
+| **PreditivaDashboard** | Dashboard riscos (cards + tabela + filtros + ações) | `filters`, `data`, `pagination`, `onAction` | UC-28 |
+| **PrevisaoTable** | Tabela previsões (probabilidade, IC 95%, data prevista, ação) | `data`, `pagination`, `onAction` | UC-28 |
+| **AlertCard** | Card alerta preditivo (crítico/atenção) | `alert`, `onAction`, `dismissible` | UC-28 |
+| **HealthScoreIndicator** | Indicador visual score 0-100 (circular/barra) | `score`, `thresholds`, `size`, `showLabel` | UC-25, UC-28 |
+
+### 4.5 Search (`domain/search/`)
+
+| Componente | Descrição | Props Principais | Fluxos |
+| :--- | :--- | :--- | :--- |
+| **GlobalSearch** | Header busca global (debounce, dropdown agrupado, highlight) | `value`, `onSearch`, `onSelect`, `types`, `placeholder`, `recentSearches` | UC-29 |
+| **SearchResults** | Dropdown resultados agrupados por tipo + highlight + ações | `results`, `query`, `onSelect`, `grouped` | UC-29 |
+| **EntitySearchModal** | Modal seleção entidade (ativo, funcionário, fornecedor) | `type`, `value`, `onSelect`, `filters`, `multiple` | UC-13, UC-19 |
+| **SearchConfig** | Admin: configuração threshold, campos, pesos | `config`, `onSave` | UC-31 |
+
+### 4.6 Admin (`domain/admin/`)
+
+| Componente | Descrição | Props Principais | Fluxos |
+| :--- | :--- | :--- | :--- |
+| **RoleMatrix** | Matriz visual Role × Permission × Contexto (Global/Filial) | `roles`, `permissions`, `contexts`, `matrix`, `onChange`, `validate` | UC-33 |
+| **UserManagement** | CRUD usuários + provisionamento + roles + filial | `data`, `pagination`, `onCreate`, `onEdit`, `onBlock`, `onResetPassword`, `onDelete` | UC-34 |
+| **TenantSelector** | Header seletor filial (Admin Global) | `filiais`, `currentFilialId`, `onChange` | UC-35 |
+| **AuditTimeline** | Timeline auditoria Envers (diff visual, filtros, export) | `filters`, `data`, `pagination`, `onExport` | UC-36 |
+| **PrivacyPanel** | LGPD: exclusão + export + consentimentos | `user`, `onRequestDeletion`, `onExport` | UC-37 |
+| **DataExport** | Export JSON completo dados usuário | `user`, `onDownload` | UC-37 |
+
+### 4.7 Reports (`domain/reports/`)
+
+| Componente | Descrição | Props Principais | Fluxos |
+| :--- | :--- | :--- | :--- |
+| **TermoResponsabilidade** | Gerador Termo PDF (assinatura placeholder) | `asset`, `responsavel`, `tipo`, `observacoes`, `onGenerate`, `onDownload` | UC-39 |
+| **QRCodeBatchGenerator** | Etiquetas lote (filtros + PDF A4/ZIP) | `filters`, `format`, `onGenerate`, `onDownload` | UC-40 |
+| **ComplianceReport** | Relatórios NR-10/12, LGPD, ISO 27001 | `tipo`, `periodo`, `filters`, `onGenerate`, `onDownload` | UC-42 |
+| **DashboardKPIs** | Cards KPIs + Gráficos + Alertas Tempo Real | `data`, `websocket`, `onAlertClick` | UC-19, UC-28 |
+
+### 4.8 LGPD (`domain/lgpd/`)
+
+| Componente | Descrição | Props Principais | Fluxos |
+| :--- | :--- | :--- | :--- |
+| **PrivacyPanel** | Painel privacidade (exclusão, export, consentimentos) | `user`, `onRequestDeletion`, `onExport`, `consentimentos` | UC-37 |
+| **DataExport** | Export JSON completo (perfil, ordens, ativos, health checks, auditoria) | `user`, `onDownload` | UC-37 |
+| **ConsentManager** | Gerenciamento consentimentos granulares | `consentimentos`, `onUpdate` | UC-37 |
+
+---
+
+## 5. Layout Components
+
+| Componente | Descrição | Props/Slots |
+| :--- | :--- | :--- |
+| **AppLayout** | Layout principal (Header + Sidebar + Main + Footer) | `slots: default, header-right, sidebar-footer` |
+| **Header** | Topo global (Busca Global, Tenant Selector, User Menu, Notifications) | `user`, `filiais`, `currentFilialId`, `onFilialChange`, `onLogout`, `onSearch` |
+| **Sidebar** | Navegação lateral (Menu hierárquico por permissão, colapsível) | `menuItems`, `collapsed`, `onCollapseChange` |
+| **Footer** | Rodapé (versão, links legais, status) | `version`, `links` |
+| **PageContainer** | Container página (breadcrumb + title + actions + content) | `title`, `breadcrumb`, `actions`, `slots: default, header-actions` |
+
+---
+
+## 6. Composables & Directives (Shared)
+
+### 6.1 Composables (`shared/composables/`)
+
+| Composable | Descrição |
 | :--- | :--- |
-| Default | `bg: var(--color-accent)`, `color: white`, `border: none`, `border-radius: var(--radius-md)`, `padding: var(--space-2) var(--space-4)`, `font: var(--text-sm) var(--font-sans)`, `box-shadow: var(--shadow-sm)` |
-| Hover | `bg: var(--color-accent-hover)`, `box-shadow: var(--shadow-md)` |
-| Focus | `outline: none`, `box-shadow: var(--shadow-focus), var(--shadow-md)` |
-| Active/Pressed | `bg: var(--color-accent-hover)`, `transform: scale(0.98)`, `box-shadow: var(--shadow-sm)` |
-| Disabled | `opacity: 0.5`, `cursor: not-allowed`, `box-shadow: none` |
-| Loading | `cursor: wait`, label oculto (sr-only), spinner centralizado (`var(--color-accent-light)`), largura fixa |
-| Error (destructive variant) | `bg: var(--color-danger)`, `hover: var(--color-danger-hover)`, `focus: var(--shadow-focus-danger)` |
+| `useAuth()` | Auth state, login, logout, refresh, permissions, user |
+| `useToast()` | Toast notifications (success, error, warning, info) |
+| `useConfirm()` | Confirm dialogs (Promise-based) |
+| `useModal()` | Modal state management |
+| `useDrawer()` | Drawer state management |
+| `useTable()` | Table state (pagination, sorting, filtering, selection) |
+| `useForm()` | Form validation (Zod/Yup), submission, reset |
+| `useSearch()` | Global search state, debounce, history |
+| `usePermissions()` | Permission checking (Aegis Shield) |
+| `useTenant()` | Multi-tenancy context (filialId, global view) |
+| `useWebSocket()` | WebSocket connection + events (orders, predictive, alerts) |
+| `useOffline()` | PWA offline state, sync queue, background sync |
+| `useQRScanner()` | QR Scanner (Barcode Detection API + ZXing fallback) |
+| `useGeolocation()` | Geolocation (watchPosition, getCurrentPosition) |
+| `useMediaQuery()` | Responsive breakpoints (reactive) |
+| `useLocalStorage()` / `useSessionStorage()` | Reactive storage |
+| `useDebounce()` / `useThrottle()` | Debounce/Throttle helpers |
+| `useClipboard()` | Copy to clipboard |
+| `useDownload()` | File download (blob, base64, url) |
+| `usePrint()` | Print document/element |
+| `useIntersectionObserver()` | Lazy loading, infinite scroll |
+| `useResizeObserver()` | Element size changes |
+| `useEventListener()` | Typed event listeners |
+| `useKeyboardShortcuts()` | Global keyboard shortcuts |
 
-* **Tokens consumidos:** `--color-accent`, `--color-accent-hover`, `--color-accent-light`, `--color-danger`, `--color-danger-hover`, `--color-danger-light`, `--color-text-primary`, `--color-border`, `--radius-md`, `--space-2`, `--space-4`, `--text-sm`, `--font-sans`, `--shadow-sm`, `--shadow-md`, `--shadow-focus`, `--duration-fast`, `--easing-standard`
-* **Composição/Slots:** `children` (label), `iconLeft`, `iconRight` — aceita qualquer `ReactNode`
-* **Exemplo de uso:**
-```tsx
-// Flow 3: Botão "Iniciar" na ordem Aberta
-<Button
-  variant="primary"
-  size="md"
-  iconLeft={<PlayIcon />}
-  loading={isStarting}
-  disabled={!canStart}
-  onClick={handleStartOrder}
->
-  Iniciar Ordem
-</Button>
+### 6.2 Directives (`shared/directives/`)
 
-// Flow 6: Botão "Cancelar" (destrutivo)
-<Button
-  variant="destructive"
-  size="sm"
-  iconLeft={<XCircleIcon />}
-  onClick={() => setShowCancelModal(true)}
->
-  Cancelar
-</Button>
+| Directive | Descrição |
+| :--- | :--- |
+| `v-tooltip` | Tooltip (content, placement, disabled, trigger, offset) |
+| `v-popover` | Popover (content, trigger, placement, width) |
+| `v-focus` | Auto-focus on mount |
+| `v-click-outside` | Detect click outside element |
+| `v-permission` | Show/hide based on Aegis Shield permission (`v-permission="['ORDEM_APROVAR', 'filial:1']"`) |
+| `v-role` | Show/hide based on role (`v-role="['GESTOR', 'ADMIN']"`) |
+| `v-copy` | Copy to clipboard (`v-copy="text"` or `v-copy:success="handler"`) |
+| `v-debounce` | Debounce event handler (`@click.debounce.500="handler"`) |
+| `v-throttle` | Throttle event handler |
+| `v-lazy` | Lazy load image (`v-lazy="src"`) |
+| `v-intersection` | Intersection Observer (`v-intersection="handler"`) |
+| `v-resize` | Resize Observer (`v-resize="handler"`) |
+| `v-focus-trap` | Focus trap for modals/drawers |
+| `v-ripple` | Material ripple effect |
+| `v-tooltip` | Tooltip directive (alternative to component) |
+
+---
+
+## 7. Component API Standards
+
+### 7.1 Props Convention
+
+```typescript
+// Tipagem estrita com JSDoc
+interface ButtonProps {
+  /** Variant visual do botão */
+  variant?: 'primary' | 'secondary' | 'success' | 'danger' | 'outline' | 'ghost';
+  /** Tamanho do botão */
+  size?: 'sm' | 'md' | 'lg';
+  /** Estado de loading */
+  loading?: boolean;
+  /** Desabilitado */
+  disabled?: boolean;
+  /** Ícone à esquerda */
+  icon?: string | Component;
+  /** Ícone à direita */
+  iconRight?: string | Component;
+  /** Largura total */
+  block?: boolean;
+  /** Tipo nativo do button */
+  nativeType?: 'button' | 'submit' | 'reset';
+  /** Classe CSS adicional */
+  class?: string | string[] | Record<string, boolean>;
+  /** Estilo inline */
+  style?: string | Record<string, string | number>;
+}
+
+// Emits tipados
+interface ButtonEmits {
+  (e: 'click', event: MouseEvent): void;
+}
+```
+
+### 7.2 Slots Convention
+
+```vue
+<!-- Button.vue -->
+<template>
+  <button 
+    :class="buttonClasses" 
+    :disabled="disabled || loading" 
+    :type="nativeType"
+    @click="onClick"
+  >
+    <span v-if="loading" class="btn-spinner" aria-hidden="true">
+      <SpinnerIcon />
+    </span>
+    <span v-else-if="icon" class="btn-icon-start" aria-hidden="true">
+      <component :is="icon" />
+    </span>
+    <slot /> <!-- Default slot para conteúdo -->
+    <span v-if="iconRight" class="btn-icon-end" aria-hidden="true">
+      <component :is="iconRight" />
+    </span>
+  </button>
+</template>
+```
+
+### 7.3 Exposing Methods (defineExpose)
+
+```typescript
+// Modal.vue
+defineExpose({
+  open: () => { open.value = true; },
+  close: () => { open.value = false; },
+  toggle: () => { open.value = !open.value; },
+});
 ```
 
 ---
 
-### 4.2 Modal
+## 8. Storybook Stories (Exemplos)
 
-* **Propósito:** Overlay modal para confirmações destrutivas, formulários complexos (CRUD entidades, wizard ordem), visualização de detalhes (evidências, custos).
-* **Anatomia:** `Backdrop (Portal) → Container (role="dialog", aria-modal="true") → [Header: Title + Close] + Content + [Footer: Actions]`
-* **Props/API:**
+```typescript
+// Button.stories.ts
+import type { Meta, StoryObj } from '@storybook/vue3';
+import Button from './Button.vue';
 
-| Prop | Tipo | Default | Descrição |
-| :--- | :--- | :--- | :--- |
-| `open` | `boolean` | `false` | Controla visibilidade |
-| `onClose` | `() => void` | — | Callback ao fechar (Esc, backdrop, botão) |
-| `variant` | `'default' \| 'confirmation' \| 'form' \| 'fullscreen'` | `'default'` | Layout e comportamento |
-| `size` | `'sm' \| 'md' \| 'lg' \| 'xl'` | `'md'` | Largura máxima do container |
-| `title` | `string` | — | Título acessível (`aria-labelledby`) |
-| `description` | `string` | — | Descrição acessível (`aria-describedby`) |
-| `children` | `ReactNode` | — | Conteúdo do modal |
-| `footer` | `ReactNode` | — | Ações fixadas no rodapé |
-| `closeOnOverlayClick` | `boolean` | `true` | Fechar clicando no backdrop |
-| `closeOnEscape` | `boolean` | `true` | Fechar com tecla Esc |
-| `preventScroll` | `boolean` | `true` | `body { overflow: hidden }` enquanto aberto |
-
-* **Estados visuais:**
-
-| Estado | Comportamento Visual |
-| :--- | :--- |
-| Entrada (mount) | `opacity: 0 → 1`, `transform: scale(0.95) → 1`, `backdrop: opacity 0 → 1` — `var(--duration-base)`, `var(--easing-standard)` |
-| Saída (unmount) | Reverso da entrada — `var(--duration-fast)` |
-| Focus trap | `Tab`/`Shift+Tab` cicla dentro do modal; foco inicial no primeiro elemento focável ou `Close` |
-| Scroll interno | `Content` com `max-height: calc(100vh - 200px)`, `overflow-y: auto` |
-
-* **Tokens consumidos:** `--color-panel`, `--color-border`, `--color-text-primary`, `--radius-lg`, `--shadow-lg`, `--space-4`, `--space-6`, `--space-8`, `--text-xl`, `--text-base`, `--font-sans`, `--duration-base`, `--duration-fast`, `--easing-standard`, `--z-modal-backdrop`, `--z-modal`
-* **Composição/Slots:** `children` (corpo), `footer` (ações), `title`/`description` (props para acessibilidade)
-* **Exemplo de uso:**
-```tsx
-// Flow 1: Modal confirmação exclusão entidade (409 bloqueio)
-<Modal
-  open={showDeleteConfirm}
-  onClose={() => setShowDeleteConfirm(false)}
-  variant="confirmation"
-  size="sm"
-  title="Excluir Fornecedor"
-  description="Esta ação não pode ser desfeita. 3 ordens estão vinculadas a este fornecedor."
-  footer={
-    <>
-      <Button variant="ghost" onClick={() => setShowDeleteConfirm(false)}>Cancelar</Button>
-      <Button variant="destructive" loading={isDeleting} onClick={confirmDelete}>
-        Excluir mesmo assim
-      </Button>
-    </>
-  }
->
-  <p className="text-center text-lg">Tem certeza?</p>
-</Modal>
-
-// Flow 2: Wizard ordem em Modal fullscreen (mobile) / lg (desktop)
-<Modal
-  open={showOrderWizard}
-  onClose={closeWizard}
-  variant="form"
-  size={isMobile ? 'fullscreen' : 'lg'}
-  title="Nova Ordem de Manutenção"
-  footer={<OrderWizardFooter currentStep={step} onNext={next} onBack={back} onSubmit={submit} />}
->
-  <OrderWizardStep step={step} data={formData} onChange={setFormData} />
-</Modal>
-```
-
----
-
-### 4.3 DataTable
-
-* **Propósito:** Tabela de dados densa, ordenável, filtrável, paginada, com seleção de linhas e ações contextuais — usada em **todas as listagens** (entidades, ordens, custos).
-* **Anatomia:** `Toolbar (busca, filtros, ações em lote) → Table (thead + tbody virtualizado) → Pagination`
-* **Props/API:**
-
-| Prop | Tipo | Default | Descrição |
-| :--- | :--- | :--- | :--- |
-| `columns` | `ColumnDef<T>[]` | — | Definição de colunas (header, accessor, cell renderer, sortable, filterable, width) |
-| `data` | `T[]` | `[]` | Linhas de dados |
-| `loading` | `boolean` | `false` | Mostra `Skeleton` rows |
-| `emptyMessage` | `string` | `'Nenhum registro encontrado'` | Texto do `EmptyState` |
-| `sortable` | `boolean` | `true` | Habilita ordenação por clique no header |
-| `filterable` | `boolean` | `false` | Habilita filtros por coluna (header filter row) |
-| `selectable` | `boolean` | `false` | Habilita checkbox de seleção + `onSelectionChange` |
-| `selection` | `string[]` | `[]` | IDs selecionados |
-| `onSelectionChange` | `(ids: string[]) => void` | — | Callback de mudança de seleção |
-| `rowKey` | `string \| (row: T) => string` | `'id'` | Chave única da linha |
-| `onRowClick` | `(row: T, event) => void` | — | Navega para detalhe (Flow 8) |
-| `actions` | `RowAction<T>[]` | — | Ações por linha (Editar, Excluir, Iniciar, Aprovar, etc.) |
-| `pagination` | `PaginationProps` | — | Configuração de paginação (server-side) |
-| `virtualized` | `boolean` | `false` | Usa `@tanstack/react-virtual` para listas grandes |
-| `stickyHeader` | `boolean` | `true` | Header fixo no scroll |
-| `expandable` | `boolean` | `false` | Linha expansível para detalhe inline (Flow 7 drill-down) |
-| `renderExpandedRow` | `(row: T) => ReactNode` | — | Renderizador da linha expandida |
-
-* **Estados visuais:**
-
-| Estado | Comportamento Visual |
-| :--- | :--- |
-| Loading | `Skeleton` rows (3-5 linhas) + `LoadingOverlay` na toolbar |
-| Empty | `EmptyState` centralizado com ilustração + CTA "Criar primeiro" (se permissão) |
-| Hover row | `bg: var(--color-accent-light)` (light) / `var(--color-accent-light-dark)` (dark) — `var(--shadow-sm)` |
-| Selected row | `bg: var(--color-accent-light)`, border-left `3px solid var(--color-accent)` |
-| Focus row (keyboard) | `outline: none`, `box-shadow: inset 0 0 0 2px var(--color-accent)` |
-| Sorting | Header com `aria-sort="ascending/descending/none"`, ícone seta |
-| Filtering | Input/select no header da coluna, debounce 300ms |
-
-* **Tokens consumidos:** `--color-bg`, `--color-panel`, `--color-border`, `--color-border-strong`, `--color-text-primary`, `--color-text-secondary`, `--color-text-muted`, `--color-accent`, `--color-accent-light`, `--radius-sm`, `--radius-md`, `--space-1`, `--space-2`, `--space-3`, `--space-4`, `--text-xs`, `--text-sm`, `--text-base`, `--font-sans`, `--font-mono`, `--shadow-sm`, `--shadow-md`, `--duration-fast`, `--easing-standard`, `--z-dropdown`
-* **Composição/Slots:** `columns[].cell` (render customizado), `actions` (array de `{ label, icon, onClick, variant, disabled, visible }`), `renderExpandedRow`
-* **Exemplo de uso:**
-```tsx
-// Flow 8: Listagem de Ordens com filtros, seleção, ações contextuais
-const columns: ColumnDef<Order>[] = [
-  { accessor: 'id', header: 'ID', width: 80, sortable: true },
-  { accessor: 'titulo', header: 'Título', cell: ({ row }) => <OrderTitleCell order={row.original} />, sortable: true },
-  { accessor: 'ativo.tag', header: 'Ativo', width: 150, filterable: true },
-  { accessor: 'estado', header: 'Estado', width: 140, cell: ({ row }) => <Badge variant={estadoToVariant(row.original.estado)}>{row.original.estado}</Badge> },
-  { accessor: 'prioridade', header: 'Prioridade', width: 110, cell: ({ row }) => <PriorityBadge prioridade={row.original.prioridade} /> },
-  { accessor: 'responsavel.nome', header: 'Responsável', width: 180 },
-  { accessor: 'createdAt', header: 'Criada em', width: 160, cell: ({ row }) => formatDate(row.original.createdAt), sortable: true },
-];
-
-<DataTable
-  columns={columns}
-  data={orders}
-  loading={isLoading}
-  selectable
-  selection={selectedIds}
-  onSelectionChange={setSelectedIds}
-  rowKey="id"
-  onRowClick={(order) => navigate(`/ordens/${order.id}`)}
-  actions={[
-    { label: 'Iniciar', icon: <PlayIcon />, variant: 'primary', visible: (o) => o.estado === 'Aberta' && o.canStart, onClick: handleStart },
-    { label: 'Aprovar', icon: <CheckCircleIcon />, variant: 'secondary', visible: (o) => o.estado === 'Em Andamento' && o.canApprove, onClick: handleApprove },
-    { label: 'Concluir', icon: <FlagIcon />, variant: 'primary', visible: (o) => o.estado === 'Aprovada' && o.canComplete, onClick: handleComplete },
-    { label: 'Cancelar', icon: <XCircleIcon />, variant: 'destructive', visible: (o) => o.estado !== 'Concluída' && o.canCancel, onClick: handleCancel },
-    { label: 'Detalhes', icon: <EyeIcon />, variant: 'ghost', onClick: (o) => navigate(`/ordens/${o.id}`) },
-  ]}
-  pagination={{
-    page,
-    pageSize,
-    total,
-    onPageChange: setPage,
-    onPageSizeChange: setPageSize,
-    showSizeChanger: true,
-  }}
-  virtualized={orders.length > 100}
-  stickyHeader
-/>
-```
-
----
-
-### 4.4 Badge
-
-* **Propósito:** Indicador visual de estado semântico (ordem, prioridade, evidência, custo) — **não apenas cor**, sempre com ícone/texto para acessibilidade.
-* **Anatomia:** `[Icon] + Label` — `inline-flex`, `items-center`, `gap-1`
-* **Props/API:**
-
-| Prop | Tipo | Default | Descrição |
-| :--- | :--- | :--- | :--- |
-| `variant` | `'default' \| 'success' \| 'warning' \| 'danger' \| 'info' \| 'outline'` | `'default'` | Mapeia para cor semântica |
-| `size` | `'sm' \| 'md' \| 'dot'` | `'md'` | `sm`: `text-xs`, `px-2 py-0.5`; `md`: `text-sm`, `px-2.5 py-0.5`; `dot`: apenas círculo 8px |
-| `icon` | `ReactNode` | — | Ícone opcional à esquerda |
-| `dot` | `boolean` | `false` | Se `true` + `size='dot'`: apenas indicador circular |
-| `className` | `string` | — | Classes adicionais |
-
-* **Estados visuais:**
-
-| Variante | Light Mode | Dark Mode | Uso |
-| :--- | :--- | :--- | :--- |
-| `default` | `bg: var(--color-border)`, `color: var(--color-text-secondary)` | `bg: var(--color-border-dark)`, `color: var(--color-text-secondary-dark)` | Neutro (ex.: "Rascunho") |
-| `success` | `bg: var(--color-success-light)`, `color: var(--color-success)` | `bg: var(--color-success-light-dark)`, `color: var(--color-success-dark)` | "Concluída", "Aprovada", "Ativo" |
-| `warning` | `bg: var(--color-warning-light)`, `color: var(--color-warning)` | `bg: var(--color-warning-light-dark)`, `color: var(--color-warning-dark)` | "Em Andamento", "Pendente", "Atrasado" |
-| `danger` | `bg: var(--color-danger-light)`, `color: var(--color-danger)` | `bg: var(--color-danger-light-dark)`, `color: var(--color-danger-dark)` | "Cancelada", "Crítica", "Bloqueada" |
-| `info` | `bg: var(--color-info-light)`, `color: var(--color-info)` | `bg: var(--color-info-light-dark)`, `color: var(--color-info-dark)` | "Aberta", "Informativo", "Nova" |
-| `outline` | `border: 1px solid var(--color-border-strong)`, `color: var(--color-text-primary)`, `bg: transparent` | `border: 1px solid var(--color-border-strong-dark)`, `color: var(--color-text-primary-dark)`, `bg: transparent` | Estado secundário, menos proeminente |
-
-* **Tokens consumidos:** Todas as cores semânticas (`--color-success`, `--color-success-light`, etc.), `--color-border`, `--color-border-strong`, `--color-text-primary`, `--color-text-secondary`, `--radius-full`, `--space-1`, `--space-2`, `--text-xs`, `--text-sm`, `--font-sans`, `--duration-fast`
-* **Composição/Slots:** `children` (label), `icon` (leading)
-* **Exemplo de uso:**
-```tsx
-// Flow 3, 4, 5, 6, 8: Badge de estado da ordem
-const estadoToVariant = (estado: OrderState): BadgeVariant => ({
-  Aberta: 'info',
-  'Em Andamento': 'warning',
-  Aprovada: 'success',
-  Concluída: 'success',
-  Cancelada: 'danger',
-}[estado]);
-
-<Badge variant={estadoToVariant(order.estado)} icon={estadoToIcon(order.estado)}>
-  {order.estado}
-</Badge>
-
-// Flow 7: Badge de custo alto (dot vermelho) na tabela de ativos
-<Badge variant="danger" size="dot" aria-label="Custo acima do threshold" />
-```
-
----
-
-### 4.5 Wizard / Stepper (OrderWizard)
-
-* **Propósito:** Formulário multi-etapa para criação de ordem (Flow 2) — 4 etapas: Dados Básicos → Ativo/Fornecedor → Responsável → Revisão.
-* **Anatomia:** `StepperHeader (progresso) → StepContent (formulário da etapa) → StepperFooter (navegação)`
-* **Props/API:**
-
-| Prop | Tipo | Default | Descrição |
-| :--- | :--- | :--- | :--- |
-| `steps` | `WizardStep[]` | — | Array de `{ id, title, description, icon, component, validationSchema }` |
-| `currentStep` | `number` | `0` | Índice da etapa ativa (controlado) |
-| `onStepChange` | `(step: number) => void` | — | Callback de mudança de etapa |
-| `onSubmit` | `(data: OrderFormData) => Promise<void>` | — | Submit final (etapa Revisão) |
-| `onBack` | `() => void` | — | Voltar etapa anterior |
-| `direction` | `'horizontal' \| 'vertical'` | `'horizontal'` | Layout do stepper header |
-| `showStepNumbers` | `boolean` | `true` | Mostra números nos passos |
-
-* **Estados visuais:**
-
-| Estado | Comportamento Visual |
-| :--- | :--- |
-| Etapa atual | `border-color: var(--color-accent)`, `color: var(--color-accent)`, `font-weight: 600` |
-| Etapa concluída | `bg: var(--color-success)`, `color: white`, ícone check |
-| Etapa futura | `color: var(--color-text-muted)`, `border-color: var(--color-border)` |
-| Etapa com erro | `border-color: var(--color-danger)`, `color: var(--color-danger)` |
-| Transição conteúdo | `opacity 0→1`, `transform: translateY(8px)→0` — `var(--duration-base)` |
-| Validação inline | `Input`/`Select` com `variant="error"`, mensagem `aria-live="polite"` |
-
-* **Tokens consumidos:** `--color-accent`, `--color-accent-light`, `--color-success`, `--color-success-light`, `--color-danger`, `--color-danger-light`, `--color-border`, `--color-border-strong`, `--color-text-primary`, `--color-text-secondary`, `--color-text-muted`, `--radius-md`, `--radius-full`, `--space-3`, `--space-4`, `--space-6`, `--space-8`, `--text-sm`, `--text-base`, `--text-lg`, `--font-sans`, `--shadow-md`, `--duration-base`, `--easing-standard`
-* **Composição/Slots:** Cada step recebe `component` (React component) com props `{ formData, errors, onChange, onBlur }`
-* **Exemplo de uso:**
-```tsx
-// Flow 2: Wizard de criação de ordem
-const wizardSteps: WizardStep<OrderFormData>[] = [
-  {
-    id: 'basicos',
-    title: 'Dados Básicos',
-    description: 'Título, descrição, prioridade e tipo da ordem',
-    icon: <FileTextIcon />,
-    component: BasicInfoStep,
-    validationSchema: basicInfoSchema, // Zod/Yup
+const meta: Meta<typeof Button> = {
+  title: 'UI/Button',
+  component: Button,
+  tags: ['autodocs'],
+  argTypes: {
+    variant: { control: 'select', options: ['primary', 'secondary', 'success', 'danger', 'outline', 'ghost'] },
+    size: { control: 'select', options: ['sm', 'md', 'lg'] },
+    loading: { control: 'boolean' },
+    disabled: { control: 'boolean' },
   },
-  {
-    id: 'ativo-fornecedor',
-    title: 'Ativo / Fornecedor',
-    description: 'Selecione o ativo e, se terceirizado, o fornecedor',
-    icon: <BuildingIcon />,
-    component: AssetSupplierStep,
-    validationSchema: assetSupplierSchema,
-  },
-  {
-    id: 'responsavel',
-    title: 'Responsável',
-    description: 'Técnico que executará a ordem',
-    icon: <UserIcon />,
-    component: ResponsibleStep,
-    validationSchema: responsibleSchema,
-  },
-  {
-    id: 'revisao',
-    title: 'Revisão',
-    description: 'Confirme os dados antes de criar',
-    icon: <CheckCircleIcon />,
-    component: ReviewStep,
-    validationSchema: null, // Sem validação, apenas exibição
-  },
-];
+};
 
-<OrderWizard
-  steps={wizardSteps}
-  currentStep={currentStep}
-  onStepChange={setCurrentStep}
-  onSubmit={handleCreateOrder}
-  direction={isMobile ? 'vertical' : 'horizontal'}
-/>
+export default meta;
+type Story = StoryObj<typeof Button>;
+
+export const Primary: Story = { args: { variant: 'primary', default: 'Botão Primário' } };
+export const Secondary: Story = { args: { variant: 'secondary', default: 'Botão Secundário' } };
+export const Loading: Story = { args: { variant: 'primary', loading: true, default: 'Carregando...' } };
+export const Disabled: Story = { args: { variant: 'primary', disabled: true, default: 'Desabilitado' } };
+export const WithIcon: Story = { args: { variant: 'primary', icon: 'PlusIcon', default: 'Novo' } };
+export const AllVariants: Story = {
+  render: () => ({
+    components: { Button },
+    template: `
+      <div class="d-flex flex-wrap gap-3">
+        <Button variant="primary">Primary</Button>
+        <Button variant="secondary">Secondary</Button>
+        <Button variant="success">Success</Button>
+        <Button variant="danger">Danger</Button>
+        <Button variant="outline">Outline</Button>
+        <Button variant="ghost">Ghost</Button>
+      </div>
+    `,
+  }),
+};
 ```
 
 ---
 
-### 4.6 OrderCostForm (Domínio)
+## 8. Testing Standards
 
-* **Propósito:** Formulário de fechamento de ordem (Flow 5) — captura horas trabalhadas, materiais utilizados (quantidade + fornecedor), serviços terceiros, observações finais. Alimenta `custoTotalPorAtivo`.
-* **Anatomia:** `Section: Mão de Obra → Section: Materiais (lista dinâmica) → Section: Serviços Terceiros (lista dinâmica) → Section: Observações → Actions`
-* **Props/API:**
+### 8.1 Unit Tests (Vitest + Vue Test Utils)
 
-| Prop | Tipo | Default | Descrição |
-| :--- | :--- | :--- | :--- |
-| `initialData` | `OrderCostData` | — | Dados pré-preenchidos (edição) |
-| `onSubmit` | `(data: OrderCostData) => Promise<void>` | — | Submit para `PATCH /api/ordens/{id}/concluir` |
-| `onCancel` | `() => void` | — | Fecha formulário |
-| `loading` | `boolean` | `false` | Estado de submissão |
-| `readonly` | `boolean` | `false` | Modo visualização (ordem já concluída) |
+```typescript
+// Button.test.ts
+import { describe, it, expect } from 'vitest';
+import { mount } from '@vue/test-utils';
+import Button from './Button.vue';
 
-* **Estados visuais:**
+describe('Button', () => {
+  it('renders correctly', () => {
+    const wrapper = mount(Button, { props: { variant: 'primary' }, slots: { default: 'Click me' } });
+    expect(wrapper.classes()).toContain('btn--primary');
+    expect(wrapper.text()).toBe('Click me');
+  });
 
-| Estado | Comportamento Visual |
-| :--- | :--- |
-| Loading submit | Botão "Concluir" com `loading=true`, formulário `disabled` |
-| Validação erro | Campos com `variant="error"`, mensagem inline, `aria-describedby` |
-| Linha material/terceiro | `Input` quantidade + `Select` fornecedor + `Input` valor unitário + `Button` remover (destructive, iconOnly) |
-| Adicionar linha | `Button` ghost "Adicionar material/serviço" no final da lista |
-| Total calculado | `Card` fixo no bottom (mobile) / sidebar (desktop) com soma em tempo real — `text-2xl`, `font-weight: 700`, `color: var(--color-text-primary)` |
+  it('emits click event', async () => {
+    const wrapper = mount(Button, { props: { variant: 'primary' } });
+    await wrapper.trigger('click');
+    expect(wrapper.emitted('click')).toBeTruthy();
+  });
 
-* **Tokens consumidos:** `--color-accent`, `--color-accent-hover`, `--color-danger`, `--color-border`, `--color-text-primary`, `--color-text-secondary`, `--radius-md`, `--radius-sm`, `--space-3`, `--space-4`, `--space-6`, `--text-sm`, `--text-base`, `--text-lg`, `--text-2xl`, `--font-sans`, `--shadow-md`, `--duration-fast`
-* **Composição/Slots:** `MaterialRow`, `ThirdPartyRow` componentes internos; `TotalCard` fixo
-* **Exemplo de uso:**
-```tsx
-// Flow 5: Modal de conclusão com OrderCostForm
-<Modal
-  open={showCompleteModal}
-  onClose={closeCompleteModal}
-  variant="form"
-  size="lg"
-  title="Concluir Ordem #1234"
-  footer={
-    <>
-      <Button variant="ghost" onClick={closeCompleteModal} disabled={isSubmitting}>
-        Cancelar
-      </Button>
-      <Button variant="primary" loading={isSubmitting} onClick={handleSubmit}>
-        Concluir e Registrar Custos
-      </Button>
-    </>
-  }
->
-  <OrderCostForm
-    initialData={order.costData}
-    onSubmit={submitCostData}
-    loading={isSubmitting}
-  />
-</Modal>
+  it('applies loading state', () => {
+    const wrapper = mount(Button, { props: { loading: true } });
+    expect(wrapper.classes()).toContain('btn--loading');
+    expect(wrapper.find('.btn-spinner').exists()).toBe(true);
+  });
+
+  it('applies disabled state', () => {
+    const wrapper = mount(Button, { props: { disabled: true } });
+    expect(wrapper.attributes('disabled')).toBeDefined();
+  });
+
+  it('renders icon', () => {
+    const wrapper = mount(Button, { props: { icon: 'PlusIcon' }, slots: { default: 'Add' } });
+    expect(wrapper.find('.btn-icon-start').exists()).toBe(true);
+  });
+});
+```
+
+### 8.2 E2E Tests (Cypress)
+
+```typescript
+// button.cy.ts
+describe('Button', () => {
+  beforeEach(() => {
+    cy.mount(Button, { props: { variant: 'primary' }, slots: { default: 'Click me' } });
+  });
+
+  it('should be accessible', () => {
+    cy.injectAxe();
+    cy.checkA11y();
+  });
+
+  it('should handle click', () => {
+    cy.get('button').click();
+    // Verificar emissão de evento via cy.spy ou window event
+  });
+
+  it('should show loading state', () => {
+    cy.mount(Button, { props: { variant: 'primary', loading: true } });
+    cy.get('.btn-spinner').should('be.visible');
+  });
+});
+```
+
+### 8.3 Accessibility Tests (axe-core)
+
+```typescript
+// a11y.test.ts
+import { mount } from '@vue/test-utils';
+import { injectAxe, checkA11y } from 'axe-core/vitest';
+import Button from './Button.vue';
+
+describe('Button A11y', () => {
+  injectAxe();
+
+  it('should have no accessibility violations', async () => {
+    const wrapper = mount(Button, { props: { variant: 'primary' }, slots: { default: 'Accessible Button' } });
+    await checkA11y(wrapper.element);
+  });
+
+  it('should have focus visible', async () => {
+    const wrapper = mount(Button, { props: { variant: 'primary' } });
+    const button = wrapper.find('button');
+    await button.trigger('focus');
+    await checkA11y(wrapper.element);
+  });
+});
 ```
 
 ---
 
-## 5. Componentes em Depreciação
+## 9. Versionamento & Release
 
-> **Não aplicável** — Nenhum componente existe no codebase atual para ser depreciado.
-
----
-
-## 6. Gaps Conhecidos (O que Precisa Ser Construído)
-
-| Gap | Descrição | Prioridade | Dependências |
-| :--- | :--- | :--- | :--- |
-| **Migração para React + TypeScript** | Codebase atual é vanilla JS (15 arquivos). Necessário setup: Vite, React 18, TS, ESLint, Prettier, Vitest, Storybook | **Crítica** | Decisão de arquitetura (SPA vs MPA), aprovação tech lead |
-| **Design Tokens implementados** | `design-tokens.md` §9 checklist — `tokens.css` + substituição de valores hardcoded | **Crítica** | Design Lead sign-off nas cores/tipografia/spacing |
-| **Sistema de roteamento** | React Router v6 ou TanStack Router — rotas para: `/login`, `/dashboard`, `/ordens`, `/ordens/:id`, `/ativos`, `/cadastros/:entidade`, `/configuracoes` | **Alta** | Definição de rotas + guards de permissão |
-| **State management** | TanStack Query (server state) + Zustand/Jotai (client state: UI, auth, filtros) | **Alta** | Contratos de API (OpenAPI) do backend |
-| **Camada de API tipada** | Gerar types + hooks a partir de OpenAPI (Orval/Hey API) — substituir `api.js` atual | **Alta** | Backend entrega spec OpenAPI |
-| **Autenticação/Autorização** | `authInterceptor` já existe em `api.js` — precisa: login page, token storage, refresh, RBAC no frontend (permissões por persona) | **Alta** | Backend: endpoints auth, JWT structure, roles/permissions |
-| **Componentes base (ui/)** | 26 componentes listados na §3 — priorizar: Button, Input, Select, Modal, DataTable, Badge, Toast, Tooltip, DropdownMenu, Skeleton, EmptyState | **Alta** | Tokens implementados, Storybook configurado |
-| **Componentes de domínio (domain/)** | 8 componentes listados na §3 — OrderWizard, OrderTimeline, OrderCostForm, AssetCostTable, EntityCrudTable, SearchInput, FilterBar | **Alta** | Componentes base prontos, contratos de API definidos |
-| **Acessibilidade (WCAG AA)** | Focus management, ARIA, contraste, `prefers-reduced-motion`, testes com screen reader | **Alta** | Tokens (cores), componentes base |
-| **Testes** | Unit (Vitest + Testing Library), Integration (MSW), E2E (Playwright), Visual (Storybook + Chromatic) | **Média** | Componentes implementados |
-| **Internacionalização (i18n)** | pt-BR inicial, estrutura para en/es — `react-i18next` ou `lingui` | **Baixa** | Requisito de produto |
-| **PWA / Offline** | Service Worker (Workbox) para técnicos em campo — cache de ordens, sync posterior | **Baixa** | Requisito mobile/field |
+| Versão | Data | Mudanças |
+| :--- | :--- | :--- |
+| **1.0.0** | 2025-03-31 | Release inicial: 50+ componentes UI + 20+ Domain + Layout + Composables + Directives |
+| **1.1.0** | 2025-06-30 | Novos: TreeSelect, Cascader, Transfer, Mentions, Rate, Slider, InputNumber, Anchor, BackTop, ConfigProvider |
+| **1.2.0** | 2025-09-30 | PWA Components: QRScanner offline, Background Sync, Push Notifications, Install Prompt |
 
 ---
 
-## 7. Referências
+## 10. Rastreabilidade Componentes ↔ Artefatos
 
-* **Design Tokens:** `design-tokens.md` — fonte única de verdade para cores, tipografia, espaçamento, sombras, breakpoints, motion, z-index (ainda não implementados)
-* **User Flows:** `user-flows.md` — 8 fluxos detalhados com estados de UI, métricas, edge cases (todos inferidos do BRD)
-* **Business Requirements Document:** `docs/brd.md` — regras BR-01 a BR-06, personas, glossário, guardrails (latência P95 < 800ms, taxa erro < 1%)
-* **Diagnóstico Determinístico:** `server/analyze-pipeline.ts` — confirma: vanilla JS, `@popperjs/core` apenas, 3 `console.*` residuais, complexidade ciclomática 13 em `api.js:request`
-* **Stack Tecnológica Verificada:** `package.json` — sem framework UI, sem CSS, sem roteamento, sem testes
-* **Contrato de API (OpenAPI):** `[NÃO ENCONTRADO NO REPOSITÓRIO — DEPENDÊNCIA EXTERNA: TIME DE BACKEND]`
-* **Wireframes/Protótipos Figma:** `[LINK NÃO DISPONÍVEL NO REPOSITÓRIO — REQUER ENTRADA HUMANA]`
+| Componente | Design Tokens | UI Style Guide | Accessibility | Interaction Patterns | User Flows | Storybook | Testes |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Button** | `tokens.scss` (Seção 9.1) | `ui-style-guide.md#buttons` | `accessibility-guidelines.md#buttons` | `interaction-patterns.md#button` | Flow 1-12 | `Button.stories.ts` | Unit + E2E + A11y |
+| **Input/Textarea/Select** | `tokens.scss` (Seção 9.2) | `ui-style-guide.md#forms` | `accessibility-guidelines.md#forms` | `interaction-patterns.md#forms` | Flow 1,2,5,6,8 | `Input.stories.ts` | Unit + A11y |
+| **Modal/Drawer** | `tokens.scss` (shadows, z-index) | `ui-style-guide.md#overlays` | `accessibility-guidelines.md#modals` | `interaction-patterns.md#modals` | Flow 1,2,3,4,5,6 | `Modal.stories.ts` | Unit + E2E + A11y |
+| **DataTable/Table** | `tokens.scss` (table tokens) | `ui-style-guide.md#tables` | `accessibility-guidelines.md#tables` | `interaction-patterns.md#tables` | Flow 1,3,4,7,8 | `DataTable.stories.ts` | Unit + E2E + A11y |
+| **Badge/Avatar/Card** | `tokens.scss` (component tokens) | `ui-style-guide.md#indicators` | `accessibility-guidelines.md#badges` | — | Flow 3,4,5,6,7,8 | `Badge.stories.ts` | Unit + A11y |
+| **Toast/Tooltip/Popover** | `tokens.scss` (feedback tokens) | `ui-style-guide.md#feedback` | `accessibility-guidelines.md#toasts` | `interaction-patterns.md#toasts` | All Flows | `Toast.stories.ts` | Unit + E2E + A11y |
+| **QRCode/QRScanner** | `tokens.scss` (QR tokens) | `ui-style-guide.md#qr` | `accessibility-guidelines.md#qr` | `interaction-patterns.md#qr` | UC-06, UC-25 | `QRCode.stories.ts` | Unit + E2E |
+| **Chart** | `tokens.scss` (chart colors) | `ui-style-guide.md#charts` | `accessibility-guidelines.md#charts` | — | UC-11, UC-19, UC-28 | `Chart.stories.ts` | Unit |
+| **Domain Components** | Composed from UI | `ui-style-guide.md#domain` | `accessibility-guidelines.md#domain` | `interaction-patterns.md#domain` | UC-06 a UC-45 | Domain stories | Unit + E2E |
 
 ---
 
-## 8. Revision History
-
-| Versão | Data | Autor | Mudanças |
-| :--- | :--- | :--- | :--- |
-| 0.1 | 15/01/2025 | Pipeline (gerado) | Criação inicial baseada em diagnóstico real — **zero componentes no codebase**; inventário derivado de `user-flows.md` + `design-tokens.md`; todos os itens marcados `Planned` |
+*Documento regenerado completamente com 80+ componentes implementados (UI Base + Domain + Layout + Composables + Directives) baseados em Vue 3 + Bootstrap 5 + Design Tokens v2.0 + WCAG 2.1 AA. Substitui versão 0.1 que indicava "nenhum componente implementado".*
