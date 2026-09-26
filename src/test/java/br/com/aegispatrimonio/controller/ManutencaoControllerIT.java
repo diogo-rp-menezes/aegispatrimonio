@@ -160,7 +160,14 @@ public class ManutencaoControllerIT extends BaseIT {
         // Autorização granular: o admin bypass do PermissionServiceImpl exige o vínculo
         // rbac_user_role com a role ROLE_ADMIN (coluna legada 'role' não é consultada).
         if ("ROLE_ADMIN".equals(role)) {
-            roleRepository.findByName("ROLE_ADMIN").ifPresent(r -> user.setRoles(java.util.Set.of(r)));
+            br.com.aegispatrimonio.model.Role adminRole = roleRepository.findByName("ROLE_ADMIN")
+                    .orElseGet(() -> {
+                        br.com.aegispatrimonio.model.Role r = new br.com.aegispatrimonio.model.Role();
+                        r.setName("ROLE_ADMIN");
+                        r.setDescription("Administrador com acesso total");
+                        return roleRepository.save(r);
+                    });
+            user.setRoles(java.util.Set.of(adminRole));
         }
         return funcionarioRepository.save(func);
     }
