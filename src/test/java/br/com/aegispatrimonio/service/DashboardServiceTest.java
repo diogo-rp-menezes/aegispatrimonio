@@ -1,11 +1,13 @@
 package br.com.aegispatrimonio.service;
 
+import br.com.aegispatrimonio.context.TenantContext;
 import br.com.aegispatrimonio.dto.ChartDataDTO;
 import br.com.aegispatrimonio.dto.DashboardStatsDTO;
 import br.com.aegispatrimonio.dto.RiskyAssetDTO;
 import br.com.aegispatrimonio.model.StatusAtivo;
 import br.com.aegispatrimonio.repository.AtivoRepository;
 import br.com.aegispatrimonio.repository.LocalizacaoRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -32,8 +34,14 @@ class DashboardServiceTest {
     @InjectMocks
     private DashboardService dashboardService;
 
+    @AfterEach
+    void tearDown() {
+        TenantContext.clear();
+    }
+
     @Test
     void shouldReturnCorrectStats() {
+        TenantContext.setFilialId(1L);
         when(ativoRepository.countByCurrentTenant()).thenReturn(10L);
         when(ativoRepository.countByStatusAndCurrentTenant(StatusAtivo.EM_MANUTENCAO)).thenReturn(2L);
         when(ativoRepository.getValorTotalByCurrentTenant()).thenReturn(new BigDecimal("1000.00"));
@@ -64,5 +72,15 @@ class DashboardServiceTest {
         assertThat(stats.ativosPorTipo().get(0).label()).isEqualTo("Notebook");
         assertThat(stats.riskyAssets()).hasSize(1);
         assertThat(stats.riskyAssets().get(0).nome()).isEqualTo("Test Asset");
+    }
+
+    @Test
+    void shouldThrowWhenTenantContextIsNotSet() {
+        // TenantContext limpo: nenhuma query tenant-scoped deve executar com filialId null
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> dashboardService.getStats())
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Contexto de filial não definido");
+
+        org.mockito.Mockito.verifyNoInteractions(ativoRepository, localizacaoRepository);
     }
 }

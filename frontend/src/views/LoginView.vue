@@ -139,8 +139,6 @@ const handleLogin = async () => {
     });
 
     const data = await handleResponse(response);
-    console.log('Login successful, data:', data);
-    console.log('Token received:', data.token);
 
     // If login successful, we get a token. Proceed to fetch context.
     await fetchUserContextAndRedirect(data.token);

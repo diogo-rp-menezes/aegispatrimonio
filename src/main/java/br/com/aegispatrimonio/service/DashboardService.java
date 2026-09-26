@@ -1,5 +1,6 @@
 package br.com.aegispatrimonio.service;
 
+import br.com.aegispatrimonio.context.TenantContext;
 import br.com.aegispatrimonio.dto.ChartDataDTO;
 import br.com.aegispatrimonio.dto.DashboardStatsDTO;
 import br.com.aegispatrimonio.dto.RiskyAssetDTO;
@@ -32,6 +33,13 @@ public class DashboardService {
 
     @Transactional(readOnly = true)
     public DashboardStatsDTO getStats() {
+        // Guard: falha explícita quando o contexto de tenant não foi definido.
+        // Sem isso, as queries SpEL filtrariam por filial.id = null silenciosamente.
+        if (TenantContext.getFilialId() == null) {
+            throw new IllegalArgumentException(
+                "Contexto de filial não definido. Envie o header X-Filial-ID para consultar o dashboard.");
+        }
+
         long totalAtivos = ativoRepository.countByCurrentTenant();
         long ativosEmManutencao = ativoRepository.countByStatusAndCurrentTenant(StatusAtivo.EM_MANUTENCAO);
         BigDecimal valorTotal = ativoRepository.getValorTotalByCurrentTenant();

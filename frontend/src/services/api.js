@@ -1,12 +1,22 @@
 // src/services/api.js
 
+// Chaves de sessão persistidas no localStorage (fonte única de verdade)
+const SESSION_KEYS = ['authToken', 'userRoles', 'allowedFiliais', 'currentFilial'];
+
+// Limpa a sessão local
+export const clearSession = () => {
+  SESSION_KEYS.forEach((key) => localStorage.removeItem(key));
+};
+
 // Função para tratar respostas HTTP
 export const handleResponse = async (response) => {
-  if (response.status === 401 || response.status === 403) {
-    // Opcional: Redirecionar para login ou limpar storage
-    // localStorage.removeItem('authToken');
-    // window.location.href = '/login';
+  if (response.status === 401 && window.location.pathname !== '/login') {
+    // Sessão expirada/inválida: limpa e redireciona. A guarda de pathname evita
+    // loop quando o próprio /login responde 401 (credenciais inválidas).
+    clearSession();
+    window.location.assign('/login');
   }
+  // 403: não redireciona — usuário autenticado sem permissão vê o erro na view
 
   if (!response.ok) {
     const error = await response.text();
@@ -46,10 +56,7 @@ export const request = async (endpoint, options = {}) => {
   }
 
   if (token) {
-    console.log('Adding Authorization header with token:', token);
     headers['Authorization'] = `Bearer ${token}`;
-  } else {
-    console.log('No token found in localStorage');
   }
 
   if (filialId) {
@@ -81,6 +88,19 @@ export const request = async (endpoint, options = {}) => {
   }
 
   return handleResponse(response);
+};
+
+// Logout server-side: revoga o JWT (denylist) e limpa a sessão local.
+// Fire-and-forget tolerante a falha: sempre limpa e redireciona.
+export const logout = async () => {
+  try {
+    await request('/auth/logout', { method: 'POST' });
+  } catch (e) {
+    console.debug('Logout request failed, clearing local session anyway:', e);
+  } finally {
+    clearSession();
+    window.location.assign('/login');
+  }
 };
 
 // Interceptor legado (mantido para compatibilidade se usado em outro lugar, mas request() é preferido)

@@ -1,146 +1,339 @@
-# CI/CD & Release Plan — Aegis1 Módulo de Manutenção
+# CI/CD & Release Plan — Aegis1
 
-> **Owner:** Eng Lead / DevOps · **Ferramenta de CI/CD:** GitHub Actions
+> **Versão:** 2.0 · **Owner:** DevOps / Tech Leads · **Status:** Draft
+> **Base:** System Architecture v2.0 + Dev Environment v2.0 + NFR v2.0 + Análise AST Java Completa
+> **Ferramenta CI/CD:** GitHub Actions + ArgoCD (GitOps) + Kustomize
+> **Cobertura:** Full Stack — Backend (Java 21/Spring Boot 3.3) + Frontend (Vue 3/Vite/PWA) + Infra (Docker/K8s)
+
+---
 
 ## 1. Pipeline Overview
+
 ```mermaid
 graph LR
-    A[Push/PR] --> B[Static Analysis]
-    B --> C[Unit + Integration Tests]
-    C --> D[Build Frontend]
-    D --> E[Contract Tests (Pact)]
-    E --> F[Deploy Staging]
-    F --> G[E2E Critical + Smoke]
-    G --> H{Aprovação Manual}
-    H -- Sim --> I[Deploy Produção]
-    H -- Não/Automático --> I
-    I --> J[Post-Deploy Verification]
+    A[Push/PR] --> B[Static Analysis & Security]
+    B --> C[Unit Tests]
+    C --> D[Integration Tests (TestContainers)]
+    D --> E[Contract Tests]
+    E --> F[Build Docker Images]
+    F --> G[Security Scan Images]
+    G --> H[Push Registry + Sign]
+    H --> I[Deploy Staging (ArgoCD)]
+    I --> J[E2E + Smoke + Performance]
+    J --> K{Aprovação Manual}
+    K -- Sim --> L[Deploy Prod (ArgoCD)]
+    K -- Auto (Hotfix) --> L
+    L --> M[Post-Deploy Verification]
+    M --> N[Monitoring + Alerting]
 ```
 
-## 2. Pipeline Stages
+---
 
-### Stage 1: Static Analysis
-* **Ferramentas:** ESLint (regras recomendadas + plugin security), Semgrep (OWASP Top 10 + custom: detecção de `localStorage.setItem('token')`, `console.*` com dados sensíveis), `npm audit` (auditoria de dependências)
-* **Arquivos alvo:** `frontend/src/**/*.js`, `frontend/*.js`
-* **Critério de bloqueio:** Qualquer erro ESLint, finding crítico/alto Semgrep, vulnerabilidade `high`/`critical` no `npm audit` = pipeline vermelho
-* **Tempo alvo:** < 3 min
+## 2. Pipeline Stages (GitHub Actions)
 
-### Stage 2: Automated Testing (Nível 1 — Obrigatório para Merge)
-* **Escopo:** Unit Tests (Vitest) + Integration Tests (Vitest + MSW) + Contract Tests Consumer (Pact)
-* **Cobertura mínima exigida:** 
-  * Global: 85% statements / 80% branches / 80% functions / 85% lines
-  * Crítico (`frontend/src/services/api.js`, validações de BR-01 a BR-06): 95% statements / 90% branches
-* **Ferramentas:** Vitest + @testing-library/dom + MSW + @pact-foundation/pact
-* **Artefatos gerados:** Relatórios de cobertura (HTML + LCOV), contratos Pact (`.json`) em `pacts/`
-* **Critério de bloqueio:** Falha em qualquer teste, cobertura abaixo do mínimo, contrato Pact não gerado = pipeline vermelho
-* **Tempo alvo:** < 10 min
+### Stage 1: Static Analysis & Security (< 5 min)
 
-### Stage 3: Build & Packaging
-* **Comando:** `npm run build` (a ser definido — Vite assumido por convenção de projeto vanilla JS moderno)
-* **Artefato gerado:** Bundle estático otimizado em `frontend/dist/` (HTML, JS minificado, CSS, assets)
-* **Registry/Storage:** GitHub Actions Artifacts (retidos por 30 dias) + GitHub Pages / Netlify / Vercel / S3+CloudFront (conforme target de hospedagem — [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] Premissa: hospedagem estática em CDN)
-* **Tagging:** 
-  * `sha-<short-sha>` para cada run de CI
-  * `latest` para `main` branch
-  * `v<MAJOR>.<MINOR>.<PATCH>` para tags Git SemVer
+| Job | Ferramentas | Alvo | Gate |
+| :--- | :--- | :--- | :--- |
+| **Backend Lint** | Checkstyle (Google Java Style), SpotBugs, PMD | `src/main/java/**/*.java` | Fail se errors |
+| **Frontend Lint** | ESLint (Airbnb + Vue + TS + Prettier), `no-console: error` | `frontend/src/**/*.ts`, `frontend/src/**/*.vue` | Fail se errors |
+| **Security SAST** | Semgrep (OWASP Top 10 + Custom: hardcoded secrets, `localStorage.setItem('token')`, crypto weak) | Backend + Frontend | Fail se HIGH/CRITICAL |
+| **Secrets Scan** | TruffleHog / GitLeaks | Todo repo (histórico incluído) | Fail se qualquer segredo |
+| **Dependency Check** | OWASP Dependency Check (CVSS ≥ 7) | `pom.xml`, `frontend/package.json` | Fail se CRITICAL/HIGH |
 
-### Stage 4: Deploy to Staging
-* **Gatilho:** Automático em merge para `main` (após Stage 1-3 verdes)
-* **Estratégia:** Deploy do bundle `frontend/dist/` para ambiente de staging (URL protegida por VPN/SSO)
-* **Validação pós-deploy (automática, < 5 min):** 
-  * Health check: `GET /health` ou carregamento da `index.html` retorna 200
-  * Smoke test Playwright: login → lista ordens → abre detalhe → logout (1 jornada crítica)
-* **Dados:** Dump anonimizado de produção (script `scripts/anonymize-dump.sql` — [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] Premissa: backend usa SQL relacional e pipeline de anonimização existe)
+### Stage 2: Unit Tests (< 5 min)
 
-### Stage 5: Deploy to Production
-* **Gatilho:** Manual (workflow_dispatch) após aprovação em Staging + janela de bake time ≥ 30 min
-* **Estratégia de rollout:** Blue-Green via CDN (swap de origin/path) — rollback instantâneo revertendo DNS/origin
-* **Janela de deploy:** Terça a quinta, 10h–16h BRT (evitar segundas, sextas, feriados, fora de horário comercial)
-* **Pré-requisitos (Definition of Ready):**
-  * [ ] CI verde (Nível 1) na branch/tag de release
-  * [ ] Staging deploy sucedido + E2E crítico (Nível 2) verde
-  * [ ] 0 bugs P0/P1 abertos vinculados à release
-  * [ ] Performance k6 dentro dos SLAs na staging (P95 < 800 ms, erro < 1%)
-  * [ ] Pact contracts verificados contra provider (backend) — `pact-verifier` passa
-  * [ ] Security scan (Semgrep + ZAP Baseline) sem findings críticos/altos não mitigados
+| Job | Ferramentas | Cobertura Mínima | Gate |
+| :--- | :--- | :--- | :--- |
+| **Backend Unit** | JUnit 5 + Mockito + AssertJ | ≥ 80% (Crítico: ≥ 95% domain services, security, predictive, fuzzy) | Fail se < threshold |
+| **Frontend Unit** | Vitest + Vue Test Utils + Happy DOM | ≥ 80% (Crítico: ≥ 95% stores, composables, utils, validators) | Fail se < threshold |
+
+### Stage 3: Integration Tests (TestContainers) (< 15 min)
+
+| Job | Ferramentas | Escopo | Gate |
+| :--- | :--- | :--- | :--- |
+| **Backend IT** | TestContainers (MySQL 8.0 real, Redis) + Spring Boot Test + RestAssured | 100% Controllers + Services + Repositories + Security + Schedulers + Envers + LGPD | Fail se qualquer teste falha |
+| **Frontend Integration** | Vitest + MSW (Mock Service Worker) | API mocks para fluxos críticos | Fail se qualquer teste falha |
+
+> **TestContainers Config:** `.testcontainers.properties` → `testcontainers.reuse.enable=true`, `testcontainers.ryuk.disabled=true` (velocidade 10x)
+
+### Stage 4: Contract Tests (< 5 min)
+
+| Job | Ferramentas | Escopo | Gate |
+| :--- | :--- | :--- | :--- |
+| **Provider (Backend)** | Spring Cloud Contract (Producer) | Gera contratos `.json` em `target/contracts/` | Fail se contrato quebrado |
+| **Consumer (Frontend)** | Pact (Consumer) + Pact Broker | Valida contratos contra provider | Fail se contrato quebrado |
+
+### Stage 5: Build Docker Images (< 10 min)
+
+| Imagem | Dockerfile | Base | Otimizações |
+| :--- | :--- | :--- | :--- |
+| **Backend** | `Dockerfile` (multi-stage) | Builder: `maven:3.9-eclipse-temurin-21` → Runtime: `gcr.io/distroless/java21-debian12` | Layer caching, `.dockerignore`, non-root user 1000, read-only rootfs |
+| **Frontend** | `frontend/Dockerfile` (multi-stage) | Builder: `node:20-alpine` (pnpm) → Runtime: `nginx:alpine` (static) | Vite build, Brotli/Gzip, CSP headers, PWA assets |
+
+**Tags:** `ghcr.io/owner/aegis1-backend:{sha}`, `ghcr.io/owner/aegis1-frontend:{sha}`, `latest` (main), `v{MAJOR}.{MINOR}.{PATCH}` (tags)
+
+### Stage 6: Security Scan Images (< 5 min)
+
+| Job | Ferramenta | Gate |
+| :--- | :--- | :--- |
+| **Trivy Scan** | `trivy image --severity HIGH,CRITICAL --exit-code 1` | Fail se CRITICAL/HIGH |
+| **SBOM Generate** | Syft (`syft packages ghcr.io/owner/aegis1-backend:{sha} -o spdx-json`) | Artefato anexado ao release |
+| **Cosign Sign** | `cosign sign --yes ghcr.io/owner/aegis1-backend:{sha}` (keyless) | Verificação `cosign verify` |
+
+### Stage 7: Deploy Staging (ArgoCD GitOps) (< 5 min)
+
+```yaml
+# ArgoCD Application (staging)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: aegis1-staging
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/diogo-rp-menezes/aegis1.git
+    targetRevision: develop
+    path: k8s/overlays/staging
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: aegis1-staging
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+    - CreateNamespace=true
+    - PrunePropagationPolicy=foreground
+    - PruneLast=true
+  ignoreDifferences:
+  - group: apps
+    kind: Deployment
+    jsonPointers:
+    - /spec/replicas  # HPA gerencia replicas
+```
+
+**Validação Pós-Deploy Automática (< 5 min):**
+- Health Checks: `GET /actuator/health/liveness` + `readiness` → 200
+- Smoke Tests: Cypress (Login → Lista Ordens → Detalhe → Logout) + Playwright (API Health)
+- Métricas: Prometheus scrape OK, Grafana dashboards carregando
+
+### Stage 8: E2E + Smoke + Performance Staging (< 25 min)
+
+| Job | Ferramenta | Escopo | Gate |
+| :--- | :--- | :--- | :--- |
+| **E2E Critical** | Cypress (Chromium/Firefox) | 12 jornadas: Login, 5 Ordens, 4 Cadastros, Listagem, Dashboard, Busca | Fail se qualquer falha |
+| **Accessibility** | Cypress + axe-core | WCAG 2.1 AA (zero critical/serious) | Fail se violações |
+| **Performance** | k6 (Grafana k6 Cloud) | Carga basal (50 VUs 10min) + Pico (200 VUs 5min) | P95 < 500ms (Backend), < 800ms (Frontend), Error < 1% |
+| **Security DAST** | OWASP ZAP Active Scan | Staging URL | Fail se HIGH/CRITICAL |
+
+### Stage 9: Deploy Production (ArgoCD GitOps + Manual Approval)
+
+```yaml
+# ArgoCD Application (prod)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: aegis1-prod
+  namespace: argocd
+spec:
+  project: production
+  source:
+    repoURL: https://github.com/diogo-rp-menezes/aegis1.git
+    targetRevision: main
+    path: k8s/overlays/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: aegis1-prod
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    - PrunePropagationPolicy=foreground
+  # Manual sync only (requires ArgoCD UI/API approval)
+```
+
+**Gatilho:** Manual (`workflow_dispatch`) após:
+- [ ] CI verde (Stages 1-6) na tag de release
+- [ ] Staging deploy sucedido + E2E Critical + Performance + Security verdes
+- [ ] 0 bugs P0/P1 abertos vinculados à release
+- [ ] Pact contracts verificados contra provider (backend)
+- [ ] Janela de deploy: Terça a quinta, 10h–16h BRT
+
+**Estratégia Rollout:** Blue-Green via ArgoCD (Canary opcional 10% → 50% → 100%)
+- `argocd app set aegis1-prod --parameter replicaCount=3` (HPA gerencia)
+- Rollback: `argocd app rollback aegis1-prod <revision>` (< 2 min)
+
+### Stage 10: Post-Deploy Verification (< 10 min)
+
+- [ ] Health Checks verdes (CDN + Backend + DB + Redis)
+- [ ] Métricas negócio: Ordens criadas/min, Taxa conclusão, Dashboard custos
+- [ ] Zero erros críticos 30 min (Sentry + Grafana Alerts)
+- [ ] Smoke Tests sintéticos (Playwright agendado 15min) passam 30 min consecutivos
+- [ ] Error Rate < 0.5% primeiros 60 min
+- [ ] P95 Latência < 500ms (Backend) / < 800ms (Frontend) primeiros 60 min
+- [ ] Comunicação release: Slack #releases + Changelog atualizado + GitHub Release Notes
+
+---
 
 ## 3. Release Strategy
-* **Versionamento:** SemVer (MAJOR.MINOR.PATCH) — tags Git `vX.Y.Z`
-* **Cadência de release:** Contínua (deploy em produção a cada merge em `main` que passe gates) — batch opcional por sprint se negócio exigir
-* **Feature Flags:** Não implementado no código atual — [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] Premissa: se necessário, usar LaunchDarkly/Unleash ou flags baseadas em `localStorage`/`sessionStorage` para rollout gradual de features frontend-only
-* **Branching model:** Trunk-based development — `main` sempre deployável; feature branches de vida curta (< 2 dias); PRs obrigatórios com review + CI verde
+
+### 3.1 Versionamento: SemVer (Semantic Versioning)
+
+| Tipo | Exemplo | Quando |
+| :--- | :--- | :--- |
+| **Major** | `1.0.0` → `2.0.0` | Breaking changes (API, DB schema, config, auth) |
+| **Minor** | `1.0.0` → `1.1.0` | Novas features backward-compatible |
+| **Patch** | `1.0.0` → `1.0.1` | Bug fixes backward-compatible |
+
+### 3.2 Release Flow
+
+```mermaid
+gitGraph
+    commit id: "v1.0.0"
+    branch develop
+    checkout develop
+    commit id: "feat: ativo qr pdf"
+    commit id: "fix: ordem aprovacao"
+    commit id: "refactor: api request"
+    tag: "v1.1.0-rc.1"
+    checkout main
+    merge develop tag: "v1.1.0"
+    branch hotfix/1.1.1
+    checkout hotfix/1.1.1
+    commit id: "fix: jwt refresh race"
+    tag: "v1.1.1"
+    checkout main
+    merge hotfix/1.1.1
+```
+
+1. **Feature Development:** `feature/*` branches off `develop` → PR → CI → Merge `develop`
+2. **Feature Freeze:** PR `develop` → `release/x.y.0` (apenas fixes, sem features)
+3. **Stabilization:** Testes extensivos staging (load, chaos, security, UAT)
+4. **Release Candidate:** Tag `v1.0.0-rc.1` → Deploy staging → Validação UAT (PO + QA)
+5. **Release:** Tag `v1.0.0` → `main` → ArgoCD sync prod → Smoke tests
+6. **Post-Release:** Hotfix branch se necessário (`hotfix/1.0.1` → `main` + `develop`)
+
+### 3.3 Cadência & Feature Flags
+
+- **Deploy Contínuo:** `develop` → Staging automático a cada merge
+- **Produção:** Semanal (Terça/Quinta) ou sob demanda (Hotfix)
+- **Feature Flags:** Não implementado v1.0 (roadmap v1.1: LaunchDarkly/Unleash ou flags baseadas em config DB)
+
+---
 
 ## 4. Environments
-| Ambiente | Propósito | URL | Deploy automático? | Dados |
-| :--- | :--- | :--- | :--- | :--- |
-| **Local** | Desenvolvimento | `http://localhost:5173` (Vite dev server) | N/A (dev) | MSW handlers + fixtures JSON versionados em `tests/fixtures/` |
-| **CI (GitHub Actions)** | Validação de PR | N/A (ephemeral) | Sim (a cada push/PR) | MSW puro (frontend isolado) + seeds determinísticos |
-| **Staging** | Homologação pré-produção | `https://staging-aegis1.exemplo.com` (VPN/SSO) | Sim (merge `main`) | Dump anonimizado de produção |
-| **Production** | Usuários reais | `https://aegis1.exemplo.com` | Manual (workflow_dispatch) | Reais (somente leitura para sintéticos) |
+
+| Ambiente | Propósito | URL | Deploy | Dados | Infra |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Local** | Desenvolvimento | `http://localhost:5173` (Frontend), `http://localhost:8080` (Backend) | Manual (`docker compose --profile dev up`) | TestContainers / Fixtures JSON | Docker Compose (MySQL, Redis, Backend, Frontend, Mailhog, MinIO) |
+| **CI** | Validação PR | Ephemeral | GitHub Actions (Self-hosted runners para TestContainers) | TestContainers MySQL/Redis efêmeros | GitHub Actions Runners (16GB RAM) |
+| **Staging** | Homologação | `https://staging-aegis1.empresa.com` (VPN/SSO) | ArgoCD (auto `develop`) | Dump anonimizado prod + Seed controlado | K8s Namespace `aegis1-staging` (HPA min=2, max=10) |
+| **Production** | Usuários reais | `https://aegis1.empresa.com` | ArgoCD (manual `main`) | Reais (Read-only sintéticos) | K8s Namespace `aegis1-prod` (HPA min=3, max=20, PDB, NetPol) |
+
+---
 
 ## 5. Rollback Strategy
-* **Gatilho de rollback:** 
-  * Taxa de erro (5xx + JS errors) > 1% nos primeiros 10 min pós-deploy
-  * Alerta crítico de negócio (ex: `custoTotalPorAtivo` divergente, vazamento de token)
-  * Falha em smoke tests sintéticos agendados (Playwright a cada 15 min)
-* **Mecanismo:** Reverter CDN/origin para versão anterior (`sha-<previous>` ou tag `vX.Y.Z-1`) — tempo alvo < 2 min
-* **Kill switch complementar:** Feature flag (se implementada) para desabilitar funcionalidade problemática sem redeploy
-* **Tempo alvo de rollback:** < 5 minutos (detecção + execução + verificação)
+
+| Gatilho | Mecanismo | Tempo Alvo |
+| :--- | :--- | :--- |
+| **Error Rate > 1%** (5xx + JS errors) primeiros 10 min | `argocd app rollback aegis1-prod <revision-anterior>` | < 2 min |
+| **Alerta Crítico Negócio** (`custoTotalPorAtivo` divergente, vazamento token, cross-tenant leak) | Rollback imediato + Incident Response | < 5 min |
+| **Smoke Tests Falham** (Playwright 15min consecutivos) | Rollback automático via ArgoCD webhook | < 2 min |
+| **Performance Degradation** (P95 > 2x baseline 30 min) | Rollback + Scale up HPA | < 5 min |
+
+**Kill Switch Complementar:** Feature Flag (config DB) para desabilitar funcionalidade problemática sem redeploy (roadmap v1.1)
+
+---
 
 ## 6. Approval Gates
-| Gate | Ambiente | Aprovador | SLA |
-| :--- | :--- | :--- | :--- |
-| **Deploy Produção** | Production | Eng Lead + PO (conjunto) | ≤ 1h úteis após solicitação |
-| **Hotfix P0** | Production | Eng Lead (pode aprovar sozinho) | Imediato (bypass staging se necessário, com Pact verification local) |
 
-## 7. Post-Deploy Verification
-- [ ] Health checks verdes (CDN + backend API reachable)
-- [ ] Métricas de negócio dentro do esperado (ordens criadas/min, taxa de conclusão, dashboard custos carregando)
-- [ ] Nenhum novo erro crítico em 30 min (Datadog/New Relic / Sentry — [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] Premissa: APM/error tracking configurado)
-- [ ] Smoke tests sintéticos (Playwright agendado) passam por 30 min consecutivos
-- [ ] Error rate < 0.5% nos primeiros 60 min
-- [ ] P95 latência < 800 ms nos primeiros 60 min
-- [ ] Comunicação de release enviada (Slack #releases + changelog atualizado) — se release com features visíveis
-
-## 8. Secrets & Configuration Management
-* **Ferramenta:** GitHub Actions Secrets (repository/organization) + `.env` files locais (não commitados)
-* **Segredos por ambiente:**
-  * **CI:** `NPM_TOKEN` (se publicar pacotes), `PACT_BROKER_TOKEN` (se usar Pact Broker), `SONAR_TOKEN` (se usar SonarCloud)
-  * **Staging:** `STAGING_DEPLOY_KEY` (SSH/RSync/CLI do provedor), `STAGING_API_BASE_URL`
-  * **Production:** `PROD_DEPLOY_KEY`, `PROD_API_BASE_URL`, `CDN_PURGE_TOKEN` (se invalidar cache)
-* **Política de rotação:** 
-  * Chaves de deploy: rotação a cada 90 dias ou após saída de membro da equipe
-  * Tokens de API/serviços: conforme política do provedor (geralmente 90–365 dias)
-  * JWT signing keys (backend): responsabilidade do Backend Lead — frontend apenas consome
-* **Configuração não-secreta:** `vite.config.js` / `environment.js` com variáveis injetadas no build via `import.meta.env.VITE_*` (ex: `VITE_API_BASE_URL`, `VITE_SENTRY_DSN`)
+| Gate | Ambiente | Aprovador | SLA | Condições |
+| :--- | :--- | :--- | :--- | :--- |
+| **Deploy Produção** | Production | Eng Lead + PO (conjunto) | ≤ 1h úteis | CI verde, Staging verde, 0 P0/P1, Performance OK, Pact OK, Security OK |
+| **Hotfix P0** | Production | Eng Lead (pode aprovar sozinho) | Imediato | Bypass staging se necessário (com Pact verification local + CI verde) |
+| **Release Candidate** | Staging | QA Lead + PO | ≤ 4h | E2E Full + Performance + Security + Chaos verdes |
 
 ---
 
-## 9. Implementation Checklist (Próximos Passos)
-*[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] Itens abaixo não existem no codebase atual e precisam ser implementados para habilitar este pipeline.*
+## 6. Secrets & Configuration Management
 
-| Item | Descrição | Responsável | Estimativa |
+| Segredo | Armazenamento | Rotação | Injeção |
 | :--- | :--- | :--- | :--- |
-| **package.json scripts** | Adicionar `test:unit`, `test:integration`, `test:e2e`, `test:contract`, `build`, `lint`, `audit` | Dev | 2h |
-| **Vite config** | Configurar build otimizado (minify, hash assets, code splitting) + env vars | Dev | 2h |
-| **Vitest + MSW setup** | Configurar testes unitários/integração com coverage thresholds | Dev | 4h |
-| **Playwright setup** | Configurar E2E com fixtures, page objects, axe-core | QA | 8h |
-| **Pact consumer tests** | Implementar testes de contrato para endpoints consumidos | Dev | 8h |
-| **GitHub Actions workflows** | Criar `.github/workflows/ci.yml`, `cd-staging.yml`, `cd-production.yml` | Eng Lead | 8h |
-| **Staging infra** | Provisionar ambiente staging (CDN + backend staging + DB anonimizado) | DevOps/Backend | 16h |
-| **Production infra** | Configurar CDN production + Blue-Green swap mechanism | DevOps | 8h |
-| **Monitoring/Alerting** | Configurar Datadog/New Relic/Sentry + dashboards + alertas P0 | Eng Lead | 8h |
-| **Remove console.* residuals** | Limpar `console.error` (linha 26) e `console.log` (linhas 49, 52) em `api.js` | Dev | 0.5h |
-| **Refactor api.js:request** | Quebrar função complexidade 13 em funções menores para testabilidade | Dev | 4h |
+| **DB Password** | Vault / AWS Secrets Manager | 30 dias (auto) | External Secrets Operator → K8s Secret |
+| **JWT Private/Public Key** | Vault PKI / cert-manager | 90 dias (auto) | Vault Agent Injector / cert-manager → K8s Secret |
+| **S3 Credentials** | Vault / AWS Secrets Manager | 90 dias | External Secrets Operator |
+| **SMTP Password** | Vault | 90 dias | External Secrets Operator |
+| **Sentry DSN** | GitHub Actions Secrets / Vault | Conforme Sentry | Build arg (frontend) / Env var (backend) |
+| **GitHub Actions Secrets** | GitHub Settings | 90 dias / saída membro | `secrets.*` nos workflows |
+
+**Config Não-Secreta:** `ConfigMap` K8s (application.yml, nginx.conf) + `application-{dev,staging,prod}.yml` (Spring Profiles)
 
 ---
 
-## 10. Rastreabilidade com Test Strategy
-| Seção deste Plano | Origem no Test Strategy |
-| :--- | :--- |
-| Stage 2 (Unit/Integration/Contract) | Seção 2 (Test Pyramid) + Seção 4 (Coverage Targets) |
-| Stage 4 (Staging Deploy + Smoke) | Seção 3 (Test Environments → Staging) + Seção 7 (Regression Strategy → Nível 2) |
-| Stage 5 (Production Gates) | Seção 7 (Critérios de entrada de release) |
-| Rollback Triggers | Seção 7 (Critérios de saída pós-deploy) + Seção 8 (Bug Severity P0) |
-| Post-Deploy Verification | Seção 7 (Critérios de saída) + Seção 9 (Metrics: error rate, P95) |
-| Secrets/Config | Seção 6 (Test Data Management → Tokens/JWT) + Seção 3 (Environments) |
+## 7. Disaster Recovery & Backup
+
+| Componente | RTO | RPO | Estratégia |
+| :--- | :--- | :--- | :--- |
+| **Frontend (CDN)** | ≤ 15 min | 0 | Assets imutáveis versionados; Rollback CDN (versão anterior); DNS TTL 60s |
+| **Backend (K8s)** | ≤ 30 min | ≤ 1 min | K8s Rollback (Deployment revision); MySQL PITR (binlog + backup snapshot diário); Testes restore mensais |
+| **MySQL Primary** | ≤ 60 min | ≤ 1 min | Automated Backup (RDS/Cloud SQL) + Binlog Replication; Cross-region Read Replica; Restore testado mensalmente |
+| **Redis** | ≤ 15 min | ≤ 5 min | AOF + RDB Snapshots; Replica Multi-AZ; Cache warming script pós-restore |
+| **Object Storage** | ≤ 30 min | 0 | Versioning habilitado; Cross-region Replication (CRR); Lifecycle policies |
+| **Secrets/Vault** | ≤ 15 min | 0 | Vault/SealedSecrets; Backup encrypted; Rotation automática (cert-manager TLS, JWT keys) |
+
+---
+
+## 8. Implementation Checklist (Definition of Done para Pipeline)
+
+### CI/CD Pipeline
+- [ ] GitHub Actions Workflows: `ci.yml`, `cd-staging.yml`, `cd-prod.yml`, `security.yml`, `dependency-update.yml`
+- [ ] Self-hosted Runners para TestContainers (16GB RAM, Docker socket)
+- [ ] TestContainers Reuso habilitado (`.testcontainers.properties`)
+- [ ] Coverage Gate 80% (JaCoCo + Vitest) — Fail se abaixo
+- [ ] Contract Tests (Spring Cloud Contract + Pact) — Bidirecional
+- [ ] Docker Multi-stage Builds (Distroless + Nginx) + SBOM (Syft) + Sign (Cosign) + Scan (Trivy)
+- [ ] ArgoCD Applications (staging + prod) + Kustomize Overlays
+- [ ] Blue-Green/Canary Deploy via ArgoCD + Rollback < 2 min
+- [ ] Post-Deploy Verification Automática (Health, Smoke, Metrics, Alerts)
+
+### Observabilidade Pipeline
+- [ ] Prometheus Operator + ServiceMonitors (Backend, Frontend, K8s, Node)
+- [ ] Grafana Operator + Dashboards Provisionados (Golden Signals + Business KPIs)
+- [ ] Tempo/Jaeger Operator + OpenTelemetry SDK (Java + JS) + Sampling 10%/100% errors
+- [ ] Loki Stack + Promtail + Logback Logstash Encoder (Logs JSON + Correlation ID)
+- [ ] Alertmanager + Routes (Critical→PagerDuty, Warning→Slack, Info→Log)
+- [ ] Sentry (Frontend Errors + RUM Core Web Vitals) + Source Maps Upload CI
+
+### Segurança Pipeline
+- [ ] OWASP Dependency Check (CVSS ≥ 7 = Fail)
+- [ ] SpotBugs + Semgrep + CodeQL (SAST) — Every PR
+- [ ] Trivy Container Scan (CRITICAL/HIGH = Fail) — Every Build
+- [ ] TruffleHog/GitLeaks (Secrets) — Pre-commit + CI
+- [ ] OWASP ZAP Active Scan (DAST) — Staging Deploy + Weekly
+- [ ] Pen Test Manual Anual + Relatório + Remediação 30d
+
+---
+
+## 9. Rastreabilidade Deploy ↔ Artefatos
+
+| Stage | System Arch | Dev Env | Test Strategy | Security Policies | Código |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Static Analysis** | §5 (Quality) | §5 (Lint) | §6 (Static Analysis) | §5 (SAST) | `checkstyle.xml`, `spotbugs.xml`, `eslint.config.js`, `semgrep.yml` |
+| **Unit Tests** | §5 (Quality) | §5 (Test Local) | §6 (Unit) | — | `*Test.java`, `*.test.ts` |
+| **Integration Tests** | §5 (Quality) | §5 (TestContainers) | §6 (Integration) | §7 (Cross-tenant) | `*ControllerIT.java`, `*ServiceIT.java` |
+| **Contract Tests** | §4 (API Spec) | — | §6 (Contract) | — | `*ContractTest.java`, `*.pact.test.ts` |
+| **Build Images** | §10 (Deployment) | §2 (Docker) | — | §6 (Supply Chain) | `Dockerfile*`, `frontend/Dockerfile*`, `.dockerignore` |
+| **Security Scan** | §11 (Observability) | — | §6 (Security) | §5 (SAST/DAST/SCA) | `trivy`, `cosign`, `syft`, `dependency-check` |
+| **Deploy Staging** | §10 (Deployment) | §3 (Docker Compose) | §6 (E2E/Perf) | §7 (Incident Response) | `k8s/overlays/staging/`, `argocd-app-staging.yaml` |
+| **E2E/Perf/Security** | §11 (Observability) | — | §6 (E2E/Perf/Security) | §7 (Alertas) | `cypress/`, `k6/`, `zap/`, `litmus/` |
+| **Deploy Prod** | §10 (Deployment) | — | §6 (Smoke) | §7 (Rollback) | `k8s/overlays/prod/`, `argocd-app-prod.yaml` |
+| **Post-Deploy** | §11 (Observability) | — | §6 (Monitoring) | §7 (Runbooks) | `runbooks/`, `grafana/dashboards/`, `alertmanager/rules/` |
+
+---
+
+*Documento regenerado completamente com base em System Architecture v2.0 + Dev Environment v2.0 + Test Strategy v2.0 + Security Policies v2.0. Substitui versão 1.0 que continha apenas pipeline frontend vanilla JS + CDN estático.*

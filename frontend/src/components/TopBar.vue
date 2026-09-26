@@ -25,6 +25,13 @@
         <h6>John Smith</h6>
         <small>Administrador</small>
       </div>
+      <button
+        class="btn btn-sm btn-outline-secondary ms-2"
+        title="Sair"
+        aria-label="Sair"
+        @click="handleLogout">
+        <i class="bi bi-box-arrow-right"></i>
+      </button>
     </div>
 
     <!-- Quick Switcher Modal -->
@@ -65,6 +72,7 @@
 
 <script setup>
 import { defineProps, defineEmits, ref, onMounted, computed, nextTick } from "vue";
+import { logout } from "../services/api";
 
 defineProps({
   isMobile: Boolean
@@ -126,6 +134,10 @@ onMounted(() => {
         }
     });
 });
+
+const handleLogout = () => {
+    logout();
+};
 
 const onFilialChange = () => {
     if (currentFilial.value) {

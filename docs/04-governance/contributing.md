@@ -1,111 +1,137 @@
 # Contributing & Onboarding Guide — Aegis1
 
-> Bem-vindo(a)! Este guia leva você do zero ao primeiro PR mergeado no **Aegis1** — uma aplicação frontend vanilla JS/ES Modules servida estaticamente, sem build step, que consome uma API REST externa.
+> **Versão:** 2.0 · **Status:** Draft · **Owner:** Tech Leads / DevOps
+> **Base:** System Architecture v2.0 + Dev Environment v2.0 + NFR v2.0 + Análise AST Java Completa
+> **Cobertura:** Full Stack — Backend (Java 21/Spring Boot 3.3) + Frontend (Vue 3/Vite/PWA) + Infra (Docker/K8s/TestContainers)
 
 ---
 
-## 1. Primeiros Passos
+## 1. Primeiros Passos (Zero to Contributing)
 
 ### 1.1 Pré-requisitos Obrigatórios
+
 | Ferramenta | Versão Mínima | Finalidade |
 | :--- | :--- | :--- |
-| **Git** | 2.40+ | Controle de versão |
-| **VS Code** (recomendado) | Latest | Editor com extensões: *ESLint*, *Prettier*, *Live Server* |
-| **Navegador** | Chrome/Edge/Firefox recentes | DevTools para debug de ES Modules, CSP, Network |
-| **Node.js** | 18.x+ | **Opcional** — apenas para ferramentas de dev (lint, testes, servidor estático `serve`) |
-| **pnpm** ou **npm** | pnpm 8+ / npm 9+ | **Opcional** — gerenciador para instalar ferramentas de dev |
+| **JDK** | **21 LTS** (Temurin/Eclipse Adoptium) | Compilar/rodar backend Spring Boot |
+| **Maven** | **3.9+** (Wrapper `mvnw` incluído) | Build backend, gerenciar dependências |
+| **Node.js** | **20 LTS** (Iron) | Frontend build (Vite), ferramentas dev |
+| **pnpm** | **9+** | Gerenciador pacotes frontend (rápido, disk-efficient) |
+| **Docker** | **24+** (Desktop/Engine) | TestContainers, Docker Compose, Build images |
+| **Docker Compose** | **v2.20+** (plugin Docker) | Orquestração local (MySQL, Redis, Backend, Frontend) |
+| **Git** | **2.40+** | Versionamento, hooks, CI |
+| **kubectl** | **1.28+** | Deploy/debug K8s local (kind/k3d) ou remoto |
+| **kind** ou **k3d** | **0.22+** / **5.5+** | Cluster K8s local para testes integração/infra |
+| **Helm** | **3.12+** | Charts K8s (ingress, cert-manager, prometheus, etc.) |
+| **VS Code** | **Latest** | IDE recomendada |
 
-> **Nota:** O repositório **não possui** `package.json` com scripts, `devDependencies`, bundler (Vite/Webpack), TypeScript, nem backend/banco local. O desenvolvimento roda 100% no navegador contra a API externa.
+### 1.2 VS Code Extensions (Obrigatórias)
 
-### 1.2 Clone e Setup Inicial
+```json
+{
+  "recommendations": [
+    "vscjava.vscode-java-pack",
+    "vmware.vscode-spring-boot",
+    "redhat.vscode-yaml",
+    "ms-kubernetes-tools.vscode-kubernetes-tools",
+    "vue.volar",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "ms-azuretools.vscode-docker",
+    "github.vscode-github-actions",
+    "sonarsource.sonarlint-vscode",
+    "editorconfig.editorconfig"
+  ]
+}
+```
+
+### 1.3 Clone & Setup Inicial
+
 ```bash
-# 1. Clonar
-git clone <url-do-repo> aegis1
+git clone https://github.com/diogo-rp-menezes/aegis1.git
 cd aegis1
 
-# 2. (Opcional) Inicializar package.json para ferramentas de dev
-npm init -y
-# ou
-pnpm init -y
+# Git hooks (pre-commit: lint, format, test)
+cat > .git/hooks/pre-commit << 'EOF'
+#!/bin/bash
+set -e
+echo "🔍 Running pre-commit checks..."
+./mvnw checkstyle:check spotbugs:check -q -DskipTests || exit 1
+cd frontend && pnpm lint || exit 1 && pnpm format:check || exit 1 && cd ..
+echo "✅ Pre-commit checks passed"
+EOF
+chmod +x .git/hooks/pre-commit
 
-# 3. (Opcional) Instalar ferramentas de qualidade de código
-npm install -D eslint prettier @eslint/js eslint-plugin-import eslint-plugin-promise serve
-# ou
-pnpm add -D eslint prettier @eslint/js eslint-plugin-import eslint-plugin-promise serve
+# direnv (opcional, recomendado)
+cat > .envrc << 'EOF'
+source_env_if_exists .env.local
+export MAVEN_OPTS="-Xmx2g -XX:+UseG1GC"
+export JAVA_HOME=$(/usr/libexec/java_home -v 21 2>/dev/null || echo "/usr/lib/jvm/temurin-21-jdk")
+export PNPM_HOME="$HOME/.local/share/pnpm"
+export PATH="$PNPM_HOME:$PATH"
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+export TESTCONTAINERS_REUSE_ENABLE=true
+export TESTCONTAINERS_RYUK_DISABLED=true
+EOF
+direnv allow
 ```
 
-### 1.3 Configurar Variáveis de Ambiente
-**Não existe `.env.example`** — variáveis de build não se aplicam (sem build step).  
-A URL da API backend é definida em `frontend/src/services/api.js`:
+### 1.4 Verificação de Ambiente (Definition of Ready para Dev)
 
-```js
-// frontend/src/services/api.js (linha ~10)
-const API_BASE_URL = 'https://api.aegis1.example.com'; // ← altere para dev/staging
-```
-
-**Alternativa (recomendada para evitar CORS):** use proxy local (ver seção 1.5).
-
-### 1.4 Subir Servidor Estático Local
-Escolha **uma** opção:
-
-| Opção | Comando | Porta Padrão |
-| :--- | :--- | :--- |
-| **A. npx serve** (rápido, com CORS) | `npx serve frontend -l 3000 --cors` | 3000 |
-| **B. Python built-in** (sem Node) | `cd frontend && python -m http.server 3000` | 3000 |
-| **C. VS Code Live Server** | Botão direito em `frontend/index.html` → "Open with Live Server" | 5500 |
-| **D. http-server global** | `npm i -g http-server && http-server frontend -p 3000 -c-1` | 3000 |
-
-Acesse: `http://localhost:3000` (ou porta indicada).
-
-### 1.5 Proxy Local para API (Evita CORS)
-Se o backend não permite `Origin: http://localhost:3000`:
-
-```bash
-# Com serve (opção A acima)
-npx serve frontend -l 3000 --cors --proxy "/api:https://api.aegis1.example.com"
-```
-
-Ajuste `frontend/src/services/api.js` para chamar `/api/...` em vez da URL absoluta.
-
-### 1.6 Checklist de Verificação do Ambiente
-- [ ] Servidor estático inicia sem erros e serve `index.html` em `http://localhost:3000`
-- [ ] Console do navegador **não mostra erros de carregamento de módulos** (ES Modules via `<script type="module">`)
-- [ ] Chamada de rede para `API_BASE_URL` (ou proxy `/api`) retorna 200/401 (não 0/CORS error/ERR_CONNECTION_REFUSED)
-- [ ] `npx eslint frontend/src --ext .js` executa sem erros **(após configurar ESLint — ver seção 5)**
-- [ ] `npx prettier --check frontend/src` passa **(após configurar Prettier — ver seção 5)**
-- [ ] `npm test` / `npx vitest run` executa e passa **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA: suite de testes ainda não implementada; NFR-M02 exige ≥ 80% cobertura em `api.js` e fluxos de ordem]**
-- [ ] Variáveis sensíveis (`TELEMETRY_DSN`) **não** estão commitadas; `.env*` no `.gitignore` (se vier a existir)
-- [ ] CSP headers funcionam (testar via `serve` com headers customizados ou extensão VS Code "Live Server" com config de headers)
+- [ ] `./mvnw clean verify` passa (testes unitários + integração + quality gates)
+- [ ] `cd frontend && pnpm install && pnpm lint && pnpm format:check && pnpm typecheck && pnpm test:coverage` passa
+- [ ] `docker compose --profile dev up -d` sobe todos serviços saudáveis
+- [ ] Backend acessível em `http://localhost:8080/actuator/health` → `{"status":"UP"}`
+- [ ] Frontend acessível em `http://localhost:5173` → carrega sem erros console
+- [ ] Login funciona: `POST /api/v1/auth/login` → retorna `accessToken` + `refreshToken` cookie
+- [ ] Multi-tenancy: Header `X-Tenant-Id: 1` filtra dados corretamente
+- [ ] Busca fuzzy: `GET /api/v1/busca?q=notebok` → retorna resultados com highlight
+- [ ] PWA: Service Worker registrado (`Application → Service Workers` → `activated`)
+- [ ] Observabilidade: `http://localhost:8080/actuator/prometheus` expõe métricas
+- [ ] Testes contrato: `./mvnw test -Dtest=*ContractTest` + `cd frontend && pnpm pact:verify` passam
+- [ ] Segurança: `./mvnw org.owasp:dependency-check-maven:check` → zero CVSS ≥ 7
 
 ---
 
-## 2. Estrutura do Projeto
+## 2. Estrutura do Projeto (Resumo)
 
 ```
 aegis1/
-├── frontend/                    # Raiz servida estaticamente
-│   ├── index.html               # Entry point HTML (carrega main.js como module)
+├── .github/workflows/         # GitHub Actions CI/CD
+├── frontend/                  # Vue 3 + Vite + PWA
 │   ├── src/
-│   │   ├── main.js              # Bootstrap da aplicação (importa rotas, componentes)
-│   │   ├── services/
-│   │   │   └── api.js           # Cliente HTTP central (fetch + auth + retry + timeout) — 33 funções, 627 LOC total
-│   │   ├── components/          # Componentes UI vanilla JS (se existirem)
-│   │   ├── pages/               # Páginas/rotas (se existirem)
-│   │   └── utils/               # Helpers puros (formatação, validação, etc.)
-│   ├── assets/                  # Imagens, fontes, ícones estáticos
-│   └── styles/                  # CSS global / variáveis / reset
-├── .gitignore                   # Deve ignorar node_modules/, .env*, dist/, coverage/
-├── README.md                    # Visão geral do produto (fora do escopo deste doc)
-└── CONTRIBUTING.md              # Este arquivo
+│   │   ├── main.ts            # Bootstrap (Pinia, Router, Axios, i18n)
+│   │   ├── router/            # Vue Router (lazy-loaded + guards)
+│   │   ├── stores/            # Pinia stores (auth, order, asset, search, ui, tenant)
+│   │   ├── api/               # Axios instance + interceptors
+│   │   ├── components/        # UI Kit (Button, Table, Modal, Form, Chart, QR, PDF)
+│   │   ├── pages/             # Page components (Dashboard, Assets, Orders, etc.)
+│   │   ├── composables/       # Vue Composition API utilities
+│   │   ├── utils/             # Helpers (date, currency, format, permissions)
+│   │   └── sw/                # Service Worker, IndexedDB, Background Sync
+│   ├── vite.config.ts         # Vite + PWA Plugin (Workbox) + Proxy
+│   └── package.json
+├── src/main/java/com/aegis1/  # Backend Java
+│   ├── config/                # Security, Auditoria, MultiTenancy, Scheduler, OpenAPI
+│   ├── security/              # JwtTokenProvider, AegisShield, MultiTenancyFilter
+│   ├── domain/                # Módulos: ativo, ordem, preventiva, preditiva, busca, cadastro, relatorio, auditoria, seguranca, lgpd
+│   └── shared/                # Kernel compartilhado (exceptions, dto, util, events)
+├── src/main/resources/
+│   ├── db/migration/          # Flyway (V1__init.sql, V2__..., R__repeatable)
+│   ├── templates/pdf/         # Thymeleaf templates (Termo, Etiquetas)
+│   ├── application*.yml       # Configs
+│   └── keys/                  # JWT keys (dev only)
+├── k8s/                       # Kubernetes manifests (Kustomize overlays)
+├── docker-compose*.yml        # Full stack local
+├── Dockerfile*                # Multi-stage builds
+├── pom.xml                    # Maven POM
+└── .editorconfig              # EditorConfig
 ```
-
-> **Diagnóstico real:** 15 arquivos `.js` sob `frontend/`, 33 funções, 627 LOC. Zero classes. Zero arquivos de teste, config, ou backend.
 
 ---
 
-## 3. Padrões de Commit
+## 3. Padrões de Commit (Conventional Commits 1.0 — Português)
 
-### 3.1 Convenção Adotada: **Conventional Commits 1.0** (em português)
 ```
 <tipo>(<escopo>): <descrição curta no imperativo>
 
@@ -114,7 +140,7 @@ aegis1/
 [rodapé opcional: Refs #123, Closes #456]
 ```
 
-### 3.2 Tipos Permitidos
+### Tipos Permitidos
 | Tipo | Quando Usar |
 | :--- | :--- |
 | `feat` | Nova funcionalidade visível ao usuário |
@@ -126,306 +152,295 @@ aegis1/
 | `perf` | Melhoria de performance |
 | `security` | Correção de vulnerabilidade |
 | `style` | Formatação, lint, sem mudança lógica |
+| `ci` | Mudanças em CI/CD pipelines |
 
-### 3.3 Escopos Sugeridos (baseados na estrutura real)
-- `api` — `frontend/src/services/api.js`
-- `ui` — componentes/páginas em `frontend/src/components/`, `frontend/src/pages/`
-- `config` — ESLint, Prettier, Vitest, package.json, scripts
-- `docs` — README, CONTRIBUTING, arquitetura
-- `devops` — CI/CD, proxy, CDN, variáveis de ambiente
+### Escopos Sugeridos
+**Backend:** `ativo`, `ordem`, `preventiva`, `preditiva`, `busca`, `cadastro`, `relatorio`, `auditoria`, `seguranca`, `lgpd`, `auth`, `config`, `infra`
+**Frontend:** `dashboard`, `assets`, `orders`, `preventiva`, `preditiva`, `busca`, `cadastros`, `admin`, `relatorios`, `lgpd`, `ui`, `pwa`, `auth`, `router`, `stores`
+**Infra/Transversal:** `ci`, `docker`, `k8s`, `db`, `security`, `obs`, `docs`, `deps`
 
-### 3.4 Exemplos
+### Exemplos
 ```
-feat(api): adiciona interceptador de refresh token automático
-fix(api): corrige timeout em requisições longas (>30s)
-refactor(api): extrai withRetry e withTimeout de request() (complexidade 13→8)
-docs(onboarding): adiciona seção de proxy local para CORS
-chore(config): adiciona ESLint + Prettier + Vitest ao package.json
-test(api): cobre fluxo de erro 401 + refresh token
+feat(ativo): adiciona suporte a QR Code unitário + Termo PDF
+fix(ordem): corrige validação BR-06 (evidência obrigatória na aprovação)
+refactor(api): extrai retryLogic e timeoutHandler de request() (complexidade 13→8)
+docs(arquitetura): atualiza ADR-003 com decisão Aegis Shield
+chore(deps): atualiza Spring Boot 3.3.0 → 3.3.1
+test(preditiva): cobre regressão linear OLS com IC 95%
+security(auth): implementa rotação de refresh token (HttpOnly cookie)
+perf(busca): adiciona cache Redis TTL 5min para queries fuzzy frequentes
+ci(pipeline): adiciona contract tests Pact no stage validate
 ```
 
-### 3.5 Regras Adicionais
-- **Commits atômicos:** uma mudança lógica por commit.
-- **Mensagens em português** (padrão da equipe).
-- **Máx. 72 chars** na linha de assunto; corpo quebrado em 80 chars.
-- **Breaking changes:** indicar `BREAKING CHANGE:` no corpo ou `!` após tipo/escopo (`feat(api)!: ...`).
+### Regras Adicionais
+- Commits atômicos: uma mudança lógica por commit
+- Mensagens em português (padrão da equipe)
+- Máx. 72 chars na linha de assunto; corpo quebrado em 80 chars
+- Breaking changes: `BREAKING CHANGE:` no corpo ou `!` após tipo/escopo
+- Signed commits: `git commit -s` (DCO - Developer Certificate of Origin)
 
 ---
 
 ## 4. Fluxo de Contribuição (Branching & PRs)
 
-### 4.1 Branching Model: **GitHub Flow Simplificado**
+### 4.1 Branching Model: GitHub Flow + Release Branches
+
 ```
-main (protegida, deploy automático em CDN)
+main (protegida, deploy automático staging → prod via ArgoCD)
   │
-  ├── feature/nome-da-feature     # novas funcionalidades
-  ├── fix/nome-do-bug             # correções
-  ├── refactor/nome-da-refatoracao
-  ├── docs/nome-da-doc
-  └── chore/nome-da-tarefa
+  ├── develop (integração contínua, deploy automático staging)
+  │     ├── feature/ativo-qr-pdf
+  │     ├── fix/ordem-aprovacao-evidencia
+  │     ├── refactor/api-request-complexity
+  │     ├── docs/adr-aegis-shield
+  │     └── chore/deps-spring-boot-331
+  │
+  ├── release/1.0.0 (stabilization, apenas fixes)
+  │     ├── fix/release-1.0.0-login-refresh
+  │     └── fix/release-1.0.0-fuzzy-search-cache
+  │
+  └── hotfix/1.0.1 (apenas main → prod urgente)
+        └── fix/hotfix-1.0.1-jwt-key-rotation
 ```
 
-### 4.2 Passo a Passo
-1. **Atualize `main`:** `git checkout main && git pull origin main`
-2. **Crie branch:** `git checkout -b feature/nome-da-feature` (use tipo/escopo do commit)
-3. **Desenvolva** seguindo padrões de código (seção 5) e testes (seção 5.3).
-4. **Rode qualidade localmente** (antes de push):
+### 4.2 Branch Naming Convention
+```
+<tipo>/<escopo>-<descrição-kebab-case>
+# Exemplos:
+feature/ativo-qr-code-pdf
+fix/ordem-aprovacao-evidencia-obrigatoria
+refactor/api-request-extract-retry-timeout
+docs/adr-003-aegis-shield-decision
+chore/deps-update-spring-boot-331
+test/preditiva-regressao-linear-ols
+security/auth-refresh-token-rotation
+perf/busca-fuzzy-redis-cache-ttl
+ci/github-actions-add-contract-tests
+```
+
+### 4.3 Passo a Passo do PR
+1. Atualize `develop`: `git checkout develop && git pull origin develop`
+2. Crie branch: `git checkout -b feature/ativo-qr-code-pdf`
+3. Desenvolva seguindo padrões de código (seção 5) e testes (seção 6)
+4. Rode qualidade localmente:
    ```bash
-   npx eslint frontend/src --ext .js --max-warnings=0
-   npx prettier --check frontend/src
-   npx vitest run                 # quando configurado [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
+   ./mvnw checkstyle:check spotbugs:check test -DskipITs -q
+   cd frontend && pnpm lint && pnpm format:check && pnpm typecheck && pnpm test:coverage
    ```
-5. **Commit & Push:** `git push -u origin feature/nome-da-feature`
-6. **Abra Pull Request** contra `main` com template (abaixo).
-7. **Solicite revisão** de **pelo menos 1 revisor** (owner ou maintainer).
-8. **Enderece comentários** (novos commits na mesma branch).
-9. **Merge via Squash** após CI verde e aprovação — mantém histórico limpo.
-
-### 4.3 Template de PR Obrigatório
-```markdown
-## O que este PR faz
-<!-- Descrição clara e concisa da mudança -->
-
-## Como testar
-<!-- Passos manuais ou comandos para validar a mudança -->
-1. ...
-2. ...
-
-## Checklist
-- [ ] Testes adicionados/atualizados (ou justificativa se não aplicável)
-- [ ] Documentação atualizada (README, CONTRIBUTING, comentários de código)
-- [ ] Sem breaking changes (ou documentado em "Breaking Changes" abaixo)
-- [ ] Lint e formatação passam localmente
-- [ ] Console limpo (sem `console.log/error` em código de produção)
-
-## Breaking Changes (se houver)
-<!-- Descreva o que quebra e migração necessária -->
-```
+5. Commit & Push: `git push -u origin feature/ativo-qr-code-pdf`
+6. Abra Pull Request contra `develop` com template
+7. Solicite revisão de **pelo menos 1 revisor** (code owner do módulo)
+8. CI deve passar (GitHub Actions: build, test, security, contract, bundle size)
+9. Merge (Squash and merge) → `develop` → deploy automático staging via ArgoCD
+10. Release: Quando `develop` estável → PR `develop` → `main` → tag `v1.0.0` → deploy prod
 
 ---
 
 ## 5. Padrões de Código
 
-### 5.1 Linguagem & Runtime
-- **JavaScript Vanilla (ES2022+)** — ES Modules nativos (`<script type="module">`).
-- **Sem TypeScript, sem bundler, sem transpilação.**
-- **Runtime alvo:** Navegadores modernos (últimas 2 versões major de Chrome, Edge, Firefox, Safari).
+### 5.1 Backend (Java 21 + Spring Boot 3.3)
 
-### 5.2 Estilo & Lint (Obrigatório — Configurar no Primeiro PR de Tooling)
-> **Estado atual:** **Não configurado**. O diagnóstico encontrou `console.error/log` em `api.js:26,49,52` e complexidade ciclomática 13 em `request()`.
-
-**Configuração alvo (`.eslintrc.cjs` na raiz):**
-```js
-module.exports = {
-  root: true,
-  env: { browser: true, es2022: true },
-  parserOptions: { ecmaVersion: 'latest', sourceType: 'module' },
-  plugins: ['import', 'promise'],
-  extends: ['eslint:recommended', 'plugin:import/recommended', 'plugin:promise/recommended'],
-  rules: {
-    'no-console': 'error',                    // NFR-M03, NFR-SEC04
-    'complexity': ['error', 10],              // NFR-M01: request() hoje = 13
-    'max-depth': ['error', 4],
-    'max-lines-per-function': ['error', 50],
-    'import/order': ['error', { 'newlines-between': 'always' }],
-    'promise/always-return': 'error',
-    'promise/no-return-wrap': 'error',
-    'promise/param-names': 'error'
-  },
-  overrides: [
-    { files: ['**/*.test.js'], env: { jest: true } }
-  ]
-};
-```
-
-**Prettier (`.prettierrc`):**
-```json
-{
-  "singleQuote": true,
-  "trailingComma": "es5",
-  "printWidth": 100,
-  "tabWidth": 2,
-  "semi": true
-}
-```
-
-**Scripts no `package.json` (a criar):**
-```json
-{
-  "scripts": {
-    "lint": "eslint frontend/src --ext .js --max-warnings=0",
-    "format": "prettier --write frontend/src",
-    "format:check": "prettier --check frontend/src",
-    "test": "vitest run --reporter=verbose",
-    "test:watch": "vitest",
-    "dev": "serve frontend -l 3000 --cors"
-  }
-}
-```
-
-### 5.3 Convenções de Nomenclatura
-| Entidade | Convenção | Exemplo |
+| Padrão | Ferramenta | Configuração |
 | :--- | :--- | :--- |
-| Arquivos JS | `kebab-case.js` | `api.js`, `order-form.js` |
-| Funções/Variáveis | `camelCase` | `fetchOrders`, `apiBaseUrl` |
-| Constantes globais | `UPPER_SNAKE_CASE` | `API_BASE_URL`, `DEFAULT_TIMEOUT_MS` |
-| Componentes (se houver) | `PascalCase` | `OrderCard`, `CostBreakdown` |
-| Eventos customizados | `kebab-case` | `order:created`, `auth:token-refreshed` |
+| **Estilo** | Checkstyle | Google Java Style (`checkstyle.xml`) |
+| **Bugs** | SpotBugs | `spotbugs.xml` (max rank 15) |
+| **Code Smells** | PMD | `pmd-ruleset.xml` |
+| **Complexidade** | Checkstyle/PMD | Ciclomática ≤ 10 por método; Classe ≤ 500 linhas |
+| **Null Safety** | Annotations | `@NonNull` / `@Nullable` (Lombok `@NonNull` em construtores) |
+| **Imutabilidade** | Records / `final` | Preferir `record` para DTOs; `final` em campos/parâmetros |
+| **Exceções** | Custom Exceptions | `BusinessException` (409), `NotFoundException` (404), `ValidationException` (400) |
+| **Transações** | `@Transactional` | Read-only para queries; `rollbackFor = Exception.class` em comandos |
+| **Validação** | Bean Validation | `@Valid` em DTOs; `@NotNull`, `@Size`, `@Pattern`, custom validators |
+| **Documentação** | JavaDoc | Público API (Controllers, Services, DTOs) — obrigatório |
+| **Arquitetura** | ArchUnit | Testes: `ArchUnitTest` valida boundaries |
 
-### 5.4 Testes Obrigatórios [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
-> **NFR-M02 exige ≥ 80% cobertura em `api.js` e fluxos de ordem.**  
-> **Stack de teste alvo:** Vitest (rápido, ESM nativo, compatível com navegador via JSDOM/happy-dom).
+### 5.2 Frontend (Vue 3 + TypeScript + Vite)
 
-**O que testar (mínimo):**
-- `api.js`: `request()` — sucesso, 401+refresh, 4xx/5xx, timeout, abort, retry.
-- Fluxos de ordem: criação, listagem, cancelamento, cálculo de custo.
-- Utils puros: formatação de moeda, datas, validação de CPF/CNPJ.
-
-**Estrutura sugerida:**
-```
-frontend/
-├── src/
-│   └── services/
-│       ├── api.js
-│       └── api.test.js          # co-locado
-└── test/
-    ├── setup.js                 # globals, mocks (fetch, localStorage)
-    └── utils/
-        └── currency.test.js
-```
-
----
-
-## 6. Revisão de Código (Code Review Guidelines)
-
-### 6.1 O Que Revisores Devem Verificar
-| Critério | Perguntas-Chave |
-| :--- | :--- |
-| **Corretude** | Resolve o problema? Edge cases cobertos? Tratamento de erro adequado? |
-| **Legibilidade** | Nomes claros? Funções pequenas (<50 linhas)? Comentários *por que*, não *o que*? |
-| **Testes** | Novos testes para features/fixes? Cobertura ≥ 80% nos arquivos alterados? |
-| **Segurança** | Sem segredos no código? Sanitização de entrada? CSP compatível? Sem `eval`/`innerHTML` inseguro? |
-| **Performance** | Evita re-renders desnecessários? `request()` usa `AbortController`? Payloads mínimos? |
-| **Padrões** | Segue ESLint/Prettier? Commits Conventional? Escopo correto? |
-
-### 6.2 Tempo de Resposta Esperado
-- **Primeira revisão:** ≤ 1 dia útil após PR aberto.
-- **Revisões subsequentes:** ≤ 4 horas úteis.
-
-### 6.3 Como Dar Feedback Construtivo
-- **Tom:** Respeitoso, impessoal, focado no código.
-- **Sugestões vs. Bloqueios:** Use `Suggestion:` para melhorias opcionais; `Must fix:` para bloqueios (bugs, segurança, breaking changes não documentados).
-- **Exemplo bom:**  
-  > `Suggestion:` Extrair `withRetry` para função separada reduz complexidade de `request` de 13 para ≤10 (NFR-M01).  
-  > `Must fix:` `console.log` em `api.js:49` vaza token em produção — remover antes do merge.
-
----
-
-## 7. Reportando Bugs
-
-### 7.1 Onde Reportar
-**GitHub Issues** do repositório (aba *Issues* → *New Issue* → *Bug Report*).
-
-### 7.2 Template Obrigatório
-```markdown
-## Descrição
-<!-- O que acontece vs. o que deveria acontecer -->
-
-## Passos para Reproduzir
-1. ...
-2. ...
-3. ...
-
-## Comportamento Esperado
-<!-- Descrição clara -->
-
-## Comportamento Atual
-<!-- Logs, screenshots, vídeo (se aplicável) -->
-
-## Ambiente
-- OS: [ex: Windows 11, macOS 14, Ubuntu 22.04]
-- Navegador: [ex: Chrome 126, Firefox 127]
-- Versão do frontend: [commit hash ou tag]
-- Backend: [dev/staging/prod + versão se conhecida]
-
-## Contexto Adicional
-<!-- Configurações especiais, proxy, flags de feature, etc. -->
-```
-
----
-
-## 8. Propondo Novas Funcionalidades
-
-### 8.1 Processo: **RFC Leve (Issue + Discussão)**
-1. Abra **Issue** com label `rfc` ou `feature-proposal`.
-2. Preencha:
-   - **Problema:** Qual dor do usuário/negócio resolve?
-   - **Solução proposta:** Fluxo, API, UI, mudanças de dados.
-   - **Alternativas consideradas:** Por que esta é a melhor?
-   - **Impacto:** Performance, bundle size, breaking changes, migração.
-   - **Esforço estimado:** T-shirt size (XS/S/M/L/XL).
-3. Discussão assíncrona (mínimo 2 dias úteis para comentários).
-4. Aprovação de **1 maintainer** → autorizado a implementar.
-
-> **Exemplo real:** "Code-splitting por rota + roteador leve" (Future Evolution #3 do SAD) — requer RFC antes de iniciar.
-
----
-
-## 9. Código de Conduta
-
-**Referência:** `CODE_OF_CONDUCT.md` (raiz do repositório — **não existe ainda**; criar baseado no [Contributor Covenant v2.1](https://www.contributor-covenant.org/version/2/1/code_of_conduct/)).
-
-### Resumo Operacional
-| Princípio | Ação Prática |
-| :--- | :--- |
-| **Respeito** | Linguagem inclusiva; sem ataques pessoais; assumir boa intenção. |
-| **Inclusão** | Acolher contribuições de qualquer nível de experiência; mentoria ativa. |
-| **Profissionalismo** | Feedback técnico, não pessoal; resolver conflitos em privado primeiro. |
-| **Denúncia** | Canal: `conduct@aegis1.example.com` (ou issue privada para maintainers). Resposta em ≤ 48h. |
-
-> **Ação:** Primeiro PR de *chore* deve adicionar `CODE_OF_CONDUCT.md` e linkar aqui.
-
----
-
-## 10. Contatos & Suporte
-
-| Canal | Uso | Tempo de Resposta Esperado |
+| Padrão | Ferramenta | Configuração |
 | :--- | :--- | :--- |
-| **GitHub Issues** | Bugs, features, RFCs, dúvidas técnicas públicas | ≤ 2 dias úteis (triage) |
-| **Slack/Discord da equipe** (se houver) | Dúvidas rápidas, pair programming, alinhamento diário | Tempo real (horário comercial) |
-| **Email da equipe** (`team@aegis1.example.com`) | Questões sensíveis (segurança, dados, conduta) | ≤ 24h |
-| **Documentação viva** | `README.md`, `CONTRIBUTING.md`, `docs/architecture/` | Sempre atualizada no PR que muda comportamento |
+| **Lint** | ESLint | `eslint.config.js` (Airbnb/Standard + Vue + TypeScript + Prettier) |
+| **Format** | Prettier | `.prettierrc` (single quote, trailing comma, printWidth 100) |
+| **Types** | TypeScript | `tsconfig.json` (strict: true, noImplicitAny, strictNullChecks) |
+| **Complexidade** | ESLint | `complexity: ["error", 10]` (ciclomática ≤ 10) |
+| **Console** | ESLint | `no-console: "error"` (produção) / `warn` (dev) |
+| **Componentes** | Vue 3 | `<script setup>` + Composition API + `defineProps`/`defineEmits` tipados |
+| **Estado** | Pinia | Stores tipados (`defineStore` com `state`, `getters`, `actions` tipados) |
+| **Roteamento** | Vue Router | Lazy-loaded routes + Guards (auth, permission, tenant) |
+| **API Client** | Axios | Instância única + Interceptors (auth, error, tracing, retry) |
+| **Testes** | Vitest + Vue Test Utils | Unit (stores, utils, composables) + Component (mount + props + events) |
+| **E2E** | Cypress | Fluxos críticos (login, criar ativo, ordem completa, health check) |
+| **Acessibilidade** | axe-core | `cy.injectAxe()` + `cy.checkA11y()` em testes E2E |
 
----
+### 5.3 Database (Flyway + MySQL 8.0)
 
-## Apêndice A — Comandos Úteis de Referência Rápida
-
-| Comando | Descrição |
+| Padrão | Regra |
 | :--- | :--- |
-| `npx serve frontend -l 3000 --cors` | Sobe servidor estático local com CORS (dev rápido) |
-| `cd frontend && python -m http.server 3000` | Alternativa sem Node.js |
-| `npx eslint frontend/src --ext .js --max-warnings=0` | Lint rigoroso (configurar `.eslintrc.cjs` primeiro) |
-| `npx prettier --write frontend/src` | Formata código (configurar `.prettierrc` primeiro) |
-| `npx vitest run` | Executa testes (quando configurado — NFR-M02) |
-| `git status && git diff` | Verifica alterações locais antes de commit |
-| `curl -I https://api.aegis1.example.com/health` | Testa conectividade com backend (ajustar URL) |
+| **Nomenclatura** | `V{versao}__{descricao}.sql` (ex.: `V1.0.1__add_health_check_table.sql`) |
+| **Repeatable** | `R__{descricao}.sql` (views, functions, dados de referência) |
+| **Undo** | `U{versao}__{descricao}.sql` (opcional, para rollback manual) |
+| **Baseline** | `flyway baseline` em produção (versão inicial) |
+| **Transacional** | Cada migration em transação (Flyway default) |
+| **Naming** | `snake_case` tabelas/colunas; `UPPER_CASE` enums; FK: `fk_{tabela}_{coluna}` |
+| **Índices** | `idx_{tabela}_{colunas}`; Trigram: `idx_{tabela}_trgm_{coluna}` |
+| **Partitioning** | `REVINFO` por mês; `auditoria` por ano (se volume alto) |
+| **Dados Sensíveis** | Nunca em migrations (usar Vault/SealedSecrets + `application-prod.yml`) |
 
 ---
 
-## Apêndice B — Troubleshooting Comum (Resumo)
+## 6. Testes (Quality Gates)
 
-| Sintoma | Causa Provável | Solução Rápida |
+### 6.1 Pirâmide de Testes
+```
+         /\
+        /  \  E2E (Cypress) — 5-10% — Fluxos críticos user-facing
+       /----\ Integration (TestContainers) — 20-30% — Controllers, Services, Repositories, Security
+      /------\ Unit (JUnit 5 / Vitest) — 60-70% — Domain logic, Services, Utils, Stores, Composables
+     /________\
+```
+
+### 6.2 Gates de CI (Obrigatórios para Merge)
+
+| Gate | Backend | Frontend | Threshold |
+| :--- | :--- | :--- | :--- |
+| **Build** | `./mvnw compile` | `pnpm build` | Sucesso |
+| **Unit Tests** | `./mvnw test -DskipITs` | `pnpm test` | Pass |
+| **Integration Tests** | `./mvnw verify -DskipUnitTests=false` | — | Pass (TestContainers) |
+| **Contract Tests** | `./mvnw test -Dtest=*ContractTest` | `pnpm pact:verify` | Pass |
+| **E2E Tests** | — | `pnpm cypress:run` | Pass (fluxos críticos) |
+| **Coverage** | JaCoCo | Vitest (V8) | **≥ 80%** (instruções/linhas) |
+| **Static Analysis** | Checkstyle + SpotBugs + PMD | ESLint + Prettier + TypeScript | Zero errors |
+| **Security Scan** | OWASP Dep Check (CVSS ≥ 7) | npm audit / Snyk | Zero critical/high |
+| **Bundle Size** | — | `gzip dist/assets/*.js` | **≤ 150 kB** gzipped |
+| **Accessibility** | — | axe-core (Cypress) | Zero violations WCAG 2.1 AA |
+
+### 6.3 TestContainers Configuration (`.testcontainers.properties`)
+```properties
+testcontainers.reuse.enable=true
+testcontainers.ryuk.disabled=true
+```
+
+### 6.4 Convenções de Nomenclatura de Testes
+| Tipo | Padrão | Exemplo |
 | :--- | :--- | :--- |
-| **Erro CORS** | Backend não permite `localhost:3000` | Usar proxy `serve --proxy "/api:https://api.backend"` + ajustar `api.js` |
-| **`TypeError: Failed to fetch`** | `API_BASE_URL` errada / backend down / proxy | Verificar `api.js:10`; testar no `curl`/Postman |
-| **Módulos ES não carregam** | Servidor não serve `application/javascript` ou paths errados | Usar `serve`/`http-server`/Live Server (não `file://`); checar `<script type="module" src="/src/main.js">` |
-| **`console.*` em produção** | Código não limpo (`api.js:26,49,52`) | Remover `console.*`; ESLint `no-console: error` no CI |
-| **Complexidade `request()` = 13** | Função monolítica | Refatorar em `withTimeout`, `withRetry`, `withAuth`, `parseResponse`, `handleError` (NFR-M01) |
-| **Token JWT não persiste** | `localStorage` bloqueado (modo privado) / refresh down | Testar janela normal; checar `authInterceptor` em `api.js` |
-| **Bundle > 150 kB gzipped** | Sem code-splitting (NFR-P03) | Dynamic `import()` por rota + roteador leve (Future Evolution #3) |
+| **Unit** | `*Test.java` / `*.test.ts` | `AtivoServiceTest.java`, `orderStore.test.ts` |
+| **Integration** | `*ControllerIT.java` / `*ServiceIT.java` | `AtivoControllerIT.java`, `OrdemServiceIT.java` |
+| **Contract** | `*ContractTest.java` / `*.pact.test.ts` | `AtivoControllerContractTest.java` |
+| **E2E** | `*.cy.ts` | `order-complete-flow.cy.ts` |
 
 ---
 
-> **Este documento reflete o estado real do codebase** (diagnóstico determinístico: 15 arquivos JS, 627 LOC, zero build, zero deps de dev, zero backend local).  
-> **Itens marcados `[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]`** correspondem a práticas recomendadas pelos NFRs (testes, code-splitting, CSP, telemetria, tooling) que **ainda não estão implementadas** no repositório.  
-> **Próximos passos obrigatórios** (derivados do SAD/NFR): configurar `package.json` com scripts `lint`, `test`, `format`; adicionar ESLint/Prettier/Vitest; remover `console.*` de `api.js`; refatorar `request` (complexidade 13 → ≤10); implementar code-splitting por rota.
+## 7. Segurança no Desenvolvimento
+
+### 7.1 Secrets Management
+- **NUNCA** commitar segredos no Git
+- **Local:** `.env.local` (gitignored) + `direnv` + Vault CLI
+- **CI/CD:** GitHub Actions Secrets / Vault / AWS Secrets Manager
+- **K8s:** SealedSecrets / External Secrets Operator / Vault Agent Injector
+- **Rotação:** Chaves JWT (RS256) rotacionadas a cada 90 dias via cert-manager / Vault
+
+### 7.2 Dependency Security
+```bash
+# Backend: OWASP Dependency Check (CI)
+./mvnw org.owasp:dependency-check-maven:check -DfailBuildOnCVSS=7
+
+# Frontend: npm audit + Snyk (CI)
+cd frontend && pnpm audit --prod --audit-level=high
+```
+
+### 7.3 Code Security (SAST/DAST)
+- **SAST:** SpotBugs + Semgrep + CodeQL (GitHub Actions)
+- **DAST:** OWASP ZAP (staging, pré-deploy prod)
+- **Secrets Scan:** TruffleHog / GitLeaks (pre-commit + CI)
+- **Container Scan:** Trivy (imagens Docker) — fail se CRITICAL/HIGH
+
+---
+
+## 8. Documentação
+
+### 8.1 Obrigatória por PR
+- **OpenAPI:** Atualizar `src/main/resources/openapi/openapi.yaml` se endpoints alterados
+- **ADR:** Nova ADR se decisão arquitetural (template em `docs/03-architecture/adr-template.md`)
+- **README Módulo:** `domain/*/README.md` (visão geral, endpoints, config, testes)
+- **CHANGELOG:** Entrada em `CHANGELOG.md` (Conventional Commits → `git cliff` ou manual)
+
+### 8.2 Diagramas (Diagram as Code)
+- **Mermaid** em `docs/03-architecture/` (C4, Sequência, ER, Activity)
+- **Atualizar** no mesmo PR que altera código relacionado
+- **Nunca** imagens estáticas coladas (PNG/JPG) — apenas Mermaid versionado
+
+---
+
+## 9. Code Review Guidelines
+
+### 9.1 Para Autores (Self-Review Antes do PR)
+- [ ] Código compila e testes passam localmente
+- [ ] Commits atômicos, mensagens Conventional Commits em português
+- [ ] Breaking changes documentados + `BREAKING CHANGE:` no commit
+- [ ] Documentação atualizada (OpenAPI, ADR, README, CHANGELOG)
+- [ ] Métricas/Observabilidade instrumentadas (metrics, logs, tracing)
+- [ ] Segurança: sem secrets, validação entrada, autorização verificada
+
+### 9.2 Para Revisores (Checklist)
+- [ ] **Corretude:** Lógica de negócio implementada conforme Use Cases/ACs
+- [ ] **Arquitetura:** Respeita boundaries (ArchUnit), DDD tático, Clean Architecture
+- [ ] **Qualidade:** Ciclomática ≤ 10, nomes claros, sem código morto, DRY
+- [ ] **Testes:** Cobertura ≥ 80% nas mudanças; cenários BDD cobertos; edge cases
+- [ ] **Segurança:** Autorização (Aegis Shield), validação entrada, sem secrets, SQL injection safe
+- [ ] **Performance:** Queries otimizadas (EXPLAIN), índices, cache, paginação, N+1 evitado
+- [ ] **Observabilidade:** Logs JSON (correlation ID), métricas Prometheus, tracing headers
+- [ ] **Acessibilidade:** WCAG 2.1 AA (se UI), aria-labels, focus order, contraste
+- [ ] **Documentação:** OpenAPI, ADR, README, CHANGELOG atualizados
+- [ ] **DX:** Mensagens de erro claras, DX para desenvolvedores futuros
+
+### 9.3 Aprovação
+- **Mínimo 1 aprovação** de code owner do módulo (definido em `CODEOWNERS`)
+- **Todos os checks CI verdes** (build, test, security, contract, bundle, accessibility)
+- **Nenhum comentário `Request Changes` pendente** (resolvido ou `Dismiss` com justificativa)
+- **Merge:** Squash and merge (mantém histórico limpo) → `develop`
+
+---
+
+## 10. Release Process
+
+### 10.1 Versionamento: SemVer (Semantic Versioning)
+| Tipo | Exemplo | Quando |
+| :--- | :--- | :--- |
+| **Major** | `1.0.0` → `2.0.0` | Breaking changes (API, DB schema, config) |
+| **Minor** | `1.0.0` → `1.1.0` | Novas features backward-compatible |
+| **Patch** | `1.0.0` → `1.0.1` | Bug fixes backward-compatible |
+
+### 10.2 Release Flow
+1. **Feature Freeze:** PR `develop` → `release/x.y.0` (apenas fixes)
+2. **Stabilization:** Testes extensivos em staging (load, chaos, security)
+3. **Release Candidate:** Tag `v1.0.0-rc.1` → deploy staging → validação UAT
+4. **Release:** Tag `v1.0.0` → `main` → ArgoCD sync prod → Smoke tests
+5. **Post-Release:** Hotfix branch se necessário (`hotfix/1.0.1`)
+
+### 10.3 Changelog
+- Gerado automaticamente via `git cliff` (Conventional Commits → CHANGELOG.md)
+- Categorias: `Features`, `Bug Fixes`, `Breaking Changes`, `Security`, `Performance`, `Documentation`, `Chore`
+- Publicado no GitHub Releases + Notificação Slack/Email
+
+---
+
+## 11. Comunicação & Suporte
+
+| Canal | Finalidade |
+| :--- | :--- |
+| **GitHub Issues** | Bug reports, feature requests, tasks (templates obrigatórios) |
+| **GitHub Discussions** | Perguntas técnicas, RFCs, decisões arquiteturais |
+| **Slack #aegis1-dev** | Daily sync, blockers, pair programming, deploy coordination |
+| **Confluence / Notion** | Documentação viva, runbooks, ADRs, onboarding wiki |
+| **Email: diogorpm@gmail.com** | Contato direto com maintainer (Diogo Menezes) |
+
+---
+
+## 12. Licença & Código de Conduta
+
+- **Licença:** MIT (ver `LICENSE`)
+- **Código de Conduta:** [Contributor Covenant v2.1](https://www.contributor-covenant.org/version/2/1/code_of_conduct/) — aplicado a todos participantes
+- **DCO:** Developer Certificate of Origin — `git commit -s` obrigatório
+
+---
+
+*Documento regenerado completamente para stack Full Stack (Java 21/Spring Boot 3.3 + Vue 3/Vite/PWA + Docker/K8s/TestContainers). Substitui versão 1.0 que descrevia apenas frontend vanilla JS + API externa.*

@@ -15,6 +15,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Transactional
 class DashboardIntegrationTest extends BaseIT {
@@ -28,6 +29,14 @@ class DashboardIntegrationTest extends BaseIT {
     @AfterEach
     void cleanup() {
         TenantContext.clear();
+    }
+
+    @Test
+    void shouldThrowWhenTenantContextIsNotSet() {
+        // Sem TenantContext: falha explícita em vez de query silenciosa com filialId null
+        assertThatThrownBy(() -> dashboardService.getStats())
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Contexto de filial não definido");
     }
 
     @Test

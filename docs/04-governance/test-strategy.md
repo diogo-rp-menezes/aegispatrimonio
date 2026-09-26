@@ -1,119 +1,273 @@
-# Test Strategy — Aegis1 Módulo de Manutenção
+# Test Strategy — Aegis1
 
-> **Versão:** 1.0 · **Owner:** QA Lead / Eng Lead · **Status:** Draft
+> **Versão:** 2.0 · **Owner:** QA Lead / Tech Leads · **Status:** Draft
+> **Base:** System Architecture v2.0 + NFR v2.0 + Use Cases v2.0 + Análise AST Java Completa
+> **Cobertura:** Full Stack — Backend (Java 21/Spring Boot 3.3) + Frontend (Vue 3/Vite/PWA) + Infra (Docker/K8s/TestContainers)
+
+---
 
 ## 1. Objectives & Quality Goals
-* Garantir zero regressões críticas (P0) em produção nos fluxos de ordens de manutenção (US-ORD-01 a US-ORD-05) e cadastros mestres (US-CAD-01 a US-CAD-20) <!-- source: user-stories#US-ORD-01 -->
-* Reduzir tempo médio de detecção de bugs (MTTD) para < 2 horas via execução contínua em CI e monitoramento de erro em staging <!-- source: user-stories#NFR-Taxa-Erro-API -->
-* Validar conformidade com regras de negócio BR-01 a BR-06 em 100% dos cenários BDD documentados nas user stories <!-- source: user-stories#Business Rules Referenciadas -->
-* Assegurar latência P95 < 800 ms em todas as chamadas `api.js:request` sob carga simulada <!-- source: user-stories#NFR-Latência-P95 -->
-* Detectar vazamento de dados sensíveis no frontend (tokens, PII) via testes de segurança automatizados <!-- source: user-stories#NFR-Segurança-Dados -->
-* Garantir consistência de custos (`custoTotalPorAtivo`) entre backend e frontend via testes de contrato Pact <!-- source: user-stories#NFR-Consistência-Custos -->
 
-## 2. Test Pyramid
-| Camada | Cobertura Mínima | Ferramenta | Frequência de Execução | Responsável |
-| :--- | :--- | :--- | :--- | :--- |
-| **Unit Tests** | 85% linhas / 80% branches (crítico: 95% em `api.js:request`, `handleApiError`, `authInterceptor`, validações frontend) | Vitest + @testing-library/dom (JS vanilla) | A cada commit (pre-push hook + CI) | Dev |
-| **Integration Tests** | 100% dos fluxos de API mockados (MSW) cobrindo: authInterceptor + refresh + retry único (BR-06), handleApiError (409, 401, 404, 5xx, timeout), paginação/filtros ordens, cache listas mestras (<1s) | Vitest + MSW (Mock Service Worker) | A cada PR (pipeline obrigatório) | Dev |
-| **E2E Tests** | 100% das jornadas críticas (Happy Path + 1 erro por story): criar ordem (BR-01), iniciar (BR-01), aprovar (BR-02), concluir (BR-03/BR-04), cancelar (BR-03), listar/filtrar/paginar, dashboard custos, CRUD 4 entidades mestres | Playwright (Chromium, Firefox, WebKit) | A cada deploy para staging + nightly | QA |
-| **Contract Tests** | Todos os endpoints públicos consumidos pelo frontend: `POST/GET/PUT/DELETE /api/{departamentos,filiais,fornecedores,funcionarios,ordens,ativos}` + endpoints de transição (`/iniciar`, `/aprovar`, `/concluir`, `/cancelar`) | Pact (consumer-driven) | A cada release candidate + CI do provider (backend) | Dev + Backend |
+* **Zero regressões críticas (P0/P1)** em produção nos fluxos core: Ativos + Hardware + QR/PDF, Ordens (Corretiva/Preventiva/Preditiva), Cadastros Mestres, Auth/RBAC/Multi-tenancy, Busca Fuzzy, Preditiva, Auditoria, LGPD
+* **MTTD < 2 horas** via execução contínua CI + observabilidade (Prometheus/Grafana/Sentry) + alertas automatizados
+* **100% regras de negócio (BR-01 a BR-18)** validadas via testes BDD (Gherkin) + Contract Tests
+* **Latência P95 < 500ms (Backend) / < 800ms (Frontend→Backend)** sob carga (k6 + k8s staging)
+* **Zero vazamento dados sensíveis** (tokens, PII, cross-tenant) via SAST/DAST/Secrets Scan + Testes cross-tenant
+* **Consistência `custoTotalPorAtivo` / TCO** entre backend/frontend via Contract Tests (Pact/Spring Cloud Contract)
+* **Cobertura ≥ 80%** (instruções/linhas) — Gate CI obrigatório (JaCoCo + Vitest V8)
+* **Acessibilidade WCAG 2.1 AA** — Zero violações críticas/severas (axe-core E2E)
+
+---
+
+## 2. Test Pyramid (Full Stack)
+
+| Camada | Cobertura Mínima | Ferramentas | Frequência | Responsável | Escopo |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Unit Tests** | **≥ 85% linhas / ≥ 80% branches** (Crítico: ≥ 95% em domain services, security, predictive, fuzzy) | **Backend:** JUnit 5 + Mockito + AssertJ<br>**Frontend:** Vitest + Vue Test Utils + Happy DOM | A cada commit (pre-push hook + CI) | Dev | Domain logic, Services, Utils, Stores, Composables, Validators, Levenshtein, OLS Regression |
+| **Integration Tests** | **100% Controllers + Services + Repositories + Security + Schedulers** | **Backend:** TestContainers (MySQL 8.0 real, Redis) + Spring Boot Test + RestAssured<br>**Frontend:** Vitest + MSW (Mock Service Worker) para API mocks | A cada PR (pipeline obrigatório) | Dev | Controllers (CRUD + Transições), Services (Business Rules), Repositories (Queries, Filters), Security (Auth, RBAC, Multi-tenancy), Schedulers (Preventiva, Preditiva, SLA), Auditoria (Envers), LGPD |
+| **Contract Tests** | **100% endpoints públicos** (Consumer-driven) | **Backend:** Spring Cloud Contract (Producer)<br>**Frontend:** Pact (Consumer) + Pact Broker | A cada PR (Consumer) + Daily (Provider verification) | Dev + Backend | Todos endpoints `/api/v1/**` consumidos pelo frontend: Auth, Ativos, Ordens, Preventiva, Preditiva, Busca, Cadastros, Relatórios, Admin, Auditoria, LGPD |
+| **E2E Tests** | **100% jornadas críticas** (Happy Path + 1 erro por story) | **Frontend:** Cypress (Chromium, Firefox, WebKit) + axe-core<br>**Backend:** TestContainers + RestAssured (fluxos cross-service) | A cada deploy staging + Nightly | QA | Login, Criar Ativo+Hardware+QR+PDF, Ordem Completa (Criar→Iniciar→Aprovar→Concluir), Preventiva (Plano→Geração Auto), Preditiva (Health Check→Previsão→Ordem Auto), Busca Fuzzy, Admin (RBAC Matrix, Troca Filial), Auditoria, LGPD, Relatórios QR/PDF |
+| **Performance** | **P95 < 500ms (Backend) / < 800ms (Frontend)** | **k6** (scripts `tests/performance/`) + Grafana k6 Cloud | Release Candidate + Weekly Staging | QA/DevOps | Carga basal (50 VUs), Pico (200 VUs), Soak (1h), Spike (500 VUs 30s) — Endpoints: Auth, Ativos, Ordens, Busca, Dashboard, Preditiva |
+| **Security** | **Zero Critical/High** | **SAST:** SpotBugs + Semgrep + CodeQL<br>**DAST:** OWASP ZAP (Active Scan)<br>**SCA:** OWASP Dep Check + Trivy<br>**Secrets:** TruffleHog/GitLeaks<br>**Container:** Trivy | SAST/SCA: Every PR<br>DAST: Staging Deploy + Weekly<br>Container: Every Build | Security/DevOps | OWASP Top 10, LGPD, Multi-tenancy leak, RBAC bypass, Token replay, XSS/CSRF, Rate Limit, CSP |
+| **Accessibility** | **WCAG 2.1 AA — Zero Critical/Serious** | **axe-core** (Cypress + @axe-core/playwright) | Every PR (E2E) + Nightly | QA | Todas páginas user-facing (Dashboard, Assets, Orders, Preventiva, Preditiva, Admin, Relatórios, LGPD) |
+| **Chaos/Resilience** | **MTTR < 15min** (RTO) | **Toxiproxy** (Staging) + **LitmusChaos** (K8s Staging) | Sprint + Ad-hoc incidentes | DevOps/SRE | Latência injetada, Falha 5xx, DB/Redis down, Pod kill, Network partition, Token expiry + refresh fail |
+
+---
 
 ## 3. Test Environments
-| Ambiente | Propósito | Dados | Acesso |
+
+| Ambiente | Propósito | Dados | Acesso | Provisionamento |
+| :--- | :--- | :--- | :--- | :--- |
+| **Local (Dev)** | Desenvolvimento, debug unit/integration | TestContainers (MySQL/Redis efêmeros) + MSW fixtures JSON | Dev (IDE) | `./mvnw test` / `pnpm test` / `docker compose --profile dev up` |
+| **CI (GitHub Actions)** | Validação automatizada PRs | TestContainers (MySQL 8.0 real, Redis) + MSW | Pipeline (obrigatório merge) | `act` local / GitHub Actions runners (self-hosted para TestContainers) |
+| **Staging** | Homologação pré-prod com dados realistas anonimizados | Dump anonimizado produção (script `scripts/anonymize-dump.sh` + `scripts/seed-staging.sh`) | QA, PO, Eng Lead (VPN/SSO) | ArgoCD sync `staging` overlay + `scripts/seed-staging.sh` pós-deploy |
+| **Production** | Smoke tests pós-deploy + monitoramento sintético | Dados reais (somente leitura sintéticos) | Automação (Playwright agendado 15min) + Alertas | ArgoCD sync `prod` overlay + Canary/Blue-Green |
+
+---
+
+## 4. Coverage Targets (Quality Gates)
+
+| Métrica | Backend (JaCoCo) | Frontend (Vitest V8) | Gate CI |
 | :--- | :--- | :--- | :--- |
-| **Local** | Desenvolvimento e debug de testes unitários/integração | MSW handlers + fixtures JSON (departamentos, filiais, fornecedores, funcionários, ordens, ativos) versionados em `tests/fixtures/` | Dev (npm run test:unit, npm run test:integration) |
-| **CI (GitHub Actions/GitLab CI)** | Validação automatizada de PRs | Banco efêmero SQLite em memória (se backend roda no CI) ou MSW puro para frontend isolado; seeds determinísticos | Pipeline (obrigatório para merge) |
-| **Staging** | Homologação pré-produção com dados realistas anonimizados | Dump anonimizado de produção (scripts `scripts/anonymize-dump.sql` — [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] Premissa: existe pipeline de anonimização) | QA, PO, Eng Lead (URL protegida por VPN/SSO) |
-| **Produção** | Smoke tests pós-deploy + monitoramento sintético | Dados reais (somente leitura para sintéticos) | Automação (Playwright agendado a cada 15 min) + Alertas Datadog/New Relic |
+| **Instructions / Lines** | ≥ 80% | ≥ 80% | **Fail se < 80%** |
+| **Branches** | ≥ 80% | ≥ 80% | **Fail se < 80%** |
+| **Methods / Functions** | ≥ 80% | ≥ 80% | **Fail se < 80%** |
+| **Crítico (Domain Services, Security, Predictive, Fuzzy, Auth)** | ≥ 95% | ≥ 95% | **Fail se < 95%** |
+| **Exclusões Justificadas** | `*Configuration*`, `*Application*`, generated code, `main` classes | `main.ts`, `vite.config.ts`, `*.config.*`, generated | Documentado em `jacoco-excludes.xml` / `vitest.config.ts` |
 
-## 4. Coverage Targets
-* **Mínimo global:** 85% statements / 80% branches / 80% functions / 85% lines (enforced no CI via `vitest --coverage`)
-* **Crítico (regras de negócio BR-01 a BR-06 + `api.js`):** 95% statements / 90% branches — arquivos: `frontend/src/services/api.js`, componentes de formulário de ordem, validações de permissão (ownership/role) <!-- source: frontend/src/services/api.js#L36 -->
-* **Exclusões justificadas:** 
-  * `frontend/src/main.js` (bootstrap, sem lógica testável)
-  * Arquivos de configuração (vite.config.js, .eslintrc)
-  * Código gerado (se houver) — não detectado no diagnóstico
-  * `console.error/log` residuais em `api.js:26,49,52` — serão removidos antes de produção <!-- source: frontend/src/services/api.js#L26 --><!-- source: frontend/src/services/api.js#L49 --><!-- source: frontend/src/services/api.js#L52 -->
+---
 
-## 5. Non-Functional Testing
-* **Performance:** 
-  * Ferramenta: **k6** (scripts em `tests/performance/`)
-  * Cenários: 
-    * Carga basal: 50 VUs, ramp 2 min, duração 10 min — endpoints: `GET /api/ordens` (lista), `POST /api/ordens`, `PATCH /api/ordens/{id}/iniciar|aprovar|concluir|cancelar`, `GET /api/ativos/custos-totais`
-    * Pico: 200 VUs por 5 min (simula horário de abertura de plantão)
-  * Critérios de aceite: P95 < 800 ms (NFR-Latência-P95), taxa de erro < 1% (NFR-Taxa-Erro-API), throughput > 100 req/s em lista paginada
-  * Frequência: A cada release candidate + weekly em staging
-* **Segurança:**
-  * **SAST:** Semgrep (regras OWASP Top 10 + custom: detecção de `localStorage.setItem('token')`, `console.log` com dados sensíveis) — a cada commit (CI)
-  * **DAST:** OWASP ZAP Baseline Scan contra staging — nightly
-  * **Dependências:** `npm audit` + Snyk/Dependabot — daily
-  * **Validação específica:** Teste automatizado de que `authInterceptor` não vaza token em logs/erros (mocka erro 500 e verifica ausência de Authorization no console) <!-- source: user-stories#BR-06 -->
-* **Acessibilidade:**
-  * Ferramenta: **axe-core** integrado nos testes E2E (Playwright + @axe-core/playwright)
-  * Critérios: WCAG 2.1 AA — zero violações críticas/severas em páginas de alta frequência (lista ordens, detalhe, formulários CRUD, dashboard)
-  * Frequência: A cada PR (E2E roda axe nas páginas visitadas)
-* **Resiliência/Chaos:**
-  * Testes de falha induzida via MSW (integração) e Toxiproxy (staging):
-    * Latência injetada (2s, 5s, 30s timeout) — valida toast "Erro de conexão" e retry
-    * Falha intermitente 5xx (10%, 50%) — valida `handleApiError` e preservação de estado
-    * Expiração de token + refresh falho — valida redirect login + `sessionStorage` recovery (BR-06) <!-- source: user-stories#BR-06 -->
-  * Frequência: A cada sprint (staging) + ad-hoc em incidentes
+## 5. Non-Functional Testing Details
+
+### 5.1 Performance (k6)
+
+```javascript
+// tests/performance/load-test.js
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+import { Rate } from 'k6/metrics';
+
+export const options = {
+  stages: [
+    { duration: '2m', target: 50 },   // Ramp up
+    { duration: '10m', target: 50 },  // Steady state
+    { duration: '2m', target: 200 },  // Spike
+    { duration: '5m', target: 200 },  // Peak
+    { duration: '2m', target: 0 },    // Ramp down
+  ],
+  thresholds: {
+    'http_req_duration{type:api}': ['p(95)<500'],      // Backend P95 < 500ms
+    'http_req_duration{type:frontend}': ['p(95)<800'], // Frontend→Backend P95 < 800ms
+    'http_req_failed': ['rate<0.01'],                  // Error rate < 1%
+    'checks': ['rate>0.99'],                           // Checks pass > 99%
+  },
+};
+
+const authToken = `__ENV.ACCESS_TOKEN__`;
+const headers = { Authorization: `Bearer ${authToken}`, 'X-Trace-Id': `k6-${__ITER}` };
+
+export default function() {
+  const base = 'https://staging-api.aegis1.empresa.com/api/v1';
+  
+  // Auth (setup)
+  if (__ITER === 0) {
+    const login = http.post(`${base}/auth/login`, JSON.stringify({email: 'test@aegis1.com', senha: 'Test123!'}), { headers: { 'Content-Type': 'application/json' } });
+    check(login, { 'login 200': (r) => r.status === 200 });
+  }
+
+  // Cenários representativos
+  const endpoints = [
+    { name: 'Listar Ativos', url: `${base}/ativos?page=0&size=20`, type: 'api' },
+    { name: 'Buscar Ativo', url: `${base}/ativos/1`, type: 'api' },
+    { name: 'Criar Ordem', url: `${base}/ordens`, method: 'POST', body: JSON.stringify({ativoId: 1, tipo: 'CORRETIVA', descricao: 'Teste k6', prioridade: 'MEDIA', tecnicoResponsavelId: 5}), type: 'api' },
+    { name: 'Iniciar Ordem', url: `${base}/ordens/1/iniciar`, method: 'PATCH', type: 'api' },
+    { name: 'Busca Fuzzy', url: `${base}/busca?q=notebok&types=ativo,ordem`, type: 'api' },
+    { name: 'Dashboard Ordens', url: `${base}/dashboard/ordens`, type: 'api' },
+    { name: 'Dashboard Preditiva', url: `${base}/dashboard/preditiva`, type: 'api' },
+    { name: 'Health Check', url: `${base}/actuator/health`, type: 'api' },
+  ];
+
+  endpoints.forEach(ep => {
+    const params = { headers, tags: { type: ep.type || 'api', name: ep.name } };
+    let res;
+    if (ep.method === 'POST') res = http.post(ep.url, ep.body, params);
+    else if (ep.method === 'PATCH') res = http.patch(ep.url, null, params);
+    else res = http.get(ep.url, params);
+    
+    check(res, {
+      [`${ep.name} status 2xx`]: (r) => r.status >= 200 && r.status < 300,
+      [`${ep.name} p95 < threshold`]: (r) => r.timings.duration < (ep.type === 'frontend' ? 800 : 500),
+    });
+  });
+  
+  sleep(1);
+}
+```
+
+**Critérios de Aceite:**
+- P95 Latência: Backend < 500ms, Frontend→Backend < 800ms
+- Taxa Erro: < 1% (janela 5 min)
+- Throughput: > 100 req/s (lista paginada), > 50 req/s (mutations)
+- Disponibilidade: 99.9% durante teste
+
+### 5.2 Segurança (Continuous)
+
+| Tipo | Ferramenta | Frequência | Gate |
+| :--- | :--- | :--- | :--- |
+| **SAST** | SpotBugs + Semgrep (OWASP Top 10 + Custom: `localStorage.setItem('token')`, `console.*` sensível, hardcoded secrets) | Every PR | Fail se HIGH/CRITICAL |
+| **DAST** | OWASP ZAP Active Scan (staging) | Staging Deploy + Weekly | Fail se HIGH/CRITICAL |
+| **SCA** | OWASP Dependency Check (CVSS ≥ 7) + Trivy (container) | Every PR + Daily | Fail se CVSS ≥ 7 |
+| **Secrets Scan** | TruffleHog / GitLeaks | Pre-commit + CI | Fail se qualquer segredo |
+| **Container Scan** | Trivy (CRITICAL/HIGH) | Every Image Build | Fail se CRITICAL/HIGH |
+| **Pen Test** | Manual (anual) + ZAP Automated | Anual + Pré-prod | Relatório + Remediação 30d |
+
+### 5.3 Acessibilidade (WCAG 2.1 AA)
+
+```typescript
+// cypress/support/e2e.ts
+import 'cypress-axe';
+
+Cypress.Commands.add('checkA11y', (context, options) => {
+  cy.injectAxe();
+  cy.checkA11y(context, options, (violations) => {
+    const critical = violations.filter(v => v.impact === 'critical' || v.impact === 'serious');
+    if (critical.length > 0) {
+      throw new Error(`A11y violations: ${JSON.stringify(critical, null, 2)}`);
+    }
+  });
+});
+
+// Uso nos testes E2E
+it('Dashboard Ordens - Acessibilidade', () => {
+  cy.login('gestor@aegis1.com');
+  cy.visit('/dashboard');
+  cy.checkA11y(); // Fail se violações critical/serious
+});
+```
+
+**Critérios:** Zero violações `critical`/`serious` em páginas de alta frequência; `moderate`/`minor` documentados com ticket de correção.
+
+### 5.4 Chaos Engineering & Resilience (Staging)
+
+| Experimento | Ferramenta | Cenário | Validação |
+| :--- | :--- | :--- | :--- |
+| **Latência Injetada** | Toxiproxy | +2s, +5s, +30s latency em `/api/v1/**` | Toast "Erro de conexão" + Retry automático (1x) + Circuit Breaker abre |
+| **Falha Intermitente 5xx** | Toxiproxy | 10%, 50% falhas aleatórias | `handleApiError` preserva estado + Toast amigável + Retry manual |
+| **DB Down** | LitmusChaos | `PodFailure` MySQL Primary | Read Replica assume (se configurado) / Graceful degradation (cache Redis) |
+| **Redis Down** | LitmusChaos | `PodFailure` Redis | Cache miss → Fallback DB (performance degradada) / Rate limit local |
+| **Pod Kill** | LitmusChaos | `PodDelete` Backend (1/3 replicas) | HPA escala + Rolling update sem downtime (PDB minAvailable=2) |
+| **Network Partition** | LitmusChaos | `NetworkPartition` Backend ↔ DB | Circuit Breaker + Fallback cache / Error amigável |
+| **Token Expiry + Refresh Fail** | Cypress + MSW | Access token expirado + Refresh 401 | Logout limpo → Redirect `/login` + Estado limpo |
+
+---
 
 ## 6. Test Data Management
-* **Estratégia de geração:**
-  * **Fixtures JSON versionados** em `tests/fixtures/` para cada entidade: `departamentos.json`, `filiais.json`, `fornecedores.json`, `funcionarios.json`, `ordens.json`, `ativos.json` — cobrem cenários BDD (válidos, duplicados, vazios, com vínculos, sem vínculos)
-  * **Factories TypeScript/JS** (`tests/factories/`) para geração dinâmica em testes de integração/E2E (ex: `createOrdem({ estado: 'ABERTA', responsavelId: currentUser })`)
-  * **Seed scripts** para staging: `scripts/seed-staging.js` consome fixtures + randomização controlada (seed fixo por execução)
-* **Dados sensíveis:**
-  * **Obrigatório:** Anonimização/mascaramento fora de produção — CPF/CNPJ, matrículas, nomes reais, emails
-  * **Implementação:** Script `scripts/anonymize-dump.sql` (PostgreSQL/MySQL — [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] Premissa: backend usa SQL relacional) roda no pipeline de staging deploy
-  * **Tokens/JWT:** Nunca commitados; staging usa issuer de teste com chaves rotacionadas; local usa MSW com tokens JWT mockados (assinatura HS256 conhecida)
+
+### 6.1 Estratégia de Geração
+
+| Fonte | Descrição | Localização |
+| :--- | :--- | :--- |
+| **Fixtures JSON** | Cenários BDD versionados por entidade (válidos, duplicados, vazios, com vínculos, sem vínculos) | `tests/fixtures/` (backend) / `frontend/tests/fixtures/` |
+| **Factories** | Geração dinâmica tipada para testes integração/E2E (`createAtivo({tipo: 'HARDWARE'})`, `createOrdem({estado: 'ABERTA'})`) | `tests/factories/` (backend) / `frontend/tests/factories/` |
+| **Builders** | Test Data Builders (Builder Pattern) para objetos complexos (Ativo com Hardware, Ordem com Evidências) | `tests/builders/` |
+| **Seed Scripts** | Staging: `scripts/seed-staging.sh` consome fixtures + randomização controlada (seed fixo por execução) | `scripts/` |
+
+### 6.2 Dados Sensíveis (LGPD Compliance)
+
+- **Obrigatório:** Anonimização/mascaramento fora de produção (CPF/CNPJ, matrículas, nomes reais, emails, telefones)
+- **Implementação:** `scripts/anonymize-dump.sh` (mysqldump → `pt-online-schema-change` anonimização → import staging)
+- **Tokens/JWT:** Nunca commitados; Staging usa issuer de teste com chaves rotacionadas; Local usa MSW com tokens JWT mockados (HS256 conhecida)
+- **PII em Logs:** Mascaramento automático via Logback (`%replace(%msg){'\\d{11}', '***'}`) + MDC `usuarioId` hash
+
+---
 
 ## 7. Regression Strategy
-* **Suite de regressão:** 
-  * **Nível 1 (CI - obrigatório):** Unit + Integration + Contract (tempo alvo < 10 min)
-  * **Nível 2 (Staging deploy - obrigatório):** E2E crítico (12 jornadas: 5 workflow ordens + 4 CRUD mestres + listagem ordens + dashboard custos + login/auth) — tempo alvo < 25 min
-  * **Nível 3 (Nightly - completo):** E2E full (todas as 20+ stories BDD + cenários de borda + acessibilidade + performance smoke) — tempo alvo < 60 min
-* **Critérios de entrada de release (Definition of Ready para deploy em produção):**
-  * [ ] CI verde (Nível 1) na branch de release
-  * [ ] Staging deploy sucedido + Nível 2 verde
-  * [ ] 0 bugs P0/P1 abertos no Jira/GitHub Issues vinculados à release
-  * [ ] Performance k6 dentro dos SLAs na staging
-  * [ ] Pact contracts verificados contra provider (backend) — `pact-verifier` passa
-  * [ ] Security scan (Semgrep + ZAP) sem findings críticos/altos não mitigados
-* **Critérios de saída (pós-deploy produção):**
-  * [ ] Smoke tests sintéticos (Playwright agendado) passam por 30 min consecutivos
-  * [ ] Error rate (Datadog/New Relic) < 0.5% nos primeiros 60 min
-  * [ ] P95 latência < 800 ms nos primeiros 60 min
 
-## 8. Bug Triage & Severity
-| Severidade | Definição | SLA de correção | Exemplo no Aegis1 |
+| Nível | Escopo | Frequência | Tempo Alvo | Ambiente |
+| :--- | :--- | :--- | :--- | :--- |
+| **Nível 1 (CI - Obrigatório)** | Unit + Integration + Contract + SAST/SCA | Every PR | < 15 min | CI (GitHub Actions) |
+| **Nível 2 (Staging Deploy - Obrigatório)** | E2E Crítico (12 jornadas: 5 Ordens + 4 Cadastros + Listagem + Dashboard + Login/Auth + Busca) | Every Staging Deploy | < 25 min | Staging |
+| **Nível 3 (Nightly - Completo)** | E2E Full (todas 20+ stories BDD + bordas + A11y + Performance Smoke + Security Scan) | Nightly (02:00) | < 60 min | Staging |
+| **Nível 4 (Release Candidate)** | Full Suite + Performance (k6) + Security (DAST) + Chaos (Toxiproxy) + Accessibility Full | Release Candidate | < 120 min | Staging |
+| **Nível 5 (Produção - Pós-Deploy)** | Smoke Tests (Health, Auth, 3 jornadas críticas) + Synthetic Monitoring | Every Prod Deploy + 15min | < 5 min | Production |
+
+---
+
+## 8. Defect Management & Metrics
+
+### 8.1 Classificação Severidade
+
+| Severidade | Definição | SLA Correção | Exemplo |
 | :--- | :--- | :--- | :--- |
-| **Crítica (P0)** | Sistema fora do ar / perda de dados / vazamento de token / quebra de BR-01/BR-03/BR-04 (custos inconsistentes) | Imediato (hotfix em < 4h) | `authInterceptor` vaza JWT no console; `custoTotalPorAtivo` diverge do backend; ordem "Concluída" pode ser cancelada |
-| **Alta (P1)** | Funcionalidade principal quebrada para ≥ 1 perfil (gestor/técnico/aprovador) sem workaround | 24h (próximo deploy) | Botão "Iniciar" não aparece para técnico responsável; filtro de ordens não aplica `tecnicoId`; dashboard custos retorna 500 |
-| **Média (P2)** | Funcionalidade secundária afetada / erro de UX não bloqueante / validação frontend faltando | Próxima sprint (máx 2 semanas) | Toast de sucesso não some automaticamente; paginação reseta ao filtrar; modal de cancelamento não valida max 500 chars |
-| **Baixa (P3)** | Cosmético / melhoria / documentação / console.log residual | Backlog (triagem mensal) | `console.log` em `api.js:49,52`; tooltip truncado em card de ativo; ordenação por coluna não implementada (fora do MVP) |
+| **P0 - Critical** | Sistema indisponível, perda dados, vazamento segurança, compliance violation | **< 2 horas** (hotfix) | Cross-tenant leak, Token replay, DB corruption, LGPD breach |
+| **P1 - High** | Funcionalidade core quebrada, performance degradada > 50%, regra negócio violada | **< 24 horas** | Ordem não conclui, Busca fuzzy não retorna, RBAC bypass, Refresh token fail |
+| **P2 - Medium** | Funcionalidade não-core quebrada, UI/UX issue, performance < 50% | **< 5 dias úteis** | Export PDF falha, Filtro busca não funciona, Toast não aparece |
+| **P3 - Low** | Cosmético, documentação, melhoria, tech debt | **Próxima sprint** | Typos, cores inconsistentes, logs verbosos |
 
-**Processo de triagem:** Daily bug scrub (15 min) com QA Lead + Eng Lead + PO. Bugs P0/P1 entram no sprint atual (interrupção permitida). P2/P3 vão para backlog priorizado.
+### 8.2 Métricas de Qualidade (Dashboard Grafana)
 
-## 9. Reporting & Metrics
-* **Dashboards (Grafana/Datadog):**
-  * **Cobertura:** % statements/branches/functions/lines por camada (unit, integration, e2e) — trend semanal
-  * **Taxa de falha de build:** % builds falhando por causa de testes (meta < 5%)
-  * **Flakiness:** % testes E2E que falham intermitentemente (meta < 2%) — quarentena automática após 3 falhas em 10 runs
-  * **Tempo de execução:** Unit < 3 min, Integration < 7 min, E2E crítico < 25 min, E2E full < 60 min
-* **Métricas de qualidade acompanhadas:**
-  * **Escape rate:** Bugs P0/P1 encontrados em produção / total P0/P1 (meta < 5%)
-  * **MTTR (Mean Time To Recovery):** Tempo médio do deploy com bug P0 até hotfix em produção (meta < 4h)
-  * **Defect density:** Bugs válidos por 1k LOC (frontend: 627 LOC — meta < 2 bugs/kLOC/sprint) <!-- source: Diagnóstico determinístico do codebase -->
-  * **Test effectiveness:** % bugs encontrados em cada camada (meta: Unit 60%, Integration 25%, E2E 15%, Produção < 5%)
-  * **Pact verification status:** % contratos verificados com sucesso (meta 100%)
+| Métrica | Target | Fonte |
+| :--- | :--- | :--- |
+| **Defect Escape Rate** | < 5% (bugs encontrados em prod vs total) | Jira/GitHub Issues |
+| **MTTD (Mean Time to Detect)** | < 2 horas | Prometheus Alerts + Sentry |
+| **MTTR (Mean Time to Resolve)** | P0: < 2h, P1: < 24h, P2: < 5d | Jira |
+| **Change Failure Rate** | < 10% (deployments causing incidents) | ArgoCD + Incident Tracker |
+| **Deployment Frequency** | ≥ 1/dia (staging), ≥ 1/semana (prod) | ArgoCD |
+| **Test Coverage Trend** | ↗ (não decrescer) | JaCoCo + Vitest History |
+| **Flaky Test Rate** | < 1% (testes instáveis) | CI History |
+| **Performance Regression** | P95 latency não aumentar > 10% | k6 History |
 
-## 10. Roles & Responsibilities
-| Papel | Responsabilidade |
-| :--- | :--- |
-| **Dev** | Escrever e manter testes unitários (Vitest) e de integração (MSW) para código próprio; corrigir flakiness em testes próprios; garantir cobertura crítica ≥ 95% em `api.js` e validações de BR; executar suite Nível 1 localmente antes de push; participar de Pact consumer tests |
-| **QA** | Desenhar, implementar e manter suíte E2E (Playwright) baseada nos cenários BDD das user stories; gerenciar fixtures/factories e dados de staging; executar triagem diária de bugs; rodar performance (k6) e segurança (ZAP) em staging; validar acessibilidade (axe) nos E2E; reportar métricas semanais |
-| **Eng Lead** | Gate de qualidade em releases (aprova/blocka deploy baseado nos critérios de entrada); priorizar correção de P0/P1; revisar arquitetura de testes (ex: decisão de quebrar `api.js:request` complexidade 13 em funções menores para testabilidade) <!-- source: frontend/src/services/api.js#L36 -->; alinhar contratos Pact com Backend Lead; garantir remoção de `console.error/log` residuais antes de produção <!-- source: frontend/src/services/api.js#L26 --><!-- source: frontend/src/services/api.js#L49 --><!-- source: frontend/src/services/api.js#L52 --> |
-| **Backend Lead (parceiro)** | Fornecer contratos OpenAPI/Pact provider verificados; manter ambiente de staging com dados anonimizados; implementar endpoints de transição (`/iniciar`, `/aprovar`, `/concluir`, `/cancelar`) conforme contratos acordados; corrigir divergências de `custoTotalPorAtivo` detectadas por Pact |
-| **PO** | Validar critérios de aceite BDD em staging; priorizar bugs P2/P3 no backlog; aprovar exceções de cobertura (ex: funcionalidade deprecated) |
+---
+
+## 8.3 Test Reporting & Artifacts
+
+| Artefato | Ferramenta | Localização | Retenção |
+| :--- | :--- | :--- | :--- |
+| **Unit/Integration Test Report** | Surefire/Failsafe + JUnit XML | `target/surefire-reports/`, `target/failsafe-reports/` | 30 dias (CI artifacts) |
+| **Coverage Report** | JaCoCo HTML / Vitest V8 HTML | `target/site/jacoco/`, `frontend/coverage/` | 30 dias |
+| **Contract Test Results** | Spring Cloud Contract / Pact | `target/contracts/`, `frontend/pact/` | 30 dias |
+| **E2E Test Report** | Cypress Mochawesome / Playwright HTML | `frontend/cypress/reports/`, `frontend/playwright-report/` | 30 dias |
+| **Performance Report** | k6 HTML / Grafana Dashboard | `tests/performance/report.html`, Grafana | 90 dias |
+| **Security Scan Reports** | SpotBugs XML, Semgrep SARIF, Trivy JSON, ZAP HTML | CI Artifacts / GitHub Security Tab | 90 dias |
+| **Accessibility Report** | axe-core JSON / Cypress Screenshots | `frontend/cypress/a11y-report.json` | 30 dias |
+| **Chaos Experiment Report** | LitmusChaos / Toxiproxy Logs | `chaos/reports/` | 90 dias |
+
+---
+
+## 9. Rastreabilidade Testes ↔ Artefatos
+
+| Test Type | Use Cases | User Stories | API Spec | State Machine | Component | CI Job |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Unit (Backend)** | UC-01 a UC-45 | US-CAD-*, US-ASV-*, US-ORD-*, US-PRE-*, US-PRD-*, US-BUS-*, US-SEC-*, US-REL-*, US-LGD-* | — | Ordem FSM, Ativo FSM, Preventiva FSM, Preditiva FSM, Usuario FSM | Services, Utils, Levenshtein, OLS | `backend-unit-tests` |
+| **Integration (Backend)** | UC-01 a UC-45 | US-CAD-*, US-ASV-*, US-ORD-*, US-PRE-*, US-PRD-*, US-BUS-*, US-SEC-*, US-REL-*, US-LGD-* | `/api/v1/**` | Todos FSMs | Controllers, Repositories, Security, Schedulers, Envers | `backend-integration-tests` |
+| **Contract** | UC-01 a UC-45 | US-CAD-*, US-ASV-*, US-ORD-*, US-PRE-*, US-PRD-*, US-BUS-*, US-SEC-*, US-REL-*, US-LGD-* | `/api/v1/**` (OpenAPI) | — | Controllers (Producer), Stores/API (Consumer) | `contract-tests` |
+| **Unit (Frontend)** | UC-13 a UC-20, UC-25 a UC-31, UC-32 a UC-38 | US-ORD-*, US-PRD-*, US-BUS-*, US-SEC-* | — | Ordem FSM, Preditiva FSM, Usuario FSM | Stores, Composables, Utils, Validators | `frontend-unit-tests` |
+| **E2E (Frontend)** | UC-06 a UC-12, UC-13 a UC-20, UC-21 a UC-28, UC-29 a UC-31, UC-32 a UC-38, UC-39 a UC-42 | US-ASV-*, US-ORD-*, US-PRE-*, US-PRD-*, US-BUS-*, US-SEC-*, US-REL-*, US-LGD-* | `/api/v1/**` (via MSW/Backend) | Todos FSMs (UI State Mapping) | Pages, Components, Router Guards, Pinia Stores | `frontend-e2e-tests` |
+| **Performance** | UC-13 a UC-20, UC-25 a UC-28, UC-29 a UC-31 | US-ORD-*, US-PRD-*, US-BUS-* | `/api/v1/ativos`, `/ordens`, `/busca`, `/dashboard/*` | — | — | `performance-tests` |
+| **Security** | UC-32 a UC-38, UC-43 a UC-45 | US-SEC-*, US-LGD-* | `/auth/*`, `/admin/*`, `/auditoria/*` | Usuario FSM | SecurityConfig, AegisShield, MultiTenancyFilter | `security-tests` |
+| **Accessibility** | Todos UC Frontend | Todos US Frontend | — | UI State Mapping | Todos Components/Pages | `a11y-tests` |
+| **Chaos/Resilience** | UC-13 a UC-20, UC-25 a UC-28 | US-ORD-*, US-PRD-* | `/api/v1/**` | Ordem FSM, Preditiva FSM | Circuit Breaker, Retry, Fallback | `chaos-tests` |
+
+---
+
+*Documento regenerado completamente com base em análise AST completa do backend Java (domain, service, controller, security, predictive, search, audit, scheduler) + frontend Vue/PWA + infra K8s/Docker/TestContainers. Substitui versão 1.0 que continha apenas visão frontend vanilla JS + MSW mocks.*
