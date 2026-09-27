@@ -253,4 +253,41 @@ REFRESH MATERIALIZED VIEW CONCURRENTLY vw_custo_manutencao_por_ativo;
 
 ---
 
+## Apêndice: Correção M-12 — Índice `idx_alertas_ativo_id` (2026-09-27)
+
+**Problema:** a V15 criava `idx_alertas_ativo_id` sem guarda idempotente. Em produção legada
+(onde a tabela `alertas` foi criada pelo Hibernate `ddl-auto=update`), o índice já existe e a
+migration falhava por "duplicate index" — bloqueador de deploy.
+
+**Decisão técnica:** nenhuma guarda SQL única é portável entre H2 2.3 (SeedDataIT/dev,
+MODE=MySQL) e MySQL 8 (prod) — validado empiricamente:
+
+- H2 2.3 não suporta `information_schema.statistics` nem `PREPARE stmt FROM @var`;
+  `DATABASE()` retorna nome lowercase que não casa com `table_schema = 'PUBLIC'`.
+- MySQL 8 não suporta `CREATE INDEX IF NOT EXISTS`, `EXECUTE IMMEDIATE` nem
+  `information_schema.indexes`.
+
+Solução adotada: **migration Java** `V17__create_alertas_index`
+(`src/main/java/db/migration/V17__create_alertas_index.java`), que verifica a existência do
+índice via JDBC `DatabaseMetaData.getIndexInfo()` (portável para qualquer SGBD) e cria o índice
+apenas se ausente. A V15 foi ajustada para não criar o índice (apenas as tabelas, com
+`IF NOT EXISTS`).
+
+**Pontos de atenção:**
+
+1. **Checksum da V15 mudou** — em bancos locais que já aplicaram a V15 antiga, executar
+   `flyway repair` antes de `flyway migrate`.
+2. **Validação em MySQL real fica como passo de deploy** — a migration foi validada em H2
+   (SeedDataIT, BUILD SUCCESS, V17 aplicada). Antes do deploy em produção, validar em MySQL 8:
+   - Banco novo: `flyway migrate` cria o índice normalmente.
+   - Banco legado com índice pré-existente: a guarda via `DatabaseMetaData` detecta e ignora
+     (sem erro de índice duplicado).
+3. **Pacote obrigatório:** a classe Java deve ficar em `db.migration` (não em
+   `br.com.aegispatrimonio.*`) porque o Flyway mapeia a location `classpath:db/migration`
+   para esse pacote ao escanear migrations Java.
+4. **Não fechar a `Connection` do `Context`** — ela pertence ao Flyway; fechá-la quebra o
+   commit da migration ("Connection is closed").
+
+---
+
 > **Nota:** A execução real (SQL, rollback automático, checagem contra banco efêmero) depende de um motor determinístico de execução/validação — este documento é o contrato e o registro, não o executor. Ver limitações em [[db-readme]].

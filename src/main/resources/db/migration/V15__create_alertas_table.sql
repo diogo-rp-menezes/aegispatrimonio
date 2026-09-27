@@ -16,7 +16,12 @@ CREATE TABLE IF NOT EXISTS alertas (
     FOREIGN KEY (ativo_id) REFERENCES ativos(id)
 );
 
-CREATE INDEX idx_alertas_ativo_id ON alertas(ativo_id);
+-- M-12: o índice idx_alertas_ativo_id não é criado aqui. Nenhuma guarda SQL única é
+-- portável entre H2 2.3 (SeedDataIT/dev) e MySQL 8 (prod): H2 não suporta
+-- information_schema.statistics nem PREPARE FROM @var; MySQL não suporta
+-- CREATE INDEX IF NOT EXISTS nem EXECUTE IMMEDIATE. A criação idempotente do índice
+-- foi movida para a migration Java V17__create_alertas_index (JDBC DatabaseMetaData),
+-- portável para qualquer banco.
 
 CREATE TABLE IF NOT EXISTS alertas_aud (
     id BIGINT NOT NULL,
