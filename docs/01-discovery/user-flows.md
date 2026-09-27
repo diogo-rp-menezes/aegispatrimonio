@@ -1,424 +1,360 @@
-# User Flows & Interaction Diagrams — Aegis1 (Regenerado com AST Java)
+# User Flows & Interaction Diagrams — Aegis Patrimônio
 
-> **Versão:** 2.0 · **Status:** Draft · **Owner:** UX / Product / Arquitetura
-> **Base:** Use Cases v2.0 + Glossário + BRD v2.0 + NFR v2.0
-> **Cobertura:** Frontend (Vue 3/PWA) + Backend (Java 21/Spring Boot) — fluxos completos extraídos via AST
-
----
-
-## 1. User Personas & Actors (Atualizado com Domínio Completo)
-
-| Ator | Papel | Objetivos Principais | Permissões (Aegis Shield) |
+## 1. User Personas & Actors
+| Ator | Papel | Objetivos Principais | Permissões |
 | :--- | :--- | :--- | :--- |
-| **Admin Global** | Super-admin multi-tenant | Gerenciar filiais, roles/permissions, usuários globais, auditoria, configurações de segurança | `*_GLOBAL` (todas permissões, todas filiais); troca de contexto de filial |
-| **Admin Cadastros (Filial)** | Mantém dados mestres da sua filial | CRUD departamentos, fornecedores, funcionários, tipos de ativo (scoped à filial) | `*_CRIAR`, `*_LER`, `*_ATUALIZAR`, `*_EXCLUIR` na sua filial |
-| **Gestor de Manutenção** | Planejamento, KPIs, orçamento, compliance | Dashboards, custoTotalPorAtivo, aderência preventiva, preditiva, relatórios NR-10/12, LGPD | `ORDEM_LER_TODAS`, `RELATORIO_GERAR`, `ATIVO_LER`, `PREVENTIVA_GERENCIAR`, `PREDITIVA_LER` na sua filial |
-| **Gestor de Patrimônio** | Ciclo de vida ativos, depreciação, TCO | Cadastro ativos com hardware, QR Code, Termo PDF, transferência, baixa, relatórios de custo | `ATIVO_CRIAR`, `ATIVO_LER`, `ATIVO_ATUALIZAR`, `ATIVO_EXCLUIR`, `HARDWARE_GERENCIAR`, `RELATORIO_GERAR` na sua filial |
-| **Técnico de Campo** | Execução em campo (mobile/PWA) | Iniciar/concluir ordens, coletar health check (SMART), escanear QR Code, ver ordens alocadas | `ORDEM_INICIAR`, `ORDEM_CONCLUIR`, `ORDEM_LER_PROPRIAS`, `HEALTH_CHECK_COLETAR`, `QR_CODE_ESCANEAR` na sua filial |
-| **Aprovador/Supervisor** | Validação de execução | Aprovar/rejeitar ordens com evidências, revisar checklists/fotos/assinatura | `ORDEM_APROVAR`, `ORDEM_LER_TODAS` na sua filial |
-| **Auditor / Compliance** | Rastreabilidade, LGPD, ISO 27001 | Auditoria Envers completa, acessos negados, integridade dados, relatórios compliance | `AUDITORIA_LER`, `ACESSOS_NEGADOS_LER`, `INTEGRIDADE_VALIDAR` (global ou filial) |
-| **DPO (Data Protection Officer)** | LGPD | Solicitações exclusão/portabilidade, DPIA, consentimento | `LGPD_GERENCIAR` (global) |
+| **Gestor de Patrimônio** | Responsável pelo ciclo de vida dos ativos (aquisição, alocação, depreciação, baixa) across filiais | Visibilidade centralizada, relatórios de TCO, trilha de auditoria, conformidade | CRUD completo em Ativos, Tipos de Ativo, Localizações; leitura em Departamentos, Filiais, Fornecedores, Funcionários; relatórios `custoTotalPorAtivo`; exportação de dados |
+| **Analista de Manutenção** | Planeja e executa manutenções preventivas/corretivas; aprova solicitações | Fluxo de aprovação rastreável, alertas preditivos (disco, memória, rede), histórico de saúde | CRUD em Manutenções (iniciar, aprovar, cancelar, concluir); leitura em Ativos, Alertas, Health Checks; `listarAlertas`, `getRecentAlerts`, `markAsRead`, `checkResourceUsageAlerts` |
+| **Administrador de Sistema (Admin)** | Configura RBAC, cadastra tipos de ativo, departamentos, filiais, fornecedores, usuários | Controle granular de permissões, provisionamento de usuários | CRUD completo em Departamentos, Filiais, Fornecedores, Funcionários, Tipos de Ativo, Permissões, Roles, Usuários; `createUserAndToken`, `mockLogin`, `authInterceptor`, `clearSession`, `logout`, `hasPermission`, `isAdmin` |
+| **Usuário Final (Funcionário)** | Solicita manutenção, reporta problemas, visualiza ativos sob sua responsabilidade | Portal simples para abrir chamados, acompanhar status, receber notificações | Leitura em Ativos (próprios), criação de solicitações de manutenção (`iniciar`), acompanhamento de status; `listarAlertas` (próprios) |
+| **Auditor / Compliance** | Valida trilha de custódia, depreciação, baixas, acessos a dados sensíveis | Logs imutáveis de operações sensíveis com usuário/timestamp | Leitura em todos os relatórios e logs de auditoria (entidade futura `audit_log`); exportação de trilhas |
+
+> **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — Personas e permissões inferidas a partir do glossário do BRD (30+ operações de domínio) e regras de negócio BR-01 a BR-10. Não há rotas/IPC detectadas no código para confirmar endpoints reais.
 
 ---
 
-## 2. Core User Flows (Atualizados + Novos Fluxos Backend)
+## 2. Core User Flows
 
-### Flow 1: Ciclo de Vida da Ordem de Manutenção (Corretiva) — **Atualizado com Estados Completos**
+### Flow 1: Cadastro e Gestão de Ativo (CRUD Completo)
+* **Gatilho:** Gestor de Patrimônio acessa "Novo Ativo" ou edita ativo existente na listagem
+* **Ator:** Gestor de Patrimônio (Admin para criar/atualizar/deletar; User apenas leitura)
+* **Pré-condições:** Usuário autenticado com token válido (`authInterceptor`); papel `ADMIN` para escrita (BR-01)
+* **Resultado esperado:** Ativo persistido com metadados completos (tipo, localização, departamento, filial, fornecedor, depreciação) e trilha de auditoria registrada
+
+* **Passos:**
+  1. Usuário acessa tela de listagem de ativos (`listarTodos`)
+  2. Sistema exibe tabela paginada com filtros (filial, departamento, tipo, status) — **estado: loading → success/empty**
+  3. Usuário clica "Novo Ativo" ou seleciona linha para editar (`buscarPorId`)
+  4. Sistema abre formulário com campos: identificação, tipo (`createTipoAtivo`), localização (`createLocalizacao`), departamento, filial, fornecedor, data aquisição, valor, vida útil — **estado: loading → success**
+  5. Usuário preenche dados obrigatórios e submete
+  6. Sistema valida entrada (BR-03: 400 se inválido) e verifica permissão (BR-01: 403 se USER)
+  7. Sistema persiste ativo, registra log de auditoria (BR-02: usuário, timestamp, entidade, ação, valores)
+  8. Sistema retorna sucesso (201 Created / 200 OK) e atualiza listagem — **estado: success**
+  9. Para exclusão: usuário confirma modal → sistema valida permissão (BR-01) → deleta em cascata (BR-10 se hardware) → registra auditoria → **estado: success**
 
 ```mermaid
 graph TD
-    A[Início: Usuário autenticado JWT] --> B{Perfil / Ação}
-    B -- Gestor: Criar Corretiva --> C[Tela Nova Ordem]
-    C --> D[Preenche: ativo (busca fuzzy), descrição, prioridade, técnico, filial/dep/local (herdados), fornecedor opcional, custo estimado]
-    D --> E{POST /api/v1/ordens via api.request}
-    E -- 201 --> F[Toast sucesso + redirect detalhe]
-    E -- 400/409/5xx --> G[handleApiError → toast erro específico]
-    G --> D
-    F --> H[Detalhe Ordem / Lista]
-    B -- Técnico: Iniciar --> H
-    H --> I{Estado da Ordem?}
-    I -- ABERTA + técnico alocado (BR-05) --> J[Botão Iniciar habilitado]
-    J --> K[Clica Iniciar]
-    K --> L{PATCH /api/v1/ordens/{id}/iniciar}
-    L -- 200 --> M[Badge: EM_ANDAMENTO + timestamp início + cronômetro UI]
-    L -- 409 BR-05 --> N[Erro: 'Ordem não pode ser iniciada (BR-01)']
-    N --> H
-    M --> O{Perfil: Aprovador + permissão ORDEM_APROVAR na filial?}
-    O -- Sim + canApprove:true --> P[Botão Aprovar habilitado]
-    P --> Q[Modal: Evidência obrigatória (foto/checklist/assinatura digital)]
-    Q --> R{PATCH /api/v1/ordens/{id}/aprovar}
-    R -- 200 --> S[Badge: APROVADA + timestamp aprovador]
-    R -- 400 evidência --> T[Erro validação evidência (BR-06)]
-    T --> Q
-    S --> U{Perfil: Técnico responsável?}
-    U -- Sim --> V[Botão Concluir habilitado]
-    V --> W[Form: Custos finais (mão de obra, material, terceiros) + observações]
-    W --> X{PATCH /api/v1/ordens/{id}/concluir}
-    X -- 200 --> Y[Badge: CONCLUIDA + custos travados + custoTotalPorAtivo atualizado]
-    X -- 400 --> Z[Erro custos inválidos]
-    Z --> W
-    Y --> AA[Fim: Trigger preventiva check + notificações]
-    I -- ABERTA sem técnico / outros estados --> AB[Ações bloqueadas / tooltip regra]
-    I -- CONCLUIDA --> AC[Somente leitura + auditoria]
-    I -- Qualquer exceto CONCLUIDA --> AD[Botão Cancelar disponível]
-    AD --> AE[Modal confirmação + motivo obrigatório]
-    AE --> AF{PATCH /api/v1/ordens/{id}/cancelar}
-    AF -- 200 --> AG[Badge: CANCELADA + auditoria]
-    AF -- 4xx --> AH[Erro]
-    AH --> AE
+    A[Início: Listar Ativos] --> B{Autenticado?}
+    B -- Não --> C[Redirecionar Login]
+    B -- Sim --> D[Exibir Listagem<br/>loading → success/empty]
+    D --> E{Ação do Usuário}
+    E -- Novo --> F[Abrir Formulário Criação<br/>loading → success]
+    E -- Editar --> G[Buscar Por ID<br/>loading → success/404]
+    E -- Excluir --> H[Confirmar Exclusão]
+    F --> I[Preencher Dados<br/>Validação Cliente]
+    G --> I
+    I --> J{Submeter}
+    J -- Inválido --> K[Exibir Erros 400<br/>estado: error]
+    J -- Válido --> L{Permissão ADMIN?}
+    L -- Não --> M[403 Forbidden<br/>estado: error]
+    L -- Sim --> N[Persistir + Auditoria]
+    N --> O{Sucesso?}
+    O -- Sim --> P[Toast Sucesso<br/>Atualizar Listagem]
+    O -- Não --> Q[Toast Erro 5xx<br/>estado: error]
+    H --> L
+    P --> D
+    Q --> I
+    M --> D
+    K --> I
+    C --> A
 ```
 
-**Estados de UI Cobertos:**
-- **Loading:** Spinner em botões de ação + skeleton em detalhe + tabela com shimmer
-- **Empty:** "Nenhuma ordem" + CTA "Criar primeira ordem" (Gestor)
-- **Error:** Toast global via `handleApiError` (401→refresh+retry; 409→regra negócio; 5xx→erro servidor); inline em formulários
-- **Success:** Toast por transição + badge atualizado otimisticamente
-- **Disabled:** Botões por estado/permissão (Aegis Shield); campos custo só em APROVADA
-- **Real-time:** WebSocket/SSE para atualização de badge sem refresh (ordem iniciada/aprovada/concluída por outro usuário)
-
-**Métricas Instrumentadas:** Funil (criadas→iniciadas→aprovadas→concluídas); lead time (iniciar→aprovar); % canceladas; erros API por endpoint; SLA breach count.
+* **Estados de UI cobertos:** loading (listagem, formulário, busca), empty (nenhum ativo cadastrado), error (400 validação, 403 permissão, 404 não encontrado, 5xx servidor), success (toast + atualização), disabled (botões durante submit)
+* **Métricas instrumentadas neste fluxo:** taxa de conclusão de cadastro, tempo médio preenchimento, taxa de erro 400/403/5xx, latência P95 `listarTodos`/`buscarPorId`/`createAtivo`/`atualizar`/`deletar`
 
 ---
 
-### Flow 2: CRUD Entidades Mestres (Filial, Departamento, Fornecedor, Funcionário, TipoAtivo) — **Multi-tenancy Aware**
+### Flow 2: Solicitação e Aprovação de Manutenção (Workflow de Estados)
+* **Gatilho:** Usuário Final ou Analista identifica necessidade de manutenção e clica "Nova Solicitação"
+* **Ator:** Usuário Final (inicia), Analista de Manutenção (aprova/cancela/conclui), Gestor de Patrimônio (visualiza)
+* **Pré-condições:** Ativo existe (`buscarPorId` retorna 200); usuário autenticado
+* **Resultado esperado:** Solicitação criada no estado `PENDENTE`, transicionada para `APROVADA` → `EM_ANDAMENTO` → `CONCLUIDA` ou `CANCELADA`, com trilha de auditoria em cada transição
+
+* **Passos:**
+  1. Usuário acessa detalhe do ativo (`buscarPorId`) ou listagem de manutenções
+  2. Sistema exibe botão "Nova Manutenção" — **estado: disabled se usuário sem permissão**
+  3. Usuário preenche: tipo (preventiva/corretiva), prioridade, descrição, data desejada, ativo vinculado
+  4. Sistema valida (BR-03) e cria solicitação com status `PENDENTE` — **estado: loading → success**
+  5. Analista recebe notificação/alerta (`listarAlertas`/`getRecentAlerts`) e acessa fila de aprovação
+  6. Analista revisa: pode `aprovar` (→ `APROVADA`), `cancelar` (→ `CANCELADA` com justificativa) ou solicitar mais info
+  7. Se aprovada: técnico executa → Analista `conclui` (→ `CONCLUIDA` com custo, peças, mão de obra) — alimenta `custoTotalPorAtivo`
+  8. Cada transição registra auditoria (BR-02: usuário, timestamp, estado anterior/novo)
+  9. Usuário Final acompanha status em "Minhas Solicitações" — **estados: loading, empty, success**
 
 ```mermaid
 graph TD
-    A[Menu Cadastros] --> B[Seletor de Filial (se Admin Global)]
-    B --> C[Seleciona Entidade: Filial/Depto/Fornecedor/Funcionário/TipoAtivo]
-    C --> D[Lista Paginada Server-side + Busca Fuzzy (Levenshtein)]
-    D --> E{Ação}
-    E -- Novo --> F[Modal Criar com validação client-side]
-    F --> G{POST /api/v1/{entidade} (scoped por filial via header/contexto)}
-    G -- 201 --> H[Toast + fecha modal + refresh lista]
-    G -- 409 duplicado --> I[Erro inline: 'Registro já existe']
-    I --> F
-    E -- Editar --> J[GET /api/v1/{entidade}/{id} → Modal pré-preenchido]
-    J --> K[PUT /api/v1/{entidade}/{id}]
-    K -- 200 --> L[Toast + atualiza linha]
-    K -- 409 --> M[Erro duplicado]
-    E -- Detalhe --> N[GET /api/v1/{entidade}/{id} → Modal read-only + Auditoria tab]
-    E -- Excluir --> O[Modal confirmação]
-    O --> P{DELETE /api/v1/{entidade}/{id}}
-    P -- 204 --> Q[Toast + remove linha]
-    P -- 409 BR-04 --> R[Erro: 'Entidade possui vínculos (ativos/ordens), exclusão bloqueada']
+    A[Início: Nova Solicitação] --> B{Autenticado?}
+    B -- Não --> C[Login]
+    B -- Sim --> D[Formulário Manutenção<br/>loading → success]
+    D --> E[Preencher Dados]
+    E --> F{Validar 400?}
+    F -- Sim --> G[Erros Campo<br/>estado: error]
+    F -- Não --> H[Criar PENDENTE<br/>Auditoria]
+    H --> I{Sucesso?}
+    I -- Não --> J[Toast Erro<br/>estado: error]
+    I -- Sim --> K[Notificar Analista<br/>Alerta]
+    K --> L[Fila Aprovação Analista]
+    L --> M{Ação Analista}
+    M -- Aprovar --> N[Status APROVADA<br/>Auditoria]
+    M -- Cancelar --> O[Modal Justificativa<br/>Status CANCELADA<br/>Auditoria]
+    M -- Mais Info --> P[Notificar Solicitante]
+    N --> Q[Técnico Executa]
+    Q --> R[Analista Conclui<br/>Custo/Peças/MãoObra]
+    R --> S[Status CONCLUIDA<br/>Auditoria + custoTotalPorAtivo]
+    S --> T[Notificar Solicitante]
+    O --> T
+    P --> L
+    G --> E
+    J --> E
+    T --> U[Fim: Histórico Atualizado]
 ```
 
-**Diferenças por Entidade:**
-- **Filial:** Apenas Admin Global; raiz da hierarquia; exclusão bloqueada se houver departamentos/ativos/ordens
-- **Departamento:** Scoped à filial selecionada; Admin Filial ou Admin Global
-- **Fornecedor:** Campos: categoria, SLA padrão, avaliação, certificações
-- **Funcionário:** Vincula `Usuario` (provisiona login); define função manutenção (TECNICO/APROVADOR/SOLICITANTE)
-- **TipoAtivo:** Define vida útil, valor residual %, requer hardware — usado em depreciação automática
+* **Estados de UI cobertos:** loading (criação, transições), empty (nenhuma solicitação), error (400, 403, 404 ativo, 5xx), success (toast por transição), disabled (botões de ação conforme papel/estado — ex: só Admin/Analista vê "Aprovar")
+* **Métricas instrumentadas neste fluxo:** lead time PENDENTE→APROVADA, taxa de aprovação, tempo médio conclusão, custo médio por manutenção, % preventiva vs corretiva
 
 ---
 
-### Flow 3: Cadastro Completo de Ativo com Hardware + QR Code + Termo PDF
+### Flow 3: Health Check de Hardware e Alertas Preditivos
+* **Gatilho:** Agendador externo (cron/Spring `@Scheduled`) chama `updateHealthCheck` periodicamente OU Analista dispara manualmente
+* **Ator:** Sistema (agendador) / Analista de Manutenção (manual)
+* **Pré-condições:** Ativo é do tipo hardware; endpoint `updateHealthCheck` idempotente (BR-10: limpa adaptadores/discos/memórias anteriores via `deleteByAtivoDetalheHardwareId`)
+* **Resultado esperado:** Métricas de disco, memória, rede persistidas; alertas gerados se thresholds excedidos (disco >85%, memória >90%, latência rede >100ms — BR-05)
+
+* **Passos:**
+  1. Agendador executa `updateHealthCheck(ativoId, payload)` com dados coletados (adaptadores, discos, memórias)
+  2. Sistema valida ativo existe (BR-04: 404 se não) e é hardware
+  3. Sistema remove dados antigos do hardware (`deleteByAtivoDetalheHardwareId` — BR-10)
+  4. Sistema persiste novos dados (`findByAtivoDetalheHardwareId` para verificação)
+  5. Sistema executa `checkResourceUsageAlerts` (complexidade 17 — refatorar) avaliando thresholds configuráveis
+  6. Se excedido: cria alerta com severidade, tipo (DISCO/MEMORIA/REDE), valor atual, threshold
+  7. Analista visualiza alertas em dashboard (`listarAlertas`, `getRecentAlerts`) — **estados: loading, empty, success**
+  8. Analista `markAsRead` ou converte em manutenção preventiva (Flow 2)
+  9. Histórico de saúde disponível via `getHealthHistory` para tendências — **estado: loading → success/empty**
 
 ```mermaid
 graph TD
-    A[Ativos → Novo Ativo] --> B[Seleciona TipoAtivo]
-    B --> C{TipoAtivo.requerDetalheHardware?}
-    C -- Sim --> D[Seção Hardware Expandida]
-    C -- Não --> E[Formulário Básico]
-    D --> D1[CPU: modelo, cores, frequência]
-    D1 --> D2[Memória: total GB, tipo, frequência]
-    D2 --> D3[Discos: +Adicionar → tipo SSD/HDD, capacidade, serial, SMART raw, temp, horas]
-    D3 --> D4[Adaptadores Rede: +Adicionar → MAC, IP, velocidade, tipo WiFi/Ethernet]
-    D4 --> E
-    E --> F[Dados Comuns: tag único, serial, modelo, fabricante, data aquisição, valor, filial, depto, localização, responsável, fornecedor, NF]
-    F --> G{POST /api/v1/ativos}
-    G -- 201 --> H[Backend: calcula depreciação (BR-03) + gera QR Code (tag+URL+hash) + persiste Ativo + Hardware + Componentes]
-    H --> I[Response: ativo completo + qrCodeUrl + termoPdfUrl]
-    I --> J[UI: Toast sucesso + botões 'Ver Termo PDF' + 'Imprimir QR Code' + 'Copiar Link Público']
-    J --> K[Termo PDF: abre nova aba → opção assinatura digital (placeholder v1: manual) → download]
-    K --> L[QR Code: SVG/PNG → impressão etiqueta]
-    G -- 400/409 --> M[Erros: tag duplicado, filial inválida, hardware obrigatório faltando]
-    M --> F
+    A[Início: Agendador/Manual] --> B{Ativo Existe?}
+    B -- Não --> C[404 Not Found<br/>Log Erro]
+    B -- Sim --> D{Tipo Hardware?}
+    D -- Não --> E[Ignorar/Log Warn]
+    D -- Sim --> F[Limpar Dados Antigos<br/>deleteByAtivoDetalheHardwareId]
+    F --> G[Persistir Novos Dados<br/>Adaptadores/Discos/Memórias]
+    G --> H{Sucesso Persistência?}
+    H -- Não --> I[Log Erro 5xx<br/>Retry/Alertar DevOps]
+    H -- Sim --> J[Executar checkResourceUsageAlerts]
+    J --> K{Threshold Excedido?}
+    K -- Não --> L[Fim: Health Check OK]
+    K -- Sim --> M[Criar Alerta<br/>Severidade/Tipo/Valor]
+    M --> N[Notificar Analista<br/>Push/Email/In-App]
+    N --> O[Dashboard Alertas<br/>loading → success/empty]
+    O --> P{Analista Ação}
+    P -- Mark Read --> Q[markAsRead]
+    P -- Converter Manutenção --> R[Flow 2: Nova Preventiva]
+    Q --> O
+    R --> S[Fim: Preventiva Criada]
+    L --> S
+    C --> S
+    E --> S
+    I --> S
 ```
 
-**Estados UI:** Loading no submit (pode demorar 2s para PDF/QR); progress bar se lote; erro de validação hardware por campo.
+* **Estados de UI cobertos:** loading (dashboard alertas, histórico saúde), empty (nenhum alerta, sem histórico), error (falha coleta, 5xx em `checkResourceUsageAlerts`), success (health check OK, alerta lido), disabled (botão "Converter em Manutenção" se já existe aberta)
+* **Métricas instrumentadas neste fluxo:** frequência health checks executados, % alertas convertidos em preventiva (meta ≥70% — BRD), taxa de erro `checkResourceUsageAlerts` (<0,1% — BRD), latência P95 `updateHealthCheck`/`getHealthHistory`
 
 ---
 
-### Flow 4: Gestão de Hardware do Ativo (Coleta em Campo via PWA + QR Code)
+### Flow 4: Gestão de RBAC e Provisionamento de Usuários (Admin)
+* **Gatilho:** Admin acessa "Administração > Usuários/Permissões/Roles"
+* **Ator:** Administrador de Sistema (papel `ADMIN` obrigatório — BR-01)
+* **Pré-condições:** Usuário autenticado com `isAdmin=true`; token válido (`authInterceptor`)
+* **Resultado esperado:** Entidades mestras gerenciadas (Departamento, Filial, Fornecedor, Funcionário, TipoAtivo, Permissão, Role, Usuário) com auditoria completa
+
+* **Passos:**
+  1. Admin acessa painel de administração — **estado: loading → success**
+  2. Aba "Usuários": lista (`listarTodos` — BR-01: USER pode ler), botão "Novo Usuário" — **estado: disabled se não ADMIN**
+  3. Admin preenche: nome, email, papel (Role), departamento, filial, senha temporária
+  4. Sistema valida (BR-03) e executa `createUserAndToken` (retorna token inicial) ou `createUsuario` + `createFuncionarioAndUsuario`
+  5. Sistema registra auditoria (BR-02)
+  6. Aba "Roles/Permissões": CRUD em `createRole`, `createPermission`, associação role↔permission
+  7. Aba "Mestras": CRUD em Departamento, Filial, Fornecedor, Funcionário, TipoAtivo — **todos 403 para USER (BR-01)**
+  8. Admin pode `logout` ou `clearSession` (invalida token cliente/servidor — BR-08)
+  9. `mockLogin` disponível apenas em ambiente de teste — **estado: hidden em prod**
 
 ```mermaid
 graph TD
-    A[Técnico escaneia QR Code do ativo (câmera PWA)] --> B[PWA abre /public/ativo/{tag}?h={hash} → read-only + botão 'Coletar Health Check' se técnico autenticado]
-    B --> C[Login rápido (biometria/pin) → JWT curto 15min]
-    C --> D[Tela Health Check: Discos listados + campos SMART]
-    D --> E[Preenche: reallocated_sectors, seek_error_rate, spin_retry_count, temperature, power_on_hours]
-    E --> F{POST /api/v1/ativos/{id}/health-check}
-    F -- 200 --> G[Backend: HealthCheckService.analisar() → score 0-100 + threshold check]
-    G --> H{Score < threshold?}
-    H -- Sim --> I[Alerta crítico + gera ordem preditiva automática (UC-27) + notificação]
-    H -- Não --> J[Toast 'Health check salvo' + score exibido]
-    I --> K[Dashboard preditivo atualizado tempo real]
-    J --> K
-    F -- 400/401/5xx --> L[Erro offline-first: salva local (IndexedDB) → sincroniza quando online]
+    A[Início: Painel Admin] --> B{isAdmin?}
+    B -- Não --> C[403 Forbidden<br/>Redirecionar Dashboard]
+    B -- Sim --> D[Carregar Abas<br/>loading → success]
+    D --> E{Aba Selecionada}
+    E -- Usuários --> F[Listar Usuários<br/>loading → success/empty]
+    E -- Roles/Permissões --> G[Listar Roles/Perms<br/>loading → success/empty]
+    E -- Mestras --> H[Listar Entidades<br/>loading → success/empty]
+    F --> I{Ação}
+    I -- Novo --> J[Formulário Usuário<br/>createUserAndToken]
+    I -- Editar --> K[Buscar Usuário<br/>atualizar]
+    I -- Excluir --> L[Confirmar + Auditoria]
+    J --> M{Validar 400?}
+    M -- Sim --> N[Erros Campo]
+    M -- Não --> O[Persistir + Token + Auditoria]
+    O --> P{Sucesso?}
+    P -- Sim --> Q[Toast + Atualizar Lista]
+    P -- Não --> R[Toast Erro]
+    G --> S[CRUD Roles/Perms<br/>Mesmo Padrão]
+    H --> T[CRUD Mestras<br/>Mesmo Padrão<br/>403 se USER]
+    Q --> F
+    R --> J
+    N --> J
+    L --> F
+    S --> D
+    T --> D
+    C --> A
 ```
 
-**Offline-First (PWA):** Service Worker + IndexedDB para health checks offline; sync automático ao reconectar; indicador visual "pendente sincronização".
+* **Estados de UI cobertos:** loading (listagens, formulários), empty (nenhum usuário/role), error (400, 403, 404, 5xx), success (toast + atualização), disabled (todas as ações de escrita se não ADMIN; `mockLogin` hidden em prod)
+* **Métricas instrumentadas neste fluxo:** tempo de provisionamento usuário (<5min — BRD), taxa de erro 403 (deve ser 0% para ADMIN), auditoria 100% operações escrita
 
 ---
 
-### Flow 5: Manutenção Preventiva — Agendamento + Geração Automática
+### Flow 5: Relatórios Financeiros e Auditoria (Gestor/Auditor)
+* **Gatilho:** Gestor de Patrimônio ou Auditor acessa "Relatórios > Custo Total por Ativo" ou "Auditoria > Trilha de Logs"
+* **Ator:** Gestor de Patrimônio, Auditor / Compliance
+* **Pré-condições:** Usuário autenticado; permissão de leitura em relatórios/logs
+* **Resultado esperado:** Relatório `custoTotalPorAtivo` (soma manutenções por ativo — BR-06) exportável; logs de auditoria imutáveis filtráveis
+
+* **Passos:**
+  1. Usuário acessa tela de relatórios — **estado: loading → success**
+  2. Filtros: período, filial, departamento, tipo ativo, status manutenção
+  3. Sistema executa `custoTotalPorAtivo` agregando custos (peças, mão de obra, terceiros) por `ativo_id`
+  4. Exibe tabela: Ativo, Tag, Descrição, Total Manutenções, Qtd Manutenções, Última Manutenção — **estado: success/empty**
+  5. Botão "Exportar CSV/Excel" — gera arquivo para contabilidade (BRD Seção 7)
+  6. Aba "Auditoria": filtros por entidade, ação, usuário, período
+  7. Sistema consulta `audit_log` (entidade futura — BR-02 gap) — **estado: loading → success/empty**
+  8. Exibe: timestamp, usuário, entidade, entidade_id, ação, valores_anteriores, valores_novos
+  9. Exportação para evidência SOX/LGPD
 
 ```mermaid
 graph TD
-    A[Gestor → Preventiva → Novo Plano] --> B[Seleciona: Ativo(s) ou TipoAtivo + Filial]
-    B --> C[Define: Frequência CRON, dia/hora, técnico padrão, descrição padrão]
-    C --> D{POST /api/v1/preventivas}
-    D -- 201 --> E[Plano criado + próxima execução calculada]
-    E --> F[Scheduler (15min) verifica proximaExecucao <= now]
-    F --> G{Para cada plano devido}
-    G --> H[Cria SolicitacaoManutencao tipo PREVENTIVA + estado ABERTA + técnico padrão]
-    H --> I[Atualiza proximaExecucao (próximo CRON)]
-    I --> J[Notifica técnico (push/email) + WebSocket dashboard]
-    J --> K[Auditoria: geração automática preventiva]
-    K --> L[Gestor → Relatório Aderência: % concluídas no prazo / total geradas]
+    A[Início: Tela Relatórios] --> B{Autenticado?}
+    B -- Não --> C[Login]
+    B -- Sim --> D[Carregar Filtros<br/>loading → success]
+    D --> E{Aba}
+    E -- Custo Total --> F[Aplicar Filtros]
+    F --> G[Executar custoTotalPorAtivo]
+    G --> H{Resultado}
+    H -- Vazio --> I[Estado Empty<br/>Mensagem Orientativa]
+    H -- Dados --> J[Tabela + Totais<br/>estado: success]
+    J --> K[Exportar CSV/Excel]
+    K --> L[Download Arquivo]
+    E -- Auditoria --> M[Aplicar Filtros Log]
+    M --> N[Consultar audit_log]
+    N --> O{Resultado}
+    O -- Vazio --> P[Estado Empty]
+    O -- Dados --> Q[Tabela Logs<br/>Imutável/Ordenado]
+    Q --> R[Exportar Evidência]
+    R --> S[Download/Compartilhar]
+    L --> T[Fim]
+    S --> T
+    I --> T
+    P --> T
+    C --> A
 ```
 
-**Estados UI:** Lista de planos com status (ATIVO/PAUSADO); próxima execução visível; botão "Gerar Agora" (manual trigger); pausa/reativa.
+* **Estados de UI cobertos:** loading (consulta agregada, logs), empty (sem dados no período), error (timeout agregação, 5xx), success (tabela renderizada), disabled (exportar se empty)
+* **Métricas instrumentadas neste fluxo:** tempo geração relatório (meta <5s), taxa de exportação, completude logs auditoria (meta 100% — BRD)
 
 ---
 
-### Flow 6: Manutenção Preditiva — Health Check + Regressão Linear + Ordem Automática
+### Flow 6: Autenticação e Gestão de Sessão
+* **Gatilho:** Usuário acessa aplicação não autenticado OU sessão expira durante uso
+* **Ator:** Qualquer usuário (Admin, Gestor, Analista, Funcionário)
+* **Pré-condições:** Nenhuma (tela pública de login)
+* **Resultado esperado:** Usuário autenticado com JWT válido; `authInterceptor` injeta token em requisições subsequentes; `logout`/`clearSession` invalidam corretamente
+
+* **Passos:**
+  1. Usuário acessa URL base → redirecionado para `/login` se sem token válido
+  2. Tela de login: campos email/username, senha, botão "Entrar" — **estado: loading (submit) → success/error**
+  3. Sistema valida credenciais (backend: `mockLogin` apenas testes; produção: integração LDAP/AD futura — BRD Seção 7)
+  4. Se válido: retorna JWT + dados usuário (roles, permissions) → armazena em memory/storage
+  5. `authInterceptor` injeta `Authorization: Bearer <token>` em todas as chamadas `request` (frontend `api.js:46`)
+  6. Usuário navega → se 401/token expirado: `clearSession` → redireciona login preservando `returnUrl`
+  7. Usuário clica "Sair" → `logout` (invalida server-side) + `clearSession` (limpa client) → redireciona login
+  8. `mockLogin` disponível apenas em `NODE_ENV=development` — **estado: hidden em prod**
 
 ```mermaid
 graph TD
-    A[Batch Noturno 02:00 - ManutencaoPreditivaService] --> B[Para cada ativo com >= 3 health checks]
-    B --> C[Regressão Linear Simples Mínimos Quadrados: reallocated_sectors vs power_on_hours]
-    C --> D[Calcula: dias até threshold crítico + IC 95%]
-    D --> E{Probabilidade > 80% E dataPrevista < 30 dias?}
-    E -- Sim --> F[Cria PrevisaoFalha + Alerta + Ordem Preditiva Automática]
-    E -- Não --> G[Atualiza PrevisaoFalha (monitoramento)]
-    F --> H[Ordem: tipo PREDITIVA, prioridade ALTA/CRITICA, descrição com data/probabilidade]
-    H --> I[Notificação: Gestor + Técnico responsável + Dashboard alerta]
-    I --> J[Ação Gestor: 'Agendar Substituição' → cria preventiva programada + marca previsão TRATADA]
-    G --> K[Dashboard Preditivo: cards (monitorados, alertas, ordens preditivas, previsões <30d) + tabela drill-down]
+    A[Início: Acesso App] --> B{Token Válido?}
+    B -- Sim --> C[Permitir Acesso<br/>authInterceptor Injeta Token]
+    B -- Não --> D[Tela Login<br/>estado: ready]
+    D --> E[Preencher Credenciais]
+    E --> F{Submeter}
+    F --> G[Validar Backend]
+    G -- Inválido --> H[Erro 401<br/>estado: error<br/>Mensagem Genérica]
+    G -- Válido --> I[Receber JWT + User Data]
+    I --> J[Armazenar Token<br/>Redirecionar returnUrl]
+    J --> C
+    C --> K{Navegação}
+    K -- Requisição --> L[request + Token]
+    L --> M{Resposta}
+    M -- 2xx --> N[handleResponse<br/>Sucesso]
+    M -- 401 --> O[clearSession<br/>Redirecionar Login]
+    M -- 403 --> P[handleApiError<br/>Toast Permissão]
+    M -- 5xx --> Q[handleApiError<br/>Toast Erro Servidor]
+    N --> K
+    O --> D
+    P --> K
+    Q --> K
+    K -- Logout --> R[logout + clearSession]
+    R --> D
+    H --> E
 ```
 
-**Dashboard Preditivo (Tempo Real):**
-- Cards: Ativos monitorados | Alertas ativos | Ordens preditivas abertas | Previsões < 30 dias
-- Tabela: Ativo | Tag | Disco | Health Score | Probabilidade | Data Prevista | IC 95% | Ação (Ver Ordem / Agendar Substituição)
-- Filtros: Filial, Probabilidade (slider), Horizonte (7/30/90 dias)
-- WebSocket: novo alerta preditivo → toast + badge atualizado
+* **Estados de UI cobertos:** loading (submit login, requisições autenticadas), error (401 credenciais, 403 permissão, 5xx servidor, network error), success (login ok, requisições ok), disabled (botão login durante submit, botões app durante 401 redirect)
+* **Métricas instrumentadas neste fluxo:** taxa de sucesso login, tempo médio autenticação, taxa de 401 (expiração), latência P95 `request` (meta ≤500ms — BRD), console.error/debug residuais em `api.js:36,99` (remover prod)
 
 ---
 
-### Flow 7: Busca Inteligente Global (Fuzzy Levenshtein + Filtros)
-
-```mermaid
-graph TD
-    A[Header: Campo Busca Global (debounce 300ms)] --> B[Digita: 'notebok', 'dell 5520', 'joao silva']
-    B --> C{GET /api/v1/busca?q=...&types=ativo,ordem,funcionario,fornecedor&filialId=1&page=0&size=10}
-    C --> D[Backend: FuzzySearchService.buscar()]
-    D --> E[Levenshtein distance <= 2 (config threshold 0.7) nos campos indexados]
-    E --> F[Score fuzzy + boost por tipo (ativo>ordem>funcionario>fornecedor) + filtros exatos]
-    F --> G[Resultados unificados paginados + highlight termo]
-    G --> H[UI: Dropdown resultados agrupados por tipo + ícones + ações rápidas]
-    H --> I[Clique resultado → navega para detalhe da entidade]
-```
-
-**Configuração Admin (UC-31):** Threshold similaridade (0.5-0.9), campos indexados por entidade, pesos de boost — `@RefreshScope` para reload sem restart.
-
----
-
-### Flow 8: Segurança Aegis Shield — RBAC Granular + Multi-tenancy + Auditoria
-
-#### 8.1 Login & Refresh Token
-```mermaid
-sequenceDiagram
-    participant U as Usuário
-    participant F as Frontend (Vue + Pinia)
-    participant B as Backend (Spring Security)
-    U->>F: Email + Senha
-    F->>B: POST /api/v1/auth/login
-    B->>F: 200 {accessToken (15min), refreshToken (HttpOnly cookie 7d)}
-    F->>F: Armazena accessToken em memória (Pinia); refreshToken em cookie
-    Note over F: authInterceptor anexa Authorization: Bearer <accessToken> em TODAS requests
-    F->>B: GET /api/v1/ativos (com accessToken)
-    B->>F: 200 dados
-    Note over F,B: AccessToken expira (401)
-    F->>B: POST /api/v1/auth/refresh (cookie automático)
-    B->>F: 200 {novo accessToken}
-    F->>F: Atualiza Pinia + retry request original (1x only)
-    B->>F: 200 dados
-    Note over F: Falha refresh → limpa Pinia/cookie → redirect /login
-```
-
-#### 8.2 Matriz de Permissões (Admin Global)
-```mermaid
-graph TD
-    A[Admin → Roles & Permissions] --> B[Matriz Visual: Roles x Permissions x Contexto]
-    B --> C[Roles: ADMIN(global), GESTOR(filial), TECNICO(proprio), USER(leitura), AUDITOR(leitura+auditoria)]
-    C --> D[Permissions: ATIVO_*, ORDEM_*, RELATORIO_*, CONFIG_*, AUDITORIA_*, LGPD_*, HEALTH_CHECK_*, PREDITIVA_*]
-    D --> E[Contexto: Global (ADMIN) ou Filial (demais)]
-    E --> F[Edita célula → PUT /api/v1/admin/roles/{role}/permissions]
-    F --> G[Validação: consistência (ex.: TECNICO não pode ter ORDEM_APROVAR)]
-    G --> H[Auditoria: alteração de permissão registrada (Envers)]
-```
-
-#### 8.3 Multi-tenancy: Troca de Contexto (Admin Global)
-```mermaid
-graph TD
-    A[Header: Seletor Filial (visível só ADMIN global)] --> B[Seleciona Filial X]
-    B --> C[MultiTenancyFilter define tenantId=X no Hibernate Filter]
-    C --> D[Todas queries subsequentes filtradas: WHERE filial_id = X]
-    D --> E[UI reflete dados da Filial X]
-    E --> F[Auditoria: troca de contexto registrada (usuario, filialAnterior, filialNova, timestamp)]
-```
-
-#### 8.4 Auditoria Envers (Consulta + Export)
-```mermaid
-graph TD
-    A[Auditoria → Filtros: Entidade, ID, Usuario, Periodo, Acao] --> B[GET /api/v1/auditoria?entidade=Ativo&id=123&page=0&size=50]
-    B --> C[Retorna: Revisao, Timestamp, Usuario, Acao (CREATE/UPDATE/DELETE), Diff campo-a-campo (antes/depois), IP, User-Agent]
-    C --> D[UI: Timeline expansível + diff visual (verde/vermelho) + export PDF/CSV assinado]
-    D --> E[Filtro avançado: 'Mostrar apenas alterações de custoTotalPorAtivo' / 'Apenas transferências de filial']
-```
-
----
-
-### Flow 9: Relatórios — Termo Responsabilidade PDF + Etiquetas QR Code Lote
-
-#### 9.1 Termo de Responsabilidade (Alocação/Transferência/Baixa)
-```mermaid
-graph TD
-    A[Ativo → Gerar Termo (UC-06, UC-08 transferência, UC-09 baixa)] --> B[Modal: Tipo (ALOCACAO/TRANSFERENCIA/BAIXA), observações]
-    B --> C{POST /api/v1/relatorios/termo-responsabilidade}
-    C --> D[Backend: PdfGenerator.gerarTermo() → template Thymeleaf/FlyingSaucer]
-    D --> E[PDF com: Dados ativo + Responsável + Filial + Data + QR Code verificação + Hash integridade SHA-256]
-    E --> F[Assinatura: Placeholder v1 (manual + testemunha) | Futuro: ICP-Brasil/gov.br A1]
-    F --> G[Retorna stream PDF → Frontend: nova aba + download + opção 'Enviar por email']
-    G --> H[Auditoria: geração termo registrada]
-```
-
-#### 9.2 Etiquetas QR Code em Lote (Inventário)
-```mermaid
-graph TD
-    A[Relatórios → Etiquetas em Lote] --> B[Filtros: Filial, TipoAtivo, Status, Localização]
-    B --> C{POST /api/v1/relatorios/etiquetas-lote}
-    C --> D[QRCodeGenerator.gerarLote() → ZIP com SVGs OU PDF pronto A4 (24 etiquetas/folha)]
-    D --> E[QR Code: https://aegis1.com/public/ativo/{tag}?h={hash} → página pública read-only]
-    E --> F[Download ZIP/PDF → Impressão térmica/laser]
-```
-
----
-
-### Flow 10: LGPD — Direito ao Esquecimento + Portabilidade
-
-```mermaid
-graph TD
-    A[Minha Conta → Privacidade] --> B{Botão: 'Solicitar Exclusão dos Meus Dados'}
-    B --> C[POST /api/v1/usuarios/me/solicitar-exclusao]
-    C --> D{Automatizado ou Workflow DPO?}
-    D -- Automatizado v1 --> E[Anonimiza Usuario: nome→'USUARIO_ANON_{hash}', email→hash@anonymized.local]
-    E --> F[Mantém Auditoria Envers com hash do usuário original (rastreabilidade legal)]
-    F --> G[Revoga tokens + invalida sessões + status INATIVO]
-    G --> H[Toast 'Seus dados foram anonimizados. Auditoria mantida para conformidade legal.']
-    D -- Workflow DPO --> I[Cria tarefa DPO → notifica → DPO aprova → executa anonimização]
-    A --> J[Botão: 'Exportar Meus Dados']
-    J --> K[GET /api/v1/usuarios/me/exportar]
-    K --> L[JSON completo: perfil, ordens, ativos responsáveis, health checks, auditoria, consentimentos]
-    L --> M[Download .json + opção PDF]
-```
-
----
-
-### Flow 11: Dashboard Unificado (Ordens + Preditiva + Custos + Alertas)
-
-```mermaid
-graph TD
-    A[Dashboard Principal] --> B[WebSocket conectado (SSE fallback)]
-    B --> C[Cards KPI: Ordens Abertas | Em Andamento | Aguardando Aprovação | Vencendo SLA 24h | Concluídas Mês | Custo Total Mês]
-    C --> D[Gráficos: Tendência 30d | Por Prioridade | Por Filial | Por Tipo Ativo]
-    D --> E[Alertas Tempo Real: Ordem >24h sem aprovação | Ordem >SLA | Health Check Crítico | Previsão Falha <30d]
-    E --> F[Clique Alerta → Navega para detalhe (Ordem / Ativo Preditivo)]
-    F --> G[Drill-down: Clique card 'Custo Total Mês' → Relatório Custo por Ativo (UC-11)]
-    G --> H[Drill-down: Clique 'Aderência Preventiva' → Relatório Preventiva (UC-24)]
-```
-
-**WebSocket Events:** `ordem.criada`, `ordem.iniciada`, `ordem.aprovada`, `ordem.concluida`, `ordem.cancelada`, `health.check.critico`, `preditiva.alerta`, `sla.breach`.
-
----
-
-### Flow 12: Validação de Integridade & Compliance (Batch + Auditoria)
-
-```mermaid
-graph TD
-    A[Batch Semanal (Domingo 03:00)] --> B[Calcula SHA-256 de tabelas críticas: ativo, ordem, usuario, auditoria]
-    B --> C[Compara com baseline em tabela integridade_checksum]
-    C --> D{Divergência?}
-    D -- Sim --> E[Alerta CRÍTICO: Security + Admin Global + Auditor]
-    E --> F[Cria Incidente Segurança + Auditoria assinada digitalmente]
-    D -- Não --> G[Registra checksum atual + relatório OK]
-    G --> H[Dashboard Compliance: 'Integridade OK - última verificação: {timestamp}']
-```
-
----
-
-## 3. Estados de UI Padronizados (Design System)
-
-| Estado | Componente | Especificação |
+## 3. Edge Cases & Error Flows
+| Cenário | Tratamento na UI | Mensagem Exibida |
 | :--- | :--- | :--- |
-| **Loading** | Botão, Tabela, Detalhe, Modal | Spinner 20px (botão), Skeleton (tabela/detalhe), Overlay semi-transparente (modal) |
-| **Empty** | Lista, Tabela, Busca | Ilustração SVG + mensagem contextual + CTA primário (ex.: "Criar primeiro ativo") |
-| **Error** | Toast global, Inline form, Modal | Toast: 4s auto-dismiss, ação "Retry" se recuperável; Inline: vermelho #DC2626, ícone alerta; Modal: erro crítico (5xx, auth) |
-| **Success** | Toast, Badge otimista | Toast: verde #16A34A, 3s; Badge: transição de cor suave (ex.: amarelo→verde) |
-| **Disabled** | Botão, Input, Select | Opacidade 0.5, cursor not-allowed, tooltip com razão (regra de negócio / permissão) |
-| **Offline** | Banner topo, Ícone nuvem riscada | Banner fixo "Você está offline. Alterações salvas localmente." + contador pendentes |
-| **Sync** | Indicador sincronização | Spinner pequeno + "Sincronizando {n} itens..." → "Sincronizado há {tempo}" |
+| Sessão expira durante preenchimento de formulário longo (ex: novo ativo) | `authInterceptor` detecta 401 → `clearSession` → salva estado formulário em `sessionStorage` → redireciona login com `returnUrl` → após login restaura dados | "Sua sessão expirou. Os dados preenchidos foram salvos temporariamente. Faça login para continuar." |
+| Usuário USER tenta acessar rota de escrita (ex: `/ativos/novo`) | Roteamento client-side verifica `isAdmin` (do token/user data) → oculta link/botão; se acessa URL direta, backend retorna 403 → frontend exibe toast + redireciona listagem | "Acesso negado. Apenas administradores podem realizar esta ação." |
+| `buscarPorId` retorna 404 (ativo removido por outro usuário) | Tela de detalhe exibe estado **error** com botão "Voltar à Listagem"; listagem atualizada automaticamente via polling ou refresh manual | "Ativo não encontrado. Pode ter sido removido por outro usuário." |
+| `checkResourceUsageAlerts` falha (5xx / timeout) — complexidade 17 | Backend: circuit breaker / retry com backoff; Frontend: dashboard alertas exibe **error** com botão "Tentar Novamente"; alerta crítico enviado para DevOps (log estruturado) | "Falha ao verificar alertas de hardware. Tentando novamente em 30s. Equipe técnica notificada." |
+| Health check payload inválido (ex: disco sem `totalBytes`) | `updateHealthCheck` valida schema (BR-03: 400) → retorna detalhes campo a campo → agendador loga erro + alerta DevOps; não gera alerta falso positivo | "Dados de health check inválidos: campo 'disco.totalBytes' é obrigatório." |
+| Concorrência: dois admins editam mesmo ativo simultaneamente | Backend: optimistic locking (`@Version`) → segundo `atualizar` recebe 409 Conflict → frontend exibe modal "Dados alterados por outro usuário. Recarregar?" | "Este registro foi modificado por outro usuário. Deseja recarregar os dados atuais?" |
+| Exportação `custoTotalPorAtivo` com dataset grande (>10k linhas) | Backend: streaming CSV / chunked response; Frontend: botão "Exportar" → **loading** com progress bar → download automático ao concluir | "Gerando relatório... 45% concluído. Não feche esta aba." |
+| `setUsername` stub vazio em `Usuario.java:86` afeta `createFuncionarioAndUsuario` | Backend: correção urgente + teste regressão; Frontend: validação cliente impede envio username vazio; monitoramento de 5xx em criação usuário | "Erro interno ao criar usuário. Contate suporte. (Ref: USR-001)" |
+
+> **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — Cenários de exceção inferidos a partir das regras de negócio (BR-01 a BR-10), achados do diagnóstico (complexidade ciclomática, stubs, console.*) e padrões comuns de UX. Não há código de frontend real para confirmar implementação atual.
 
 ---
 
-## 4. Métricas de UX Instrumentadas (Por Fluxo)
-
-| Fluxo | Métricas-Chave | Ferramenta |
-| :--- | :--- | :--- |
-| Ordem Corretiva | Funil conversão, Lead time (iniciar→aprovar), Taxa rejeição aprovação, Tempo conclusão | Mixpanel/Amplitude + Backend metrics |
-| Cadastros Mestres | Tempo para criar, Taxa erro duplicado, Taxa exclusão bloqueada | Backend metrics |
-| Ativo + Hardware | Tempo cadastro completo, % ativos com hardware completo, Taxa coleta health check campo | Backend + PWA analytics |
-| Preventiva | Aderência (% prazo), Cobertura (ativos com plano), Tempo geração automática | Scheduler metrics + Relatórios |
-| Preditiva | Precisão previsão (real vs previsto), Falsos positivos/negativos, Tempo até ação, Cobertura ativos monitorados | ML metrics + Business metrics |
-| Busca Fuzzy | Taxa sucesso (clique resultado), Tempo resposta P95, % queries com typo, Zero results rate | Search analytics |
-| Auth/Segurança | Taxa login sucesso, Tempo refresh token, Tentativas brute force, Acessos negados cross-tenant | Security metrics + SIEM |
-| Relatórios | Tempo geração PDF/QR, Taxa download, Erros geração | Backend metrics |
-| LGPD | Solicitações exclusão/exportação, Tempo atendimento, Conformidade prazo legal | DPO workflow metrics |
+## 4. Cross-Flow Dependencies
+* **Flow 2 (Manutenção) depende de Flow 1 (Ativo):** `buscarPorId` do ativo deve retornar 200 antes de permitir `iniciar` manutenção; ativo deve existir e estar ativo.
+* **Flow 3 (Health Check) alimenta Flow 2 (Manutenção Preventiva):** Alertas gerados em `checkResourceUsageAlerts` → botão "Converter em Manutenção Preventiva" inicia Flow 2 com tipo=preventiva, prioridade=alta, descrição pré-preenchida.
+* **Flow 4 (RBAC) controla todos os demais:** Permissões definidas aqui (roles, permissions, `isAdmin`) determinam quais botões/rotas/ações estão **disabled** ou **hidden** nos Flows 1, 2, 3, 5, 6.
+* **Flow 5 (Relatórios) consome dados dos Flows 1, 2, 3:** `custoTotalPorAtivo` agrega manutenções (Flow 2); auditoria loga operações dos Flows 1, 2, 3, 4.
+* **Flow 6 (Auth) é pré-condição de todos:** Token válido + `authInterceptor` funcionando (sem `console.error/debug` residuais) é requisito para qualquer fluxo autenticado.
 
 ---
 
-## 5. Acessibilidade (WCAG 2.1 AA) — Por Fluxo Crítico
-
-| Fluxo | Requisitos AA | Implementação |
-| :--- | :--- | :--- |
-| Ordem (criar/iniciar/aprovar/concluir) | Focus order lógico, ARIA labels em badges/botões condicionais, Live region para toasts, Contraste 4.5:1 | Vue `focus-trap`, `aria-live="polite"` no toast container, `aria-pressed` em toggle buttons |
-| Health Check (PWA mobile) | Touch target 48x48px, Orientação portrait/landscape, Redução de movimento, Legendas em gráficos | CSS `min-height: 48px`, `@media (prefers-reduced-motion)`, `aria-label` em charts |
-| Busca Global | Anúncio de resultados (aria-live), Navegação por setas no dropdown, Escape para fechar | `role="combobox"`, `aria-controls`, `aria-expanded` |
-| Auditoria/Relatórios | Tabelas acessíveis (scope=col/row), Export acessível, Zoom 200% sem perda | `<th scope="col">`, `tabindex="0"` em links export |
-| Dashboard | Landmarks (main, aside, nav), Heading hierarchy (h1→h2→h3), Regiões live para alertas | `role="region" aria-label="Alertas críticos"` |
-
----
-
-## 6. Rastreabilidade Flows ↔ Use Cases ↔ Artefatos
-
-| Flow | Use Cases | API Spec | State Machine | Component Library | Testes E2E |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| Flow 1 (Ordem Corretiva) | UC-13 a UC-20 | `/api/v1/ordens` | `state-machines.md#solicitacaomanutencao` | `OrderCard`, `OrderDetail`, `OrderActions` | Cypress: criar→iniciar→aprovar→concluir |
-| Flow 2 (Cadastros) | UC-01 a UC-05 | `/api/v1/filiais`, `/departamentos`, `/fornecedores`, `/funcionarios`, `/tipos-ativo` | — | `EntityTable`, `EntityForm`, `EntityModal` | Cypress: CRUD cada entidade |
-| Flow 3 (Ativo + Hardware) | UC-06 a UC-12 | `/api/v1/ativos`, `/hardware`, `/relatorios/custo-total` | `state-machines.md#ativo` | `AtivoForm`, `HardwareSection`, `QRCodeDisplay`, `PdfViewer` | Cypress: cadastro hardware + QR + PDF |
-| Flow 4 (Health Check PWA) | UC-25 | `/api/v1/ativos/{id}/health-check` | `state-machines.md#healthcheck` | `HealthCheckForm`, `QRScanner` | Cypress + PWA: offline→sync |
-| Flow 5 (Preventiva) | UC-21 a UC-24 | `/api/v1/preventivas`, `/relatorios/preventiva-aderencia` | `state-machines.md#manutencaopreventiva` | `PreventivaPlanForm`, `PreventivaCalendar` | Cypress: criar plano → geração auto |
-| Flow 6 (Preditiva) | UC-25 a UC-28 | `/api/v1/health-check`, `/dashboard/preditiva`, `/previsao-falha` | `state-machines.md#healthcheck` | `PreditivaDashboard`, `PrevisaoTable`, `AlertCard` | Unit: ManutencaoPreditivaServiceTest; Cypress: dashboard |
-| Flow 7 (Busca Fuzzy) | UC-29 a UC-31 | `/api/v1/busca` | — | `GlobalSearch`, `SearchResults`, `SearchConfig` | Unit: FuzzySearchServiceTest, LevenshteinDistanceTest |
-| Flow 8 (Aegis Shield) | UC-32 a UC-38 | `/api/v1/auth`, `/admin/roles`, `/admin/usuarios`, `/auditoria` | `state-machines.md#usuario` | `LoginForm`, `RoleMatrix`, `TenantSelector`, `AuditTimeline` | Integration: SecurityConfigIT, AegisShieldTest, MultiTenancyIT |
-| Flow 9 (Relatórios QR/PDF) | UC-39 a UC-42 | `/api/v1/relatorios/termo`, `/qr-code`, `/etiquetas-lote`, `/compliance` | — | `PdfViewer`, `QRCodeGenerator`, `BatchExport` | Integration: RelatorioControllerIT, QRCodeGeneratorTest |
-| Flow 10 (LGPD) | UC-37 | `/api/v1/usuarios/me/exclusao`, `/exportar` | — | `PrivacyPanel`, `DataExport` | Integration: UsuarioControllerIT (LGPD) |
-| Flow 11 (Dashboard) | UC-19, UC-28 | `/api/v1/dashboard/ordens`, `/dashboard/preditiva` | — | `KPICard`, `ChartWidget`, `AlertFeed`, `WebSocketProvider` | Cypress: real-time updates |
-| Flow 12 (Integridade) | UC-45 | `/api/v1/auditoria/integridade` | — | `IntegrityBadge` | Integration: IntegridadeChecksumIT |
+## 5. Acessibilidade nos Fluxos
+* **Navegação por teclado:** Ordem de tab lógica em todos os formulários (Flow 1, 2, 4, 6); `Tab` navega campos, `Enter` submete, `Esc` fecha modais/cancela; `Shift+Tab` reverso. Foco visível (`:focus-visible`) em todos os elementos interativos.
+* **Leitores de tela:** 
+  - Labels associados via `<label for>` ou `aria-label` em todos os inputs (Flow 1, 2, 4, 6)
+  - Tabelas com `<caption>`, `<th scope="col">`, `aria-sort` para ordenação (Flow 1, 5)
+  - Estados dinâmicos anunciados via `aria-live="polite"`: loading ("Carregando ativos..."), success ("Ativo salvo com sucesso"), error ("Erro ao salvar: campo valor é obrigatório"), empty ("Nenhum ativo cadastrado")
+  - Modais (confirmação exclusão, justificativa cancelamento) com `role="dialog"`, `aria-modal="true"`, `aria-labelledby` no título, foco trapado
+  - Alertas de health check (Flow 3) com `role="alert"` para anúncio imediato
+  - Indicadores de estado (spinner loading, ícones success/error) com `aria-hidden="true"` + texto alternativo em `sr-only`
+* **Contraste e zoom:** Cores de status (sucesso=verde, erro=vermelho, aviso=amarelo) com contraste ≥4.5:1; layout responsivo até 400% zoom sem perda de funcionalidade.
 
 ---
 
-*Documento regenerado com base em análise AST completa do backend Java (domain, service, controller, security, predictive, search, audit, report, scheduler) + frontend Vue/PWA. Substitui versão 1.0 que continha apenas visão frontend.*
+## 6. Referências
+* **Wireframes/Protótipos:** [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — Não há arquivos de design no repositório. Recomenda-se criar no Figma com base nestes flows.
+* **Use Cases relacionados:** UC-01 (Cadastrar Ativo), UC-02 (Solicitar Manutenção), UC-03 (Aprovar Manutenção), UC-04 (Monitorar Health Check), UC-05 (Gerenciar Usuários/RBAC), UC-06 (Visualizar Relatórios/Auditoria) — mapeados 1:1 dos Flows 1–6.
+* **Glossário Ubiquitous Language (BRD Seção 12):** 30+ termos de domínio usados como base para nomenclatura de ações/estados.
+* **Regras de Negócio (BRD Seção 6):** BR-01 a BR-10 referenciadas em cada fluxo.
+* **Diagnóstico Determinístico:** 348 arquivos Java, 15 JS; complexidade ciclomática alta em `api.js:46` (13), `AlertNotificationService:96` (17), `ManutencaoSpecification:26` (14), `AtivoMapper:15` (14), `RealisticDataSeeder:34` (15); stub `Usuario.setUsername:86`; console.* residual `api.js:36,99`.
+* **Stack Tecnológica Verificada:** Java backend (Spring Boot implícito), JavaScript frontend (15 arquivos), `@popperjs/core` para tooltips/dropdowns; sem ORM/banco identificado — SQL cru assumido.

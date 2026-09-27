@@ -1,4 +1,4 @@
-# Glossário & Ubiquitous Language — Aegis1
+# Glossário & Ubiquitous Language — A1
 
 > Documento gerado automaticamente pelo pipeline determinístico de análise de código
 > (server/glossary-pipeline.ts). Termos extraídos via AST + schema real (server/db.ts) + rotas
@@ -8,91 +8,63 @@
 ## 1. Termos de Domínio
 | Termo | Definição | Contexto/Bounded Context | Sinônimos observados |
 | :--- | :--- | :--- | :--- |
-| aprovar | Ação de autorizar formalmente a execução ou conclusão de uma solicitação de manutenção, validando sua conformidade dentro do fluxo de trabalho. | frontend | autorizar, validar, homologar, confirmar |
-| atualizar | Ação de modificar os dados cadastrais de uma entidade existente para refletir seu estado mais recente ou corrigir informações. | frontend | editar, modificar, alterar, atualizar registro |
-| atualizar_comAdmin_deveRetornarOk | Regra de negócio que garante que usuários com perfil de administrador podem atualizar registros de ativos, filiais e fornecedores com sucesso. | src | atualização por administrador, permissão de atualização admin, teste de autorização admin |
-| atualizar_comUser_deveRetornarForbidden | Regra de negócio que impede usuários com perfil padrão de alterar registros de departamentos, filiais ou funcionários, retornando erro de acesso negado. | src | atualização negada para usuário comum, acesso proibido na edição, validação de permissão de atualização |
-| authInterceptor | Mecanismo que gerencia automaticamente as credenciais de acesso nas comunicações entre o sistema e o servidor, garantindo que as requisições estejam autenticadas. | frontend | Interceptador de Autenticação, Middleware de Segurança, Gerenciador de Tokens |
-| buscarPorId | Operação de recuperação de uma entidade específica através de seu identificador único. | frontend | consultarPorId, obterPorId, recuperarPorId, findById |
-| buscarPorId_comIdInexistente_deveRetornarNotFound | Regra de negócio que determina que o sistema deve informar a inexistência do registro quando uma busca é realizada com um identificador não cadastrado. | src | Validação de recurso inexistente, Tratamento de ID inválido na consulta, Retorno de não encontrado para ID desconhecido |
-| cancelar | Ação de anular uma solicitação de manutenção ou um fluxo de aprovação em andamento, revertendo seu estado para cancelado. | frontend | anular, revogar, desfazer |
-| concluir | Ação de finalizar uma ordem de manutenção ou uma etapa de fluxo de aprovação, alterando seu estado para encerrado ou aprovado. | frontend | finalizar, encerrar, completar, aprovar |
-| createAtivo | Processo de criação de um ativo de teste para suportar a execução de cenários de integração dos controladores. | src | criarAtivoTeste, setupAtivo, instanciarAtivoParaTeste |
-| createDepartamento | Função auxiliar de teste responsável por cadastrar um novo departamento no ambiente de integração para viabilizar a execução dos cenários de validação. | src | criarDepartamento, setupDepartamento, novoDepartamentoParaTeste |
-| createFilial | Ação de cadastrar uma nova filial ou unidade de negócio no sistema, estabelecendo sua identidade e dados cadastrais básicos. | src | cadastrarFilial, registrarUnidade, criarUnidadeNegocio |
-| createFornecedor | Criação de um novo fornecedor no sistema, registrando seus dados cadastrais para futuras aquisições e relacionamentos comerciais. | src | cadastrarFornecedor, registrarFornecedor, incluirFornecedor, novoFornecedor |
-| createFuncionario | Processo de cadastro de um novo funcionário no sistema, incluindo seus dados pessoais e profissionais para vinculação a alertas, ativos e relatórios. | src | cadastrarFuncionario, registrarFuncionario, incluirFuncionario, adicionarFuncionario |
-| createFuncionarioAndUsuario | Utilitário de teste que provisiona um colaborador com credenciais de acesso para validação de funcionalidades de integração. | src | criarFuncionarioEUsuario, provisionarFuncionarioComUsuario, setupFuncionarioUsuario |
-| createLocalizacao | Ação de cadastrar um novo local físico ou lógico onde ativos patrimoniais podem ser alocados, permitindo sua rastreabilidade e gestão espacial. | src | Cadastrar Localização, Registrar Local, Incluir Local de Ativo |
-| createPermission | Processo de estabelecer direitos de acesso e autorizações para recursos do sistema, definindo quais ações usuários ou perfis podem executar sobre determinadas entidades. | src | criarPermissao, estabelecerAcesso, definirAutorizacao, configurarPermissoes |
-| createRole | Processo de criação de um novo papel ou perfil de acesso no sistema de segurança, definindo permissões e responsabilidades para usuários. | src | criar papel, criar perfil de acesso, cadastrar função, definir papel de usuário |
-| createTipoAtivo | Processo de cadastro de uma nova classificação ou categoria de ativos no sistema patrimonial. | src | Cadastrar Tipo de Ativo, Incluir Classificação de Ativo, Criar Categoria de Ativo |
-| createUserAndToken | Processo de teste que provisiona um usuário no sistema e gera seu token de autenticação para validação de cenários de integração. | src | provisionar usuário e token de teste, criar usuário autenticado para teste, gerar credenciais de acesso para integração |
-| createUsuario | Processo de cadastro de um novo usuário no sistema, permitindo seu acesso e associação a patrimônios e alertas. | src | cadastrarUsuario, registrarUsuario, incluirUsuario |
-| criar | Ação de registrar uma nova entidade (como departamento, filial, fornecedor ou funcionário) no sistema, tornando-a disponível para uso nas operações do negócio. | frontend | cadastrar, registrar, inserir, adicionar |
-| criar_comAdmin_deveRetornarCreated | Regra que garante que usuários com perfil de administrador conseguem cadastrar novos registros e recebem confirmação de criação bem-sucedida. | src | Criar como admin retorna 201, Cadastro por administrador com sucesso, Teste de criação autorizada para admin |
-| criar_comDadosInvalidos_deveRetornarBadRequest | O sistema deve rejeitar tentativas de cadastro com informações inválidas ou incompletas, respondendo com erro de requisição malformada. | src | Validação de dados de entrada no cadastro, Bloqueio de criação com dados inválidos, Retorno de erro 400 para payload inválido |
-| criar_comUser_deveRetornarForbidden | Regra de negócio que impede usuários com perfil padrão de cadastrar novos registros, retornando erro de acesso negado. | src | Criação negada para usuário comum, Acesso proibido ao criar recurso, Validação de permissão de criação |
-| custoTotalPorAtivo | Representa o somatório dos custos de manutenção agrupados por cada ativo do patrimônio. | frontend | custo total por ativo, gasto total por ativo, total de custos por ativo |
-| deletar | Ação de remover permanentemente um registro de entidade (departamento, filial, fornecedor ou funcionário) da base de dados do sistema. | frontend | excluir, remover, apagar |
-| deletar_comAdmin_deveRetornarNoContent | Um administrador pode excluir um recurso e o sistema confirma a exclusão sem retornar conteúdo na resposta. | src | Exclusão por administrador, Deleção com permissão de admin, Remoção autorizada por admin |
-| deletar_comUser_deveRetornarForbidden | Regra de segurança que impede usuários com perfil padrão de excluir registros, retornando erro de acesso negado. | src | Restrição de exclusão para usuário comum, Bloqueio de delete para role user, Validação de permissão de exclusão |
-| deleteByAtivoDetalheHardwareId | Processo de remoção em lote de componentes de hardware (adaptadores de rede, discos, memórias) vinculados a um detalhe de ativo específico. | src | Remover componentes por detalhe de ativo, Excluir itens de hardware por ID do ativo, Limpar hardware associado ao ativo |
-| doFilterInternal | Método central que executa a lógica de filtro de autenticação e autorização nas requisições HTTP, validando tokens JWT e permissões de acesso. | src | Filtro de Autenticação, Validador de Token, Processador de Segurança |
-| editar | Ação de modificar informações de uma entidade existente, como dados de ativos, filiais ou fornecedores. | frontend | modificar, alterar, atualizar |
-| excluir | Ação de remover um registro do sistema permanentemente. | frontend | deletar, remover, apagar |
-| filial | Unidade organizacional que representa uma divisão física ou lógica da empresa, contendo departamentos e localizações. | frontend | unidade, sucursal, estabelecimento |
-| funcionario | Colaborador da organização, vinculado a departamentos e filiais, podendo ser responsável por ativos e solicitações. | frontend | colaborador, empregado, membro da equipe |
-| fornecedor | Entidade externa que fornece produtos ou serviços para a organização, cadastrada para gestão de aquisições e contratos. | frontend | provedor, vendedor, parceiro comercial |
-| gerarRelatorio | Ação de produzir um documento estruturado com dados do sistema, como termos de responsabilidade ou etiquetas de identificação. | frontend | emitir relatório, criar documento, exportar dados |
-| getAll | Operação de recuperação de todos os registros de uma entidade, sem filtros de paginação ou busca. | frontend | listarTodos, obterTodos, buscarTodos |
-| getById | Operação de busca de um registro específico pelo seu identificador único. | frontend | buscarPorId, obterPorId, consultarPorId |
-| handleApiError | Processa e padroniza falhas de comunicação com serviços externos para garantir tratamento consistente. | frontend | tratarErroApi, gerenciarFalhaComunicacao, processarErroRequisicao |
-| handleResponse | Processa o retorno das chamadas de rede, garantindo que os dados recebidos estejam no formato esperado para uso nas telas. | frontend | tratarResposta, processarRetorno |
-| iniciar | Ação de dar início a um processo de manutenção, alterando seu estado para 'em andamento' e registrando o responsável. | frontend | começar, dar início, abrir, executar |
-| listar | Ação de recuperar e exibir uma coleção completa de registros de uma determinada entidade, como departamentos, filiais, fornecedores ou funcionários. | frontend | consultar, buscar todos, relacionar, obter lista |
-| listar_comFiltros_deveRetornarPaginado | Regra que define a listagem paginada com suporte a filtros de busca, ordenação e paginação para otimizar performance. | src | Listagem paginada com filtros, Busca com paginação, Filtros em listagem de recursos |
-| login | Processo de autenticação do usuário no sistema, validando credenciais e gerando token de acesso. | frontend | autenticar, entrar, sign in |
-| login_deveRetornarToken | Regra que garante que credenciais válidas geram um token JWT de acesso para sessões autenticadas. | src | Login retorna token, Autenticação bem-sucedida gera JWT, Geração de token de acesso |
-| login_comCredenciaisInvalidas_deveRetornarUnauthorized | Regra de segurança que bloqueia tentativas de acesso com credenciais incorretas, retornando erro de não autorizado. | src | Bloqueio de login inválido, Falha de autenticação retorna 401, Credenciais incorretas negam acesso |
-| manutencao | Processo de conservação ou reparo de ativos patrimoniais, podendo ser preventiva, corretiva ou preditiva. | frontend | manutenção, serviço técnico, intervenção |
-| manutencaoPreventiva | Tipo de manutenção programada periodicamente para evitar falhas e prolongar a vida útil dos ativos. | frontend | preventiva, manutenção programada, manutenção periódica |
-| manutencaoPreditiva | Tipo de manutenção baseada em análise de dados e monitoramento de condições para prever falhas antes que ocorram. | frontend | preditiva, manutenção baseada em condição, monitoramento preditivo |
-| request | Representa a ação de solicitar dados ou operações ao sistema backend, encapsulando a comunicação entre a interface do usuário e os serviços de negócio. | frontend | chamada de serviço, requisição de API, solicitação de dados |
-| salvar | Ação de persistir alterações ou novos registros no banco de dados. | frontend | gravar, persistir, armazenar |
-| solicitacaoManutencao | Registro formal de uma necessidade de intervenção em um ativo, contendo detalhes do problema, prioridade e responsável. | frontend | ordem de serviço, chamado de manutenção, solicitação técnica |
-| tipoAtivo | Classificação que categoriza ativos por natureza, como hardware, software, mobiliário, veículos, etc. | frontend | categoria de ativo, classificação de patrimônio, tipo de bem |
-| usuario | Pessoa com credenciais de acesso ao sistema, associada a perfis de permissão e vinculada a funcionalidades específicas. | frontend | user, usuário do sistema, conta de acesso |
-
-## 2. Termos Técnicos / de Implementação
-| Termo | Definição | Contexto | Onde aparece |
-| :--- | :--- | :--- | :--- |
-| Ativo | Entidade principal do domínio patrimonial, representa um bem tangível ou intangível rastreado pelo sistema. | backend | src/main/java/.../domain/Ativo.java |
-| AtivoDetalheHardware | Detalhamento de especificações de hardware de um ativo (CPU, memória, disco, rede). | backend | src/main/java/.../domain/AtivoDetalheHardware.java |
-| AdaptadorRede | Componente de hardware representando uma interface de rede do ativo. | backend | src/main/java/.../domain/AdaptadorRede.java |
-| Disco | Componente de hardware representando unidade de armazenamento do ativo. | backend | src/main/java/.../domain/Disco.java |
-| Memoria | Componente de hardware representando memória RAM do ativo. | backend | src/main/java/.../domain/Memoria.java |
-| Filial | Unidade organizacional de negócio, raiz da hierarquia de localização. | backend | src/main/java/.../domain/Filial.java |
-| Departamento | Divisão organizacional dentro de uma filial. | backend | src/main/java/.../domain/Departamento.java |
-| Localizacao | Local físico ou lógico onde ativos são alocados (sala, andar, rack, etc.). | backend | src/main/java/.../domain/Localizacao.java |
-| Fornecedor | Entidade externa fornecedora de bens/serviços. | backend | src/main/java/.../domain/Fornecedor.java |
-| Funcionario | Colaborador da organização, pode ser responsável por ativos. | backend | src/main/java/.../domain/Funcionario.java |
-| TipoAtivo | Classificação/categoria de ativos (ex.: Notebook, Servidor, Impressora). | backend | src/main/java/.../domain/TipoAtivo.java |
-| SolicitacaoManutencao | Ordem de serviço para manutenção de ativo. | backend | src/main/java/.../domain/SolicitacaoManutencao.java |
-| ManutencaoPreventiva | Agendamento de manutenção preventiva recorrente. | backend | src/main/java/.../domain/ManutencaoPreventiva.java |
-| Usuario | Conta de acesso ao sistema com roles/permissões. | backend | src/main/java/.../domain/Usuario.java |
-| Role | Perfil de acesso (ex.: ADMIN, USER, GESTOR). | backend | src/main/java/.../domain/Role.java |
-| Permission | Permissão granular para ações sobre recursos. | backend | src/main/java/.../domain/Permission.java |
-| Auditoria | Registro imutável de alterações em entidades (Hibernate Envers). | backend | src/main/java/.../config/AuditoriaConfig.java |
-| FuzzySearch | Busca aproximada usando algoritmo Levenshtein para tolerar erros de digitação. | backend | src/main/java/.../service/FuzzySearchService.java |
-| LevenshteinDistance | Métrica de distância de edição entre strings, usada na busca fuzzy. | backend | src/main/java/.../util/LevenshteinDistance.java |
-| ManutencaoPreditivaService | Serviço que aplica regressão linear (mínimos quadrados) para prever falhas de disco. | backend | src/main/java/.../service/ManutencaoPreditivaService.java |
-| HealthCheck | Verificação de saúde do ativo baseada em métricas de hardware (SMART, temperatura, etc.). | backend | src/main/java/.../service/HealthCheckService.java |
-| JwtTokenProvider | Componente que gera e valida tokens JWT para autenticação stateless. | backend | src/main/java/.../security/JwtTokenProvider.java |
-| SecurityConfig | Configuração central de Spring Security (CORS, CSRF, filtros, rules). | backend | src/main/java/.../config/SecurityConfig.java |
-| AegisShield | Modelo de autorização granular hierárquico e contextual com multi-tenancy por filial. | backend | src/main/java/.../security/AegisShield.java |
-| MultiTenancyFilter | Filtro que isola dados por filial (tenant) no nível de query. | backend | src/main/java/.../security/MultiTenancyFilter.java |
-| FlywayMigration | Scripts de migração de banco versionados (V1__init, V2__..., etc.). | backend | src/main/resources/db/migration/ |
-| TestContainers | Infraestrutura de testes de integração com containers reais (MySQL, etc.). | backend | src/test/java/.../TestContainersConfig.java |
-| QRCodeGenerator | Utilitário para geração de etiquetas QR Code para ativos. | backend | src/main/java/.../util/QRCodeGenerator.java |
-| PdfGenerator | Geração de PDFs (Termos de Responsabilidade, relatórios). | backend | src/main/java/.../util/PdfGenerator.java |
+| aprovar | Ação de autorizar formalmente uma solicitação de manutenção ou etapa de fluxo de trabalho, permitindo sua execução ou prosseguimento. | frontend | autorizar, validar, homologar, confirmar |
+| atualizar | Operação de modificar os dados cadastrais de uma entidade existente no sistema, como departamentos, filiais, fornecedores ou funcionários. | frontend | Editar, Modificar, Alterar |
+| atualizar_comAdmin_deveRetornarOk | Um usuário com perfil de administrador consegue alterar os dados de um registro com sucesso. | src | Atualização por administrador, Edição com permissão de admin, Alteração autorizada para admin |
+| atualizar_comUser_deveRetornarForbidden | Regra de acesso que impede usuários com perfil básico de alterar cadastros de departamentos, filiais ou funcionários, retornando erro de permissão negada. | src | Restrição de atualização para usuário comum, Bloqueio de edição por perfil não administrativo, Acesso negado em operação de update para role user |
+| authInterceptor | Componente responsável por interceptar requisições HTTP para anexar automaticamente credenciais de autenticação, garantindo que o usuário esteja identificado perante o backend. | frontend | Interceptador de Autenticação, Middleware de Auth, Token Injector |
+| buscarPorId | Operação de recuperação de uma entidade específica a partir de seu identificador único. | frontend | consultarPorId, obterPorId, recuperarPorId, findById |
+| buscarPorId_comIdInexistente_deveRetornarNotFound | Regra que determina que a busca de um registro por identificador inexistente deve resultar em resposta de 'não encontrado'. | src | Busca por ID inexistente retorna 404, Consulta de recurso inexistente deve falhar com Not Found, Validação de ID inexistente na busca |
+| cancelar | Ação de interromper e invalidar uma solicitação de manutenção ou um fluxo de aprovação em andamento, impedindo sua execução futura. | frontend | anular, revogar, desfazer, abortar |
+| clearSession | Encerra a sessão do usuário autenticado, removendo credenciais e tokens de acesso. | frontend | logout, encerrar sessão, limpar sessão |
+| concluir | Ação de finalizar uma ordem de manutenção ou um fluxo de aprovação, alterando seu status para concluído e registrando as informações de encerramento. | frontend | finalizar, encerrar, dar baixa, completar |
+| createAtivo | Processo de cadastro de um novo ativo no patrimônio, registrando suas informações essenciais para rastreamento e gestão. | src | cadastrarAtivo, registrarAtivo, incluirBemPatrimonial |
+| createDepartamento | Processo de cadastro de um novo departamento no sistema. | src | cadastrarDepartamento, registrarDepartamento, incluirDepartamento |
+| createFilial | Método utilitário de teste que cria uma entidade Filial (unidade organizacional da empresa) para cenários de integração. | src | criarFilial, criarSucursal, criarUnidade, registrarFilial, cadastrarFilial |
+| createFornecedor | Ação de cadastrar um novo fornecedor no sistema para que ele possa ser associado a ativos, alertas, manutenções ou depreciações. | src | cadastrar fornecedor, registrar fornecedor, incluir fornecedor |
+| createFuncionario | Registra um novo funcionário no sistema para composição de cenários de teste em controladores de alertas, ativos e relatórios. | src | criarFuncionario, novoFuncionario, registrarFuncionario, instanciarFuncionario |
+| createFuncionarioAndUsuario | Processo de cadastrar um novo funcionário no sistema e simultaneamente criar seu acesso de usuário para autenticação. | src | cadastrarFuncionarioComUsuario, registrarColaboradorEAcesso, criarFuncionarioEUsuário |
+| createLocalizacao | Método auxiliar utilizado nos testes de integração para cadastrar uma nova localização no sistema, garantindo dados de apoio para os cenários de validação. | src | criarLocalizacao, registrarLocalizacaoTeste, setupLocalizacao |
+| createPermission | Processo de cadastrar uma nova permissão de acesso no sistema, definindo quais ações um papel ou usuário pode executar. | src | Cadastrar permissão, Incluir permissão, Provisionar acesso |
+| createRole | Cria um papel de acesso para controle de permissões no sistema. | src | criarPerfil, criarFuncao, definirPapel |
+| createTipoAtivo | Processo de cadastrar uma nova classificação de ativos no sistema, definindo suas características e regras de depreciação. | src | Cadastrar Tipo de Ativo, Incluir Tipo de Ativo, Registrar Classificação de Ativo |
+| createUserAndToken | Utilitário de teste que provisiona um usuário no sistema e gera seu token de autenticação para validação de cenários de segurança. | src | criarUsuarioEToken, provisionarUsuarioDeTeste, gerarCredenciaisDeTeste |
+| createUsuario | Processo de criação de um usuário de teste para viabilizar a execução de cenários de integração. | src | criarUsuarioTeste, registrarUsuarioParaTeste, setupUsuario |
+| criar | Ação de registrar uma nova entidade (como departamento, filial, fornecedor ou funcionário) no sistema, tornando-a disponível para uso nos processos de negócio. | frontend | cadastrar, incluir, registrar, adicionar |
+| criar_comAdmin_deveRetornarCreated | Regra que garante que usuários com perfil de administrador conseguem cadastrar novos registros e recebem confirmação de sucesso com código HTTP 201. | src | Criar como admin retorna 201, Cadastro por administrador com sucesso, POST admin retorna Created |
+| criar_comDadosInvalidos_deveRetornarBadRequest | Regra de validação que impede a criação de registros com informações incorretas ou incompletas, retornando erro de requisição inválida. | src | validação de entrada, rejeição de dados inválidos, bloqueio de cadastro incorreto |
+| criar_comUser_deveRetornarForbidden | Regra de negócio que impede usuários com perfil padrão de criar novos registros, retornando erro de acesso negado. | src | Restrição de criação para usuários comuns, Bloqueio de inclusão por perfil de acesso, Validação de permissão de criação |
+| custoTotalPorAtivo | Representa o somatório de todos os gastos de manutenção agrupados por cada ativo do patrimônio. | frontend | Gasto total por ativo, Despesa total de manutenção por equipamento, Custo acumulado por ativo |
+| deletar | Ação de remover permanentemente um registro de entidade (como departamento, filial, fornecedor ou funcionário) do sistema, tornando-o indisponível para consultas ou operações futuras. | frontend | excluir, remover, apagar |
+| deletar_comAdmin_deveRetornarNoContent | Verifica se um usuário com perfil de administrador consegue excluir um registro e o sistema responde com status 204 (Sem Conteúdo), confirmando a remoção bem-sucedida. | src | exclusão por administrador, deleção com permissão de admin, teste de delete admin |
+| deletar_comUser_deveRetornarForbidden | Regra de acesso que impede usuários com perfil padrão de excluir registros, retornando erro de permissão negada. | src | Exclusão negada para usuário comum, Permissão de delete restrita a admin, Acesso proibido ao deletar com role user |
+| deleteByAtivoDetalheHardwareId | Processo de remoção em lote de componentes de hardware (adaptadores de rede, discos, memórias) vinculados a um identificador específico de detalhe de ativo. | src | Excluir componentes por ID de hardware, Remover itens de hardware do ativo, Limpar detalhes de hardware por ativo |
+| doFilterInternal | Processa cada requisição HTTP para aplicar regras de autenticação, autorização e contexto de tenant, garantindo que apenas usuários autorizados acessem recursos protegidos. | src | filtro de segurança, validação de acesso, processamento de requisição |
+| findAll | Operação que retorna a lista completa de registros de uma determinada entidade, sem aplicação de filtros ou paginação. | src | listar todos, buscar todos, obter todos, recuperar todos |
+| findByAtivoDetalheHardwareId | Operação de busca que recupera componentes de hardware (adaptadores de rede, discos, memórias) vinculados a um registro específico de detalhe de hardware de um ativo. | src | buscarPorDetalheHardwareAtivo, listarComponentesPorDetalheHardware, consultarItensPorAtivoDetalheHardware |
+| findByFilialIdIn | Operação de busca que retorna registros associados a um conjunto de identificadores de filiais. | src | buscarPorIdsDeFilial, listarPorFiliais, filtrarPorFiliais |
+| getHealthHistory | Recupera o histórico de indicadores de saúde do ativo, como uso de disco, para fins de monitoramento e análise operacional. | src | consultar histórico de saúde, obter histórico de integridade, recuperar métricas de saúde |
+| getRecentAlerts | Recupera a lista das notificações ou avisos mais recentes gerados no sistema para apresentação ao usuário. | src | Buscar alertas recentes, Obter notificações recentes, Listar últimos alertas, Recuperar avisos recentes |
+| handleApiError | Processa erros de comunicação com serviços externos, garantindo tratamento consistente e feedback adequado ao usuário. | frontend | tratarErroApi, gerenciarFalhaApi, processarErroDeServico |
+| handleResponse | Função responsável por processar e padronizar o retorno das chamadas de rede, garantindo que a aplicação consuma dados consistentes ou trate falhas de comunicação de forma centralizada. | frontend | processarResposta, tratarRetornoAPI, normalizarResposta |
+| hasPermission | Verifica se o usuário possui autorização para executar uma ação específica sobre um recurso, considerando o contexto da solicitação. | src | verificarPermissão, autorizarAcesso, checarPermissão |
+| iniciar | Ação de dar início a uma ordem de manutenção ou a um fluxo de aprovação, colocando o processo em andamento. | frontend | Iniciar, Dar início, Começar, Disparar |
+| isAdmin | Verifica se o usuário autenticado possui o perfil de administrador para autorizar ações sensíveis. | src | éAdministrador, temPermissaoAdmin, verificaPerfilAdmin |
+| listar | Ação de recuperar e exibir uma coleção de registros de uma determinada entidade, como departamentos, filiais, fornecedores ou funcionários. | frontend | consultar, buscar, obter, recuperar, exibir |
+| listarAlertas | Processo de recuperar e apresentar a relação de alertas gerados para que o usuário possa acompanhar situações de atenção no patrimônio. | src | Consultar alertas, Visualizar notificações, Obter lista de alertas, Exibir avisos |
+| listarTodos | Recupera a relação completa de registros de uma entidade específica (como ativos, departamentos, filiais ou fornecedores) cadastrados no sistema. | src | listar, consultar todos, obter todos, recuperar todos |
+| listarTodos_comUser_deveRetornarOk | Verificação de que um usuário autenticado consegue visualizar a listagem completa de registros do sistema com sucesso. | src | Listagem autorizada, Consulta completa autenticada, Acesso à listagem total |
+| logout | Encerramento da sessão do usuário, invalidando seu token de acesso e impedindo novas requisições autenticadas até novo login. | frontend | deslogar, sair, encerrar sessão, sign out |
+| markAsRead | Registra a visualização de um alerta pelo usuário, atualizando seu status para 'lido' no sistema. | src | marcarComoLido, confirmarLeitura, acknowledgeAlert |
+| mockLogin | Simula a autenticação de usuário em testes de integração para validar endpoints protegidos sem credenciais reais. | src | simularLogin, autenticarUsuarioTeste, mockAutenticacao |
+| onUpdate | Momento em que os dados de um registro são alterados e persistidos, disparando automaticamente verificações ou rotinas complementares necessárias. | src | Atualização de Registro, Pré-Atualização, Gatilho de Alteração |
+| preUpdate | Ponto de execução automática de validações ou ajustes nos dados imediatamente antes de uma alteração ser confirmada no banco de dados. | src | Gatilho de atualização, Validação pré-salvamento, Callback de atualização |
+| request | Função utilitária centralizada que executa chamadas HTTP para a API do backend, encapsulando a lógica de autenticação, tratamento de erros e configuração padrão de requisições. | frontend | chamada API, cliente HTTP, serviço de requisição |
+| setup | Etapa de configuração inicial que define as condições necessárias para a realização de testes de software. | src | inicialização, configuração, preparação, prévia |
+| tearDown | Etapa de limpeza e restauração do estado do sistema após a execução de um cenário de teste, garantindo isolamento entre testes. | src | limpeza, finalização, pós-condição, reset de ambiente |
+| toDTO | Processo de transformação de dados internos do sistema em formato padronizado para comunicação com outras aplicações ou interfaces. | src | converterParaDTO, transformarParaTransferencia, serializarParaSaida |
+| toEntity | Converte um objeto de transferência de dados (DTO) ou requisição em uma entidade de persistência pronta para ser salva no banco de dados. | src | converterParaEntidade, mapearParaEntidade, transformarEmEntidade |
+| toEntity_deveMapearDTOparaEntidade | Processo de validação que garante a correta transformação de objetos de transferência de dados em entidades de domínio. | src | validação de mapeamento DTO-Entidade, teste de conversão para entidade, verificação de transformação de dados |
+| toEntity_deveRetornarNullParaDTONulo | Regra de negócio que determina que a transformação de um objeto de transferência de dados (DTO) nulo deve resultar em uma entidade de domínio nula, garantindo consistência e evitando falhas no processamento. | src | Conversão segura de nulo, Tratamento de DTO nulo, Mapeamento nulo para nulo |
+| updateHealthCheck | Atualiza o status de saúde de um ativo com dados de hardware e disco para análise preditiva. | src | atualizarHealthCheck, atualizarStatusSaude, registrarHealthCheck, atualizarCheckSaude |
+| updateScalars | Atualiza os valores numéricos ou textuais simples (métricas, indicadores) de um ativo de hardware durante a verificação de integridade. | src | atualizarValoresSimples, atualizarMetricas, atualizarIndicadores, refreshScalars |

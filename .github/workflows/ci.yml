@@ -12,35 +12,66 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        # v4.2.2
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        # v4.7.0
+        uses: actions/setup-java@7a6d8a8234af8ebf22e471f265c9fcbc229f1161
         with:
           distribution: temurin
           java-version: '21'
           cache: 'maven'
 
-      - name: Build and run tests (Maven verify)
+      - name: Build, test and enforce coverage gate (Maven verify)
+        # JaCoCo check rule (BUNDLE LINE COVEREDRATIO >= 0.80) is bound to the
+        # verify phase in pom.xml, so this step fails below 80% line coverage.
         run: ./mvnw -B -DskipTests=false verify
 
       - name: Upload build artifact (jar)
         if: always()
-        uses: actions/upload-artifact@v4
+        # v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: aegis-artifact
           path: target/*.jar
 
       - name: Upload JaCoCo exec
         if: always()
-        uses: actions/upload-artifact@v4
+        # v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: jacoco-exec
           path: target/jacoco.exec
 
       - name: Upload JaCoCo HTML report
         if: always()
-        uses: actions/upload-artifact@v4
+        # v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: jacoco-report-html
           path: target/site/jacoco/**
+
+  frontend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        # v4.2.2
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Set up Node 20
+        # v4.4.0
+        uses: actions/setup-node@49933952801f2c6e4328b1fe2c31ed6e2e03e548
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: frontend

@@ -39,6 +39,8 @@ public class LocalizacaoControllerIT extends BaseIT {
     @Autowired private LocalizacaoRepository localizacaoRepository;
     @Autowired private FuncionarioRepository funcionarioRepository;
     @Autowired private UsuarioRepository usuarioRepository;
+    @Autowired private br.com.aegispatrimonio.repository.RoleRepository roleRepository;
+    @Autowired private br.com.aegispatrimonio.repository.PermissionRepository permissionRepository;
     @Autowired private FilialRepository filialRepository;
     @Autowired private DepartamentoRepository departamentoRepository;
 
@@ -69,10 +71,12 @@ public class LocalizacaoControllerIT extends BaseIT {
         createLocalizacao("Sala 101", filialA);
         createLocalizacao("Sala 201", filialB);
 
-        Funcionario adminFunc = createFuncionarioAndUsuario("Admin", "admin@aegis.com", "ROLE_ADMIN", deptoA, Set.of(filialA, filialB));
+        Funcionario adminFunc = createFuncionarioAndUsuario("Admin",
+                "admin.loc." + java.util.UUID.randomUUID() + "@aegis.com", "ROLE_ADMIN", deptoA, Set.of(filialA, filialB));
         this.adminToken = jwtService.generateToken(new CustomUserDetails(adminFunc.getUsuario()));
 
-        Funcionario userFunc = createFuncionarioAndUsuario("User", "user@aegis.com", "ROLE_USER", deptoA, Set.of(filialA));
+        Funcionario userFunc = createFuncionarioAndUsuario("User",
+                "user.loc." + java.util.UUID.randomUUID() + "@aegis.com", "ROLE_USER", deptoA, Set.of(filialA));
         this.userToken = jwtService.generateToken(new CustomUserDetails(userFunc.getUsuario()));
     }
 
@@ -158,6 +162,34 @@ public class LocalizacaoControllerIT extends BaseIT {
         user.setStatus(Status.ATIVO);
         user.setFuncionario(func);
         func.setUsuario(user);
+        // Autorização granular: o admin bypass do PermissionServiceImpl exige o vínculo
+        // rbac_user_role com a role ROLE_ADMIN (coluna legada 'role' não é consultada).
+        if ("ROLE_ADMIN".equals(role)) {
+            br.com.aegispatrimonio.model.Role adminRole = roleRepository.findByName("ROLE_ADMIN")
+                    .orElseGet(() -> {
+                        br.com.aegispatrimonio.model.Role r = new br.com.aegispatrimonio.model.Role();
+                        r.setName("ROLE_ADMIN");
+                        r.setDescription("Administrador com acesso total");
+                        return roleRepository.save(r);
+                    });
+            user.setRoles(new java.util.HashSet<>(Set.of(adminRole)));
+        } else if ("ROLE_USER".equals(role)) {
+            // H1c: controller usa LOCALIZACAO:READ; USER precisa do par granular.
+            br.com.aegispatrimonio.model.Permission pRead = permissionRepository
+                    .findByResourceAndAction("LOCALIZACAO", "READ")
+                    .orElseGet(() -> permissionRepository.save(
+                            new br.com.aegispatrimonio.model.Permission(null, "LOCALIZACAO", "READ", "Ler Localizações", null)));
+            br.com.aegispatrimonio.model.Role userRole = roleRepository.findByName("ROLE_USER")
+                    .orElseGet(() -> {
+                        br.com.aegispatrimonio.model.Role r = new br.com.aegispatrimonio.model.Role();
+                        r.setName("ROLE_USER");
+                        r.setDescription("Usuário padrão");
+                        return roleRepository.save(r);
+                    });
+            userRole.setPermissions(new java.util.HashSet<>(Set.of(pRead)));
+            roleRepository.save(userRole);
+            user.setRoles(new java.util.HashSet<>(Set.of(userRole)));
+        }
 
         return funcionarioRepository.save(func);
     }

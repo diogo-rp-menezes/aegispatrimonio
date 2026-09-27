@@ -50,6 +50,12 @@ class FilialControllerIT extends BaseIT {
     private UsuarioRepository usuarioRepository;
 
     @Autowired
+    private br.com.aegispatrimonio.repository.RoleRepository roleRepository;
+
+    @Autowired
+    private br.com.aegispatrimonio.repository.PermissionRepository permissionRepository;
+
+    @Autowired
     private JwtService jwtService;
 
     @Autowired
@@ -253,6 +259,34 @@ class FilialControllerIT extends BaseIT {
         user.setStatus(Status.ATIVO);
         user.setFuncionario(savedFunc); // Associar ao funcionário já salvo
         savedFunc.setUsuario(user); // Manter a bidirecionalidade
+        // Autorização granular: o admin bypass do PermissionServiceImpl exige o vínculo
+        // rbac_user_role com a role ROLE_ADMIN (coluna legada 'role' não é consultada).
+        if ("ROLE_ADMIN".equals(role)) {
+            br.com.aegispatrimonio.model.Role adminRole = roleRepository.findByName("ROLE_ADMIN")
+                    .orElseGet(() -> {
+                        br.com.aegispatrimonio.model.Role r = new br.com.aegispatrimonio.model.Role();
+                        r.setName("ROLE_ADMIN");
+                        r.setDescription("Administrador com acesso total");
+                        return roleRepository.save(r);
+                    });
+            user.setRoles(new java.util.HashSet<>(Set.of(adminRole)));
+        } else if ("ROLE_USER".equals(role)) {
+            // H1c: controller usa FILIAL:READ; USER precisa do par granular.
+            br.com.aegispatrimonio.model.Permission pRead = permissionRepository
+                    .findByResourceAndAction("FILIAL", "READ")
+                    .orElseGet(() -> permissionRepository.save(
+                            new br.com.aegispatrimonio.model.Permission(null, "FILIAL", "READ", "Ler Filiais", null)));
+            br.com.aegispatrimonio.model.Role userRole = roleRepository.findByName("ROLE_USER")
+                    .orElseGet(() -> {
+                        br.com.aegispatrimonio.model.Role r = new br.com.aegispatrimonio.model.Role();
+                        r.setName("ROLE_USER");
+                        r.setDescription("Usuário padrão");
+                        return roleRepository.save(r);
+                    });
+            userRole.setPermissions(new java.util.HashSet<>(Set.of(pRead)));
+            roleRepository.save(userRole);
+            user.setRoles(new java.util.HashSet<>(Set.of(userRole)));
+        }
 
         // Agora associar as filiais e salvar novamente o funcionário para persistir a associação ManyToMany
         savedFunc.setFiliais(filiais);

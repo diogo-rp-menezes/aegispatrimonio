@@ -1,141 +1,91 @@
-# Non-Functional Requirements (NFR) — Aegis1
+# Non-Functional Requirements (NFR) — Aegis Patrimônio
 
-> **Versão:** 2.0 · **Status:** Draft · **Owner:** Arquitetura / Engenharia Backend / Engenharia Frontend / Segurança
-
----
+> **Versão:** 1.0 · **Status:** Draft · **Owner:** Engenharia/Arquitetura
 
 ## 1. Performance
-
-### Backend (Java/Spring Boot)
-* **NFR-P01:** Latência P95 de endpoints REST `/api/v1/**` ≤ 500 ms em condições normais (excluindo operações de I/O pesado como geração de PDF/QR Code em lote).
-* **NFR-P02:** Busca Fuzzy (Levenshtein) — tempo de resposta P95 ≤ 300 ms para base de 100k ativos (com índices trigram/pg_trgm no MySQL + cache Redis para queries frequentes).
-* **NFR-P03:** Manutenção Preditiva (Regressão Linear / Mínimos Quadrados) — cálculo de health check por ativo ≤ 50 ms; batch noturno para 10k ativos ≤ 5 min.
-* **NFR-P04:** Geração de PDF (Termo de Responsabilidade) ≤ 2 s por documento; lote de 100 etiquetas QR Code ≤ 10 s.
-* **NFR-P05:** Auditoria (Hibernate Envers) — overhead de escrita ≤ 10% em operações CRUD; consultas de histórico com paginação ≤ 500 ms.
-
-### Frontend (Vue 3)
-* **NFR-P06:** Latência P95 da chamada `request` (frontend → backend) ≤ 800 ms em condições normais de rede.
-* **NFR-P07:** Time to Interactive (TTI) ≤ 3,5 s em 4G (mobile) e ≤ 2 s em broadband desktop.
-* **NFR-P08:** Bundle JS (gzipped) ≤ 150 kB inicial (code-splitting por rota obrigatório).
-* **NFR-P09:** Taxa de erro de integração API (`handleApiError`) < 1% das requisições totais (janela 5 min).
-
-### Métricas & Ferramentas
-* **Medição Backend:** Spring Boot Actuator + Micrometer + Prometheus/Grafana; k6 para load testing.
-* **Medição Frontend:** Lighthouse CI no pipeline (TTI/bundle), APM (Sentry/Datadog RUM) em produção.
-* **Tracing:** Header `trace-id` propagado frontend→backend; 100% mutações cobertas.
-
----
+* **NFR-P01:** Tempo de resposta da API (endpoint `request` em `frontend/src/services/api.js`) ≤ 500ms no percentil 95 (p95) e ≤ 1.000ms no p99 sob carga nominal. <!-- source: BRD#4 (Guardrail Metrics) -->
+* **NFR-P02:** Time to First Byte (TTFB) da aplicação web ≤ 200ms em rede local (latência de rede < 5ms). [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
+* **NFR-P03:** Largest Contentful Paint (LCP) da interface principal ≤ 2,5s em conexão 4G (simulada) e ≤ 1,2s em rede corporativa. [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
+* **NFR-P04:** Processamento do job `AlertNotificationService.checkResourceUsageAlerts` (complexidade ciclomática 17) concluído em ≤ 30s para base de 12.000 ativos. <!-- source: Diagnóstico#Funções com complexidade ciclomática alta; BRD#5 (In-Scope: Alertas) -->
+* **Método de medição:** Testes de carga com k6/Gatling simulando 100 usuários concorrentes; APM via Spring Boot Actuator `/actuator/metrics/http.server.requests` e frontend `performance.mark`/`measure`. [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
 
 ## 2. Escalabilidade
-
-* **NFR-S01:** Frontend estático via CDN ≥ 500 usuários concorrentes ativos sem degradação > 10%.
-* **NFR-S02:** Backend escala horizontalmente (K8s HPA) para picos de 200 req/s em mutações de ordens (iniciar, aprovar, concluir, cancelar, busca fuzzy).
-* **NFR-S03:** Multi-tenancy por Filial — isolamento no nível de query (Hibernate Filter / `MultiTenancyFilter`) sem degradação linear com nº de filiais (testado até 100 filiais).
-* **NFR-S04:** Sessão stateless (JWT); `authInterceptor` refresh automático único (max 1 retry) sem gargalo de refresh simultâneo (token bucket client-side).
-* **NFR-S05:** Banco de dados MySQL 8.0 — connection pool (HikariCP) dimensionado para 2x CPU cores; read replicas para consultas de relatório/dashboard.
-
----
+* **NFR-S01:** Suportar 400 usuários concorrentes (meta corporativa BRD#10 Fase 3) com degradação de throughput ≤ 10% em relação a 100 usuários, em instância única (vertical scaling). <!-- source: BRD#10 (Fase 3: 400+ usuários); Topologia: monolito -->
+* **NFR-S02:** Throughput mínimo de 200 req/s (leituras) e 50 req/s (escritas transacionais) por instância da aplicação Java. [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
+* **NFR-S03:** Banco de dados (motor não especificado — ver seção *O que falta verificar*) deve sustentar 500 conexões simultâneas com pool de conexões configurado (HikariCP padrão Spring Boot). [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
+* **Observação:** Não há suporte a auto-scaling horizontal, clustering ou sharding na stack atual (monolito Java + JS, sem Kubernetes/Orquestrador identificado). Escalabilidade é vertical (mais vCPU/RAM) ou read-replica para relatórios (BRD#8 Risco "Single point of failure").
 
 ## 3. Disponibilidade & Confiabilidade
-
-* **NFR-A01:** Disponibilidade frontend (CDN+DNS) ≥ 99,9% mensal (SLO); SLA provedor ≥ 99,5%.
-* **NFR-A02:** RTO deploy frontend ≤ 15 min (rollback CDN); RTO backend ≤ 30 min (K8s rollback + Flyway down migration testada).
-* **NFR-A03:** RPO = 0 para assets frontend (imutáveis versionados); RPO backend ≤ 1 min (MySQL binlog + backup contínuo).
-* **NFR-A04:** Falha na API backend não trava UI; `handleApiError` exibe mensagem amigável + retry manual; circuit breaker (Resilience4j) no backend para dependências externas.
-* **NFR-A05:** Health checks: `/actuator/health` (liveness/readiness) com checks de DB, Redis, disco; K8s probes configurados.
-* **NFR-A06:** TestContainers (MySQL real) em CI garante compatibilidade de migrações Flyway antes de deploy.
-
----
+* **NFR-A01:** Uptime mínimo de 99,5% (SLA contratual) / 99,9% (SLO interno) medido mensalmente, exceto janelas de manutenção programadas (máx. 4h/mês). [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
+* **NFR-A02:** RTO (Recovery Time Objective) ≤ 4 horas para restauração completa (banco + aplicação) a partir de backup diário. <!-- source: BRD#8 (Mitigação: runbook de restore < 4h) -->
+* **NFR-A03:** RPO (Recovery Point Objective) ≤ 24 horas (backup diário full + WAL/log shipping se suportado pelo motor de banco). [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
+* **NFR-A04:** Eliminar single points of failure críticos: banco de dados deve ter réplica de leitura (read-replica) para relatórios `custoTotalPorAtivo` e health checks; armazenamento de logs de auditoria (WORM) em storage separado e replicado. <!-- source: BRD#8 (Risco Single point of failure; BR-02 Auditoria) -->
 
 ## 4. Segurança
-
-### Autenticação & Autorização (Aegis Shield)
-* **NFR-SEC01:** Comunicação exclusivamente HTTPS (TLS 1.3); HSTS no CDN; certificado válido + rotação automática (cert-manager).
-* **NFR-SEC02:** JWT stateless (RS256, chave rotacionada); `authInterceptor` frontend + `JwtTokenProvider` backend; refresh token HttpOnly cookie (SameSite=Strict) — migração de localStorage antes do go-live.
-* **NFR-SEC03:** **RBAC Granular (Aegis Shield)**: Roles hierárquicas (ADMIN > GESTOR > TECNICO > USER > AUDITOR); Permissions contextuais por recurso/ação/filial; avaliação em tempo real (SpEL / custom `PermissionEvaluator`).
-* **NFR-SEC04:** **Multi-tenancy por Filial**: Isolamento obrigatório no nível de query (Hibernate Filter + `MultiTenancyFilter`); testes cross-tenant em CI (TestContainers) — vazamento = falha de build.
-* **NFR-SEC05:** Auditoria imutável (Hibernate Envers) em 100% entidades de domínio: captura quem, quando, o quê (diff campo a campo), IP, user-agent; logs de auditoria imutáveis (append-only, retenção 7 anos).
-
-### Frontend & OWASP
-* **NFR-SEC06:** Zero `console.*` em build produção; pipeline falha se `console.*` no bundle (eslint/no-console error).
-* **NFR-SEC07:** CSP restritivo (`script-src 'self'`, `style-src 'self' 'unsafe-inline'`, `img-src 'self' data:`); sanitização de entradas (DOMPurify) em formulários de cadastro.
-* **NFR-SEC08:** Proteção CSRF via SameSite=Strict + header `X-CSRF-Token` para mutações; CORS restrito a domínios permitidos.
-* **NFR-SEC09:** Rate limiting por IP/usuário no API Gateway / Spring Cloud Gateway (ex.: 100 req/min para auth, 500 req/min para API).
-* **NFR-SEC10:** Dependências: OWASP Dependency Check no CI; zero vulnerabilidades críticas/altas; renovação automática (Dependabot).
-
----
+* **NFR-SEC01:** Todos os dados sensíveis (tokens JWT, senhas, dados de ativos com informação sensível LGPD) criptografados em repouso (AES-256 no volume do banco) e em trânsito (TLS 1.2+ obrigatório, preferencialmente 1.3). <!-- source: BRD#7 (Premissa 7: LGPD/SOX); BRD#6 (BR-08 Sessão & Token) -->
+* **NFR-SEC02:** Autenticação stateless via JWT (HS256 ou RS256) com expiração ≤ 1h e refresh token rotation; MFA obrigatório para papel `ADMIN` (integração futura com provedor OIDC/AD). <!-- source: BRD#7 (Premissa 5: JWT stateless); BRD#6 (BR-01 RBAC Estrito) -->
+* **NFR-SEC03:** Conformidade com OWASP Top 10 (2021) — validação de entrada (BR-03), controle de acesso quebrado (BR-01), logging de falhas de autorização, proteção contra injeção SQL (uso de prepared statements / JPA criteria — stack usa SQL cru). [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
+* **NFR-SEC04:** Rotação de segredos (chave JWT, credenciais de banco, chaves de criptografia) a cada 90 dias via cofre de segredos (ex.: HashiCorp Vault, AWS Secrets Manager — não identificado na stack, requer provisionamento). [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
+* **NFR-SEC05:** Logs de auditoria imutáveis (append-only, storage WORM) para todas as operações de escrita listadas em BR-02 (`criar`, `atualizar`, `deletar`, `aprovar`, `cancelar`, `concluir`, `iniciar`) com `usuario_id`, `timestamp`, `entidade`, `entidade_id`, `acao`, `valores_anteriores`, `valores_novos`. <!-- source: BRD#6 (BR-02 Trilha de Auditoria Obrigatória) -->
 
 ## 5. Usabilidade & Acessibilidade
-
-* **NFR-U01:** WCAG 2.1 AA nos fluxos críticos (criar ordem, iniciar, aprovar, concluir, cancelar, listar, custoTotalPorAtivo, dashboard preditivo).
-* **NFR-U02:** Responsivo 320–1920 px; touch targets ≥ 48×48 px para técnico em campo (mobile/PWA).
-* **NFR-U03:** Leitores de tela: ARIA labels, roles, live regions em badges de status, botões condicionais, alertas de health check.
-* **NFR-U04:** Internacionalização (i18n) preparada — v1 apenas pt-BR; chaves externas em JSON.
-
----
+* **NFR-U01:** Conformidade com WCAG 2.1 nível AA em todos os fluxos críticos (login, cadastro de ativo, solicitação de manutenção, dashboard de alertas). [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
+* **NFR-U02:** Suporte a leitores de tela (NVDA, JAWS) nos fluxos críticos; ordem de foco lógica, labels em inputs, ARIA landmarks. [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
+* **NFR-U03:** Interface responsiva funcionando em viewports de 320px (mobile) a 1920px (desktop) sem perda de funcionalidade; componentes Popper.js (tooltips, dropdowns) testados em touch e mouse. <!-- source: Stack: @popperjs/core; BRD#5 (Out-of-Scope: app mobile nativo — apenas web responsiva) -->
+* **NFR-U04:** Tempo de percepção de interação (INP) ≤ 200ms para ações principais (abrir modal, salvar formulário, filtrar tabela). [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
 
 ## 6. Observabilidade
-
-* **NFR-O01:** Logs estruturados (JSON) backend: SLF4J + Logback + Logstash encoder; correlation ID (`trace-id`) propagado; níveis: ERROR/WARN em produção, DEBUG em staging.
-* **NFR-O02:** Métricas Prometheus: latência (histogram), throughput (counter), erro (counter), JVM (memory, GC, threads), pool DB, cache hit/miss, health check preditivo (score, threshold).
-* **NFR-O03:** Dashboards Grafana: Golden Signals (latency, traffic, errors, saturation) por endpoint; Business KPIs (ordens/dia, custoTotalPorAtivo, alertas preditivos ativos).
-* **NFR-O04:** Alertas: erro API > 1% (5 min), latência P95 > 500 ms (5 min), falha refresh > 5% (15 min), disco preditivo > threshold (imediato), auditoria acesso negado > 10/min (possível ataque).
-* **NFR-O05:** Frontend: Core Web Vitals (LCP, FID, CLS) via RUM; erros não tratados → Sentry; zero `console.*` em produção.
-
----
+* **NFR-O01:** Logs estruturados em JSON (campos: `timestamp`, `level`, `traceId`, `spanId`, `service`, `message`, `context`) emitidos para stdout/arquivo; métricas expostas via Spring Boot Actuator `/actuator/prometheus` (JVM, HTTP, DB pool, cache). [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
+* **NFR-O02:** Health checks em `/actuator/health` (liveness/readiness) verificando conectividade com banco, disco, e serviço de agendamento de health checks de ativos. <!-- source: BRD#5 (In-Scope: updateHealthCheck); BRD#7 (Premissa 6: agendador externo) -->
+* **NFR-O03:** Tracing distribuído (OpenTelemetry) propagando `traceparent` em 100% das requisições HTTP de entrada e chamadas JDBC; instrumentação automática via Java agent. [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
+* **NFR-O04:** Alertas configurados (Prometheus Alertmanager / Grafana) para: latência p95 > 500ms por 5min, taxa de erro 5xx > 0,1% por 2min, uso de CPU > 80% por 10min, uso de heap > 85% por 5min, falha no job `checkResourceUsageAlerts`. <!-- source: BRD#4 (Guardrail Metrics); Diagnóstico#AlertNotificationService complexity -->
 
 ## 7. Manutenibilidade & Qualidade de Código
-
-* **NFR-M01:** Complexidade ciclomática ≤ 10 por função (backend: Checkstyle/SpotBugs; frontend: ESLint complexity). Refatorar `request` (complexidade 13) em: retry, timeout, parsing, auth.
-* **NFR-M02:** Cobertura mínima testes ≥ 80% (gate CI): Unit (JUnit 5 + Mockito), Integration (TestContainers MySQL), Contract (Spring Cloud Contract / Pact), Frontend (Vitest + Vue Test Utils).
-* **NFR-M03:** Qualidade estática: Checkstyle (Google Java Style), SpotBugs, PMD no backend; ESLint (Airbnb/Standard) + Prettier + TypeScript strict no frontend; `no-console` error em prod.
-* **NFR-M04:** Contrato OpenAPI 3.1 versionado (`/api/v1/openapi.yaml`); validação no CI (contract tests frontend↔backend); breaking changes = version bump (v2).
-* **NFR-M05:** Documentação viva: ADRs para decisões arquiteturais; diagramas C4 (Structurizr/PlantUML) versionados; README por módulo.
-
----
+* **NFR-M01:** Cobertura mínima de testes automatizados de 80% (linhas) para novo código; 60% para código legado (meta progressiva). Ferramentas: JaCoCo (Java), Vitest/Jest (JS). <!-- source: BRD#8 (Mitigação: testes unidade cobertura ≥ 80%) -->
+* **NFR-M02:** Complexidade ciclomática máxima por método/função ≤ 10 (atualmente 5 métodos excedem: `request`=13, `run`=15, `toDTO`=14, `build`=14, `checkResourceUsageAlerts`=17). Refatoração obrigatória antes de Q2/2025. <!-- source: Diagnóstico#Funções com complexidade ciclomática alta -->
+* **NFR-M03:** Documentação de API REST mantida via OpenAPI 3.0 (SpringDoc) atualizada a cada release; validação em pipeline CI de breaking changes. [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
+* **NFR-M04:** Zero chamadas `console.*` residuais em produção (`api.js:36 error`, `api.js:99 debug`). Pipeline CI deve falhar se detectar. <!-- source: Diagnóstico#Chamadas console.* residuais -->
+* **NFR-M05:** Zero métodos stub com corpo vazio (`Usuario.setUsername:86`). Pipeline CI deve falhar se detectar. <!-- source: Diagnóstico#Funções com corpo vazio (stub) -->
 
 ## 8. Compliance & Regulatório
-
-* **NFR-C01:** **LGPD** — Direito ao esquecimento: endpoint `DELETE /api/v1/usuarios/me` anonimiza dados pessoais (mantém auditoria Envers com hash); consentimento granular por finalidade.
-* **NFR-C02:** **Retenção**: Logs erro/telemetria ≤ 30 dias; anonimização IDs ordem/usuário após 7 dias; Auditoria Envers retenção 7 anos (requisito fiscal/trabalhista).
-* **NFR-C03:** **NR-10/NR-12** — Rastreabilidade documental: Termo de Responsabilidade PDF assinado digitalmente (ICP-Brasil ou assinatura eletrônica avançada); checklist de segurança obrigatório no fluxo **aprovar**.
-* **NFR-C04:** **ISO 27001** — Controles: A.5.15 (acesso), A.8.2 (classificação informação), A.8.3 (manipulação mídia), A.12.4 (log), A.14.2 (segurança desenvolvimento).
-* **NFR-C05:** **SOC 2 Type II** — Princípios: Segurança, Disponibilidade, Confidencialidade; evidências via auditoria Envers + logs estruturados + testes de penetração anuais.
-
----
+* **NFR-C01:** LGPD — Implementar direito ao esquecimento (exclusão lógica + anonimização de dados pessoais em `Funcionario`, `Usuario`, logs de auditoria) via endpoint administrativo com registro de auditoria. <!-- source: BRD#7 (Premissa 7: LGPD/SOX); BRD#6 (BR-02) -->
+* **NFR-C02:** SOX — Retenção de logs de auditoria (BR-02) e relatórios financeiros (`custoTotalPorAtivo`) por mínimo 7 anos em storage WORM com integridade verificada (hash SHA-256 periódico). <!-- source: BRD#7 (Premissa 7); BRD#6 (BR-06) -->
+* **NFR-C03:** Classificação de dados: ativos com dados sensíveis (ex.: HD com dados pessoais) marcados com tag `LGPD_SENSITIVE`; acesso restrito a roles `ADMIN` e `AUDITOR`. [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
 
 ## 9. Portabilidade & Compatibilidade
-
-* **NFR-PO01:** Backend: Java 21 LTS, Spring Boot 3.3, MySQL 8.0 — compatível com qualquer K8s 1.28+ / Docker 24+.
-* **NFR-PO02:** Frontend: Build independente de cloud; assets estáticos deployáveis em S3+CloudFront, Azure Static Web Apps, Netlify, Vercel, Nginx.
-* **NFR-PO03:** Banco: MySQL 8.0 (primário); migração para PostgreSQL 15+ suportada via Flyway (dialect abstraction) — testado em CI.
-
----
+* **NFR-PO01:** Compatibilidade com as 2 últimas versões estáveis dos navegadores principais (Chrome, Edge, Firefox, Safari) em desktop; última versão em mobile (iOS Safari, Chrome Android). [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
+* **NFR-PO02:** Deploy suportado em VM Linux (Ubuntu 22.04 LTS / RHEL 9) ou container Docker (imagem base Eclipse Temurin 17 JRE) com banco de dados relacional gerenciado ou self-hosted (motor a definir — ver *O que falta verificar*). <!-- source: Stack: Java 17+ implícito; BRD#7 (Premissa 1, 4) -->
+* **NFR-PO03:** Frontend servido como arquivos estáticos pelo backend (Spring Boot `static` resources) ou CDN (Nginx/CloudFront) — build via Vite/Webpack (não configurado ainda). [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
 
 ## 10. Custo (Cost Efficiency)
-
-* **NFR-CO01:** Hospedagem estática frontend ≤ USD 30/mês (500 users, 10k pageviews/dia).
-* **NFR-CO02:** Backend K8s: 3 nodes (4 vCPU, 16 GB) ≈ USD 400/mês (spot/preemptible para batch preditivo noturno).
-* **NFR-CO03:** MySQL managed (Cloud SQL / RDS) db.r6g.xlarge ≈ USD 300/mês; Redis cache ≈ USD 50/mês.
-* **NFR-CO04:** Zero custo licença runtime/framework (stack MIT/Apache 2.0); ferramentas CI/CD open source (GitHub Actions/GitLab CI).
-
----
+* **NFR-CO01:** Custo de infraestrutura por ativo gerenciado ≤ R$ 2,00/mês (meta guardrail BRD#4). Inclui compute, banco, storage, backup, monitoramento, rede. <!-- source: BRD#4 (Guardrail Metrics) -->
+* **NFR-CO02:** Otimização de queries SQL (raw SQL / JPA nativo) para evitar full table scans em tabelas grandes (`Ativo`, `Manutencao`, `HealthCheck`); índices compostos alinhados a `ManutencaoSpecification.build` filtros. <!-- source: BRD#6 (BR-09); Stack: SQL cru/sem ORM -->
+* **NFR-CO03:** Logs de auditoria (WORM) com política de tiering: hot (30 dias) em SSD, cold (7 anos) em object storage classe Archive/Glacier. [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
 
 ## 11. Rastreabilidade
-
-| ID | Requisito Relacionado (BRD) | Prioridade | Artefato de Validação |
+| ID | Requisito Relacionado (BRD) | Prioridade | Status de Validação |
 | :--- | :--- | :--- | :--- |
-| NFR-P01–P05 | BRD#4, BRD#6 BR-10, BR-11 | Must | k6 load test, Actuator metrics |
-| NFR-S01–S05 | BRD#3, BRD#5, BRD#6 BR-13 | Must | K8s HPA config, TestContainers cross-tenant |
-| NFR-A01–A06 | BRD#7, BRD#8 | Must | K8s probes, Actuator health, CI TestContainers |
-| NFR-SEC01–SEC10 | BRD#6 BR-13–16, BRD#8 | Must | Pen test, OWASP Dep Check, CI cross-tenant test |
-| NFR-U01–U04 | BRD#3 | Should | Lighthouse CI, axe-core, manual QA |
-| NFR-O01–O05 | BRD#4, BRD#8 | Must | Grafana dashboards, Alertmanager rules |
-| NFR-M01–M05 | BRD#8, BRD#9 | Must | CI gates (coverage, quality, contract) |
-| NFR-C01–C05 | BRD#7, BRD#8 | Must | DPIA, Audit logs, Pen test report |
-| NFR-PO01–PO03 | BRD#7 | Should | Multi-cloud deploy test |
-| NFR-CO01–CO04 | BRD#9 | Could | FinOps dashboard |
+| NFR-P01 | Guardrail: Latência P95 API ≤ 500ms | Must | Não validado |
+| NFR-P04 | In-Scope: Alertas & Monitoramento (`checkResourceUsageAlerts`) | Must | Não validado |
+| NFR-S01 | Fase 3 Corporativo: 400+ usuários | Must | Não validado |
+| NFR-A02 | Risco: Runbook restore < 4h | Must | Não validado |
+| NFR-A04 | Risco: Single point of failure | Must | Não validado |
+| NFR-SEC01 | Premissa 7: LGPD/SOX; BR-08 Token | Must | Não validado |
+| NFR-SEC02 | BR-01 RBAC Estrito; Premissa 5 JWT | Must | Não validado |
+| NFR-SEC05 | BR-02 Trilha de Auditoria Obrigatória | Must | Não validado |
+| NFR-M02 | Diagnóstico: Complexidade ciclomática alta (5 métodos) | Must | Não validado |
+| NFR-M04 | Diagnóstico: Console.* residual | Should | Não validado |
+| NFR-M05 | Diagnóstico: Stub vazio `setUsername` | Should | Não validado |
+| NFR-C01 | Premissa 7: LGPD; BR-02 Auditoria | Must | Não validado |
+| NFR-C02 | Premissa 7: SOX; BR-06 Custo Total | Must | Não validado |
+| NFR-CO01 | Guardrail: Custo infra/ativo ≤ R$ 2,00/mês | Should | Não validado |
 
 ---
 
-*Documento regenerado com base em análise AST completa do backend Java (performance, security, observability, compliance) + frontend Vue. Substitui versão 1.0 que continha apenas visão frontend.*
+## O que falta verificar (Gaps de Informação)
+1. **Motor de banco de dados:** Não identificado no `package.json` nem em arquivos de configuração (application.yml/properties não escaneados). NFRs de escalabilidade (NFR-S03), disponibilidade (NFR-A03), portabilidade (NFR-PO02) e custo (NFR-CO01) dependem desta definição (PostgreSQL, Oracle, SQL Server, MySQL?). **Ação:** Confirmar com DBA/Infra na Sprint 0.
+2. **Estratégia de deploy e infraestrutura alvo:** VM única? Container Docker? Kubernetes? Cloud provider? Isso impacta NFR-A01, NFR-A04, NFR-PO02, NFR-CO01. **Ação:** Definir com DevOps/Infra.
+3. **Provedor de identidade / MFA:** Integração com AD/LDAP/OIDC prevista (BRD#7 Dependências externas) mas não implementada. NFR-SEC02 depende desta decisão. **Ação:** Alinhar com Segurança da Informação.
+4. **Ferramentas de observabilidade stack:** Prometheus/Grafana? Datadog? New Relic? ELK? NFR-O01, NFR-O03, NFR-O04 exigem escolha. **Ação:** Definir na Sprint 0.
+5. **Política de retenção de dados específica por entidade:** BRD menciona 7 anos para SOX, mas LGPD pode exigir prazos diferentes por tipo de dado. NFR-C01, NFR-C02 precisam de matriz de retenção aprovada por Compliance. **Ação:** Workshop com Compliance/Legal.
+6. **Orçamento de infraestrutura validado:** Estimativa BRD#9 (R$ 180k/ano) precisa cotação real para validar NFR-CO01. **Ação:** FinOps/Infra prover cotação.

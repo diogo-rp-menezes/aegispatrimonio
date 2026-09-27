@@ -55,7 +55,10 @@ spec:
     spec:
       containers:
         - name: aegis-app
-          image: aegispatrimonio:latest
+          # Placeholder versionado: o CI/deploy DEVE injetar a tag real da imagem
+          # (ex.: via `kubectl set image` ou kustomize image override).
+          # Nunca usar :latest em produção (imutabilidade de versão).
+          image: aegispatrimonio:0.0.1
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
@@ -90,6 +93,46 @@ spec:
             periodSeconds: 20
             timeoutSeconds: 2
             failureThreshold: 3
+---
+# PDB: garante que drains de nó (atualizações do cluster) não derrubem todas as
+# réplicas do app simultaneamente (2 réplicas, minAvailable: 1).
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: aegis-app
+  namespace: aegis
+  labels:
+    app: aegis-app
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: aegis-app
+---
+# NetworkPolicy: ingress default-deny + allow 8080 de qualquer origem.
+# Justificativa: não há Ingress/Controller definido no repo, então restringir por
+# label de origem quebraria um cluster genérico. Egress deixado livre — restrição
+# de egress (DNS + MySQL 3306) registrada como pendência (requer teste em cluster
+# com CNI que suporte NetworkPolicy).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: aegis-app-allow-8080
+  namespace: aegis
+  labels:
+    app: aegis-app
+spec:
+  podSelector:
+    matchLabels:
+      app: aegis-app
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8080
 ---
 apiVersion: v1
 kind: Service

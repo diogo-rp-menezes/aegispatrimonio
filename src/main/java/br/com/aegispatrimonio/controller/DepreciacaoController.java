@@ -37,7 +37,7 @@ public class DepreciacaoController {
      * @return ResponseEntity com status 200 OK e uma mensagem de confirmação.
      */
     @PostMapping("/recalcular-todos")
-    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'UPDATE', null)")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'DEPRECIACAO', 'UPDATE', null)")
     @Operation(summary = "Recalcular depreciação de todos os ativos",
                description = "Inicia o recálculo completo da depreciação para todos os ativos do sistema. Acesso restrito a ADMIN.")
     @ApiResponses(value = {
@@ -60,7 +60,7 @@ public class DepreciacaoController {
      * @throws br.com.aegispatrimonio.exception.ResourceNotFoundException se o ativo não for encontrado.
      */
     @PostMapping("/recalcular/{ativoId}")
-    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'UPDATE', null)")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'DEPRECIACAO', 'UPDATE', null)")
     @Operation(summary = "Recalcular depreciação de um ativo específico",
                description = "Inicia o recálculo completo da depreciação para um ativo específico. Acesso restrito a ADMIN.")
     @ApiResponses(value = {
@@ -85,7 +85,7 @@ public class DepreciacaoController {
      * @throws br.com.aegispatrimonio.exception.ResourceNotFoundException se o ativo não for encontrado.
      */
     @GetMapping("/calcular-mensal/{ativoId}")
-    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'READ', null)")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'DEPRECIACAO', 'READ', null)")
     @Operation(summary = "Calcular depreciação mensal de um ativo",
                description = "Calcula o valor mensal de depreciação para um ativo específico. Acesso restrito a ADMIN.")
     @ApiResponses(value = {

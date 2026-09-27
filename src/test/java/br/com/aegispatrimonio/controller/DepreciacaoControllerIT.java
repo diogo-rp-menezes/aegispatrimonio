@@ -43,6 +43,7 @@ public class DepreciacaoControllerIT extends BaseIT {
     @Autowired private TipoAtivoRepository tipoAtivoRepository;
     @Autowired private FornecedorRepository fornecedorRepository;
     @Autowired private LocalizacaoRepository localizacaoRepository;
+    @Autowired private br.com.aegispatrimonio.repository.RoleRepository roleRepository;
 
     @Autowired
     private JwtService jwtService;
@@ -56,7 +57,8 @@ public class DepreciacaoControllerIT extends BaseIT {
     void setUp() {
         Filial filial = createFilial("Sede Teste", "SEDE-TESTE", "99.999.999/0001-99");
         Departamento depto = createDepartamento("TI Depreciação", filial);
-        Funcionario adminFunc = createFuncionarioAndUsuario("Admin Depreciação", "admin.dep@aegis.com", "ROLE_ADMIN", depto, Set.of(filial));
+        Funcionario adminFunc = createFuncionarioAndUsuario("Admin Depreciação",
+                "admin.dep." + java.util.UUID.randomUUID() + "@aegis.com", "ROLE_ADMIN", depto, Set.of(filial));
         this.adminToken = jwtService.generateToken(new CustomUserDetails(adminFunc.getUsuario()));
 
         TipoAtivo tipoAtivo = createTipoAtivo("Servidor");
@@ -113,6 +115,18 @@ public class DepreciacaoControllerIT extends BaseIT {
         Usuario user = new Usuario();
         user.setEmail(email); user.setPassword(passwordEncoder.encode("password")); user.setRole(role);
         user.setStatus(Status.ATIVO); user.setFuncionario(func); func.setUsuario(user);
+        // Autorização granular: o admin bypass do PermissionServiceImpl exige o vínculo
+        // rbac_user_role com a role ROLE_ADMIN (coluna legada 'role' não é consultada).
+        if ("ROLE_ADMIN".equals(role)) {
+            br.com.aegispatrimonio.model.Role adminRole = roleRepository.findByName("ROLE_ADMIN")
+                    .orElseGet(() -> {
+                        br.com.aegispatrimonio.model.Role r = new br.com.aegispatrimonio.model.Role();
+                        r.setName("ROLE_ADMIN");
+                        r.setDescription("Administrador com acesso total");
+                        return roleRepository.save(r);
+                    });
+            user.setRoles(Set.of(adminRole));
+        }
         return funcionarioRepository.save(func);
     }
 

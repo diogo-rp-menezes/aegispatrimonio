@@ -85,9 +85,12 @@ class MovimentacaoControllerIT extends BaseIT {
         Filial filial = createFilial("Matriz", "MTRZ", "00.000.000/0001-00");
         filial = filialRepository.findById(filial.getId()).orElseThrow(); // Re-fetch para garantir que a entidade esteja fresca no contexto
         Departamento depto = createDepartamento("TI", filial.getId()); // Passar ID da filial
-        this.userOrigem = createFuncionarioAndUsuario("User Origem", "origem@aegis.com", "ROLE_USER", depto, Set.of(filial.getId()));
-        this.userDestino = createFuncionarioAndUsuario("User Destino", "destino@aegis.com", "ROLE_USER", depto, Set.of(filial.getId()));
-        Funcionario adminFunc = createFuncionarioAndUsuario("Admin", "admin@aegis.com", "ROLE_ADMIN", depto, Set.of(filial.getId()));
+        this.userOrigem = createFuncionarioAndUsuario("User Origem",
+                "origem.mov." + java.util.UUID.randomUUID() + "@aegis.com", "ROLE_USER", depto, Set.of(filial.getId()));
+        this.userDestino = createFuncionarioAndUsuario("User Destino",
+                "destino.mov." + java.util.UUID.randomUUID() + "@aegis.com", "ROLE_USER", depto, Set.of(filial.getId()));
+        Funcionario adminFunc = createFuncionarioAndUsuario("Admin",
+                "admin.mov." + java.util.UUID.randomUUID() + "@aegis.com", "ROLE_ADMIN", depto, Set.of(filial.getId()));
         this.adminToken = jwtService.generateToken(new CustomUserDetails(adminFunc.getUsuario()));
 
         this.localOrigem = createLocalizacao("Sala 101", filial.getId()); // Passar ID da filial

@@ -1,362 +1,256 @@
-# Migration Specification & Plan — Aegis1
+# Migration Specification & Plan — MIG-20250115-001
 
-> **Versão:** 2.0 · **Owner:** DBA / Backend Team · **Status:** Active
-> **Base:** Análise AST Java Completa (Flyway Migrations, Entidades JPA, Hibernate Envers, Multi-tenancy)
-> **Ferramenta:** Flyway 10+ (Maven Plugin + CLI) + TestContainers (CI Validation)
-
----
-
-## 1. Migration Overview
+> **Versão:** 1.0 · **Status:** Proposed
+> Migração inicial de criação do schema completo do Aegis Patrimônio conforme [[db-schema-spec]] v1.0.
+> **⚠️ PRÉ-REQUISITO CRÍTICO:** Decisão do SGBD alvo (MOTOR-001) e estratégia de ORM/migração (ORM-001) devem estar resolvidas antes da execução.
 
 ```yaml
 migration:
-  id: "MIG-AEGIS1-2025-001"
-  title: "Aegis1 Database Schema Evolution (Flyway)"
-  source_state: { version: "0.0.0" }
-  target_state: { version: "2.0.0" }
-  status: "active"
+  id: "MIG-20250115-001"
+  title: "Initial schema creation for Aegis Patrimônio asset management system"
+  source_state: { version: "0.0.0 (empty database)" }
+  target_state: { version: "1.0.0 (full schema per db-schema-spec v1.0)" }
+
+  changes:
+    - type: "CREATE"
+      object: "19 tables (core, reference, transactional, supporting, audit)"
+      description: "Create all tables defined in db-schema-spec sections 1.1–1.19 with logical types; physical type mapping deferred to SGBD decision"
+    - type: "CREATE"
+      object: "35 foreign key relationships"
+      description: "Add FK constraints per db-schema-spec section 2 (REL-001 to REL-036) with defined on_delete/on_update semantics"
+    - type: "CREATE"
+      object: "56 constraints (UNIQUE, CHECK)"
+      description: "Add all constraints per db-schema-spec section 3 (CONSTRAINT-001 to CONSTRAINT-056)"
+    - type: "CREATE"
+      object: "35 indexes"
+      description: "Create indexes per db-schema-spec section 4 (INDEX-001 to INDEX-035) with documented query-pattern evidence"
+    - type: "CREATE"
+      object: "4 views (1 materialized)"
+      description: "Create views per db-schema-spec section 5: vw_ativo_completo, vw_manutencao_completa, vw_alerta_ativo, vw_custo_manutencao_por_ativo (materialized)"
+    - type: "CREATE"
+      object: "4 functions"
+      description: "Create functions per db-schema-spec section 6: validar_cpf, validar_cnpj, calcular_hash_encadeado_auditoria, anonymize_user, atualizar_custo_total_manutencao"
+    - type: "CREATE"
+      object: "6 triggers"
+      description: "Create triggers per db-schema-spec section 7: audit hash chain, audit append-only enforcement, manutencao custo_total sync, funcionario ativo sync, usuario_role audit, role_permissao audit"
 
   compatibility:
     backward_compatible: true
     forward_compatible: true
-    breaking_changes: false
 
-  deployment_strategy: "flyway_migrate (auto dev/staging, manual prod)"
+  deployment_strategy: "expand-contract"
 
   rollback:
     possible: true
-    strategy: "U__undo migrations + PITR (Point-in-Time Recovery)"
-    tested: true
+    strategy: "Full schema drop in reverse dependency order (triggers → functions → views → indexes → constraints → FKs → tables). Requires zero active connections. Data loss: total (initial migration)."
 ```
 
----
+## 2. Plano Operacional (Expand → Migrate → Contract)
 
-## 2. Migration Strategy (Expand → Migrate → Contract)
-
-### 2.1 Phases
-
-| Phase | Name | Operations | Validation Gates |
+| Fase | Nome | Operações | Checks |
 | :--- | :--- | :--- | :--- |
-| **1. Preflight** | Environment Check | Flyway version, DB connectivity, baseline status, lock acquisition | `flyway info`, DB connectivity test, lock table check |
-| **2. Expand** | Additive Changes | New tables, columns (nullable), indexes, repeatable objects (views, functions) | `flyway validate`, schema diff, no data loss |
-| **3. Migrate** | Data Migration | Data transformation, backfill, constraint enablement | Row counts, checksums, constraint validation |
-| **4. Contract** | Breaking Changes | Column drops, type changes, constraint tightening, renames | `flyway validate`, app smoke tests, contract tests |
-| **6. Cleanup** | Housekeeping | Drop unused columns/tables, rebuild stats, update comments | `ANALYZE TABLE`, `OPTIMIZE TABLE`, stats refresh |
+| 1 | Preflight | Verify SGBD decision (MOTOR-001) documented; ORM/migration tool chosen (ORM-001); target database empty; backup strategy confirmed; maintenance window scheduled | `SELECT version();` confirms target SGBD; `pg_isready` / equivalent OK; no existing objects in target schema |
+| 2 | Schema Preparation (Expand) | **2a** Create custom ENUM types (if native ENUM chosen per ENUM-001) or CHECK constraints for all logical enums<br>**2b** Create 19 tables with columns, PKs, logical types (physical mapping per SGBD)<br>**2c** Add 35 FK constraints (REL-001 to REL-036)<br>**2d** Add 56 constraints (CONSTRAINT-001 to CONSTRAINT-056)<br>**2e** Create 4 functions (validar_cpf, validar_cnpj, calcular_hash_encadeado_auditoria, anonymize_user, atualizar_custo_total_manutencao)<br>**2f** Create 6 triggers | Each step: `EXPLAIN`/`SHOW CREATE TABLE` verification; FK referential integrity test with sample inserts; constraint violation tests; function execution tests |
+| 3 | Data Transformation | **3a** Seed reference data: tipo_ativo (6 categories), role (ADMIN, GESTOR_PATRIMONIO, TECNICO_MANUTENCAO, VISUALIZADOR), permissao (full RBAC matrix), filial (initial units)<br>**3b** Create initial admin usuario + funcionario link<br>**3c** Grant initial usuario_role + role_permissao<br>**3d** Refresh materialized view vw_custo_manutencao_por_ativo | Row counts match seed scripts; FK references valid; RBAC matrix complete; materialized view populates without error |
+| 4 | Application Compatibility | **4a** Deploy application version compatible with schema v1.0.0 (JPA entities mapped to new tables per ASM-017)<br>**4b** Run integration test suite against migrated schema<br>**4c** Verify AtivoMapper.toDTO (ASM-020) works with vw_ativo_completo<br>**4d** Verify ManutencaoSpecification.build (ASM-019) uses INDEX-010<br>**4e** Verify AlertNotificationService.checkResourceUsageAlerts (ASM-005) writes to alerta table | All integration tests pass; p95 latency ≤ 50ms for ManutencaoSpecification queries; health check collection writes to ativo.ultimo_health_check; audit trail captures CREATE actions with hash_encadeado |
+| 5 | Validation | **5a** Schema comparison: actual vs db-schema-spec (all 19 tables, 35 FKs, 56 constraints, 35 indexes, 4 views, 4 functions, 6 triggers)<br>**5b** Constraint validation: attempt invalid inserts for each CHECK/UNIQUE — all rejected<br>**5c** Index usage: `EXPLAIN ANALYZE` on representative queries (INDEX-001 to INDEX-035) — index scans confirmed<br>**5d** Audit immutability: attempt UPDATE/DELETE on auditoria — blocked by trigger<br>**5e** Hash chain integrity: verify SHA-256 chain monotonic per correlation_id<br>**5f** Materialized view refresh: `REFRESH MATERIALIZED VIEW CONCURRENTLY vw_custo_manutencao_por_ativo` completes < 2s (ASM-018) | Automated schema diff tool reports zero drift; all constraint tests pass; all query plans show index usage; audit trigger blocks writes; hash chain valid; MV refresh < 2s |
+| 6 | Cleanup (Contract) | **6a** Drop any temporary staging tables used during seed<br>**6b** Revoke excessive privileges granted for migration (if any)<br>**6c** Document final schema version in schema_version table<br>**6d** Update [[db-readme]] with applied migration ID and timestamp | No orphan objects; least-privilege roles verified; schema_version record exists; documentation updated |
 
-### 2.2 Migration Principles
+## 3. Risk Assessment
 
-| Princípio | Implementação |
+```yaml
+risk:
+  overall_level: "HIGH"
+  dimensions:
+    data_loss:
+      score: 0
+      evidence: ["Initial migration on empty database — no existing data at risk"]
+    downtime:
+      score: 3
+      evidence: ["Requires maintenance window for schema creation + seed + app deploy; estimated 30-60 min for full pipeline on empty DB; zero-downtime not applicable for initial creation"]
+    locking:
+      score: 2
+      evidence: ["CREATE TABLE/INDEX/CONSTRAINT on empty tables — no lock contention; FK creation may briefly lock parent tables during validation but tables are empty"]
+    compatibility:
+      score: 4
+      evidence: ["CRITICAL: Physical type mappings (UUID, JSONB, ENUM, INET, MACADDR, TIMESTAMP WITH TIME ZONE) depend on unresolved MOTOR-001; JPA/Hibernate mapping (ASM-017) must align with chosen SGBD dialects; ENUM-001 decision affects all 15 logical enums; JSON-001 affects 4 columns across 3 tables"]
+    reversibility:
+      score: 2
+      evidence: ["Full rollback via DROP SCHEMA CASCADE possible but destroys all seeded reference data; rollback tested in staging required"]
+  destructive_operations: []
+  required_controls:
+    - "MOTOR-001 decision documented and approved before Phase 2 start"
+    - "ENUM-001 implementation strategy (native type vs CHECK vs reference table) decided and tested"
+    - "JSON-001 support confirmed in target SGBD (JSONB/JSON/TEXT+validation)"
+    - "Partitioning strategy (PART-001) defined for ativo, manutencao, alerta, auditoria — may require DDL adjustments post-initial-creation"
+    - "WORM storage (WORM-001) provisioned for auditoria table before production traffic"
+    - "RLS/Security views (SEC-001) designed for filial_id segregation"
+    - "Index validation (IDX-001) with realistic data volumes (100k+ ativos, 1M+ manutencoes) in staging"
+    - "FK-001 review: all on_delete/on_update semantics validated against business rules"
+    - "SEQ-001: Business ID generation (tag_patrimonial, numero_ordem, codigo) implemented via sequence/trigger/app"
+```
+
+## 4. Approval Gate
+
+| Campo | Valor |
 | :--- | :--- |
-| **Idempotência** | Flyway garante execução única por checksum; Repeatable scripts re-executados se alterados |
-| **Transacionalidade** | Cada migration em transação (Flyway default); `CALL` procedures fora de transação se necessário |
-| **Reversibilidade** | Undo scripts (`U{version}__*.sql`) para cada migration versionada; Testados em CI |
-| **Zero Downtime** | Expand → Migrate → Contract; Locks curtos; `LOCK_TIMEOUT` configurado; `pt-online-schema-change` para tabelas grandes |
-| **Observabilidade** | Logs estruturados (JSON) + Métricas Prometheus (`flyway_migrations_*`) + Alertas |
+| Aprovação obrigatória? | Sim |
+| Motivo | Migração inicial de alto risco: decisões de arquitetura pendentes (MOTOR-001, ENUM-001, JSON-001, PART-001, WORM-001, SEC-001) impactam fisicamente todo o DDL; rollback destrutivo; compatibilidade com JPA/Hibernate (ASM-017) não verificada |
+| Aprovado por | [Arquiteto de Dados / Tech Lead / DBA / SecOps] |
+| Status | Pending |
+
+> **Checklist de pré-aprovação (todos obrigatórios):**
+> - [ ] MOTOR-001: SGBD alvo definido (PostgreSQL / Oracle / SQL Server / MySQL)
+> - [ ] ORM-001: Ferramenta de migração escolhida (Flyway / Liquibase / JPA DDL generation / SQL scripts)
+> - [ ] ENUM-001: Estratégia de ENUM decidida e testada no SGBD alvo
+> - [ ] JSON-001: Suporte a JSONB/JSON confirmado; mapeamento físico documentado
+> - [ ] PART-001: Estratégia de particionamento definida para 4 tabelas grandes
+> - [ ] WORM-001: Storage imutável provisionado para auditoria
+> - [ ] SEC-001: Modelo de segregação por filial_id (RLS/views) aprovado
+> - [ ] SEQ-001: Geração de IDs de negócio implementada
+> - [ ] FK-001: Semânticas on_delete/on_update revisadas e aprovadas
+> - [ ] Staging environment provisionado com SGBD alvo idêntico a produção
+
+## 5. Verification (pós-execução)
+
+> **Preencher somente após a migration ser aplicada — checks de schema, integridade, compatibilidade e performance**
+
+| Check | Método | Critério de Sucesso | Resultado | Evidência |
+| :--- | :--- | :--- | :--- | :--- |
+| **Schema completeness** | Automated diff (schemadiff / pg_dump --schema-only vs spec) | Zero drift vs db-schema-spec v1.0 | [ ] Pass / [ ] Fail | [arquivo de diff / log] |
+| **Constraint enforcement** | Test suite: 56 negative test cases (one per CONSTRAINT-XXX) | All invalid inserts rejected with correct error codes | [ ] Pass / [ ] Fail | [test report] |
+| **FK referential integrity** | Insert valid/invalid FK references across all 35 relationships | Valid inserts succeed; invalid rejected | [ ] Pass / [ ] Fail | [test report] |
+| **Index usage** | `EXPLAIN ANALYZE` on 15 representative queries (covering INDEX-001 to INDEX-035) | All queries use expected index (Index Scan / Bitmap Index Scan); no Seq Scan on large tables | [ ] Pass / [ ] Fail | [query plans] |
+| **Audit immutability** | Attempt UPDATE/DELETE on auditoria table | Trigger `trg_auditoria_prevent_update_delete` blocks with clear error | [ ] Pass / [ ] Fail | [error message log] |
+| **Hash chain integrity** | Verify `hash_encadeado` = SHA256(prev_hash \|\| current_payload) for all rows per correlation_id | 100% chains valid; monotonic ordering by data_hora | [ ] Pass / [ ] Fail | [verification script output] |
+| **Materialized view refresh** | `REFRESH MATERIALIZED VIEW CONCURRENTLY vw_custo_manutencao_por_ativo` | Completes < 2s (ASM-018); data matches manual aggregation | [ ] Pass / [ ] Fail | [timing + data comparison] |
+| **Application integration** | Full integration test suite (JPA entities, mappers, specifications, services) | All tests pass; p95 latency targets met (ManutencaoSpecification ≤ 50ms, custoTotalPorAtivo ≤ 2s) | [ ] Pass / [ ] Fail | [CI/CD pipeline results] |
+| **RBAC functionality** | Test role/permission resolution for all 4 default roles | Correct permission sets resolved; usuario_role/role_permissao triggers audit correctly | [ ] Pass / [ ] Fail | [test report] |
+| **Seed data validity** | Count rows in all reference tables; verify FK links | Expected row counts; no orphan references | [ ] Pass / [ ] Fail | [row counts + FK check queries] |
 
 ---
 
-## 3. Migration Catalog (Planned)
+## Apêndice: Mapeamento de Tipos Lógicos → Físicos (Pendente MOTOR-001)
 
-### 3.1 Versioned Migrations (V*)
+> **Fonte:** [[db-schema-spec]] seções 1.1–1.19 — todos os tipos abaixo são **LÓGICOS**. A conversão física **deve** ser definida na decisão MOTOR-001 antes da Fase 2.
 
-| Version | Description | Type | Est. Lock Time | Rollback | Dependencies |
+| Tipo Lógico | PostgreSQL | Oracle | SQL Server | MySQL 8.0+ | Observação |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **V1.0.0** | **Init Schema** - Organizacional (Filial, Departamento, Localizacao, TipoAtivo), Cadastros (Fornecedor, Funcionario), Segurança (Usuario, Role, Permission, RefreshToken), Auditoria (REVINFO, CustomRevisionEntity) | Versioned | < 30s | U1.0.0 | — |
-| **V1.1.0** | **Ativos & Hardware** - Ativo, AtivoDetalheHardware, Disco, Memoria, AdaptadorRede, indices trigram | Versioned | < 30s | U1.1.0 | V1.0.0 |
-| **V1.2.0** | **Manutenção Core** - SolicitacaoManutencao (State Machine), ManutencaoPreventiva (CRON), indices | Versioned | < 30s | U1.2.0 | V1.1.0 |
-| **V1.3.0** | **Preditiva** - HealthCheck, PrevisaoFalha (Regressão Linear), indices, triggers | Versioned | < 30s | U1.3.0 | V1.1.0 |
-| **V1.4.0** | **Segurança Aegis Shield** - Role, Permission, RolePermissionContext (Matriz), RefreshToken (rotation), AegisShieldPermissionEvaluator tables | Versioned | < 30s | U1.4.0 | V1.0.0 |
-| **V1.5.0** | **LGPD** - Consentimento, Anonimização hash, Export procedures | Versioned | < 30s | U1.5.0 | V1.0.0 |
-| **V1.6.0** | **Auditoria Envers** - CustomRevisionEntity, RevisionListener, Triggers imutabilidade, Partitioning REVINFO | Versioned | < 30s | U1.6.0 | V1.0.0 |
-| **V1.7.0** | **Integridade** - IntegridadeChecksum table, Job semanal SHA-256 | Versioned | < 30s | U1.7.0 | V1.6.0 |
-| **V1.7.1** | **QR/PDF** - QRCodeGenerator, PdfGenerator tables (se necessário metadados) | Versioned | < 10s | U1.7.1 | V1.1.0 |
-| **V1.8.0** | **Performance** - Partitioning REVINFO (monthly), Trigram indexes (pg_trgm), Read Replica config | Versioned | < 60s | U1.8.0 | V1.6.0 |
-
-### 3.2 Repeatable Migrations (R__)
-
-| Script | Description | Trigger |
-| :--- | :--- | :--- |
-| `R__create_trigram_indexes.sql` | pg_trgm indexes para busca fuzzy (ativo.tag, ordem.descricao, etc.) | Schema change / Manual |
-| `R__create_audit_views.sql` | Views para auditoria simplificada (última revisão por entidade) | Schema change / Manual |
-| `R__create_audit_functions.sql` | Functions para export auditoria assinado, integridade checksum | Schema change / Manual |
-| `R__create_partition_maintenance.sql` | Procedures para gerenciamento partições REVINFO (add/drop) | Monthly job / Manual |
-
-### 3.3 Undo Migrations (U__)
-
-| Undo Script | Corresponds To | Strategy |
-| :--- | :--- | :--- |
-| `U1.0.0__rollback_init_schema.sql` | V1.0.0 | `DROP TABLE ... CASCADE` (dev/staging only) |
-| `U1.1.0__rollback_assets.sql` | V1.1.0 | `DROP TABLE ativo_detalhe_hardware, disco, memoria, adaptador_rede, ativo CASCADE` |
-| `U1.2.0__rollback_maintenance.sql` | V1.2.0 | `DROP TABLE solicitacao_manutencao, manutencao_preventiva CASCADE` |
-| `U1.3.0__rollback_predictive.sql` | V1.3.0 | `DROP TABLE health_check, previsao_falha CASCADE` |
-| `U1.4.0__rollback_security.sql` | V1.4.0 | `DROP TABLE role_permission_context, permission, role, refresh_token CASCADE` |
-| `U1.5.0__rollback_lgpd.sql` | V1.5.0 | `DROP TABLE consentimento CASCADE` |
-| `U1.6.0__rollback_audit.sql` | V1.6.0 | `DROP TABLE *_AUD, revisao_info CASCADE` (careful: data loss) |
-| `U1.7.0__rollback_integrity.sql` | V1.7.0 | `DROP TABLE integridade_checksum CASCADE` |
-
-> **Nota:** Undo scripts **apenas para dev/staging**. Em produção, usar PITR (Point-in-Time Recovery) + Restore.
+| `TechnicalID` (UUID) | `uuid` (gen_random_uuid) | `RAW(16)` / `SYS_GUID()` | `UNIQUEIDENTIFIER` (NEWID/NEWSEQUENTIALID) | `CHAR(36)` / `BINARY(16)` | Requer extensão `uuid-ossp` ou `pgcrypto` no PG |
+| `BusinessID` / `BusinessCode` | `VARCHAR(n)` | `VARCHAR2(n)` | `NVARCHAR(n)` | `VARCHAR(n)` | — |
+| `SerialNumber` | `VARCHAR(n)` | `VARCHAR2(n)` | `NVARCHAR(n)` | `VARCHAR(n)` | — |
+| `Name` / `Title` / `Description` / `String` / `Address` / `City` / `StateCode` / `ZipCode` / `Phone` / `UserAgent` | `VARCHAR(n)` / `TEXT` | `VARCHAR2(n)` / `CLOB` | `NVARCHAR(n)` / `NVARCHAR(MAX)` | `VARCHAR(n)` / `TEXT` | TEXT/CLOB para > 4000 chars |
+| `ForeignKey` | `uuid` | `RAW(16)` | `UNIQUEIDENTIFIER` | `CHAR(36)` | Mesmo tipo do PK referenciado |
+| `LocalDate` | `DATE` | `DATE` | `DATE` | `DATE` | — |
+| `Instant` (TIMESTAMP WITH TIME ZONE) | `TIMESTAMPTZ` | `TIMESTAMP WITH TIME ZONE` | `DATETIMEOFFSET` | `TIMESTAMP(6)` | MySQL não tem TZ nativo — armazenar UTC + coluna tz separada ou usar `DATETIME(6)` UTC |
+| `Money` / `DecimalRate` / `Percentage` | `NUMERIC(p,s)` | `NUMBER(p,s)` | `DECIMAL(p,s)` | `DECIMAL(p,s)` | Precisão fixa obrigatória para financeiro |
+| `PositiveInteger` / `Counter` | `INTEGER` + `CHECK (>0)` | `NUMBER(10)` + `CHECK` | `INT` + `CHECK` | `INT` + `CHECK` | — |
+| `BooleanFlag` | `BOOLEAN` | `NUMBER(1)` (0/1) | `BIT` | `BOOLEAN` / `TINYINT(1)` | Oracle/MySQL não têm BOOLEAN nativo verdadeiro |
+| `StatusAtivo` / `CondicaoAtivo` / `TipoManutencao` / `StatusManutencao` / `Prioridade` / `TipoAlerta` / `Severidade` / `StatusAlerta` / `CategoriaAtivo` / `TipoDisco` / `TipoAdaptadorRede` / `AuditAction` | **Ver ENUM-001** | **Ver ENUM-001** | **Ver ENUM-001** | **Ver ENUM-001** | Decisão única para todos os 15 enums lógicos |
+| `JSONMetadata` / `JSONSnapshot` | `JSONB` | `JSON` (21c+) / `BLOB` + `IS JSON` | `NVARCHAR(MAX)` + `ISJSON` | `JSON` | PG: JSONB (binário, indexável); outros: validar suporte |
+| `MACAddress` | `MACADDR` / `MACADDR8` | `VARCHAR(17)` + `CHECK REGEXP` | `VARCHAR(17)` + `CHECK` | `VARCHAR(17)` + `CHECK` | PG nativo valida formato; outros via CHECK |
+| `InetAddress` (IPv4/IPv6) | `INET` / `CIDR` | `VARCHAR(45)` + `CHECK` | `VARCHAR(45)` + `CHECK` | `VARCHAR(45)` + `CHECK` | PG nativo suporta operações de rede |
+| `CPF` / `CNPJ` | `VARCHAR(14/18)` + `CHECK` + function | `VARCHAR2` + `CHECK` + function | `NVARCHAR` + `CHECK` + function | `VARCHAR` + `CHECK` + function | Validação algorítmica via function (validar_cpf/validar_cnpj) |
+| `Email` | `VARCHAR(255)` + `CHECK` regex | `VARCHAR2(255)` + `CHECK` | `NVARCHAR(255)` + `CHECK` | `VARCHAR(255)` + `CHECK` | Regex básica; validação completa na app |
+| `PasswordHash` | `VARCHAR(255)` | `VARCHAR2(255)` | `NVARCHAR(255)` | `VARCHAR(255)` | Armazenar apenas hash (bcrypt/argon2) |
+| `CorrelationID` / `EntityID` | `uuid` | `RAW(16)` | `UNIQUEIDENTIFIER` | `CHAR(36)` | Mesmo que TechnicalID |
+| `HashChain` | `CHAR(64)` | `CHAR(64)` | `CHAR(64)` | `CHAR(64)` | SHA-256 hex (64 chars) |
+| `ResourceName` / `ActionName` | `VARCHAR(50/100)` | `VARCHAR2` | `NVARCHAR` | `VARCHAR` | — |
 
 ---
 
-## 4. Migration Execution Plan (Per Environment)
+## Apêndice: Ordem de Criação (Respeitando Dependências FK)
 
-### 4.1 Development (Auto)
+```text
+-- Nível 0: Sem dependências (tabelas de referência puras)
+1. filial
+2. tipo_ativo
+3. role
+4. permissao
+5. fornecedor
 
-```bash
-# Local dev (TestContainers ou Docker Compose)
-./mvnw flyway:migrate -Dflyway.configFiles=flyway-dev.conf
-# Ou via Spring Boot auto-migration (spring.flyway.enabled=true)
-```
+-- Nível 1: Dependem apenas do Nível 0
+6. departamento      (FK → filial)
+7. localizacao       (FK → filial)
+8. usuario           (FK → usuario [created_by/updated_by] — auto-referência; FK → funcionario [opcional])
+9. funcionario       (FK → filial, departamento, usuario [created_by/updated_by])
 
-### 4.2 CI/Test (TestContainers)
+-- Nível 2: Dependem do Nível 1
+10. ativo            (FK → tipo_ativo, filial, departamento, localizacao, fornecedor, funcionario, usuario [created_by/updated_by])
+11. usuario_role     (FK → usuario, role, usuario [concedido_por])
+12. role_permissao   (FK → role, permissao, usuario [concedido_por])
 
-```yaml
-# .github/workflows/ci.yml
-- name: Run Flyway Migrations
-  run: |
-    ./mvnw flyway:migrate -Dflyway.configFiles=flyway-test.conf
-    ./mvnw flyway:validate
-  env:
-    MYSQL_HOST: localhost
-    MYSQL_PORT: 3306
-    MYSQL_DATABASE: aegis1_test
-```
+-- Nível 3: Dependem do Nível 2
+13. manutencao       (FK → ativo, fornecedor, funcionario, usuario [aprovador, created_by, updated_by])
+14. alerta           (FK → ativo, usuario [leitura, resolucao])
+15. ativo_detalhe_hardware (FK → ativo [UNIQUE 1:1])
 
-### 4.3 Staging (Auto + Validation)
+-- Nível 4: Dependem do Nível 3
+16. adaptador_rede   (FK → ativo_detalhe_hardware [ON DELETE CASCADE])
+17. disco            (FK → ativo_detalhe_hardware [ON DELETE CASCADE])
+18. memoria          (FK → ativo_detalhe_hardware [ON DELETE CASCADE])
 
-```bash
-# ArgoCD sync staging overlay → Flyway migrate automático
-# Pós-deploy validation:
-./mvnw flyway:validate -Dflyway.configFiles=flyway-staging.conf
-# Smoke test: ./mvnw test -Dtest=*ControllerIT
-```
+-- Nível 5: Auditoria (depende de usuario, mas pode ser criada por último)
+19. auditoria        (FK → usuario)
 
-### 4.4 Production (Manual + Approval)
-
-```bash
-# 1. Pre-deploy validation
-./mvnw flyway:validate -Dflyway.configFiles=flyway-prod.conf
-./mvnw flyway:info -Dflyway.configFiles=flyfly-prod.conf
-
-# 2. Manual approval (ArgoCD UI ou CLI)
-argocd app sync aegis1-prod --prune --flyway-migrate
-
-# 3. Post-deploy validation
-curl -f https://api.aegis1.empresa.com/actuator/health/liveness
-./mvnw test -Dtest=*ControllerIT -Dflyway.configFiles=flyway-prod.conf
-```
-
-### 4.4 Rollback Production
-
-```bash
-# Opção 1: ArgoCD Rollback (preferido - < 2 min)
-argocd app rollback aegis1-prod <revision-anterior>
-
-# Opção 2: Flyway Undo (apenas se undo script testado e seguro)
-./mvnw flyway:undo -Dflyway.configFiles=flyway-prod.conf -Dflyway.target=1.7.0
-
-# Opção 3: PITR (Point-in-Time Recovery) - Last resort
-aws rds restore-db-instance-to-point-in-time \
-  --source-db-instance-identifier aegis1-prod-primary \
-  --target-db-instance-identifier aegis1-prod-restored \
-  --restore-time 2025-01-15T14:30:00.000Z
+-- Objetos dependentes (criar após tabelas)
+20. Functions (5)
+21. Triggers (6)
+22. Indexes (35) — podem ser criados após tabelas + dados de seed para estatísticas
+23. Views (4)
+24. Materialized View (1) — refrescar após seed de manutencao
 ```
 
 ---
 
-## 5. Data Migration Patterns (Expand → Migrate → Contract)
-
-### 5.1 Adding Column (Nullable → Not Null)
+## Apêndice: Scripts de Validação Pós-Migração (Exemplos)
 
 ```sql
--- 1. EXPAND: Add nullable column
-ALTER TABLE ativo ADD COLUMN nova_coluna VARCHAR(100) NULL;
+-- 1. Verificar contagem de objetos criados
+SELECT 
+  (SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE') AS tables,
+  (SELECT count(*) FROM information_schema.table_constraints WHERE constraint_type = 'FOREIGN KEY' AND table_schema = 'public') AS fks,
+  (SELECT count(*) FROM information_schema.table_constraints WHERE constraint_type IN ('UNIQUE','CHECK') AND table_schema = 'public') AS constraints,
+  (SELECT count(*) FROM pg_indexes WHERE schemaname = 'public') AS indexes,
+  (SELECT count(*) FROM information_schema.views WHERE table_schema = 'public') AS views,
+  (SELECT count(*) FROM information_schema.routines WHERE routine_schema = 'public') AS functions;
 
--- 2. MIGRATE: Backfill data (batched)
-UPDATE ativo SET nova_coluna = 'default' WHERE nova_coluna IS NULL;
--- Batch: UPDATE ativo SET nova_coluna = 'default' WHERE nova_coluna IS NULL LIMIT 10000;
+-- 2. Verificar integridade da hash chain (amostragem)
+WITH chain AS (
+  SELECT 
+    correlation_id,
+    data_hora,
+    hash_encadeado,
+    LAG(hash_encadeado) OVER (PARTITION BY correlation_id ORDER BY data_hora) AS prev_hash,
+    valores_anteriores,
+    valores_novos,
+    metadados
+  FROM auditoria
+  WHERE correlation_id IS NOT NULL
+)
+SELECT correlation_id, count(*) AS breaks
+FROM chain
+WHERE prev_hash IS NOT NULL
+  AND hash_encadeado <> calcular_hash_encadeado_auditoria(prev_hash, 
+       jsonb_build_object('old', valores_anteriores, 'new', valores_novos, 'meta', metadados))
+GROUP BY correlation_id
+HAVING count(*) > 0;
 
--- 3. CONTRACT: Add NOT NULL constraint
-ALTER TABLE ativo MODIFY COLUMN nova_coluna VARCHAR(100) NOT NULL;
-```
+-- 3. Verificar uso de índices nas queries críticas (exemplo INDEX-010)
+EXPLAIN ANALYZE
+SELECT * FROM manutencao 
+WHERE ativo_id = 'uuid-exemplo' 
+  AND status = 'EM_ANDAMENTO' 
+  AND tipo = 'CORRETIVA' 
+  AND data_abertura >= '2025-01-01'
+ORDER BY data_abertura DESC
+LIMIT 20;
 
-### 5.2 Adding Index (Online)
-
-```sql
--- Online DDL (MySQL 8.0+)
-ALTER TABLE ativo ADD INDEX idx_ativo_nova_coluna (nova_coluna) ALGORITHM=INPLACE, LOCK=NONE;
--- Verificar: SHOW PROCESSLIST; -- Deve mostrar "copy to tmp table" breve
-```
-
-### 5.3 Adding Foreign Key (Validated)
-
-```sql
--- 1. EXPAND: Add column nullable
-ALTER TABLE solicitacao_manutencao ADD COLUMN nova_fk_id BIGINT NULL;
-
--- 2. MIGRATE: Backfill + Validate
-UPDATE solicitacao_manutencao sm JOIN outra_tabela ot ON sm.campo = ot.campo SET sm.nova_fk_id = ot.id;
-
--- 3. CONTRACT: Add FK
-ALTER TABLE solicitacao_manutencao 
-  ADD CONSTRAINT fk_solicitacao_nova_fk 
-  FOREIGN KEY (nova_fk_id) REFERENCES outra_tabela(id) 
-  ON DELETE RESTRICT ON UPDATE CASCADE;
-```
-
-### 5.4 Enum Change (Safe)
-
-```sql
--- 1. EXPAND: Add new enum value (MySQL ENUM allows ALTER)
-ALTER TABLE solicitacao_manutencao MODIFY COLUMN estado ENUM('ABERTA','EM_ANDAMENTO','AGUARDANDO_APROVACAO','APROVADA','CONCLUIDA','CANCELADA','NOVO_ESTADO');
-
--- 2. MIGRATE: Update application code to handle new value
--- 3. CONTRACT: Remove old value if needed (rare)
-```
-
-### 5.5 Table Rename (Safe)
-
-```sql
--- 1. EXPAND: Create new table with new name (CTAS)
-CREATE TABLE nova_tabela AS SELECT * FROM antiga_tabela;
-
--- 2. MIGRATE: Sync triggers / CDC / Dual-write (application level)
--- 4. CONTRACT: Swap (RENAME TABLE antiga_tabela TO antiga_tabela_old, nova_tabela TO nova_tabela)
--- 5. CLEANUP: Drop old table after validation period
+-- 4. Verificar materialized view
+SELECT count(*) FROM vw_custo_manutencao_por_ativo;
+REFRESH MATERIALIZED VIEW CONCURRENTLY vw_custo_manutencao_por_ativo;
 ```
 
 ---
 
-## 6. Validation Gates (CI/CD Gates)
-
-| Gate | Command | Threshold | Fail Action |
-| :--- | :--- | :--- | :--- |
-| **Flyway Validate** | `./mvnw flyway:validate` | 0 errors | Block PR |
-| **Schema Diff** | `./mvnw flyway:info` + diff vs baseline | 0 unexpected changes | Block PR |
-| **Checksum Verification** | `flyway validate` (checksums) | 0 mismatches | Block PR |
-| **Migration Test** | `./mvnw test -Dtest=*MigrationIT` | 100% pass | Block PR |
-| **Data Integrity** | `IntegridadeChecksumService.verificar()` | 0 mismatches | Block Deploy |
-| **Performance Regression** | `EXPLAIN ANALYZE` critical queries | < 10% degradation | Block Deploy |
-| **Rollback Test** | `flyway undo` (staging) | Success | Block PR |
-
----
-
-## 6.1 CI Pipeline Integration
-
-```yaml
-# .github/workflows/db-migration.yml
-jobs:
-  flyway-validate:
-    runs-on: ubuntu-latest
-    services:
-      mysql:
-        image: mysql:8.0
-        env: { MYSQL_ROOT_PASSWORD: root, MYSQL_DATABASE: aegis1_test }
-        ports: [3306:3306]
-        options: --health-cmd="mysqladmin ping" --health-interval=10s
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with: { distribution: temurin, java-version: 21, cache: maven }
-      - run: ./mvnw flyway:validate -Dflyway.configFiles=flyway-test.conf
-      - run: ./mvnw flyway:migrate -Dflyway.configFiles=flyway-test.conf
-      - run: ./mvnw test -Dtest=*MigrationIT
-      - run: ./mvnw flyway:validate -Dflyway.configFiles=flyway-test.conf  # Post-migrate validate
-```
-
----
-
-## 7. Rollback Procedures
-
-### 7.1 Development/Staging (Flyway Undo)
-
-```bash
-# Undo last migration
-./mvnw flyway:undo -Dflyway.configFiles=flyway-dev.conf
-
-# Undo to specific version
-./mvnw flyway:undo -Dflyway.configFiles=flyway-dev.conf -Dflyway.target=1.5.0
-```
-
-### 7.2 Production (PITR - Point in Time Recovery)
-
-```bash
-# 1. Identify restore point (before failed migration)
-RESTORE_TIME="2025-01-15T14:30:00.000Z"
-
-# 2. Restore to new instance
-aws rds restore-db-instance-to-point-in-time \
-  --source-db-instance-identifier aegis1-prod-primary \
-  --target-db-instance-identifier aegis1-prod-restored \
-  --restore-time $RESTORE_TIME \
-  --db-instance-class db.r6g.xlarge \
-  --multi-az
-
-# 3. Update K8s Secret with new endpoint
-kubectl patch secret aegis1-db-secret -n aegis1-prod \
-  -p '{"stringData":{"MYSQL_HOST":"aegis1-prod-restored.xxxxxx.us-east-1.rds.amazonaws.com"}}'
-
-# 4. Restart backend pods
-kubectl rollout restart deployment/aegis1-backend -n aegis1-prod
-
-# 4. Verify
-curl -f https://api.aegis1.empresa.com/actuator/health/liveness
-```
-
-### 7.3 Emergency Rollback (Hotfix)
-
-```bash
-# 1. Create hotfix branch from main
-git checkout main && git pull
-git checkout -b hotfix/1.0.1-flyway-rollback
-
-# 2. Add undo migration (if safe) OR create compensating migration
-# Ex: V1.7.1__compensate_failed_migration.sql
-
-# 3. Fast-track CI (skip non-critical tests)
-# 4. Tag & Deploy
-git tag -s v1.0.1-hotfix.1 -m "Hotfix: Rollback migration V1.7.0"
-git push origin v1.0.1-hotfix.1
-argocd app sync aegis1-prod --prune
-```
-
----
-
-## 8. Monitoring & Alerting (Migration)
-
-### 8.1 Metrics (Prometheus)
-
-| Metric | Type | Description |
-| :--- | :--- | :--- |
-| `flyway_migrations_applied_total` | Counter | Total migrations applied |
-| `flyway_migrations_failed_total` | Counter | Failed migrations |
-| `flyway_migration_duration_seconds` | Histogram | Duration per migration |
-| `flyway_checksum_mismatch_total` | Counter | Checksum mismatches detected |
-| `flyway_lock_wait_seconds` | Histogram | Lock acquisition time |
-
-### 8.2 Alerts (Alertmanager)
-
-| Alert | Condition | Severity | Runbook |
-| :--- | :--- | :--- | :--- |
-| **FlywayMigrationFailed** | `flyway_migrations_failed_total > 0` | Critical | `runbooks/flyway-migration-failed.md` |
-| **FlywayChecksumMismatch** | `flyway_checksum_mismatch_total > 0` | Critical | `runbooks/flyway-checksum-mismatch.md` |
-| **FlywayLockTimeout** | `flyway_lock_wait_seconds > 300` | Warning | `runbooks/flyway-lock-timeout.md` |
-| **MigrationDurationHigh** | `flyway_migration_duration_seconds > 300` | Warning | `runbooks/flyway-slow-migration.md` |
-
----
-
-## 8. Rastreabilidade Migration Spec ↔ Artefatos
-
-| Migration Aspect | System Arch | Domain Model | Manifest | Schema Spec | Security Policies | Test Quality | Runbook |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Versioning** | §4 | `db-domain-model.md` | `db-manifest.md` | `db-schema-spec.md` | — | `FlywayMigrationIT` | `runbooks/flyway-migration-failed.md` |
-| **Multi-tenancy Migrations** | §7.3 | `db-domain-model.md` | `db-manifest.md` | `db-schema-spec.md` | §2.1 | `MultiTenancyIT` | `runbooks/cross-tenant-leak.md` |
-| **Auditoria Envers** | §6 | `db-domain-model.md` | `db-manifest.md` | `db-schema-spec.md` | §3.3 | `AuditoriaControllerIT` | `runbooks/audit-tamper.md` |
-| **LGPD Migrations** | §7.3 | `db-domain-model.md` | `db-manifest.md` | `db-schema-spec.md` | §3.3 | `LgpdServiceTest` | — |
-| **Performance Migrations** | §8 | — | `db-manifest.md` | `db-schema-spec.md` | — | `PerformanceTest` | `runbooks/db-performance.md` |
-| **Rollback/Recovery** | §10 | — | `db-manifest.md` | — | §6 | `RestoreTest` | `runbooks/dr-failover.md`, `runbooks/flyway-repair.md` |
-| **Security Migrations** | §10 | — | `db-manifest.md` | `db-schema-spec.md` | §6 | `SecurityConfigIT` | `runbooks/tls-cert-renewal.md` |
-
----
-
-*Documento regenerado completamente com base em análise AST completa do backend Java (Flyway, JPA Entities, Envers, Multi-tenancy, LGPD, Security, Performance). Substitui versão 1.0 que afirmava "sem migrações - frontend sem banco".*
+> **Nota:** A execução real (SQL, rollback automático, checagem contra banco efêmero) depende de um motor determinístico de execução/validação — este documento é o contrato e o registro, não o executor. Ver limitações em [[db-readme]].

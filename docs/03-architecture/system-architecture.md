@@ -1,708 +1,273 @@
-# System Architecture Document (SAD) — Aegis1
+# System Architecture Document (SAD) — Aegis Patrimônio
 
-> **Versão:** 2.0 · **Owner:** Arquitetura/Eng Lead · **Status:** Draft
-> **Base:** BRD v2.0 + NFR v2.0 + Use Cases v2.0 + Análise AST Java Completa
-> **ADRs Relacionadas:** `docs/03-architecture/adr.md` (Fuzzy Search, Aegis Shield, Preditiva, Multi-tenancy, Auditoria)
-
----
+> **Versão:** 1.0 · **Owner:** Arquitetura/Eng Lead · **Status:** Draft
+> **ADRs relacionadas:** [Pendentes — a serem formalizadas na Sprint 0]
 
 ## 1. Overview & Goals
 
-O **Aegis1** é uma plataforma **full-stack** de gestão patrimonial e manutenção de ativos, composta por:
+O **Aegis Patrimônio** é uma aplicação web server-side para gestão de ativos patrimoniais, manutenções, health checks e alertas de recursos, com requisitos de auditoria (LGPD/SOX), RBAC estrito e trilha de auditoria imutável. A arquitetura atual é um **monolito modular Java (Spring Boot implícito)** servindo API REST e assets estáticos do frontend JavaScript (Vanilla JS + @popperjs/core), com persistência em banco relacional via SQL cru (sem ORM).
 
-- **Backend:** Java 21, Spring Boot 3.3, Spring Data JPA, Spring Security, Hibernate Envers, Lombok, Maven, MySQL 8.0, Flyway, TestContainers
-- **Frontend:** Vue 3, Bootstrap 5, Pinia, Vite, PWA (Service Worker, Web App Manifest)
-- **Infra:** Docker, Docker Compose, Kubernetes (manifests), GitHub Actions CI/CD
+**Objetivos arquiteturais principais** (derivados dos NFRs):
+- Latência de API ≤ 500 ms (p95) sob 100 usuários concorrentes, escalando verticalmente para 400 usuários com degradação ≤ 10%.
+- Disponibilidade 99,5% (SLA) / 99,9% (SLO) com RTO ≤ 4 h e RPO ≤ 24 h via backup diário + read-replica.
+- Segurança: JWT stateless (expiração ≤ 1 h), TLS 1.2+, criptografia AES-256 em repouso, logs de auditoria WORM.
+- Observabilidade: logs JSON estruturados, métricas Prometheus via Actuator, tracing OpenTelemetry.
+- Manutenibilidade: complexidade ciclomática ≤ 10 (refatorar 5 métodos críticos), cobertura ≥ 80% novo código, zero `console.*`/stubs em produção.
+- Custo: ≤ R$ 2,00/mês por ativo gerenciado (compute, DB, storage, backup, monitoramento, rede).
 
-**Objetivos Arquiteturais Principais (derivados do NFR v2.0):**
+## 2. Tech Stack Justification
 
-| Atributo | Meta | Referência NFR |
-| :--- | :--- | :--- |
-| **Performance Backend** | Latência P95 `/api/v1/**` ≤ 500 ms; Busca Fuzzy P95 ≤ 300 ms (100k ativos); Preditiva batch 10k ativos ≤ 5 min | NFR-P01, P02, P03 |
-| **Performance Frontend** | TTI ≤ 3,5s (4G) / ≤ 2s (desktop); Bundle gzipped ≤ 150 kB; Latência P95 request ≤ 800 ms | NFR-P06, P07, P08 |
-| **Escalabilidade** | Backend HPA K8s para 200 req/s picos; Multi-tenancy 100 filiais sem degradação linear; CDN 500 users concorrentes | NFR-S01, S02, S03 |
-| **Disponibilidade** | Frontend 99,9% (CDN); Backend RTO ≤ 30 min (K8s rollback); RPO ≤ 1 min (MySQL binlog); Health checks K8s probes | NFR-A01, A02, A03, A05 |
-| **Segurança** | TLS 1.3 + HSTS; JWT RS256 + Refresh HttpOnly Cookie; RBAC Granular Aegis Shield; Multi-tenancy query-level; Auditoria Envers 100% entidades; Zero console.* prod; CSP + Rate Limiting + OWASP Dep Check | NFR-SEC01 a SEC10 |
-| **Observabilidade** | Prometheus/Grafana Golden Signals + Business KPIs; Alertmanager rules; Tracing trace-id 100% mutações; Logs JSON correlation ID; Frontend Core Web Vitals RUM | NFR-O01 a O05 |
-| **Manutenibilidade** | Ciclomática ≤ 10; Coverage ≥ 80% gate CI; Checkstyle/SpotBugs/PMD + ESLint/Prettier/TS Strict; OpenAPI 3.1 + Contract Tests; ADRs + C4 versionados | NFR-M01 a M05 |
-| **Compliance** | LGPD (esquecimento + portabilidade + consentimento); NR-10/12 (termo assinado + checklist); ISO 27001/SOC 2 (auditoria + logs + pen test); Retenção auditoria 7 anos | NFR-C01 a C05 |
-| **Custo** | Frontend CDN ≤ $30/mês; Backend K8s 3 nodes ≈ $400/mês; MySQL RDS ≈ $300/mês; Redis ≈ $50/mês | NFR-CO01 a CO04 |
-
----
-
-## 2. Tech Stack Justification (Atualizado com Backend Real)
-
-| Camada | Tecnologia | Versão | Justificativa |
+| Camada | Tecnologia Escolhida | Alternativas Consideradas | Justificativa Resumida |
 | :--- | :--- | :--- | :--- |
-| **Language/Backend** | **Java** | 21 LTS | LTS longo (até 2031); Virtual Threads (preview→stable), Pattern Matching, Records, Sealed Classes — ideal para domain modeling rico |
-| **Framework Backend** | **Spring Boot** | 3.3.x | Jakarta EE 10, Spring 6, GraalVM native ready, Observability nativa (Micrometer), Security 6, Data JPA 3 |
-| **ORM/Persistência** | **Spring Data JPA / Hibernate** | 6.4+ | Entity mapping rico, Envers auditoria nativa, Specifications/QueryDSL para queries dinâmicas, Hibernate Filter multi-tenancy |
-| **Banco de Dados** | **MySQL** | 8.0 | JSON support, CTEs, Window Functions, Trigram indexes (pg_trgm via plugin), Mature, Cloud-managed (RDS/Cloud SQL) |
-| **Migrações** | **Flyway** | 10+ | Versionamento SQL, Baseline, Callbacks, Repeatable, TestContainers integration |
-| **Segurança** | **Spring Security** | 6.2+ | JWT, OAuth2, Method Security (SpEL), Filter Chain, TestSupport |
-| **Auditoria** | **Hibernate Envers** | 6.4+ | Automatic entity versioning, RevisionListener, Query API, Conditional auditing |
-| **Build/Dependency** | **Maven** | 3.9+ | Wrapper, Profiles, Enforcer, Dependency Check, Surefire/Failsafe |
-| **Testes Integração** | **TestContainers** | 1.19+ | MySQL real, Redis, Kafka; Reuso containers (`.testcontainers.properties`); Parallel execution |
-| **Language/Frontend** | **TypeScript** | 5.3+ | Strict mode, Type-safe API client (OpenAPI generated), Vue 3 Composition API |
-| **Framework Frontend** | **Vue** | 3.4+ | Composition API, `<script setup>`, Pinia, Vite, PWA Plugin |
-| **UI Library** | **Bootstrap** | 5.3+ | CSS-only (sem JS runtime), RTL, Acessível, Customizável via Sass |
-| **State Management** | **Pinia** | 2.1+ | Type-safe, DevTools, Modular, SSR-ready |
-| **Build/Bundler** | **Vite** | 5+ | ESM nativo, HMR rápido, Code-splitting automático, PWA plugin |
-| **PWA** | **Vite PWA Plugin** (Workbox) | 0.19+ | Service Worker, Manifest, Offline-first, Push, Background Sync |
-| **Containerização** | **Docker** | 24+ | Multi-stage builds, Distroless base, SBOM (Syft), Sign (Cosign) |
-| **Orquestração** | **Kubernetes** | 1.28+ | HPA, PodDisruptionBudget, NetworkPolicy, CSI, External Secrets |
-| **CI/CD** | **GitHub Actions** | — | Matrix builds, TestContainers, Security scans, Contract tests, Deploy K8s (Helm/Kustomize) |
-| **Observabilidade** | **Prometheus + Grafana + Alertmanager + Tempo/Loki** | — | Metrics, Logs, Traces unificados; OpenTelemetry SDK |
+| **Language/Runtime (Backend)** | Java 17+ (implícito por Spring Boot Actuator/Eclipse Temurin 17 JRE citado no NFR-PO02) | Kotlin, Node.js, Go | Base de código existente (333 arquivos .java); ecossistema Spring maduro para requisitos enterprise (Actuator, Security, Batch, JPA/Hibernate opcional). |
+| **Framework Web (Backend)** | Spring Boot 3.x (implícito por referências a `/actuator/*`, `HikariCP`, `SpringDoc` nos NFRs) | Quarkus, Micronaut, Jakarta EE | Stack corporativa padrão; Actuator nativo para health/metrics; integração nativa com Spring Security (JWT), SpringDoc (OpenAPI), Spring Batch (jobs como `AlertNotificationService`). |
+| **Language/Runtime (Frontend)** | JavaScript (ES2022+) — Vanilla JS (15 arquivos em `frontend/src/`) | TypeScript, React, Vue, Angular | Código legado já existente; baixo acoplamento; @popperjs/core já em uso para tooltips/dropdowns. Migração para TS/React é dívida técnica planejada (NFR-M01). |
+| **UI Library / Components** | @popperjs/core ^2.11.8 (única dependência `package.json`) | Bootstrap, Material UI, Tailwind | Requisito leve de posicionamento (tooltips, dropdowns); evita bundle pesado; compatível com NFR-U03 (responsivo 320–1920px). |
+| **Banco de Dados** | **Não definido** — motor relacional a confirmar (PostgreSQL, Oracle, SQL Server, MySQL?) | — | **Gap crítico**: NFR-S03, NFR-A03, NFR-PO02, NFR-CO01 dependem desta decisão. Ação: confirmar com DBA/Infra na Sprint 0. |
+| **ORM / Data Access** | SQL cru / JPA nativo (sem ORM identificado; NFR-CO02 cita "raw SQL / JPA nativo") | Hibernate/JPA completo, jOOQ, MyBatis | Diagnóstico: "nenhum ORM/query builder encontrado — provavelmente SQL cru". NFR-CO02 exige otimização manual de queries e índices compostos alinhados a `ManutencaoSpecification.build`. |
+| **Connection Pool** | HikariCP (padrão Spring Boot, citado em NFR-S03) | Tomcat JDBC, Vibur | Default Spring Boot; configurável para 500 conexões simultâneas (NFR-S03). |
+| **Mensageria / Filas** | **Não identificado** — jobs agendados via Spring `@Scheduled` / `TaskScheduler` (NFR-O02 cita "serviço de agendamento de health checks") | RabbitMQ, Kafka, AWS SQS, Redis Streams | Monolito atual não demanda mensageria distribuída; jobs internos (`checkResourceUsageAlerts`, `updateHealthCheck`) rodam in-process. Futuro: avaliar se desacoplamento de alertas/notificações justifica broker. |
+| **Cache** | **Não configurado** — inferido: Caffeine (local) ou Redis (se read-replica) | Ehcache, Hazelcast, Redis Cluster | NFR-S01 (vertical scaling) e NFR-A04 (read-replica para relatórios) sugerem cache local para consultas frequentes (`custoTotalPorAtivo`). [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] |
+| **Build / Packaging** | Maven ou Gradle (não detectado no diagnóstico; NFR-PO02 cita Docker com Eclipse Temurin 17 JRE) | — | Ausência de `pom.xml`/`build.gradle` no diagnóstico (apenas `package.json` do frontend). Ação: verificar repositório raiz. |
+| **Containerização** | Docker (imagem base Eclipse Temurin 17 JRE — NFR-PO02) | Jib, Buildpacks, VM nativa | NFR-PO02 prevê deploy em container Docker ou VM Linux. |
+| **Infraestrutura / Cloud** | **Não definido** — VM Linux (Ubuntu 22.04 LTS / RHEL 9) ou container Docker (NFR-PO02) | Kubernetes, AWS ECS/Fargate, Azure Container Apps, Google Cloud Run | NFR-S01: "Não há suporte a auto-scaling horizontal, clustering ou sharding na stack atual". Escalabilidade é vertical. Ação: definir com DevOps/Infra na Sprint 0. |
+| **Observabilidade Stack** | **Não definido** — NFR-O01/O03/O04 citam Prometheus/Grafana, Alertmanager, OpenTelemetry Java Agent | Datadog, New Relic, Elastic Stack, Loki/Tempo | Ação: definir na Sprint 0. |
+| **Secret Management** | **Não provisionado** — NFR-SEC04 cita HashiCorp Vault / AWS Secrets Manager | Azure Key Vault, GCP Secret Manager, Sealed Secrets | Requer provisionamento (NFR-SEC04: rotação a cada 90 dias). |
+| **CI/CD** | **Não detectado** — NFR-M03/M04/M05 exigem pipeline com validações (OpenAPI breaking changes, console.*, stubs) | GitHub Actions, GitLab CI, Jenkins, Azure DevOps | Ação: implementar pipeline na Sprint 0. |
 
----
+## 3. High-Level Architecture
 
-## 3. High-Level Architecture (C4 Level 1 — Context)
+A aplicação segue um **monolito modular** implantado como unidade única (JAR/WAR ou container Docker). O backend Spring Boot expõe endpoints REST consumidos pelo frontend servido como arquivos estáticos (ou via CDN/Nginx — NFR-PO03). Jobs de background (`AlertNotificationService.checkResourceUsageAlerts`, `updateHealthCheck`) executam no mesmo processo via `TaskScheduler`. Persistência em banco relacional único (primário) com **read-replica** para relatórios analíticos e health checks (NFR-A04). Logs de auditoria gravados em storage WORM separado (NFR-SEC05, NFR-C02).
+
+### Componentes
+
+| Componente | Responsabilidade | Tecnologia | Escala Independente? |
+| :--- | :--- | :--- | :--- |
+| **Web/API Module** | Endpoints REST (CRUD ativos, manutenções, health checks, alertas, autenticação, auditoria), serve frontend estático | Spring Boot 3.x (Spring MVC, Spring Security, SpringDoc) | Não (monolito) |
+| **Domain Services** | Regras de negócio: `AtivoService`, `ManutencaoService`, `AlertNotificationService`, `HealthCheckService`, `AuditoriaService` | Java (Spring `@Service`) | Não |
+| **Scheduler / Jobs** | Execução periódica: `checkResourceUsageAlerts` (≤30s p/ 12k ativos — NFR-P04), `updateHealthCheck` | Spring `TaskScheduler` / `@Scheduled` | Não |
+| **Data Access Layer** | Repositories + Specifications (`ManutencaoSpecification.build`), SQL cru / JPA nativo, HikariCP pool (500 conn — NFR-S03) | Spring Data JPA (parcial) + `@Query` nativas / `JdbcTemplate` | Não |
+| **Frontend (Static Assets)** | SPA Vanilla JS: login, dashboard, cadastro ativo, solicitação manutenção, alertas; usa @popperjs/core para overlays | JavaScript ES2022, @popperjs/core ^2.11.8, Vite/Webpack (build — NFR-PO03) | Não (servido pelo backend ou CDN) |
+| **Primary Database** | Persistência transacional: Ativos, Manutenções, HealthChecks, Usuários, Auditoria, Configurações | **Motor a definir** (PostgreSQL/Oracle/SQL Server/MySQL) | Vertical (mais vCPU/RAM); read-replica para leitura |
+| **Read Replica** | Consultas analíticas (`custoTotalPorAtivo`), health checks de leitura, offload de relatórios | Mesmo motor do primário (replicação nativa) | Sim (escala de leitura independente) |
+| **WORM Audit Storage** | Logs de auditoria imutáveis (append-only) para operações de escrita (BR-02) | Object storage (S3/MinIO/GCS) com Object Lock / Glacier Vault Lock | Sim (escrita sequencial, leitura rara) |
+| **Observability Stack** | Coleta logs JSON, métricas Prometheus, traces OpenTelemetry, alertas | **A definir** (Prometheus/Grafana/Alertmanager/Loki/Tempo — NFR-O01/O03/O04) | Sim (infra separada) |
+| **Identity Provider (Futuro)** | Autenticação corporativa, MFA para ADMIN, integração AD/LDAP/OIDC | **A definir** (Keycloak, Azure AD, Okta, AD FS — NFR-SEC02, BRD#7) | Sim (serviço externo) |
+
+## 4. Architectural Style & Patterns
+
+* **Estilo:** **Monolito modular** (single deployable unit) com separação lógica em camadas (Controller → Service → Repository → Domain) e módulos funcionais (Ativos, Manutenções, Alertas, Auditoria, Segurança). Não há microsserviços, serverless ou event-driven architecture na stack atual.
+* **Padrões aplicados:**
+  - **Repository Pattern** + **Specification Pattern** (`ManutencaoSpecification.build` — complexidade 14) para queries dinâmicas.
+  - **Mapper Pattern** (`AtivoMapper.toDTO` — complexidade 14) para conversão entidade↔DTO.
+  - **Scheduler Pattern** (Spring `TaskScheduler`) para jobs periódicos (`checkResourceUsageAlerts`, `updateHealthCheck`).
+  - **Stateless Authentication** (JWT — NFR-SEC02) com `SecurityFilterChain` Spring Security.
+  - **Audit Logging** (append-only, WORM) via `AuditoriaService` interceptando operações de escrita (BR-02).
+  - **Health Check Pattern** (`/actuator/health` — NFR-O02) com indicadores customizados (DB, disco, scheduler).
+* **Comunicação entre componentes:**
+  - **Síncrona (in-process):** Chamadas Java diretas entre Controllers, Services, Repositories.
+  - **Síncrona (HTTP/REST):** Frontend → Backend (API REST); Backend → Identity Provider (futuro, OIDC/SAML).
+  - **Assíncrona (in-process):** `@Async` / `TaskScheduler` para jobs longos (`checkResourceUsageAlerts`).
+  - **Sem mensageria distribuída** no estado atual.
+
+## 5. Data Modeling
+
+* **Motor de banco:** **Não definido** — ver *O que falta verificar* (Gap #1). NFRs assumem relacional com suporte a replicação (read-replica), prepared statements, WAL/log shipping, e índices compostos.
+* **Estratégia de particionamento/sharding:** **Não aplicável** no estado atual (monolito, instância única, vertical scaling — NFR-S01). Futuro: se volume de `HealthCheck`/`Manutencao` exceder capacidade vertical, avaliar particionamento por `ativo_id` + time-range (ex.: PostgreSQL `pg_partman`).
+* **Migração de schema:** **Não configurada** — ver `[[db-migration-spec]]` (a criar). Recomendado: Flyway ou Liquibase integrados ao Spring Boot (baseline + versioned migrations).
+* **Modelo conceitual:** Entidades principais — `Ativo`, `Manutencao`, `HealthCheck`, `Funcionario`, `Usuario`, `AuditoriaLog`, `Alerta`, `Configuracao`. Relacionamentos: Ativo 1:N Manutencao, Ativo 1:N HealthCheck, Usuario N:M Role (RBAC). Detalhes em `[[db-domain-model]]`.
+* **Contrato físico (tabelas, colunas, constraints, DDL):** Em `[[db-schema-spec]]` (a criar). Índices compostos críticos alinhados a `ManutencaoSpecification.build` filtros (NFR-CO02).
+
+## 6. Integration Boundaries & APIs
+
+| Integração | Tipo | Direção | Contrato | Criticidade |
+| :--- | :--- | :--- | :--- | :--- |
+| **Frontend ↔ Backend API** | REST/JSON | Inbound (Browser → App) | OpenAPI 3.0 (SpringDoc — NFR-M03) | **Alta** (única interface de usuário) |
+| **Identity Provider (OIDC/SAML/AD)** | OIDC / SAML 2.0 / LDAP | Outbound (App → IdP) | Metadata IdP / Discovery endpoint | **Alta** (NFR-SEC02: MFA obrigatório ADMIN; BRD#7 dependência externa) |
+| **Email / Notification Service** | SMTP / REST / Webhook | Outbound (App → SMTP/Provider) | Template-based (alertas, aprovações) | **Média** (BRD#5 In-Scope: Alertas) |
+| **WORM Audit Storage** | S3 API / S3-compatible | Outbound (App → Object Storage) | PutObject com Object Lock / Legal Hold | **Alta** (NFR-SEC05, NFR-C02: SOX 7 anos) |
+| **Observability Stack** | OTLP (gRPC/HTTP), Prometheus scrape | Outbound (App → Collector/Prometheus) | OpenTelemetry semantic conventions | **Alta** (NFR-O01/O03/O04) |
+| **Backup / Restore Tool** | Native DB tools / pgBackRest / RMAN / etc. | Outbound (Infra → DB) | Runbook documentado (NFR-A02: RTO ≤ 4h) | **Alta** (Disaster Recovery) |
+| **CI/CD Pipeline** | Webhook / API | Bidirecional (Pipeline ↔ Repo/Registry) | Pipeline definition (YAML) | **Média** (NFR-M03/M04/M05 validações) |
+
+## 7. Scalability & Performance Strategy
+
+* **Estratégia de escala:** **Vertical scaling only** (mais vCPU/RAM na instância única). NFR-S01: 400 usuários concorrentes com degradação ≤ 10% vs 100 usuários. **Não há** auto-scaling horizontal, clustering, sharding, Kubernetes ou orquestrador (NFR-S01 observação).
+* **Pontos de gargalo conhecidos (baseados no diagnóstico e NFRs):**
+  1. `AlertNotificationService.checkResourceUsageAlerts` (complexidade 17) — processar 12.000 ativos em ≤ 30s (NFR-P04). Risco: query N+1, loop sequencial, falta de batch/paralelismo.
+  2. `ManutencaoSpecification.build` (complexidade 14) — filtros dinâmicos podem gerar queries ineficientes; requer índices compostos (NFR-CO02).
+  3. `AtivoMapper.toDTO` (complexidade 14) — mapeamento rico pode impactar serialização de listas grandes.
+  4. `RealisticDataSeeder.run` (complexidade 15) — apenas impacto em ambiente de dev/test.
+  5. `api.js:request` (complexidade 13) — lógica de retry/interceptor no frontend; mover para camada dedicada.
+  6. **Connection pool saturation** — HikariCP 500 conexões (NFR-S03) pode exaurir sob 400 usuários + jobs + relatórios.
+  7. **Single writer database** — todas as escritas no primário; read-replica alivia apenas leituras analíticas.
+* **Estratégia de cache:** [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
+  - **L1 (Local/JVM):** Caffeine cache para `custoTotalPorAtivo` (TTL 5–15 min), configurações, lookup de roles/permissões. Invalidação por evento de escrita (`@CacheEvict` em services de escrita).
+  - **L2 (Distribuído — se read-replica):** Redis (se provisionado) para sessões JWT revogadas, rate limiting, cache de relatórios pesados. Não provisionado atualmente.
+  - **HTTP/Edge:** `Cache-Control` headers em assets estáticos (frontend); `ETag`/`Last-Modified` em endpoints GET idempotentes.
+  - **Database:** Query result cache nativo (se suportado pelo motor) para relatórios recorrentes.
+
+## 8. Reliability & Fault Tolerance
+
+* **Single points of failure identificados:**
+  1. **Instância única da aplicação** — falha de hardware/VM/container derruba todo o sistema (NFR-A04: risco "Single point of failure").
+  2. **Banco de dados primário único** — falha de disco/rede/instance indisponibiliza escritas e leituras transacionais. Mitigação: read-replica (promovível) + backup diário + runbook restore < 4h (NFR-A02).
+  3. **Scheduler in-process** — se a app reinicia, jobs (`checkResourceUsageAlerts`, `updateHealthCheck`) perdem execuções agendadas. Mitigação: agendador externo (cron/systemd/K8s CronJob) ou persistência de triggers (Quartz JDBC JobStore) — NFR-O02 cita "serviço de agendamento de health checks".
+  4. **WORM storage único** — se indisponível, auditoria para de gravar (violando NFR-SEC05). Mitigação: replicação cross-region do bucket.
+* **Estratégias de resiliência:**
+  - **Retry com backoff exponencial + jitter** em chamadas HTTP outbound (IdP, Email, WORM Storage, Observability) — `Resilience4j` ou `Spring Retry`.
+  - **Circuit Breaker** (Resilience4j) para chamadas a IdP e serviços de notificação (evita cascade failure).
+  - **Bulkhead** — isolar thread pools: `web` (requests HTTP), `scheduler` (jobs), `audit` (escrita WORM assíncrona).
+  - **Timeouts** configurados: HTTP client (connect 2s, read 10s), JDBC (query 30s, transaction 60s), job `checkResourceUsageAlerts` (hard limit 30s — NFR-P04).
+  - **Graceful shutdown** — Spring `GracefulShutdown` (timeout 30s) para drenar requests e finalizar jobs.
+* **Estratégia multi-região/multi-AZ:** **Não implementada** (monolito single-instance). NFR-A04 exige read-replica (pode estar em AZ diferente) e WORM storage replicado. Plano futuro: active-passive com DNS failover (RTO ≤ 4h).
+
+## 9. Security Architecture
+
+* **Boundary de rede:** [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
+  - **Premissa:** Deploy em VPC com subnets privadas (app, DB, WORM storage) e subnet pública (Load Balancer / Nginx / API Gateway).
+  - **App** só acessa DB (porta 5432/1521/1433/3306), WORM storage (HTTPS 443), IdP (HTTPS 443), Observability (HTTPS 443).
+  - **DB** sem acesso à internet; apenas app e ferramentas de admin (bastion/SSM).
+  - **WORM storage** com bucket policy deny `DeleteObject` sem `LegalHold` bypass; versioning + Object Lock habilitado.
+* **Controles de segurança implementados/previstos:**
+  - **Autenticação:** JWT stateless (HS256/RS256) — NFR-SEC02. Expiração access token ≤ 1h; refresh token rotation; `jti` para revogação (blocklist em cache/Redis).
+  - **Autorização:** RBAC estrito (BR-01) — roles `ADMIN`, `AUDITOR`, `GESTOR`, `OPERADOR`; `@PreAuthorize` em controllers/services; testes de acesso quebrado (NFR-SEC03).
+  - **Criptografia:** TLS 1.2+ (preferencial 1.3) em todas as conexões (NFR-SEC01). AES-256 em repouso no volume do DB (managed disk encryption / TDE). Chaves de criptografia/JWT rotacionadas a cada 90 dias via cofre (NFR-SEC04).
+  - **Proteção contra injeção:** Prepared statements / JPA Criteria / `@Query` com parâmetros bind (NFR-SEC03). **Stack usa SQL cru** — revisão de código obrigatória para concatenação de strings.
+  - **Validação de entrada:** Bean Validation (`@Valid`, constraints custom) + sanitização no frontend.
+  - **Auditoria imutável:** `AuditoriaService` grava em WORM storage (NFR-SEC05) para todas operações BR-02 (`criar`, `atualizar`, `deletar`, `aprovar`, `cancelar`, `concluir`, `iniciar`) com payload completo.
+  - **LGPD:** Endpoint administrativo "direito ao esquecimento" — exclusão lógica + anonimização em `Funcionario`, `Usuario`, `AuditoriaLog` (NFR-C01). Tag `LGPD_SENSITIVE` em ativos (NFR-C03).
+  - **Headers de segurança:** `Content-Security-Policy`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`.
+* **Referência:** Ver `security-policies.md` (a criar) para políticas detalhadas, matriz de roles/permissões, fluxo de rotação de segredos, plano de resposta a incidentes.
+
+## 10. Observability Architecture
+
+* **Logging centralizado:** [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
+  - **Formato:** JSON estruturado (NFR-O01) — campos: `timestamp` (ISO-8601 UTC), `level`, `traceId`, `spanId`, `service` (`aegis-patrimonio`), `message`, `context` (mapa chave-valor).
+  - **Destino:** stdout (container) → coletor (Fluent Bit / Vector / Promtail) → Loki / Elasticsearch / CloudWatch Logs.
+  - **Correlação:** `traceId`/`spanId` propagados via `MDC` (Logback) e cabeçalho `traceparent` (W3C TraceContext).
+  - **Auditoria logs:** duplicados para WORM storage (NFR-SEC05) via appender dedicado assíncrono.
+* **Métricas:**
+  - **Exposição:** `/actuator/prometheus` (NFR-O01) — JVM (memória, GC, threads), HTTP (latência, taxa, erros por endpoint), HikariCP (pool usage, wait time), Scheduler (job duration, success/failure), Cache (hit/miss/eviction).
+  - **Coleta:** Prometheus (scrape interval 15s) → armazenamento TSDB (Thanos/Cortex/Mimir para retenção longa) ou Grafana Cloud.
+  - **Dashboards:** Grafana — Golden Signals (Latency, Traffic, Errors, Saturation) por endpoint; business metrics (ativos ativos, manutenções abertas, alertas disparados).
+* **Tracing distribuído:**
+  - **Instrumentação:** OpenTelemetry Java Agent (auto-instrumentação Spring MVC, JDBC, HTTP Client, Quartz) — NFR-O03.
+  - **Propagação:** `traceparent` em 100% requisições HTTP inbound + chamadas JDBC + chamadas HTTP outbound.
+  - **Exportador:** OTLP/gRPC para Collector → Tempo / Jaeger / Zipkin / Grafana Cloud Traces.
+  - **Amostragem:** Tail-based (sempre exportar erros + latência > p95) + head-based 10% para requests normais.
+* **Alertas (NFR-O04):**
+  - Latência p95 API > 500ms por 5 min (NFR-P01)
+  - Taxa erro 5xx > 0,1% por 2 min
+  - CPU > 80% por 10 min
+  - Heap > 85% por 5 min
+  - Falha job `checkResourceUsageAlerts` (status ≠ SUCCESS)
+  - HikariCP pool usage > 90% por 5 min
+  - Disco > 85% (app + DB + WORM)
+  - Replicação DB lag > 60s
+  - Certificado TLS expira < 30 dias
+  - **Canais:** PagerDuty / Opsgenie / Slack / Email (on-call rotation).
+
+## 11. Deployment Topology
 
 ```mermaid
 graph TB
-    subgraph "Usuários"
-        U1[Gestor Patrimônio/Manutenção]
-        U2[Técnico Campo (PWA Mobile)]
-        U3[Aprovador/Supervisor]
-        U4[Admin Cadastros (Filial)]
-        U5[Admin Global]
-        U6[Auditor/Compliance/DPO]
+    subgraph "VPC - Região Primária"
+        subgraph "Subnet Pública (DMZ)"
+            LB[Load Balancer / Nginx / API Gateway\nTLS Termination\nWAF Opcional]
+        end
+        subgraph "Subnet Privada - App"
+            APP[Aegis Patrimônio Monolito\nSpring Boot + Static Frontend\nJava 17 / Eclipse Temurin\nContainer Docker ou VM]
+        end
+        subgraph "Subnet Privada - Data"
+            DB[(Primary Database\nMotor: TBD\nHikariCP 500 conn\nReplicação Síncrona/Assíncrona)]
+            REPLICA[(Read Replica\nRelatórios / Health Checks\nOffload Leituras)]
+            WORM[(WORM Object Storage\nS3/MinIO/GCS + Object Lock\nAuditoria + SOX 7 anos)]
+        end
+        subgraph "Subnet Privada - Observability"
+            OTEL[OpenTelemetry Collector]
+            PROM[Prometheus / Thanos]
+            GRAF[Grafana]
+            LOKI[Loki / Log Storage]
+            ALERT[Alertmanager]
+        end
+        subgraph "Subnet Privada - Security"
+            VAULT[Secret Manager\nVault / AWS Secrets Manager\nRotação 90 dias]
+            IDP[Identity Provider\nKeycloak / Azure AD / Okta\nMFA para ADMIN]
+        end
     end
 
-    subgraph "Frontend (Vue 3 PWA)"
-        FE[SPA + Service Worker\nCDN/Static Hosting\nTLS 1.3 + HSTS + CSP]
-    end
-
-    subgraph "Backend (Spring Boot 3.3)"
-        API[API REST /api/v1\nOpenAPI 3.1]
-        AUTH[Auth Server\nJWT RS256 + Refresh]
-        DOMAIN[Domain Services\nAtivos, Ordens, Preventiva, Preditiva, Busca, Auditoria]
-        SEC[Aegis Shield\nRBAC + Multi-tenancy]
-        SCHED[Schedulers\nPreventiva 15min\nPreditiva 02:00\nSLA Diário]
-    end
-
-    subgraph "Data Layer"
-        DB[(MySQL 8.0\nPrimary + Read Replicas)]
-        REDIS[(Redis Cluster\nCache + Session)]
-        STORAGE[(Object Storage\nPDFs, QR Codes, Anexos)]
-    end
-
-    subgraph "Observabilidade"
-        PROM[Prometheus\nMetrics]
-        GRAF[Grafana\nDashboards]
-        ALERT[Alertmanager\nAlerts]
-        TEMPO[Tempo/Jaeger\nTraces]
-        LOKI[Loki\nLogs JSON]
-        SENTRY[Sentry\nFrontend Errors]
-    end
-
-    subgraph "CI/CD & Infra"
-        GH[GitHub Actions\nBuild, Test, Scan, Deploy]
-        K8S[Kubernetes 1.28+\nHPA, PDB, NetPol]
-        VAULT[Secrets\nVault/SealedSecrets]
-    end
-
-    U1 --> FE
-    U2 --> FE
-    U3 --> FE
-    U4 --> FE
-    U5 --> FE
-    U6 --> FE
-
-    FE -->|HTTPS/REST + WebSocket| API
-    FE -->|HTTPS| AUTH
-
-    API --> DOMAIN
-    API --> SEC
-    AUTH --> SEC
-    DOMAIN --> DB
-    DOMAIN --> REDIS
-    DOMAIN --> STORAGE
-    SCHED --> DOMAIN
-
-    API --> PROM
-    DOMAIN --> PROM
-    SCHED --> PROM
-    FE --> SENTRY
-    FE -->|RUM| GRAF
-
-    PROM --> ALERT
-    PROM --> GRAF
-    API --> TEMPO
-    DOMAIN --> TEMPO
-    API --> LOKI
-    DOMAIN --> LOKI
-
-    GH --> K8S
-    GH --> VAULT
-    K8S --> API
-    K8S --> FE
+    LB -->|HTTPS / mTLS| APP
+    APP -->|JDBC / HikariCP| DB
+    APP -.->|JDBC ReadOnly| REPLICA
+    APP -->|S3 API + Object Lock| WORM
+    APP -->|OTLP gRPC| OTEL
+    APP -->|HTTPS| IDP
+    APP -->|HTTPS| VAULT
+    OTEL -->|Metrics| PROM
+    OTEL -->|Traces| TEMPO[Tempo / Jaeger]
+    OTEL -->|Logs| LOKI
+    PROM -->|Alert Rules| ALERT
+    ALERT -->|Notifications| PAGER[PagerDuty / Slack / Email]
+    GRAF -->|Query| PROM
+    GRAF -->|Query| LOKI
+    GRAF -->|Query| TEMPO
+    DB -.->|Replication| REPLICA
 ```
 
----
+**Notas de deploy:**
+- **Artefato:** Docker image `aegis-patrimonio:{{version}}` (base `eclipse-temurin:17-jre-alpine` ou `ubuntu:22.04` + JRE) — NFR-PO02.
+- **Configuração:** `application-{prod,staging,dev}.yml` + variáveis de ambiente / secrets (Spring Cloud Config / Vault / Kubernetes Secrets).
+- **Health checks:** `livenessProbe` → `/actuator/health/liveness`; `readinessProbe` → `/actuator/health/readiness` (inclui DB, scheduler, disco) — NFR-O02.
+- **Backup:** Snapshot diário do DB (NFR-A03: RPO ≤ 24h) + WAL/log shipping contínuo se suportado. Runbook de restore testado trimestralmente (NFR-A02: RTO ≤ 4h).
+- **Frontend build:** Vite/Webpack (NFR-PO03) gera assets em `src/main/resources/static` (Spring Boot) ou publicados em CDN (Nginx/CloudFront) com `Cache-Control: public, max-age=31536000, immutable` para assets com hash.
 
-## 4. Container Architecture (C4 Level 2 — Containers)
+## 12. Trade-offs & Known Limitations
 
-| Container | Tecnologia | Responsabilidades Principais | Escala | Comunicação |
-| :--- | :--- | :--- | :--- | :--- |
-| **CDN / Static Hosting** | S3+CloudFront / Azure SWA / Netlify | Entrega assets imutáveis (HTML/JS/CSS/WASM), Compressão Brotli, TLS 1.3, HSTS, CSP | Horizontal nativa CDN | HTTPS GET (Browser) |
-| **SPA (Browser)** | Vue 3 + Pinia + Vite PWA | Roteamento, Estado UI (Pinia), Camada API (Axios/Fetch + Interceptors), WebSocket/SSE, Service Worker (Offline, Push, Background Sync), QR Scanner (Barcode Detection API) | Client-side (por aba) | HTTPS/REST + WSS/SSE → Backend; HTTPS → CDN |
-| **API Gateway / Spring Cloud Gateway** | Spring Cloud Gateway 4.0 | Rate Limiting, CORS, Request/Response Transform, Circuit Breaker (Resilience4j), Auth Validation (JWT), Routing | Horizontal (K8s HPA) | HTTPS → Backend Services |
-| **Auth Service** | Spring Security 6 + JJWT | `/auth/login`, `/auth/refresh`, `/auth/me`; JWT RS256 (rotação chaves), Refresh Token HttpOnly Cookie; Integração Aegis Shield | Horizontal (stateless) | HTTPS (Frontend, Gateway) |
-| **Core Domain Services** | Spring Boot 3.3 (Modular Monolith) | **Ativos**: CRUD, Hardware, Depreciação, QR/PDF, Transferência, Baixa, TCO<br>**Ordens**: Corretiva/Preventiva/Preditiva, Estado Máquina, SLA, Custos, Evidências<br>**Preventiva**: Planos CRON, Scheduler Geração Auto, Aderência<br>**Preditiva**: Health Check, Regressão Linear (OLS), Previsão Falha, Ordem Auto<br>**Busca**: FuzzySearchService (Levenshtein), Índices Trigram, Redis Cache<br>**Cadastros**: Filial, Depto, Fornecedor, Funcionário, TipoAtivo (Multi-tenancy)<br>**Relatórios**: Termo PDF (FlyingSaucer), QR Code (ZXing), Etiquetas Lote, Compliance<br>**Auditoria**: Envers Query API, Diff, Export Assinado<br>**LGPD**: Anonimização, Portabilidade, Consentimento | Horizontal (K8s HPA, Read Replicas para queries) | JDBC → MySQL; Redis Cache; S3 → Storage; SMTP/FCM → Notificações |
-| **Scheduler Services** | Spring @Scheduled + Quartz | Preventiva (15min), Preditiva Batch (02:00), SLA Diário, Integridade Semanal (Dom 03:00) | Single Leader (K8s Lease Lock) | JDBC → MySQL; Domain Services |
-| **MySQL 8.0 Primary** | MySQL 8.0 (InnoDB) | Persistência transacional, Flyway Migrations, Trigram Indexes, Partitioning (auditoria), Read Replicas | Vertical + Read Replicas | JDBC (HikariCP) |
-| **Redis Cluster** | Redis 7 | Cache Busca Fuzzy (TTL 5min), Rate Limiting Counters, Session/Token Blacklist, Distributed Locks | Horizontal (Cluster Mode) | Redis Protocol |
-| **Object Storage** | S3 / MinIO / GCS | PDFs Termos, QR Codes, Anexos Fotográficos, Exports, Backups | Horizontal | S3 API (Presigned URLs) |
-| **Observability Stack** | Prometheus, Grafana, Alertmanager, Tempo, Loki, Sentry | Metrics, Dashboards, Alerts, Traces, Logs, Frontend Errors | Horizontal | OTLP/HTTP (OpenTelemetry) |
-
----
-
-## 5. Component Architecture (C4 Level 3 — Backend Modules)
-
-```mermaid
-graph TB
-    subgraph "aegis1-backend (Modular Monolith)"
-        direction TB
-        
-        subgraph "config"
-            SEC_CONFIG[SecurityConfig\nFilterChain, CORS, CSRF, MethodSecurity]
-            AUDIT_CONFIG[AuditoriaConfig\nEnvers RevisionListener]
-            MP_CONFIG[MultiTenancyConfig\nHibernate Filter, TenantContextHolder]
-            SCHED_CONFIG[SchedulerConfig\nTaskExecutor, Quartz]
-            OPEN_API[OpenApiConfig\nSpringDoc, Groups, SecuritySchemes]
-        end
-        
-        subgraph "security"
-            JWT_PROV[JwtTokenProvider\nRS256 Generate/Validate]
-            AEGIS[AegisShieldPermissionEvaluator\nRBAC Granular + Contexto]
-            MT_FILTER[MultiTenancyFilter\nTenantId → Hibernate Filter]
-            RATE_LIMIT[RateLimitFilter\nGateway/Filter]
-        end
-        
-        subgraph "domain/ativo"
-            ATIVO_SVC[AtivoService\nCRUD, Depreciação, Transferência, Baixa, TCO]
-            ATIVO_CTRL[AtivoController\nREST /api/v1/ativos]
-            HW_SVC[HardwareService\nDiscos, Memória, Rede CRUD]
-            HW_CTRL[HardwareController\nSub-recursos]
-            QR_GEN[QRCodeGenerator\nZXing SVG/PNG]
-            PDF_GEN[PdfGenerator\nFlyingSaucer Thymeleaf]
-        end
-        
-        subgraph "domain/ordem"
-            ORDEM_SVC[SolicitacaoManutencaoService\nCRUD, State Machine, Custos, Evidências]
-            ORDEM_CTRL[OrdemController\nREST /api/v1/ordens]
-            SLA_SVC[SlaSchedulerService\nDaily Job, Escalation]
-        end
-        
-        subgraph "domain/preventiva"
-            PREV_SVC[ManutencaoPreventivaService\nPlanos CRON, Geração Auto]
-            PREV_CTRL[PreventivaController\nREST /api/v1/preventivas]
-            PREV_SCHED[PreventivaScheduler\n@Scheduled 15min]
-        end
-        
-        subgraph "domain/preditiva"
-            PRED_SVC[ManutencaoPreditivaService\nRegressão Linear OLS, Previsão Falha]
-            HEALTH_SVC[HealthCheckService\nSMART Analysis, Score 0-100]
-            HEALTH_CTRL[HealthCheckController\nREST /api/v1/health-check]
-            PRED_SCHED[PreditivaScheduler\n@Scheduled 02:00]
-        end
-        
-        subgraph "domain/busca"
-            FUZZY_SVC[FuzzySearchService\nLevenshtein, Boost, Filtros]
-            LEVENSHTEIN[LevenshteinDistance\nAlgoritmo Otimizado]
-            BUSCA_CTRL[BuscaController\nREST /api/v1/busca]
-        end
-        
-        subgraph "domain/cadastro"
-            FILIAL_SVC[FilialService]
-            DEPTO_SVC[DepartamentoService]
-            FORN_SVC[FornecedorService]
-            FUNC_SVC[FuncionarioService + UsuarioProvisioning]
-            TIPO_SVC[TipoAtivoService]
-            CAD_CTRL[CadastroController\nREST /api/v1/filiais, /departamentos, ...]
-        end
-        
-        subgraph "domain/relatorio"
-            REL_SVC[RelatorioService\nCustoTotal, Aderência, Compliance]
-            REL_CTRL[RelatorioController\nREST /api/v1/relatorios]
-        end
-        
-        subgraph "domain/auditoria"
-            AUD_SVC[AuditoriaService\nEnvers Query, Diff, Export]
-            AUD_CTRL[AuditoriaController\nREST /api/v1/auditoria]
-        end
-        
-        subgraph "domain/seguranca"
-            USER_SVC[UsuarioService\nProvisioning, Roles, Filial]
-            ROLE_SVC[RoleService\nMatriz Permissions]
-            PERM_SVC[PermissionService]
-            ADMIN_CTRL[AdminController\nREST /api/v1/admin/*]
-        end
-        
-        subgraph "domain/lgpd"
-            LGPD_SVC[LgpdService\nAnonimização, Portabilidade, Consentimento]
-            LGPD_CTRL[LgpdController\nREST /api/v1/lgpd]
-        end
-    end
-    
-    DB[(MySQL 8.0\nFlyway Migrations)]
-    REDIS[(Redis\nCache, Rate Limit, Locks)]
-    STORAGE[(S3/MinIO\nPDFs, QR, Anexos)]
-    
-    ATIVO_SVC --> DB
-    HW_SVC --> DB
-    QR_GEN --> STORAGE
-    PDF_GEN --> STORAGE
-    ORDEM_SVC --> DB
-    SLA_SVC --> DB
-    PREV_SVC --> DB
-    PREV_SCHED --> PREV_SVC
-    PRED_SVC --> DB
-    HEALTH_SVC --> DB
-    PRED_SCHED --> PRED_SVC
-    FUZZY_SVC --> DB
-    FUZZY_SVC --> REDIS
-    LEVENSHTEIN --> FUZZY_SVC
-    CAD_CTRL --> DB
-    REL_SVC --> DB
-    REL_SVC --> STORAGE
-    AUD_SVC --> DB
-    USER_SVC --> DB
-    ROLE_SVC --> DB
-    LGPD_SVC --> DB
-    LGPD_SVC --> AUD_SVC
-    
-    SEC_CONFIG --> AEGIS
-    SEC_CONFIG --> MT_FILTER
-    SEC_CONFIG --> JWT_PROV
-    AUDIT_CONFIG --> AUD_SVC
-    MP_CONFIG --> MT_FILTER
-```
-
----
-
-## 6. Domain Model Overview (Entidades Principais)
-
-```mermaid
-erDiagram
-    FILIAL ||--o{ DEPARTAMENTO : "contém"
-    FILIAL ||--o{ LOCALIZACAO : "contém"
-    FILIAL ||--o{ ATIVO : "possui"
-    FILIAL ||--o{ FUNCIONARIO : "emprega"
-    FILIAL ||--o{ FORNECEDOR : "contrata"
-    FILIAL ||--o{ USUARIO : "pertence"
-    FILIAL ||--o{ SOLICITACAO_MANUTENCAO : "abre"
-    FILIAL ||--o{ MANUTENCAO_PREVENTIVA : "agenda"
-    
-    DEPARTAMENTO ||--o{ LOCALIZACAO : "contém"
-    DEPARTAMENTO ||--o{ FUNCIONARIO : "lota"
-    DEPARTAMENTO ||--o{ ATIVO : "aloca"
-    
-    LOCALIZACAO ||--o{ ATIVO : "localiza"
-    
-    TIPO_ATIVO ||--o{ ATIVO : "classifica"
-    ATIVO ||--|| ATIVO_DETALHE_HARDWARE : "detalha"
-    ATIVO_DETALHE_HARDWARE ||--o{ DISCO : "possui"
-    ATIVO_DETALHE_HARDWARE ||--o{ MEMORIA : "possui"
-    ATIVO_DETALHE_HARDWARE ||--o{ ADAPTADOR_REDE : "possui"
-    
-    ATIVO ||--o{ SOLICITACAO_MANUTENCAO : "gera"
-    FUNCIONARIO ||--o{ SOLICITACAO_MANUTENCAO : "responsável (técnico)"
-    FUNCIONARIO ||--o{ SOLICITACAO_MANUTENCAO : "solicitante"
-    FORNECEDOR ||--o{ SOLICITACAO_MANUTENCAO : "terceirizado"
-    
-    SOLICITACAO_MANUTENCAO ||--o{ MANUTENCAO_PREVENTIVA : "origina"
-    MANUTENCAO_PREVENTIVA ||--o{ SOLICITACAO_MANUTENCAO : "gera"
-    
-    ATIVO ||--o{ HEALTH_CHECK : "monitora"
-    HEALTH_CHECK ||--o{ PREVISAO_FALHA : "origina"
-    PREVISAO_FALHA ||--o{ SOLICITACAO_MANUTENCAO : "gera preditiva"
-    
-    USUARIO ||--|| FUNCIONARIO : "vinculado (1:1 opcional)"
-    USUARIO }|--o{ ROLE : "tem"
-    ROLE }|--o{ PERMISSION : "concede"
-    PERMISSION }|--o{ RECURSO_ACAO_CONTEXTO : "define"
-    
-    AUDITORIA_ENVERS }|--|| TODAS_ENTIDADES : "audita (CREATE/UPDATE/DELETE)"
-```
-
-**Entidades Chave (Extraídas via AST Java):**
-
-| Entidade | Tabela | Campos Principais | Relacionamentos | Auditoria |
-| :--- | :--- | :--- | :--- | :--- |
-| **Filial** | `filial` | id, razao_social, cnpj, codigo, endereco, telefone, email, ativo | 1:N Departamento, Localizacao, Ativo, Funcionario, Fornecedor, Usuario, Ordem, Preventiva | ✅ |
-| **Departamento** | `departamento` | id, filial_id, codigo, nome, descricao, ativo | N:1 Filial; 1:N Localizacao, Funcionario, Ativo | ✅ |
-| **Localizacao** | `localizacao` | id, filial_id, departamento_id, codigo, nome, tipo (SALA/ANDAR/RACK/OUTRO), descricao | N:1 Filial, Departamento; 1:N Ativo | ✅ |
-| **TipoAtivo** | `tipo_ativo` | id, codigo, nome, categoria (ENUM), vida_util_anos, valor_residual_pct, requer_detalhe_hardware | 1:N Ativo | ✅ |
-| **Ativo** | `ativo` | id, filial_id, departamento_id, localizacao_id, tipo_ativo_id, fornecedor_id, funcionario_responsavel_id, tag (UK), serial, modelo, fabricante, data_aquisicao, valor_aquisicao, valor_residual, vida_util_anos, status (ATIVO/BAIXADO/EM_MANUTENCAO), depreciacao_acumulada, data_baixa, motivo_baixa | N:1 Filial, Depto, Local, Tipo, Fornecedor, Funcionario; 1:1 AtivoDetalheHardware; 1:N Ordem | ✅ |
-| **AtivoDetalheHardware** | `ativo_detalhe_hardware` | id, ativo_id (1:1), cpu_modelo, cpu_cores, cpu_frequencia_ghz, memoria_total_gb, memoria_tipo, memoria_frequencia_mhz | 1:1 Ativo; 1:N Disco, Memoria, AdaptadorRede | ✅ |
-| **Disco** | `disco` | id, ativo_detalhe_hardware_id, tipo (SSD/HDD), capacidade_gb, serial, smart_raw_json, health_score, temperatura_c, horas_ligado | N:1 AtivoDetalheHardware | ✅ |
-| **Memoria** | `memoria` | id, ativo_detalhe_hardware_id, capacidade_gb, tipo (DDR4/DDR5), frequencia_mhz | N:1 AtivoDetalheHardware | ✅ |
-| **AdaptadorRede** | `adaptador_rede` | id, ativo_detalhe_hardware_id, mac_address, ip_address, velocidade_mbps, tipo (WIFI/ETHERNET) | N:1 AtivoDetalheHardware | ✅ |
-| **Fornecedor** | `fornecedor` | id, filial_id, razao_social, cnpj, contato, email, telefone, endereco, categoria, sla_padrao_horas, avaliacao, certificacoes | N:1 Filial; 1:N Ordem | ✅ |
-| **Funcionario** | `funcionario` | id, filial_id, departamento_id, nome, cpf, matricula, cargo, email, telefone, funcao_manutencao (ENUM), usuario_id (1:1 opcional) | N:1 Filial, Depto; 1:1 Usuario; 1:N Ordem (técnico/solicitante) | ✅ |
-| **Usuario** | `usuario` | id, email (UK), senha_hash, nome, status (ATIVO/INATIVO/BLOQUEADO), funcionario_id (1:1), roles (JSON/JoinTable) | 1:1 Funcionario; N:M Role | ✅ |
-| **Role** | `role` | id, nome (ADMIN/GESTOR/TECNICO/USER/AUDITOR), descricao, global (boolean) | N:M Permission; N:M Usuario | ✅ |
-| **Permission** | `permission` | id, recurso, acao, contexto (GLOBAL/FILIAL), descricao | N:M Role | ✅ |
-| **SolicitacaoManutencao** | `solicitacao_manutencao` | id, filial_id, ativo_id, tecnico_id, solicitante_id, fornecedor_id, numero (UK), descricao, prioridade (ENUM), tipo (CORRETIVA/PREVENTIVA/PREDITIVA), estado (ABERTA/EM_ANDAMENTO/AGUARDANDO_APROVACAO/APROVADA/CONCLUIDA/CANCELADA), data_abertura, data_inicio, data_aprovacao, data_conclusao, data_cancelamento, custo_estimado, custo_mao_obra, custo_material, custo_terceiros, observacoes, evidencia_json, preventiva_id (FK nullable), previsao_falha_id (FK nullable) | N:1 Filial, Ativo, Tecnico, Solicitante, Fornecedor, Preventiva, PrevisaoFalha | ✅ |
-| **ManutencaoPreventiva** | `manutencao_preventiva` | id, filial_id, ativo_id (nullable), tipo_ativo_id (nullable), cron_expression, dia_hora_preferencial, tecnico_padrao_id, descricao_padrao, ativo (boolean), proxima_execucao | N:1 Filial, Ativo, TipoAtivo, Tecnico; 1:N Ordem | ✅ |
-| **HealthCheck** | `health_check` | id, ativo_id, disco_id, score (0-100), reallocated_sectors, seek_error_rate, spin_retry_count, temperature_c, power_on_hours, coletado_por, coletado_em, fonte (MANUAL/AGENTE) | N:1 Ativo, Disco | ✅ |
-| **PrevisaoFalha** | `previsao_falha` | id, ativo_id, disco_id, data_prevista, probabilidade (0-1), ic_inferior, ic_superior, modelo_usado (LINEAR_OLS), r_quadrado, status (ATIVA/TRATADA/EXPIRADA), criada_em | N:1 Ativo, Disco; 1:1 Ordem (preditiva) | ✅ |
-| **Auditoria (Envers)** | `*_AUD` + `REVINFO` | rev, revtype, timestamp, usuario_id, ip, user_agent, diff_json | Todas entidades @Audited | N/A |
-
----
-
-## 7. Security Architecture (Aegis Shield)
-
-### 7.1 Autenticação (JWT RS256 + Refresh Rotation)
-
-```mermaid
-sequenceDiagram
-    participant U as Usuário
-    participant F as Frontend (Vue + Pinia)
-    participant G as Gateway
-    participant A as Auth Service
-    participant B as Backend Services
-    
-    U->>F: Email + Senha
-    F->>G: POST /api/v1/auth/login
-    G->>A: Forward
-    A->>A: AuthenticationManager.authenticate()
-    A->>A: JwtTokenProvider.generateToken(usuario, roles, filialId)
-    A->>F: 200 {accessToken (15min), refreshToken (HttpOnly Cookie 7d, SameSite=Strict)}
-    F->>F: Pinia: accessToken (memória); Cookie: refreshToken
-    Note over F: authInterceptor: Authorization: Bearer <accessToken> em TODAS requests
-    
-    F->>G: GET /api/v1/ativos (Bearer token)
-    G->>B: Forward + Valida JWT (JwtAuthenticationFilter)
-    B->>F: 200 dados
-    
-    Note over F,B: AccessToken expira (401)
-    F->>G: POST /api/v1/auth/refresh (Cookie automático)
-    G->>A: Forward
-    A->>A: Valida refreshToken (assinatura + expiração + não revogado)
-    A->>F: 200 {novo accessToken (15min), novo refreshToken (rotação)}
-    F->>F: Atualiza Pinia + Cookie
-    F->>G: Retry request original (1x only)
-    G->>B: Forward
-    B->>F: 200 dados
-    
-    Note over F: Falha refresh → Limpa Pinia + Cookie → Redirect /login
-```
-
-### 7.2 Autorização (Aegis Shield — RBAC Granular + Multi-tenancy)
-
-**Modelo de Permissão:** `Permission(recurso, acao, contexto)` onde:
-- **Recurso:** ATIVO, ORDEM, PREVENTIVA, PREDITIVA, RELATORIO, CONFIG, AUDITORIA, LGPD, HEALTH_CHECK, USUARIO, ROLE
-- **Acao:** CRIAR, LER, ATUALIZAR, EXCLUIR, APROVAR, INICIAR, CONCLUIR, CANCELAR, GERENCIAR, COLETAR, EXPORTAR
-- **Contexto:** GLOBAL (Admin Global) | FILIAL (demais roles)
-
-**Matriz Padrão (Configurável via Admin UI):**
-
-| Role | Contexto | Permissions (Resumo) |
-| :--- | :--- | :--- |
-| **ADMIN** | GLOBAL | `*_*` (Todas recursos, todas ações, contexto global) |
-| **GESTOR** | FILIAL | `ATIVO_*`, `ORDEM_*` (inclui APROVAR), `PREVENTIVA_GERENCIAR`, `PREDITIVA_LER`, `RELATORIO_GERAR`, `HEALTH_CHECK_COLETAR`, `AUDITORIA_LER` (scoped filial) |
-| **TECNICO** | FILIAL (próprio) | `ORDEM_INICIAR`, `ORDEM_CONCLUIR`, `ORDEM_LER_PROPRIAS`, `HEALTH_CHECK_COLETAR`, `QR_CODE_ESCANEAR`, `ATIVO_LER` (próprios) |
-| **USER** | FILIAL | `ATIVO_LER`, `ORDEM_LER_PROPRIAS`, `RELATORIO_GERAR` (básico) |
-| **AUDITOR** | FILIAL/GLOBAL | `AUDITORIA_LER`, `ACESSOS_NEGADOS_LER`, `INTEGRIDADE_VALIDAR`, `RELATORIO_GERAR` (compliance) |
-
-**Avaliação em Tempo Real:** `AegisShieldPermissionEvaluator.hasPermission(auth, resource, action, contextFilial)` → SpEL + Custom Logic (hierarquia roles + contexto filial + ownership).
-
-### 7.3 Multi-tenancy (Isolamento por Filial)
-
-- **Estratégia:** **Hibernate Filter** (`@FilterDef(name="filialFilter", parameters=@ParamDef(name="filialId", type="Long"))`) aplicado em **TODAS** entidades `@Filter(name="filialFilter", condition="filial_id = :filialId")`
-- **Injeção:** `MultiTenancyFilter` (OncePerRequestFilter) extrai `filialId` do JWT/Claims → `TenantContextHolder.set(filialId)` → Hibernate Filter ativado automaticamente
-- **Admin Global:** `filialId = null` → Filter desativado (vê todas filiais)
-- **Testes Cross-tenant:** Obrigatórios em CI (TestContainers) — vazamento = falha de build
-
----
-
-## 8. Key Technical Decisions (ADRs Resumo)
-
-| ADR | Decisão | Alternativas | Status |
+| Decisão / Trade-off | Sacrifício | Benefício | ADR / Referência |
 | :--- | :--- | :--- | :--- |
-| **ADR-001** | Busca Fuzzy Nativa (Levenshtein Java) vs Elasticsearch/Algolia | Elasticsearch (complexidade operacional), Algolia (custo), pg_trgm only (sem ranking fuzzy) | **Aceita** — Levenshtein otimizado + Trigram indexes + Redis cache |
-| **ADR-002** | Manutenção Preditiva: Regressão Linear Simples (OLS) vs ML Complexo | Random Forest, XGBoost, LSTM, Prophet | **Aceita** — Interpretável, leve, roda em batch noturno, sem dependência ML runtime; Evoluir para ML v2.0 |
-| **ADR-003** | RBAC: Aegis Shield (Role×Permission×Contexto) vs Spring ACL / Casbin | Spring ACL (complexo, lento), Casbin (externalizado), Keycloak (externalizado) | **Aceita** — Nativo Spring, performance, flexibilidade contextual, auditoria integrada |
-| **ADR-004** | Multi-tenancy: Hibernate Filter (Query-level) vs Schema-per-tenant / Column-discriminator | Schema-per-tenant (operacional complexo), Column-discriminator (sem isolamento query) | **Aceita** — Isolamento real no SQL, performance, compatível Envers, testável |
-| **ADR-005** | Auditoria: Hibernate Envers (Automático) vs Custom Trigger / Event Sourcing | Custom Triggers (manutenção), Event Sourcing (overkill), CDC (Debezium - complementar) | **Aceita** — Nativo JPA, diff campo-a-campo, query API, condicional, imutável |
-| **ADR-006** | PDF/QR Code: FlyingSaucer (Thymeleaf) + ZXing vs iText / Apache PDFBox / Puppeteer | iText (licença AGPL), PDFBox (baixo nível), Puppeteer (Node dependency) | **Aceita** — Pure Java, Thymeleaf templates, ZXing nativo, MIT/Apache licenses |
-| **ADR-007** | Frontend: Vue 3 + Vite + PWA vs React/Next.js / SvelteKit / Vanilla | Next.js (SSR desnecessário), SvelteKit (ecossistema menor), Vanilla (produtividade) | **Aceita** — Composition API, TypeScript, Pinia, PWA plugin, Bootstrap 5 CSS-only |
-| **ADR-008** | Testes Integração: TestContainers MySQL Real vs H2 / Mockito Only | H2 (dialeto diferente), Mockito only (não testa SQL real) | **Aceita** — MySQL real = confiança migrações Flyway, queries nativas, performance realista |
-| **ADR-009** | Offline-First PWA: Service Worker + IndexedDB + Background Sync vs LocalStorage Only | LocalStorage (sem sync, sem push), Dexie.js (wrapper - adicionado como dep opcional) | **Aceita** — Workbox (Vite PWA Plugin), IndexedDB nativo, Background Sync API, Push API |
-| **ADR-010** | LGPD Anonimização: Hash Preservado em Envers vs Hard Delete / Pseudonimização Simples | Hard Delete (quebra auditoria/referências), Pseudonimização simples (reversível) | **Aceita** — Hash SHA-256 + salt em Envers mantém rastreabilidade legal; Dados PII removidos |
+| **Monolito único (sem microsserviços)** | Escalabilidade horizontal, deploy independente, isolamento de falhas | Simplicidade operacional, transações ACID locais, latência baixa in-process, custo infra menor (NFR-CO01) | ADR-001 (a criar) |
+| **SQL cru / JPA nativo sem ORM completo** | Produtividade dev (boilerplate), refatoração schema mais difícil | Controle total de queries, performance previsível, índices compostos otimizados (NFR-CO02), zero overhead ORM | ADR-002 (a criar) |
+| **Vertical scaling only** | Limite teto de capacidade (hardware single-node), SPOF app | Custo previsível, sem complexidade de clustering/sharding, consistência forte trivial | NFR-S01 observação |
+| **Scheduler in-process (Spring TaskScheduler)** | Jobs param se app reinicia; não distribuído | Zero dependência externa, simples, atende carga atual (1 job crítico) | NFR-O02 gap |
+| **Frontend Vanilla JS + Popper.js** | DX limitada, sem type safety, manutenção difícil à medida que cresce | Bundle mínimo (~50KB gz), zero build step obrigatório, compatível com NFR-U03 | Dívida técnica (NFR-M01) |
+| **WORM storage para auditoria** | Custo storage maior, latência escrita ligeiramente maior | Imutabilidade legal (SOX/LGPD), integridade verificável (SHA-256), compliance | NFR-SEC05, NFR-C02 |
+| **Read-replica apenas para relatórios** | Escrita ainda single-master; réplica pode ter lag | Offload de queries pesadas (`custoTotalPorAtivo`) do primário; HA parcial | NFR-A04 |
+| **Sem mensageria distribuída** | Acoplamento temporal jobs↔API; retry limitado | Simplicidade, zero infra extra | Reavaliar se `checkResourceUsageAlerts` > 30s ou volume alertas ↑ |
+
+## 13. Future Evolution
+
+* **Curto prazo (Sprint 0–3):**
+  1. Definir motor de banco (Gap #1) e provisionar primário + read-replica + WORM bucket.
+  2. Implementar pipeline CI/CD com validações NFR-M03/M04/M05 (OpenAPI breaking changes, `console.*`, stubs).
+  3. Refatorar 5 métodos com complexidade > 10 (NFR-M02) — prioridade: `checkResourceUsageAlerts` (17), `RealisticDataSeeder.run` (15), `AtivoMapper.toDTO` (14), `ManutencaoSpecification.build` (14), `api.js:request` (13).
+  4. Configurar OpenTelemetry Java Agent + Collector + Prometheus/Grafana/Loki/Tempo (Gap #4).
+  5. Provisionar Secret Manager + rotação 90 dias (NFR-SEC04, Gap #4).
+  6. Implementar `AuditoriaService` com escrita assíncrona WORM (NFR-SEC05).
+  7. Configurar Flyway/Liquibase + baseline schema (Gap #5 — matriz retenção).
+* **Médio prazo (Q3–Q4 2025):**
+  1. Migrar frontend para TypeScript + React/Vue (NFR-M01, NFR-U01/02) — componentizar, testar com Vitest/Testing Library.
+  2. Integrar Identity Provider corporativo + MFA ADMIN (NFR-SEC02, Gap #3).
+  3. Implementar cache L1 (Caffeine) para `custoTotalPorAtivo` e lookups RBAC; avaliar Redis L2 se read-replica insuficiente.
+  4. Externalizar scheduler (Quartz JDBC JobStore ou agendador externo) para tolerância a falhas app (NFR-O02).
+  5. Hardening segurança: CSP estrito, HSTS, certificate pinning, pen test.
+  6. Testes de carga k6/Gatling validando NFR-P01/P04, NFR-S01/S02.
+* **Longo prazo (2026+):**
+  1. **Strangler Fig** para extrair `AlertNotificationService` e `HealthCheckService` como microsserviços event-driven (Kafka/RabbitMQ) se volume justificar.
+  2. Multi-AZ active-passive com DNS failover automatizado (RTO < 30 min).
+  3. Sharding/particionamento `HealthCheck`/`Manutencao` por `ativo_id` + tempo se vertical scaling esgotado.
+  4. Data Lake / OLAP (ClickHouse/BigQuery) para analytics históricos além SOX 7 anos.
+  5. Mobile app nativo (fora de escopo atual — BRD#5 Out-of-Scope) via API existente.
 
 ---
 
-## 9. Data Flow Examples
+## O que falta verificar (Gaps de Informação — Replicado do NFR para Rastreabilidade)
 
-### 9.1 Criação de Ativo com Hardware + QR + Termo (UC-06)
-
-```mermaid
-sequenceDiagram
-    participant U as Gestor
-    participant F as Frontend
-    participant G as Gateway
-    participant A as AtivoService
-    participant H as HardwareService
-    participant Q as QRCodeGenerator
-    participant P as PdfGenerator
-    participant S as Storage (S3)
-    participant DB as MySQL
-    participant AU as Auditoria (Envers)
-    
-    U->>F: Preenche formulário ativo + hardware
-    F->>G: POST /api/v1/ativos (multipart JSON)
-    G->>A: createWithHardware(dto)
-    A->>A: Valida BR-01, BR-02, BR-03
-    A->>H: saveHardware(ativoId, hardwareDto)
-    H->>DB: INSERT ativo_detalhe_hardware + discos + memorias + adaptadores
-    A->>DB: INSERT ativo (depreciação calculada)
-    A->>Q: generate(tag, publicUrl, hash)
-    Q->>S: PUT qrcodes/{tag}.svg
-    A->>P: generateTermo(ativo, responsavel, tipo=ALOCACAO)
-    P->>S: PUT termos/{ativoId}_{timestamp}.pdf
-    A->>AU: Envers auto-audit (CREATE ativo + hardware)
-    A->>F: 201 {ativo, qrCodeUrl, termoPdfUrl}
-    F->>U: Toast sucesso + Botões "Ver Termo" / "Imprimir QR"
-```
-
-### 9.2 Health Check Coleta + Previsão Falha + Ordem Preditiva Auto (UC-25, 26, 27)
-
-```mermaid
-sequenceDiagram
-    participant T as Técnico (PWA)
-    participant F as Frontend (PWA + SW)
-    participant G as Gateway
-    participant HC as HealthCheckService
-    participant PS as ManutencaoPreditivaService
-    participant OS as OrdemService
-    participant NS as NotificationService
-    participant DB as MySQL
-    participant AU as Auditoria
-    
-    T->>F: Escaneia QR Code → /public/ativo/{tag}
-    F->>T: Tela Health Check (login rápido biometria)
-    T->>F: Preenche SMART (reallocated, temp, hours)
-    F->>G: POST /api/v1/ativos/{id}/health-check
-    G->>HC: coletar(ativoId, dto)
-    HC->>HC: analisar() → Score 0-100 (thresholds por tipo disco)
-    HC->>DB: INSERT health_check + UPDATE disco.healthScore
-    HC->>AU: Envers auto-audit
-    HC->>F: 200 {score, alerta: score < threshold?}
-    
-    alt Score Crítico (< 40)
-        HC->>OS: criarOrdemPreditiva(ativoId, discoId, "CRITICA")
-        OS->>DB: INSERT ordem (PREDITIVA, CRITICA, descricao falha iminente)
-        OS->>NS: notificar(tecnico, gestor, push/email)
-        OS->>AU: Envers (origem=PREDITIVA_AUTO)
-    end
-    
-    Note over PS: Batch Noturno 02:00
-    PS->>DB: SELECT ativos com >= 3 health_checks
-    loop Para cada ativo
-        PS->>PS: regressaoLinearOLS(reallocated_sectors vs power_on_hours)
-        PS->>PS: calcula diasAteThreshold + IC95%
-        PS->>DB: INSERT/UPDATE previsao_falha
-        alt Prob > 80% E dataPrevista < 30 dias
-            PS->>OS: criarOrdemPreditiva(ativoId, discoId, "ALTA", dataPrevista, probabilidade)
-            OS->>NS: notificar + WebSocket dashboard
-        end
-    end
-```
-
-### 9.3 Busca Global Fuzzy (UC-29)
-
-```mermaid
-sequenceDiagram
-    participant U as Usuário
-    participant F as Frontend (GlobalSearch)
-    participant G as Gateway
-    participant BS as BuscaController
-    participant FS as FuzzySearchService
-    participant LD as LevenshteinDistance
-    participant DB as MySQL (Trigram Index)
-    participant RC as Redis Cache
-    
-    U->>F: Digita "notebok" (debounce 300ms)
-    F->>G: GET /api/v1/busca?q=notebok&types=ativo,ordem,funcionario,fornecedor&filialId=1&page=0&size=10
-    G->>BS: buscar(dto)
-    BS->>RC: GET cache:busca:{hash(dto)}
-    alt Cache Hit
-        RC->>BS: Resultados cached
-    else Cache Miss
-        BS->>FS: buscar(termo, tipos, filialId, page, size)
-        FS->>DB: SELECT * FROM ativo WHERE filial_id=? AND (tag % termo OR serial % termo ...) -- pg_trgm
-        FS->>FS: Para cada candidato: score = LevenshteinDistance(termo, campo) / max(len)
-        FS->>FS: Aplica boost por tipo (ativo=1.0, ordem=0.9, func=0.8, forn=0.7)
-        FS->>FS: Ordena por score DESC + filtros exatos
-        FS->>BS: Page<ResultadoBusca>
-        BS->>RC: SET cache:busca:{hash} TTL 5min
-    end
-    BS->>F: 200 {content[], totalElements, highlight}
-    F->>U: Dropdown agrupado por tipo + highlight + ações rápidas
-```
-
----
-
-## 10. Deployment Architecture (Kubernetes)
-
-```yaml
-# Resumo dos Manifests K8s (k8s/)
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: aegis1
----
-# Backend Deployment (HPA: CPU>70% / Memory>80% / Custom: request_latency_p95>500ms)
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: aegis1-backend
-  namespace: aegis1
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: aegis1-backend
-  template:
-    spec:
-      containers:
-      - name: backend
-        image: aegis1/backend:1.0.0
-        ports: [8080]
-        envFrom: [secretRef: aegis1-secrets]
-        resources:
-          requests: {memory: "1Gi", cpu: "500m"}
-          limits: {memory: "2Gi", cpu: "1000m"}
-        livenessProbe: {httpGet: {path: /actuator/health/liveness, port: 8080}, initialDelaySeconds: 60}
-        readinessProbe: {httpGet: {path: /actuator/health/readiness, port: 8080}, initialDelaySeconds: 30}
----
-# Frontend Deployment (Static + Nginx)
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: aegis1-frontend
-  namespace: aegis1
-spec:
-  replicas: 3
-  template:
-    spec:
-      containers:
-      - name: frontend
-        image: aegis1/frontend:1.0.0
-        ports: [80]
-        resources: {requests: {memory: "64Mi", cpu: "50m"}, limits: {memory: "128Mi", cpu: "100m"}}
----
-# HPA Backend
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: aegis1-backend-hpa
-  namespace: aegis1
-spec:
-  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: aegis1-backend}
-  minReplicas: 3
-  maxReplicas: 20
-  metrics:
-  - type: Resource
-    resource: {name: cpu, target: {type: Utilization, averageUtilization: 70}}
-  - type: Resource
-    resource: {name: memory, target: {type: Utilization, averageUtilization: 80}}
-  - type: Pods
-    pods: {metric: {name: http_requests_latency_p95}, target: {type: AverageValue, averageValue: "500ms"}}
-  behavior:
-    scaleDown: {stabilizationWindowSeconds: 300}
-    scaleUp: {stabilizationWindowSeconds: 60}
----
-# Ingress (TLS 1.3, Rate Limit, CSP Headers)
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: aegis1-ingress
-  namespace: aegis1
-  annotations:
-    nginx.ingress.kubernetes.io/rate-limit: "500"
-    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' wss: https:; frame-ancestors 'none';";
-      add_header X-Frame-Options "DENY";
-      add_header X-Content-Type-Options "nosniff";
-      add_header Referrer-Policy "strict-origin-when-cross-origin";
-spec:
-  tls:
-  - hosts: [aegis1.empresa.com]
-    secretName: aegis1-tls
-  rules:
-  - host: aegis1.empresa.com
-    http:
-      paths:
-      - path: /api
-        pathType: Prefix
-        backend: {service: {name: aegis1-backend, port: {number: 8080}}}
-      - path: /
-        pathType: Prefix
-        backend: {service: {name: aegis1-frontend, port: {number: 80}}}
-```
-
----
-
-## 11. Observability Stack
-
-| Componente | Função | Configuração Chave |
-| :--- | :--- | :--- |
-| **Prometheus** | Métricas (Pull) | `scrape_interval: 15s`; ServiceMonitors: backend (actuator/prometheus), frontend (nginx-vts), k8s (kube-state-metrics), node-exporter |
-| **Grafana** | Dashboards | Provisionados via ConfigMap: Golden Signals (Latency, Traffic, Errors, Saturation) por endpoint; Business: Ordens/dia, CustoTotalPorAtivo, Aderência Preventiva, Alertas Preditivos, Login Success Rate |
-| **Alertmanager** | Alertas | Routes: Critical (PagerDuty/Slack/Email), Warning (Slack), Info (Log); Inhibit rules: cross-tenant leak > 10/min → Critical |
-| **Tempo/Jaeger** | Traces | OpenTelemetry SDK (Java + JS); Sampling: 10% requests, 100% errors; Trace-id header propagado |
-| **Loki** | Logs JSON | Promtail (K8s) + Logback Logstash Encoder; Labels: app, namespace, level, traceId; Retenção 30d |
-| **Sentry** | Frontend Errors | DSN configurado; Release tracking; Source maps upload CI; Zero `console.*` prod (ESLint error) |
-
----
-
-## 12. Disaster Recovery & Backup
-
-| Componente | RTO | RPO | Estratégia |
-| :--- | :--- | :--- | :--- |
-| **Frontend (CDN)** | ≤ 15 min | 0 | Assets imutáveis versionados; Rollback CDN (versão anterior); DNS TTL 60s |
-| **Backend (K8s)** | ≤ 30 min | ≤ 1 min | K8s Rollback (Deployment revision); MySQL Point-in-Time Recovery (binlog + backup snapshot diário); Testes restore mensais |
-| **MySQL Primary** | ≤ 60 min | ≤ 1 min | Automated Backup (RDS/Cloud SQL) + Binlog Replication; Cross-region Read Replica; Restore testado mensalmente |
-| **Redis** | ≤ 15 min | ≤ 5 min | AOF + RDB Snapshots; Replica Multi-AZ; Cache warming script pós-restore |
-| **Object Storage** | ≤ 30 min | 0 | Versioning habilitado; Cross-region Replication (CRR); Lifecycle policies |
-| **Secrets/Vault** | ≤ 15 min | 0 | Vault/SealedSecrets; Backup encrypted; Rotation automática (cert-manager TLS, JWT keys) |
-
----
-
-## 13. Evolution Roadmap (Arquitetural)
-
-| Fase | Foco | Mudanças Arquiteturais |
-| :--- | :--- | :--- |
-| **v1.0 MVP** | Core Domain + Corretiva + Auth + Busca + QR/PDF | Modular Monolith Spring Boot; Vue 3 PWA; MySQL + Redis; K8s |
-| **v1.1 Should** | Preventiva + Preditiva + RBAC Granular + LGPD + Compliance | Scheduler Services; ML Pipeline (OLS); Aegis Shield Matrix; Envers 100%; Anonimização |
-| **v1.2 Could** | Maturidade + PWA Completo + Hardening + Multi-cloud | Checklists, Anexos, Import Lote; Pen Test CI; Checksums; PostgreSQL Support; PWA Push/Background Sync |
-| **v2.0 Mobile** | App Nativo iOS/Android | Capacitor/Ionic ou React Native; Offline-first nativo; QR Scanner nativo; Push nativo; Codepush |
-| **v2.1 AI/ML** | Anomaly Detection Avançado | Isolamento Forest / LSTM para preditiva; Feature Store; MLOps (MLflow/Kubeflow); A/B Testing modelos |
-| **v3.0 Platform** | Ecossistema + Integrações | API Gateway externo (Kong/Apigee); Event Mesh (Kafka); CMDB/ITSM Connectors; Marketplace Plugins |
-
----
-
-## 14. Glossário Arquitetural (Referência Rápida)
-
-| Termo | Definição |
-| :--- | :--- |
-| **Aegis Shield** | Modelo de autorização granular hierárquico e contextual com multi-tenancy por Filial (Role × Permission × Contexto) |
-| **MultiTenancyFilter** | Filtro Spring que injeta `filialId` no Hibernate Filter para isolamento query-level |
-| **FuzzySearchService** | Serviço de busca aproximada usando Levenshtein Distance + Trigram Indexes + Redis Cache |
-| **ManutencaoPreditivaService** | Serviço que aplica Regressão Linear Simples (Mínimos Quadrados) para prever falhas de disco |
-| **HealthCheckService** | Serviço que analisa métricas SMART (reallocated_sectors, temperature, power_on_hours) e calcula score 0-100 |
-| **Envers** | Hibernate Envers — Auditoria automática de entidades (@Audited) com diff campo-a-campo imutável |
-| **Flyway** | Migrações de banco versionadas (V1__init, V2__..., R__repeatable, U__undo) |
-| **TestContainers** | Testes de integração com containers reais (MySQL, Redis) — reuso habilitado via `.testcontainers.properties` |
-| **OpenAPI 3.1** | Contrato de API versionado (`/api/v1/openapi.yaml`); Validação CI via Contract Tests |
-| **PWA** | Progressive Web App — Service Worker (Workbox), Manifest, Offline-first, Push, Background Sync, Install Prompt |
-
----
-
-*Documento regenerado completamente com base em análise AST completa do backend Java (domain, service, controller, config, security, predictive, search, audit, report, scheduler) + frontend Vue/PWA + infra K8s/Docker. Substitui versão 1.0 que descrevia apenas frontend + backend externo hipotético.*
+1. **Motor de banco de dados:** Não identificado no `package.json` nem em arquivos de configuração (application.yml/properties não escaneados). NFRs de escalabilidade (NFR-S03), disponibilidade (NFR-A03), portabilidade (NFR-PO02) e custo (NFR-CO01) dependem desta definição (PostgreSQL, Oracle, SQL Server, MySQL?). **Ação:** Confirmar com DBA/Infra na Sprint 0.
+2. **Estratégia de deploy e infraestrutura alvo:** VM única? Container Docker? Kubernetes? Cloud provider? Isso impacta NFR-A01, NFR-A04, NFR-PO02, NFR-CO01. **Ação:** Definir com DevOps/Infra.
+3. **Provedor de identidade / MFA:** Integração com AD/LDAP/OIDC prevista (BRD#7 Dependências externas) mas não implementada. NFR-SEC02 depende desta decisão. **Ação:** Alinhar com Segurança da Informação.
+4. **Ferramentas de observabilidade stack:** Prometheus/Grafana? Datadog? New Relic? ELK? NFR-O01, NFR-O03, NFR-O04 exigem escolha. **Ação:** Definir na Sprint 0.
+5. **Política de retenção de dados específica por entidade:** BRD menciona 7 anos para SOX, mas LGPD pode exigir prazos diferentes por tipo de dado. NFR-C01, NFR-C02 precisam de matriz de retenção aprovada por Compliance. **Ação:** Workshop com Compliance/Legal.
+6. **Orçamento de infraestrutura validado:** Estimativa BRD#9 (R$ 180k/ano) precisa cotação real para validar NFR-CO01. **Ação:** FinOps/Infra prover cotação.
+7. **Arquivos de build/backend config:** `pom.xml`/`build.gradle`, `application.yml`, `Dockerfile` não detectados no diagnóstico. **Ação:** Verificar repositório raiz / branches.
+8. **Contrato OpenAPI atual:** Não gerado (SpringDoc não configurado). **Ação:** Habilitar `springdoc-openapi-starter-webmvc-ui` e publicar spec.

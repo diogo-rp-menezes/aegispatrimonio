@@ -23,7 +23,7 @@ public class AlertaController {
     }
 
     @GetMapping
-    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'READ', null)")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ALERTA', 'READ', null)")
     public Page<AlertaDTO> listarAlertas(
             @PageableDefault(sort = "dataCriacao", direction = org.springframework.data.domain.Sort.Direction.DESC) Pageable pageable,
             @RequestParam(required = false) Boolean lido) {
@@ -32,14 +32,14 @@ public class AlertaController {
     }
 
     @GetMapping("/recent")
-    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'READ', null)")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ALERTA', 'READ', null)")
     public List<AlertaDTO> getRecentAlerts() {
         return alertService.getRecentAlerts().stream().map(this::toDTO).toList();
     }
 
     @PatchMapping("/{id}/read")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'UPDATE', null)")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ALERTA', 'UPDATE', null)")
     public void markAsRead(@PathVariable Long id) {
         alertService.markAsRead(id);
     }

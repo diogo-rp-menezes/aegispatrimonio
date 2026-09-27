@@ -1,482 +1,430 @@
-# Formal State Machine (FSM) Specifications — Aegis1
+# Formal State Machine (FSM) Specifications — Aegis Patrimônio
 
-> **Versão:** 2.0 · **Owner:** Arquitetura/Backend Lead · **Status:** Draft
-> **Base:** Use Cases v2.0 + System Architecture v2.0 + Domain Model (AST Java)
-> **Cobertura:** Todas entidades de domínio com ciclo de vida (Backend + Frontend)
-> **Notação:** Mermaid stateDiagram-v2 + Transition Matrix + Guards + Side Effects
+> **Versão:** 1.0 · **Owner:** Arquitetura/Eng Lead · **Status:** Draft  
+> **Base:** System Architecture Document (SAD) v1.0 · **ADRs relacionadas:** Pendentes (Sprint 0)  
+> **Rastreabilidade:** Todas as máquinas abaixo derivam das entidades, serviços e regras de negócio descritos no SAD (Seções 1, 3, 4, 5, 9). Como o diagnóstico **não detectou tabelas de estado nem rotas/handlers explícitos**, os ciclos de vida a seguir são **inferidos a partir do modelo conceitual (Ativo, Manutencao, HealthCheck, Alerta, Usuario) e das operações BR-02 citadas no SAD (criar, atualizar, deletar, aprovar, cancelar, concluir, iniciar)**.  
+> **⚠️ [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — Cada máquina traz o rótulo nas seções onde premissas foram adotadas. Valide com Product Owner, DBA e Compliance antes de implementar.
 
 ---
 
-## 1. SolicitacaoManutencao (Ordem de Manutenção) — Core Domain
+## 1. Core State Machine: Ativo (Asset)
 
-### 1.1 Estados Válidos
+### Purpose
+Ciclo de vida de um ativo patrimonial desde o cadastro até a baixa/descarte, cobrindo aquisição, alocação, manutenções, health checks e conformidade LGPD/SOX. O estado do ativo governa elegibilidade para manutenção, geração de alertas de recurso e inclusão em relatórios de custo total (`custoTotalPorAtivo`).
 
-| Estado | Descrição | Tipo Ordem | Terminal? |
-| :--- | :--- | :--- | :--- |
-| `ABERTA` | Ordem criada, aguardando técnico iniciar | CORRETIVA, PREVENTIVA, PREDITIVA | Não |
-| `EM_ANDAMENTO` | Técnico iniciou execução | Todas | Não |
-| `AGUARDANDO_APROVACAO` | Técnico submeteu evidências, aguarda aprovação | CORRETIVA, PREVENTIVA | Não |
-| `APROVADA` | Aprovador validou evidências | CORRETIVA, PREVENTIVA | Não |
-| `CONCLUIDA` | Ordem finalizada com custos; `custoTotalPorAtivo` atualizado | Todas | **Sim** |
-| `CANCELADA` | Cancelada antes de CONCLUIDA (motivo obrigatório) | Todas | **Sim** |
-
-### 1.2 Matriz de Transições (Backend + Frontend)
-
-| Estado Atual | Evento (Endpoint) | Próximo Estado | Guarda (Condição) | Side Effects | Permissão (Aegis Shield) |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| `ABERTA` | `PATCH /iniciar` | `EM_ANDAMENTO` | `estado == ABERTA` ∧ `tecnicoResponsavel == usuarioLogado` ∨ `role == GESTOR_FILIAL` | `dataInicio = now()`, `executorId = usuarioLogado`, auditoria | `ORDEM_INICIAR` (filial) |
-| `EM_ANDAMENTO` | `PATCH /submeter-aprovacao` | `AGUARDANDO_APROVACAO` | `evidencias.valido == true` (checklist + foto/assinatura) | `dataSubmissaoAprovacao = now()`, notifica aprovadores | `ORDEM_CONCLUIR` (própria) |
-| `AGUARDANDO_APROVACAO` | `PATCH /aprovar` | `APROVADA` | `usuarioLogado.permissao == ORDEM_APROVAR` ∧ `filialMatch` ∧ `evidencias.integras` | `dataAprovacao = now()`, `aprovadorId = usuarioLogado`, notifica técnico | `ORDEM_APROVAR` (filial) |
-| `AGUARDANDO_APROVACAO` | `PATCH /rejeitar` | `EM_ANDAMENTO` | `usuarioLogado.permissao == ORDEM_APROVAR` ∧ `motivoRejeicao != null` | `motivoRejeicao`, notifica técnico | `ORDEM_APROVAR` (filial) |
-| `APROVADA` | `PATCH /concluir` | `CONCLUIDA` | `custosFinais.valido == true` (maoDeObra + materiais + terceiros) | `dataConclusao = now()`, `custosFinais`, **atualiza `custoTotalPorAtivo` do ativo**, verifica trigger preventiva | `ORDEM_CONCLUIR` (filial) |
-| `ABERTA` | `PATCH /cancelar` | `CANCELADA` | `motivoCancelamento != null` | `dataCancelamento = now()`, `motivo`, **não afeta `custoTotalPorAtivo`** | `ORDEM_CANCELAR` (filial) |
-| `EM_ANDAMENTO` | `PATCH /cancelar` | `CANCELADA` | `motivoCancelamento != null` ∧ (`role == GESTOR_FILIAL` ∨ `role == ADMIN`) | Idem + custo parcial registrado se houver | `ORDEM_CANCELAR` (filial) |
-| `AGUARDANDO_APROVACAO` | `PATCH /cancelar` | `CANCELADA` | `motivoCancelamento != null` ∧ `role == GESTOR_FILIAL` | Idem + evidências arquivadas | `ORDEM_CANCELAR` (filial) |
-| `APROVADA` | `PATCH /cancelar` | `CANCELADA` | `motivoCancelamento != null` ∧ `role == ADMIN_GLOBAL` (excepcional) | Idem + estorno custos se aplicável | `ORDEM_CANCELAR` (global) |
-
-### 1.3 Transições Inválidas (Explícitas)
-
-| De | Evento | Motivo |
+### Valid States
+| Estado | Descrição | É estado final? |
 | :--- | :--- | :--- |
-| `CONCLUIDA` | qualquer | Estado terminal imutável (contabilidade) |
-| `CANCELADA` | qualquer | Estado terminal |
-| `ABERTA` | `aprovar`, `concluir` | Pula execução técnica obrigatória |
-| `EM_ANDAMENTO` | `aprovar`, `concluir` | Pula evidências + aprovação (NR-10/12) |
-| `AGUARDANDO_APROVACAO` | `iniciar`, `concluir` | Viola fluxo aprovação obrigatória |
-| `APROVADA` | `iniciar`, `submeter_aprovacao`, `aprovar` | Estado pós-aprovação |
+| `RASCUNHO` | Ativo criado mas não submetido para aprovação; dados incompletos. | Não |
+| `AGUARDANDO_APROVACAO` | Submetido para aprovação do GESTOR/ADMIN (BR-02: `aprovar`). | Não |
+| `ATIVO` | Aprovado, em uso normal; gera health checks e alertas de recurso. | Não |
+| `EM_MANUTENCAO` | Possui pelo menos uma `Manutencao` em `EM_ANDAMENTO`; health checks podem ser suspensos. | Não |
+| `ALOCADO` | Atribuído a `Funcionario`/`Local`; subestado lógico de `ATIVO` (não muda estado principal). | Não |
+| `BAIXADO` | Baixa patrimonial definitiva (descarte, doação, venda); imutável após auditoria. | **Sim** |
+| `ANONIMIZADO_LGPD` | Dados sensíveis removidos/anônimos por solicitação "direito ao esquecimento" (NFR-C01); mantém PK para integridade referencial. | **Sim** |
 
-### 1.4 Diagrama Mermaid
+> [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] Estados `RASCUNHO` e `AGUARDANDO_APROVACAO` assumem fluxo de aprovação implícito no BR-02 (`aprovar`). `ALOCADO` modelado como flag/associação, não estado principal. `ANONIMIZADO_LGPD` atende NFR-C01.
 
+### Transition Matrix
+| Estado Atual | Evento | Próximo Estado | Guarda (Condição) | Side Effects |
+| :--- | :--- | :--- | :--- | :--- |
+| `RASCUNHO` | `submeter_aprovacao` | `AGUARDANDO_APROVACAO` | `dados_obrigatorios_completos(ativo)` ∧ `usuario.temPapel(GESTOR, ADMIN)` | `AuditoriaLog.criar(ATIVO_CRIADO, payload)`; notifica aprovadores |
+| `AGUARDANDO_APROVACAO` | `aprovar` | `ATIVO` | `usuario.temPapel(GESTOR, ADMIN)` ∧ `ativo.valor <= limite_aprovacao_gestor ∨ usuario.temPapel(ADMIN)` | `AuditoriaLog.criar(ATIVO_APROVADO)`; agenda `HealthCheck` inicial; publica evento `AtivoAtivado` |
+| `AGUARDANDO_APROVACAO` | `rejeitar` | `RASCUNHO` | `usuario.temPapel(GESTOR, ADMIN)` | `AuditoriaLog.criar(ATIVO_REJEITADO, motivo)`; notifica solicitante |
+| `ATIVO` | `iniciar_manutencao` | `EM_MANUTENCAO` | `existe_manutencao_aberta(ativo) ∧ manutencao.estado = APROVADA` | `AuditoriaLog.criar(MANUTENCAO_INICIADA)`; suspende health checks agendados (opcional) |
+| `EM_MANUTENCAO` | `concluir_manutencao` | `ATIVO` | `todas_manutencoes_abertas(ativo).estado = CONCLUIDA` | `AuditoriaLog.criar(MANUTENCAO_CONCLUIDA)`; reativa health checks |
+| `ATIVO` \| `EM_MANUTENCAO` | `solicitar_baixa` | `AGUARDANDO_APROVACAO_BAIXA` | `usuario.temPapel(GESTOR, ADMIN)` ∧ `nao_existe_manutencao_em_andamento(ativo)` | Cria solicitação de baixa; notifica ADMIN |
+| `AGUARDANDO_APROVACAO_BAIXA` | `aprovar_baixa` | `BAIXADO` | `usuario.temPapel(ADMIN)` ∳ `compliance_aprova_baixa(ativo)` | `AuditoriaLog.criar(ATIVO_BAIXADO, {motivo, valor_residual})`; cancela health checks futuros; grava WORM |
+| `ATIVO` \| `EM_MANUTENCAO` \| `BAIXADO` | `anonimizar_lgpd` | `ANONIMIZADO_LGPD` | `solicitacao_lgpd_valida(titular)` ∧ `nao_existe_obrigacao_legal_retencao(ativo)` | `AuditoriaLog.criar(LGPD_ANONIMIZACAO)`; anonimiza `Funcionario`, `Usuario`, `AuditoriaLog` vinculados; mantém PK |
+| `BAIXADO` | — | — | **Estado terminal** | Imutável; qualquer tentativa de transição lança `IllegalStateTransitionException` |
+| `ANONIMIZADO_LGPD` | — | — | **Estado terminal** | Imutável; apenas leitura permitida |
+
+> [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] Evento `solicitar_baixa` e estado `AGUARDANDO_APROVACAO_BAIXA` inferidos para separar aprovação de baixa da de ativação. Guarda `compliance_aprova_baixa` atende SOX 7 anos (NFR-C02). Side effects usam `AuditoriaService` (SAD Seção 9) e WORM storage.
+
+### Invalid Transitions (Explicitamente Proibidas)
+| De | Evento | Para | Motivo da Proibição |
+| :--- | :--- | :--- | :--- |
+| `BAIXADO` | qualquer | — | Estado final SOX/LGPD; imutabilidade legal (NFR-C02, NFR-SEC05) |
+| `ANONIMIZADO_LGPD` | qualquer | — | Estado final LGPD; imutabilidade legal (NFR-C01) |
+| `RASCUNHO` | `aprovar` | `ATIVO` | Pula aprovação obrigatória (BR-02) |
+| `ATIVO` | `aprovar_baixa` | `BAIXADO` | Requer estado `AGUARDANDO_APROVACAO_BAIXA` para rastreabilidade |
+| `EM_MANUTENCAO` | `aprovar_baixa` | `BAIXADO` | Manutenção em andamento impede baixa (integridade operacional) |
+| `AGUARDANDO_APROVACAO` | `iniciar_manutencao` | `EM_MANUTENCAO` | Ativo não aprovado não pode entrar em manutenção |
+
+### Diagram
 ```mermaid
 stateDiagram-v2
-    [*] --> ABERTA: criar (POST /ordens)
+    [*] --> RASCUNHO
+    RASCUNHO --> AGUARDANDO_APROVACAO: submeter_aprovacao [dados_completos ∧ papel_autorizado]
+    AGUARDANDO_APROVACAO --> ATIVO: aprovar [papel_autorizado ∧ valor_ok]
+    AGUARDANDO_APROVACAO --> RASCUNHO: rejeitar [papel_autorizado]
+    ATIVO --> EM_MANUTENCAO: iniciar_manutencao [manutencao_aprovada_existe]
+    EM_MANUTENCAO --> ATIVO: concluir_manutencao [todas_concluidas]
+    ATIVO --> AGUARDANDO_APROVACAO_BAIXA: solicitar_baixa [papel_autorizado ∧ sem_manutencao_aberta]
+    EM_MANUTENCAO --> AGUARDANDO_APROVACAO_BAIXA: solicitar_baixa [papel_autorizado ∧ sem_manutencao_aberta]
+    AGUARDANDO_APROVACAO_BAIXA --> BAIXADO: aprovar_baixa [ADMIN ∧ compliance_ok]
+    ATIVO --> ANONIMIZADO_LGPD: anonimizar_lgpd [solicitacao_valida ∧ sem_retencao_legal]
+    EM_MANUTENCAO --> ANONIMIZADO_LGPD: anonimizar_lgpd [solicitacao_valida ∧ sem_retencao_legal]
+    BAIXADO --> ANONIMIZADO_LGPD: anonimizar_lgpd [solicitacao_valida ∧ sem_retencao_legal]
+    BAIXADO --> [*]
+    ANONIMIZADO_LGPD --> [*]
     
-    ABERTA --> EM_ANDAMENTO: iniciar [técnico/gestor filial]
-    ABERTA --> CANCELADA: cancelar [motivo]
-    
-    EM_ANDAMENTO --> AGUARDANDO_APROVACAO: submeter_aprovacao [evidências OK]
-    EM_ANDAMENTO --> CANCELADA: cancelar [gestor filial]
-    
-    AGUARDANDO_APROVACAO --> APROVADA: aprovar [aprovador filial + evidências íntegras]
-    AGUARDANDO_APROVACAO --> EM_ANDAMENTO: rejeitar [motivo]
-    AGUARDANDO_APROVACAO --> CANCELADA: cancelar [gestor filial]
-    
-    APROVADA --> CONCLUIDA: concluir [custos finais OK]
-    APROVADA --> CANCELADA: cancelar [ADMIN global - excepcional]
-    
+    note right of BAIXADO: Estado final SOX 7 anos\nImutável (WORM)
+    note right of ANONIMIZADO_LGPD: Estado final LGPD\nImutável (WORM)
+```
+
+---
+
+## 2. Core State Machine: Manutencao (Maintenance)
+
+### Purpose
+Ciclo de vida de uma ordem de manutenção (corretiva, preventiva, preditiva) desde a solicitação até conclusão/cancelamento, com aprovação obrigatória (BR-02: `aprovar`) e rastreabilidade de custos para `custoTotalPorAtivo`. Integra com `AlertNotificationService` para alertas de SLA.
+
+### Valid States
+| Estado | Descrição | É estado final? |
+| :--- | :--- | :--- |
+| `SOLICITADA` | Criada por OPERADOR/GESTOR; aguarda aprovação. | Não |
+| `APROVADA` | Aprovada por GESTOR/ADMIN; elegível para `iniciar`. | Não |
+| `REJEITADA` | Recusada na aprovação; pode ser reaberta (volta a `SOLICITADA`). | Não |
+| `EM_ANDAMENTO` | Técnico iniciou execução (`iniciar`); consome recursos, gera custos. | Não |
+| `AGUARDANDO_PECA` | Pausada aguardando peça/insumo; subestado de `EM_ANDAMENTO` (modelado como estado para SLA). | Não |
+| `CONCLUIDA` | Finalizada com relatório, custos lançados, ativo liberado. | **Sim** |
+| `CANCELADA` | Cancelada antes de `EM_ANDAMENTO` (ex.: duplicada, desnecessária). | **Sim** |
+
+> [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] `AGUARDANDO_PECA` separado para pausar SLA (NFR-P04: `checkResourceUsageAlerts` ≤ 30s/12k ativos). `REJEITADA` não final para permitir retrabalho.
+
+### Transition Matrix
+| Estado Atual | Evento | Próximo Estado | Guarda (Condição) | Side Effects |
+| :--- | :--- | :--- | :--- | :--- |
+| `SOLICITADA` | `aprovar` | `APROVADA` | `usuario.temPapel(GESTOR, ADMIN)` ∧ `orcamento_disponivel(ativo, valor_estimado)` | `AuditoriaLog.criar(MANUTENCAO_APROVADA)`; notifica técnico responsável |
+| `SOLICITADA` | `rejeitar` | `REJEITADA` | `usuario.temPapel(GESTOR, ADMIN)` | `AuditoriaLog.criar(MANUTENCAO_REJEITADA, motivo)`; notifica solicitante |
+| `REJEITADA` | `reabrir` | `SOLICITADA` | `usuario.temPapel(OPERADOR, GESTOR)` ∧ `motivo_rejeicao_resolvido` | `AuditoriaLog.criar(MANUTENCAO_REABERTA)` |
+| `APROVADA` | `iniciar` | `EM_ANDAMENTO` | `usuario.temPapel(OPERADOR, TECNICO)` ∧ `ativo.estado ∈ {ATIVO, EM_MANUTENCAO}` | `AuditoriaLog.criar(MANUTENCAO_INICIADA)`; `Ativo.estado = EM_MANUTENCAO`; inicia cronômetro SLA |
+| `EM_ANDAMENTO` | `pausar_peca` | `AGUARDANDO_PECA` | `peca_necessaria_nao_disponivel` | `AuditoriaLog.criar(MANUTENCAO_PAUSADA_PECA)`; pausa SLA |
+| `AGUARDANDO_PECA` | `peca_chegou` | `EM_ANDAMENTO` | `peca_disponivel_em_estoque` | `AuditoriaLog.criar(MANUTENCAO_RETOMADA)`; retoma SLA |
+| `EM_ANDAMENTO` | `concluir` | `CONCLUIDA` | `relatorio_preenchido` ∧ `custos_lancados` ∧ `usuario.temPapel(OPERADOR, TECNICO, GESTOR)` | `AuditoriaLog.criar(MANUTENCAO_CONCLUIDA, {custo_real, tempo_real})`; `Ativo.estado = ATIVO` (se sem outras abertas); atualiza `custoTotalPorAtivo` (invalida cache) |
+| `SOLICITADA` \| `APROVADA` | `cancelar` | `CANCELADA` | `usuario.temPapel(GESTOR, ADMIN)` ∧ `nao_iniciada` | `AuditoriaLog.criar(MANUTENCAO_CANCELADA, motivo)`; libera orçamento reservado |
+| `CONCLUIDA` | — | — | **Estado final** | Imutável; custos consolidados para relatórios SOX |
+| `CANCELADA` | — | — | **Estado final** | Imutável; rastreabilidade de cancelamento |
+
+> [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] Guarda `orcamento_disponivel` inferida para controle de custos (NFR-CO01). Side effect `invalida cache custoTotalPorAtivo` alinha com estratégia de cache L1 (SAD Seção 7). Evento `pausar_peca`/`peca_chegou` para SLA realista.
+
+### Invalid Transitions (Explicitamente Proibidas)
+| De | Evento | Para | Motivo da Proibição |
+| :--- | :--- | :--- | :--- |
+| `CONCLUIDA` | qualquer | — | Estado final; custos contábeis fechados (SOX) |
+| `CANCELADA` | qualquer | — | Estado final; rastreabilidade de decisão |
+| `SOLICITADA` | `iniciar` | `EM_ANDAMENTO` | Requer aprovação prévia (BR-02: `aprovar`) |
+| `APROVADA` | `concluir` | `CONCLUIDA` | Não pode pular execução (`iniciar`) |
+| `EM_ANDAMENTO` | `cancelar` | `CANCELADA` | Já iniciada → deve `concluir` ou `pausar_peca` |
+| `AGUARDANDO_PECA` | `cancelar` | `CANCELADA` | Requer aprovação de GESTOR/ADMIN para cancelar em andamento |
+
+### Diagram
+```mermaid
+stateDiagram-v2
+    [*] --> SOLICITADA
+    SOLICITADA --> APROVADA: aprovar [papel_autorizado ∧ orcamento_ok]
+    SOLICITADA --> REJEITADA: rejeitar [papel_autorizado]
+    SOLICITADA --> CANCELADA: cancelar [papel_autorizado ∧ nao_iniciada]
+    REJEITADA --> SOLICITADA: reabrir [motivo_resolvido]
+    APROVADA --> EM_ANDAMENTO: iniciar [papel_tecnico ∧ ativo_elegivel]
+    APROVADA --> CANCELADA: cancelar [papel_autorizado]
+    EM_ANDAMENTO --> AGUARDANDO_PECA: pausar_peca [peca_indisponivel]
+    AGUARDANDO_PECA --> EM_ANDAMENTO: peca_chegou [peca_disponivel]
+    EM_ANDAMENTO --> CONCLUIDA: concluir [relatorio_ok ∧ custos_lancados]
     CONCLUIDA --> [*]
     CANCELADA --> [*]
     
-    note right of CONCLUIDA
-        Terminal: custoTotalPorAtivo atualizado
-        Auditoria: CREATE/UPDATE/DELETE + Diff
-    end note
-    
-    note right of CANCELADA
-        Terminal: não afeta custoTotalPorAtivo
-        Auditoria: motivo + ator
-    end note
-```
-
-### 1.5 Idempotência & Concorrência
-
-- **Optimistic Locking:** Campo `version` (Long) em `SolicitacaoManutencao`; `If-Match: <version>` em `PATCH`; Conflito → `409 Conflict` + `ETag` atual.
-- **Idempotency Key:** Header `Idempotency-Key` (UUID v4 gerado frontend por ação usuário); Backend armazena `idempotency_key` + `response` (24h); Duplicata → `200 OK` cached response.
-- **Race Conditions:**
-  1. Duplo clique "Iniciar" → 2 `PATCH /iniciar` simultâneas → 2ª recebe 409 (version mismatch)
-  2. Aprovação concorrente (2 aprovadores) → Optimistic lock resolve; um recebe 409
-  3. Cancelamento durante aprovação → Quem chega por último vence (lock); WebSocket notifica outro
-
----
-
-## 2. Ativo (Asset) — Lifecycle
-
-### 2.1 Estados Válidos
-
-| Estado | Descrição | Terminal? |
-| :--- | :--- | :--- |
-| `ATIVO` | Ativo operacional, depreciando, alocado | Não |
-| `EM_MANUTENCAO` | Ativo em ordem de manutenção aberta/em andamento | Não |
-| `BAIXADO` | Fim de vida útil, desativado, TCO final consolidado | **Sim** |
-
-### 2.2 Matriz de Transições
-
-| Estado Atual | Evento | Próximo Estado | Guarda | Side Effects | Permissão |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| `ATIVO` | Ordem criada (qualquer tipo) | `EM_MANUTENCAO` | `ordem.estado IN (ABERTA, EM_ANDAMENTO, AGUARDANDO_APROVACAO, APROVADA)` | Trigger automático via `OrdemService` | Sistema (interno) |
-| `EM_MANUTENCAO` | Última ordem → `CONCLUIDA` ou `CANCELADA` | `ATIVO` | `NOT EXISTS ordem WHERE ativo_id = ? AND estado NOT IN (CONCLUIDA, CANCELADA)` | Trigger automático | Sistema (interno) |
-| `ATIVO` | `PATCH /baixar` | `BAIXADO` | `motivoBaixa != null` ∧ `role IN (GESTOR_PATRIMONIO, ADMIN)` | `dataBaixa = now()`, `motivoBaixa`, **TCO final consolidado**, bloqueia novas ordens | `ATIVO_EXCLUIR` (filial) |
-| `EM_MANUTENCAO` | `PATCH /baixar` | `BAIXADO` | `motivoBaixa != null` ∧ `role == ADMIN_GLOBAL` (excepcional) | Força baixa + cancela ordens abertas | `ATIVO_EXCLUIR` (global) |
-
-### 2.3 Diagrama
-
-```mermaid
-stateDiagram-v2
-    [*] --> ATIVO: criar (POST /ativos)
-    
-    ATIVO --> EM_MANUTENCAO: ordem criada [auto]
-    EM_MANUTENCAO --> ATIVO: última ordem finalizada [auto]
-    
-    ATIVO --> BAIXADO: baixar [gestor patrimônio]
-    EM_MANUTENCAO --> BAIXADO: baixar forçado [admin global]
-    
-    BAIXADO --> [*]
-    
-    note right of BAIXADO
-        Terminal: TCO final consolidado
-        Bloqueia: novas ordens, alocação
-        Auditoria: motivo + ator + TCO final
-    end note
+    note right of CONCLUIDA: Estado final SOX\nCustos consolidados\nCache invalidado
+    note right of CANCELADA: Estado final\nRastreabilidade completa
 ```
 
 ---
 
-## 3. ManutencaoPreventiva (Plano Preventivo) — Scheduler
+## 3. Core State Machine: HealthCheck
 
-### 3.1 Estados Válidos
+### Purpose
+Ciclo de execução de health checks periódicos (agendados via `TaskScheduler` / `updateHealthCheck` job) para monitorar integridade de ativos. Resultados alimentam `AlertNotificationService.checkResourceUsageAlerts` (NFR-P04: ≤ 30s p/ 12k ativos) e dashboards.
 
-| Estado | Descrição | Terminal? |
+### Valid States
+| Estado | Descrição | É estado final? |
 | :--- | :--- | :--- |
-| `ATIVO` | Plano ativo, gera ordens conforme CRON | Não |
-| `PAUSADO` | Plano pausado manualmente, não gera ordens | Não |
-| `EXPIRADO` | Plano expirado (data fim atingida ou ativo baixado) | **Sim** |
-| `CANCELADO` | Cancelado manualmente (sem ordens geradas) | **Sim** |
+| `AGENDADO` | Job `updateHealthCheck` criou registro pendente de execução. | Não |
+| `EM_EXECUCAO` | Worker iniciou coleta de métricas (CPU, disco, rede, aplicação). | Não |
+| `SAUDAVEL` | Todas as métricas dentro dos thresholds (`< 70%` CPU, `< 80%` disco, etc.). | **Sim** (por execução) |
+| `DEGRADADO` | Alguma métrica em warning (`70-85%` CPU, `80-90%` disco). | **Sim** (por execução) |
+| `CRITICO` | Métrica em critical (`> 85%` CPU, `> 90%` disco, indisponibilidade). | **Sim** (por execução) |
+| `FALHOU` | Erro na coleta (timeout, permissão, rede); não gerou métricas válidas. | **Sim** (por execução) |
 
-### 3.2 Matriz de Transições
+> [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] Estados terminais **por execução** — cada health check gera nova instância (tabela `HealthCheck` com `ativo_id`, `executado_em`, `estado`). Thresholds alinhados com alertas do SAD (NFR-O04: CPU > 80%, Disco > 85%).
 
-| Estado Atual | Evento | Próximo Estado | Guarda | Side Effects |
+### Transition Matrix
+| Estado Atual | Evento | Próximo Estado | Guarda (Condição) | Side Effects |
 | :--- | :--- | :--- | :--- | :--- |
-| `ATIVO` | `PATCH /pausar` | `PAUSADO` | `motivoPausa != null` | `proximaExecucao` mantida; não gera novas ordens |
-| `PAUSADO` | `PATCH /reativar` | `ATIVO` | — | Recalcula `proximaExecucao` (próximo CRON ≥ now) |
-| `ATIVO` | Scheduler detecta `ativo.baixado == true` | `EXPIRADO` | `ativo.status == BAIXADO` | Para geração; ordens existentes continuam |
-| `ATIVO` | `PATCH /cancelar` | `CANCELADO` | `ordensGeradas.count == 0` ∧ `motivo != null` | Remove plano; sem ordens órfãs |
-| `PAUSADO` | `PATCH /cancelar` | `CANCELADO` | `ordensGeradas.count == 0` ∧ `motivo != null` | Idem |
-| `ATIVO` | Data fim atingida (`dataFim <= now`) | `EXPIRADO` | `dataFim != null` | Para geração |
+| `AGENDADO` | `iniciar_execucao` | `EM_EXECUCAO` | `worker_disponivel` ∧ `ativo.estado ∈ {ATIVO, EM_MANUTENCAO}` | `AuditoriaLog.criar(HEALTHCHECK_INICIADO)`; registra `inicio_em` |
+| `EM_EXECUCAO` | `coletar_metricas_sucesso` | `SAUDAVEL` | `todas_metricas < threshold_warning` | `AuditoriaLog.criar(HEALTHCHECK_OK)`; `fim_em = now()`; atualiza `Ativo.ultimo_healthcheck` |
+| `EM_EXECUCAO` | `coletar_metricas_sucesso` | `DEGRADADO` | `alguma_metrica ≥ threshold_warning ∧ < threshold_critical` | `AuditoriaLog.criar(HEALTHCHECK_DEGRADADO)`; dispara `Alerta` tipo `RECURSO_DEGRADADO` |
+| `EM_EXECUCAO` | `coletar_metricas_sucesso` | `CRITICO` | `alguma_metrica ≥ threshold_critical` | `AuditoriaLog.criar(HEALTHCHECK_CRITICO)`; dispara `Alerta` tipo `RECURSO_CRITICO` (prioridade alta) |
+| `EM_EXECUCAO` | `falha_coleta` | `FALHOU` | `timeout ∨ erro_permissao ∨ erro_rede ∨ excecao_inesperada` | `AuditoriaLog.criar(HEALTHCHECK_FALHA, {erro, stacktrace})`; dispara `Alerta` tipo `HEALTHCHECK_FALHA`; agenda retry (backoff exponencial) |
+| `SAUDAVEL` \| `DEGRADADO` \| `CRITICO` \| `FALHOU` | — | — | **Estado final da execução** | Nova execução cria novo registro (`AGENDADO`) no próximo agendamento |
 
-### 3.3 Diagrama
+> [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] Transições `coletar_metricas_sucesso` → 3 estados baseadas em thresholds (não no código). Retry em `FALHOU` inferido para robustez (SAD Seção 8: retry com backoff). `Ativo.ultimo_healthcheck` atualizado para dashboard.
 
+### Invalid Transitions (Explicitamente Proibidas)
+| De | Evento | Para | Motivo da Proibição |
+| :--- | :--- | :--- | :--- |
+| `AGENDADO` | `coletar_metricas_sucesso` | `SAUDAVEL`/`DEGRADADO`/`CRITICO` | Pula execução; `iniciar_execucao` obrigatório para timestamps |
+| `EM_EXECUCAO` | `iniciar_execucao` | `EM_EXECUCAO` | Previne execução concorrente do mesmo check (idempotência) |
+| `SAUDAVEL` | qualquer | — | Execução finalizada; novo agendamento cria nova instância |
+| `FALHOU` | `coletar_metricas_sucesso` | `SAUDAVEL` | Falha não pode virar sucesso retroativamente; retry cria nova execução |
+
+### Diagram
 ```mermaid
 stateDiagram-v2
-    [*] --> ATIVO: criar (POST /preventivas)
+    [*] --> AGENDADO
+    AGENDADO --> EM_EXECUCAO: iniciar_execucao [worker_livre ∧ ativo_ativo]
+    EM_EXECUCAO --> SAUDAVEL: coletar_metricas_sucesso [todas < warning]
+    EM_EXECUCAO --> DEGRADADO: coletar_metricas_sucesso [alguma ≥ warning < critical]
+    EM_EXECUCAO --> CRITICO: coletar_metricas_sucesso [alguma ≥ critical]
+    EM_EXECUCAO --> FALHOU: falha_coleta [timeout ∨ erro]
+    SAUDAVEL --> [*]
+    DEGRADADO --> [*]
+    CRITICO --> [*]
+    FALHOU --> [*]
     
-    ATIVO --> PAUSADO: pausar [motivo]
-    PAUSADO --> ATIVO: reativar [recalcula próxima]
-    
-    ATIVO --> EXPIRADO: ativo baixado [auto] OU data fim [auto]
-    ATIVO --> CANCELADO: cancelar [sem ordens geradas + motivo]
-    PAUSADO --> CANCELADO: cancelar [sem ordens geradas + motivo]
-    
-    EXPIRADO --> [*]
-    CANCELADO --> [*]
-    
-    note right of ATIVO
-        Scheduler 15min: verifica proximaExecucao <= now
-        Gera: ordem PREVENTIVA ABERTA
-        Atualiza: proximaExecucao = próximo CRON
-    end note
+    note right of SAUDAVEL: Execução finalizada\nNovo agendamento = nova instância
+    note right of FALHOU: Retry agendado com backoff\nNova instância AGENDADO
 ```
 
 ---
 
-## 4. HealthCheck / PrevisaoFalha (Manutenção Preditiva)
+## 4. Core State Machine: Alerta (Alert)
 
-### 4.1 HealthCheck — Coleta de Métricas
+### Purpose
+Ciclo de vida de alertas gerados por `AlertNotificationService.checkResourceUsageAlerts` (recursos), health checks (degradado/crítico/falha), SLA de manutenção, ou eventos de segurança. Suporta fluxo de triagem, reconhecimento, resolução e fechamento com auditoria completa (NFR-SEC05, WORM).
 
-| Estado | Descrição |
-| :--- | :--- |
-| `COLETADO` | Métricas SMART recebidas (manual PWA ou agente) |
-| `ANALISADO` | Score 0-100 calculado + threshold verificado |
-| `ALERTA_CRITICO` | Score < threshold crítico (ex.: 40) → Ordem preditiva auto |
-| `ALERTA_ATENCAO` | Score < threshold atenção (ex.: 60) → Notificação apenas |
-
-**Transições:** `COLETADO` → `ANALISADO` (auto, síncrono) → `ALERTA_CRITICO` | `ALERTA_ATENCAO` | `NORMAL` (score ≥ atenção)
-
-### 4.2 PrevisaoFalha — Regressão Linear Batch
-
-| Estado | Descrição |
-| :--- | :--- |
-| `ATIVA` | Previsão vigente (probabilidade > 0, data futura) |
-| `TRATADA` | Ação tomada: "Agendar Substituição" → cria preventiva one-shot |
-| `EXPIRADA` | Data prevista passou sem falha real (falso positivo) |
-| `CONFIRMADA` | Falha real ocorreu antes da data prevista (verificação pós-fato) |
-
-**Transições:**
-- Batch noturno: Cria/Atualiza `ATIVA` (prob > 0, dataPrevista > now)
-- `ATIVA` → `TRATADA`: Usuário clica "Agendar Substituição" (US-PRD-007)
-- `ATIVA` → `EXPIRADA`: Job diário verifica `dataPrevista < now` ∧ `status == ATIVA` ∧ sem ordem correlacionada
-- `ATIVA` → `CONFIRMADA`: Ordem real de falha de disco criada (correlação `previsao_falha_id`)
-
-### 4.3 Diagrama Preditiva
-
-```mermaid
-stateDiagram-v2
-    [*] --> COLETADO: POST /health-check (PWA/Agente)
-    COLETADO --> ANALISADO: HealthCheckService.analisar() [auto]
-    
-    ANALISADO --> NORMAL: score >= threshold_atencao
-    ANALISADO --> ALERTA_ATENCAO: score < threshold_atencao (ex: 60)
-    ANALISADO --> ALERTA_CRITICO: score < threshold_critico (ex: 40)
-    
-    ALERTA_CRITICO --> ORDEM_PREDITIVA_AUTO: ManutencaoPreditivaService.gerarOrdemPreditiva() [auto]
-    ALERTA_ATENCAO --> NOTIFICACAO: Alerta dashboard + push/email [auto]
-    
-    state "Batch Noturno 02:00" as BATCH {
-        [*] --> CALCULA_PREVISAO: Para cada ativo com >= 3 health_checks
-        CALCULA_PREVISAO --> ATIVA: prob > 0 E dataPrevista > now
-        ATIVA --> TRATADA: Usuario "Agendar Substituição"
-        ATIVA --> EXPIRADA: dataPrevista passou sem falha [job diário]
-        ATIVA --> CONFIRMADA: Falha real correlacionada [auto]
-    }
-    
-    TRATADA --> [*]
-    EXPIRADA --> [*]
-    CONFIRMADA --> [*]
-    NORMAL --> [*]
-    ALERTA_ATENCAO --> [*]
-    ORDEM_PREDITIVA_AUTO --> [*]
-```
-
----
-
-## 5. Usuario (User) — Lifecycle + Auth
-
-### 5.1 Estados Válidos
-
-| Estado | Descrição | Terminal? |
+### Valid States
+| Estado | Descrição | É estado final? |
 | :--- | :--- | :--- |
-| `ATIVO` | Usuário pode logar, acessar recursos conforme permissões | Não |
-| `INATIVO` | Soft delete (LGPD anonimização ou desligamento); não loga | **Sim** |
-| `BLOQUEADO` | Tentativas de login excedidas (brute force) ou admin bloqueou | Não |
-| `PENDENTE_PRIMEIRO_ACESSO` | Usuario provisionado, senha temporária, aguarda primeiro login | Não |
+| `ABERTO` | Criado automaticamente (job/health check) ou manualmente; não triado. | Não |
+| `EM_ANALISE` | Atribuído a OPERADOR/GESTOR para investigação. | Não |
+| `RECONHECIDO` | Causa raiz identificada; plano de ação definido; aguarda execução. | Não |
+| `EM_RESOLUCAO` | Ação corretiva em andamento (ex.: scale-up, restart, manutenção). | Não |
+| `RESOLVIDO` | Ação concluída; métricas normalizadas; aguarda validação/fechamento. | Não |
+| `FECHADO` | Validado por GESTOR/ADMIN; imutável. | **Sim** |
+| `SUPRIMIDO_LGPD` | Dados do alerta anonimizados por solicitação LGPD (raro; mantém PK). | **Sim** |
 
-### 5.2 Matriz de Transições
+> [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] `EM_ANALISE`/`RECONHECIDO`/`EM_RESOLUCAO`/`RESOLVIDO` modelam fluxo ITIL simplificado. `SUPPRIMIDO_LGPD` atende NFR-C01. Prioridades: `BAIXA`, `MEDIA`, `ALTA`, `CRITICA` (campo separado, não estado).
 
-| Estado Atual | Evento | Próximo Estado | Guarda | Side Effects | Permissão |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| `PENDENTE_PRIMEIRO_ACESSO` | Primeiro login (senha temporária → nova senha) | `ATIVO` | `novaSenha.valida == true` | `senhaHash = hash(novaSenha)`, `primeiroAcesso = false`, revoga refresh tokens antigos | Usuario (self) |
-| `ATIVO` | `POST /auth/login` (sucesso) | `ATIVO` | `credenciais.validas` | Emite `accessToken` (15min) + `refreshToken` (HttpOnly cookie 7d) | — |
-| `ATIVO` | `POST /auth/refresh` | `ATIVO` | `refreshToken.valido ∧ !revogado` | **Rotação:** invalida refresh antigo + emite novo par (access + refresh) | — |
-| `ATIVO` | `PATCH /bloquear` (Admin) | `BLOQUEADO` | `motivo != null` ∧ `role == ADMIN` | Revoga todos tokens; invalida sessões; `bloqueadoEm = now()` | `USUARIO_ATUALIZAR` (global) |
-| `BLOQUEADO` | `PATCH /desbloquear` (Admin) | `ATIVO` | `role == ADMIN` | `bloqueadoEm = null` | `USUARIO_ATUALIZAR` (global) |
-| `ATIVO` | `POST /usuarios/me/solicitar-exclusao` (LGPD) | `INATIVO` | `anonimizacao.sucesso == true` | **Anonimiza PII** (nome, email, CPF, telefone); `status = INATIVO`; Revoga tokens; **Envers preserva histórico + hash correlação** | Usuario (self) / DPO |
-| `ATIVO` | `PATCH /inativar` (Admin - desligamento) | `INATIVO` | `motivo != null` ∧ `role == ADMIN` | `status = INATIVO`; Revoga tokens; Mantém PII (não LGPD) | `USUARIO_EXCLUIR` (global) |
-
-### 5.3 Diagrama
-
-```mermaid
-stateDiagram-v2
-    [*] --> PENDENTE_PRIMEIRO_ACESSO: provisionar (Admin cria usuario)
-    
-    PENDENTE_PRIMEIRO_ACESSO --> ATIVO: primeiro login [senha temporária → nova]
-    
-    ATIVO --> BLOQUEADO: bloquear [admin + motivo]
-    BLOQUEADO --> ATIVO: desbloquear [admin]
-    
-    ATIVO --> INATIVO: LGPD esquecimento [self/DPO] OU desligamento [admin]
-    
-    INATIVO --> [*]
-    
-    note right of ATIVO
-        Login: accessToken 15min (memória) + refreshToken 7d (HttpOnly cookie)
-        Refresh: rotação obrigatória (invalida anterior + emite novo par)
-        Falha refresh: logout limpo → redirect /login
-    end note
-    
-    note right of INATIVO
-        LGPD: PII anonimizada (hash correlação em Envers)
-        Desligamento: PII mantida (obrigação legal)
-        Tokens revogados + sessões invalidadas
-    end note
-```
-
----
-
-## 6. Refresh Token — Lifecycle (Security)
-
-### 6.1 Estados
-
-| Estado | Descrição |
-| :--- | :--- |
-| `VALIDO` | Refresh token ativo, não expirado, não revogado, não usado |
-| `USADO` | Refresh token consumido na rotação (invalidação imediata) |
-| `REVOGADO` | Revogado manualmente (logout, bloqueio, LGPD, admin) |
-| `EXPIRADO` | `expiracao < now()` (7 dias padrão) |
-
-### 6.2 Transições
-
-```mermaid
-stateDiagram-v2
-    [*] --> VALIDO: emitir (login ou refresh)
-    
-    VALIDO --> USADO: POST /auth/refresh [rotação: invalida + emite novo]
-    VALIDO --> REVOGADO: logout / bloqueio / LGPD / admin revoke
-    VALIDO --> EXPIRADO: expiracao < now() [job limpeza diário]
-    
-    USADO --> [*]
-    REVOGADO --> [*]
-    EXPIRADO --> [*]
-    
-    note right of VALIDO
-        Armazenado: HttpOnly; Secure; SameSite=Strict cookie
-        BD: refresh_token (hash, usuarioId, filialId, expiracao, revogado, userAgent, IP)
-        Rotação: cada uso invalida anterior → novo par (access + refresh)
-    end note
-```
-
----
-
-## 7. Multi-tenancy Context (Filial) — Filial Switch (Admin Global)
-
-### 7.1 Estados de Contexto
-
-| Estado | Descrição |
-| :--- | :--- |
-| `FILIAL_SELECIONADA` | Admin Global visualizando/operando dados de uma filial específica |
-| `VISAO_GLOBAL` | Admin Global visualizando dados agregados de todas filiais (dashboard global) |
-
-### 7.2 Transições
-
-```mermaid
-stateDiagram-v2
-    [*] --> FILIAL_SELECIONADA: login Admin Global (default: primeira filial)
-    
-    FILIAL_SELECIONADA --> VISAO_GLOBAL: seletor header → "Todas Filiais"
-    VISAO_GLOBAL --> FILIAL_SELECIONADA: seletor header → seleciona filial X
-    
-    FILIAL_SELECIONADA --> FILIAL_SELECIONADA: troca filial Y → MultiTenancyFilter.set(tenantId=Y)
-    
-    note right of FILIAL_SELECIONADA
-        Hibernate Filter: WHERE filial_id = :tenantId (ativo em TODAS queries)
-        Auditoria: troca contexto registrada (usuario, filialAnterior, filialNova, timestamp)
-        UI: reflete dados da filial selecionada
-    end note
-    
-    note right of VISAO_GLOBAL
-        Hibernate Filter: DESATIVADO (tenantId = null)
-        Queries: sem filtro filial_id
-        Permissão: apenas ADMIN_GLOBAL
-    end note
-```
-
----
-
-## 8. Auditoria (Envers) — Revision Lifecycle
-
-### 8.1 Estados de Revisão (Imutáveis)
-
-| Tipo Revisão | Descrição | Entidades |
-| :--- | :--- | :--- |
-| `CREATE` | Entidade persistida pela primeira vez | Todas `@Audited` |
-| `UPDATE` | Campo(s) alterado(s) | Todas `@Audited` |
-| `DELETE` | Entidade removida (soft/hard) | Todas `@Audited` |
-| `ANONIMIZACAO` | LGPD: PII anonimizada (revisão especial) | `Usuario` |
-| `TRANSFERENCIA_FILIAL` | Ativo movido entre filiais | `Ativo` |
-| `BAIXA_ATIVO` | Ativo baixado (fim de vida) | `Ativo` |
-| `ORDEM_TRANSICAO` | Mudança de estado ordem (custom revision type) | `SolicitacaoManutencao` |
-
-### 8.2 Captura de Contexto (CustomRevisionListener)
-
-```java
-// Capturado automaticamente em TODA revisão
-revision.setUsuarioId(securityContext.getUsuarioId());
-revision.setIpAddress(request.getRemoteAddr());
-revision.setUserAgent(request.getHeader("User-Agent"));
-revision.setTraceId(MDC.get("traceId"));
-revision.setTipoRevisao(determinarTipo(entity, oldState, newState));
-```
-
-### 8.3 Imutabilidade & Retenção
-
-- **Imutável:** Tabelas `*_AUD` + `REVINFO` são **append-only**; `DELETE`/`UPDATE` bloqueados por trigger/constraint.
-- **Retenção:** 7 anos (particionamento `REVINFO` por mês; job anual `DROP PARTITION`).
-- **Export:** `AuditoriaController.exportar()` → PDF/CSV assinado digitalmente (hash SHA-256 + timestamp authority).
-
----
-
-## 9. Frontend UI State Mapping (Vue 3 + Pinia)
-
-### 9.1 Mapeamento Estados Backend → UI Components
-
-| Entidade | Estado Backend | Componente UI | Badge/Cor | Ações Habilitadas |
+### Transition Matrix
+| Estado Atual | Evento | Próximo Estado | Guarda (Condição) | Side Effects |
 | :--- | :--- | :--- | :--- | :--- |
-| **Ordem** | `ABERTA` | `OrderBadge` | 🟡 Amarelo "Aberta" | `Iniciar` (técnico), `Cancelar` (gestor) |
-| **Ordem** | `EM_ANDAMENTO` | `OrderBadge` | 🔵 Azul "Em Andamento" | `Submeter Aprovação` (técnico), `Cancelar` (gestor) |
-| **Ordem** | `AGUARDANDO_APROVACAO` | `OrderBadge` | 🟠 Laranja "Aguardando Aprovação" | `Aprovar`/`Rejeitar` (aprovador), `Cancelar` (gestor) |
-| **Ordem** | `APROVADA` | `OrderBadge` | 🟢 Verde "Aprovada" | `Concluir` (técnico), `Cancelar` (admin global) |
-| **Ordem** | `CONCLUIDA` | `OrderBadge` | ✅ Verde escuro "Concluída" | Somente leitura |
-| **Ordem** | `CANCELADA` | `OrderBadge` | 🔴 Vermelho "Cancelada" | Somente leitura |
-| **Ativo** | `ATIVO` | `AssetBadge` | 🟢 Verde "Ativo" | `Editar`, `Transferir`, `Baixar`, `Health Check` |
-| **Ativo** | `EM_MANUTENCAO` | `AssetBadge` | 🔵 Azul "Em Manutenção" | `Ver Ordem`, `Health Check` |
-| **Ativo** | `BAIXADO` | `AssetBadge` | ⚫ Cinza "Baixado" | Somente leitura + TCO final |
-| **Preventiva** | `ATIVO` | `PreventivaBadge` | 🟢 Verde "Ativa" | `Editar`, `Pausar`, `Ver Próxima` |
-| **Preventiva** | `PAUSADO` | `PreventivaBadge` | 🟡 Amarelo "Pausada" | `Reativar`, `Cancelar` |
-| **Preventiva** | `EXPIRADA`/`CANCELADA` | `PreventivaBadge` | 🔴 Vermelho "Expirada/Cancelada" | Somente leitura |
-| **HealthCheck** | `NORMAL` | `HealthScore` | 🟢 Verde (score ≥ 60) | — |
-| **HealthCheck** | `ALERTA_ATENCAO` | `HealthScore` | 🟡 Amarelo (40-59) | `Ver Detalhes` |
-| **HealthCheck** | `ALERTA_CRITICO` | `HealthScore` | 🔴 Vermelho (< 40) | `Ver Ordem Preditiva` |
-| **PrevisaoFalha** | `ATIVA` | `PrevisaoCard` | 🟠 Laranja (prob > 80%) | `Agendar Substituição` |
-| **PrevisaoFalha** | `TRATADA` | `PrevisaoCard` | 🟢 Verde "Tratada" | `Ver Preventiva Gerada` |
-| **PrevisaoFalha** | `EXPIRADA` | `PrevisaoCard` | ⚫ Cinza "Expirada" | — |
-| **Usuario** | `ATIVO` | `UserBadge` | 🟢 Verde "Ativo" | `Editar`, `Bloquear`, `Reset Senha` |
-| **Usuario** | `BLOQUEADO` | `UserBadge` | 🔴 Vermelho "Bloqueado" | `Desbloquear` |
-| **Usuario** | `INATIVO` | `UserBadge` | ⚫ Cinza "Inativo" | `Ver Auditoria` |
+| `ABERTO` | `atribuir` | `EM_ANALISE` | `usuario.temPapel(OPERADOR, GESTOR, ADMIN)` ∧ `alerta.nao_atribuido` | `AuditoriaLog.criar(ALERTA_ATRIBUIDO, {atribuido_a})`; notifica responsável |
+| `ABERTO` | `auto_resolver` | `RESOLVIDO` | `condicao_origem_normalizada` (ex.: CPU voltou < 70%) | `AuditoriaLog.criar(ALERTA_AUTO_RESOLVIDO)`; notifica criador/atribuído |
+| `EM_ANALISE` | `reconhecer` | `RECONHECIDO` | `usuario == atribuido_a ∨ usuario.temPapel(GESTOR, ADMIN)` ∧ `causa_raiz_documentada` | `AuditoriaLog.criar(ALERTA_RECONHECIDO, {causa_raiz, plano_acao})` |
+| `EM_ANALISE` | `reabrir` | `ABERTO` | `usuario.temPapel(GESTOR, ADMIN)` ∧ `informacao_adicional` | `AuditoriaLog.criar(ALERTA_REABERTO)`; limpa atribuído |
+| `RECONHECIDO` | `iniciar_resolucao` | `EM_RESOLUCAO` | `usuario.temPapel(OPERADOR, TECNICO, GESTOR)` ∧ `plano_acao_iniciado` | `AuditoriaLog.criar(ALERTA_RESOLUCAO_INICIADA)`; linka `Manutencao` se aplicável |
+| `EM_RESOLUCAO` | `resolver` | `RESOLVIDO` | `acao_concluida` ∧ `metricas_normalizadas` ∧ `usuario.temPapel(OPERADOR, TECNICO, GESTOR)` | `AuditoriaLog.criar(ALERTA_RESOLVIDO, {acao_tomada, evidencias})` |
+| `EM_RESOLUCAO` | `escalar` | `RECONHECIDO` | `bloqueio_nao_previsto` ∧ `usuario.temPapel(GESTOR, ADMIN)` | `AuditoriaLog.criar(ALERTA_ESCALADO)`; notifica nível superior |
+| `RESOLVIDO` | `validar_fechar` | `FECHADO` | `usuario.temPapel(GESTOR, ADMIN)` ∧ `validacao_ok` | `AuditoriaLog.criar(ALERTA_FECHADO)`; imutável (WORM) |
+| `RESOLVIDO` | `reabrir` | `EM_ANALISE` | `usuario.temPapel(GESTOR, ADMIN)` ∧ `reincidencia_ou_falso_positivo` | `AuditoriaLog.criar(ALERTA_REABERTO_POS_VALIDACAO)` |
+| `ABERTO` \| `EM_ANALISE` \| `RECONHECIDO` \| `EM_RESOLUCAO` \| `RESOLVIDO` \| `FECHADO` | `anonimizar_lgpd` | `SUPPRIMIDO_LGPD` | `solicitacao_lgpd_valida(titular_dados_alerta)` | `AuditoriaLog.criar(LGPD_ANONIMIZACAO_ALERTA)`; anonimiza descrição, atribuído, logs vinculados |
+| `FECHADO` | — | — | **Estado final** | Imutável; retenção SOX 7 anos (NFR-C02) |
+| `SUPPRIMIDO_LGPD` | — | — | **Estado final** | Imutável; LGPD |
 
-### 9.2 Guards Frontend (Pinia + Router)
+> [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] `auto_resolver` para alertas de recurso que se auto-resolvem (ex.: pico de CPU passageiro). `escalar` volta a `RECONHECIDO` para novo plano. `validar_fechar` exige GESTOR/ADMIN (RBAC BR-01).
 
-```typescript
-// stores/order.ts - Guards para ações de ordem
-const canIniciar = (ordem, user) => 
-  ordem.estado === 'ABERTA' && 
-  (ordem.tecnicoResponsavelId === user.id || user.hasPermission('ORDEM_INICIAR', ordem.filialId))
+### Invalid Transitions (Explicitamente Proibidas)
+| De | Evento | Para | Motivo da Proibição |
+| :--- | :--- | :--- | :--- |
+| `FECHADO` | qualquer | — | Estado final SOX; imutável (WORM) |
+| `SUPPRIMIDO_LGPD` | qualquer | — | Estado final LGPD; imutável |
+| `ABERTO` | `resolver` | `RESOLVIDO` | Pula triagem/análise (rastreabilidade) |
+| `EM_ANALISE` | `validar_fechar` | `FECHADO` | Requer `RESOLVIDO` com evidências |
+| `RECONHECIDO` | `validar_fechar` | `FECHADO` | Requer execução (`EM_RESOLUCAO` → `RESOLVIDO`) |
+| `EM_RESOLUCAO` | `reconhecer` | `RECONHECIDO` | Já reconhecido; use `escalar` se mudar plano |
 
-const canAprovar = (ordem, user) => 
-  ordem.estado === 'AGUARDANDO_APROVACAO' && 
-  user.hasPermission('ORDEM_APROVAR', ordem.filialId) &&
-  ordem.evidencias?.valido === true
-
-const canConcluir = (ordem, user) => 
-  ordem.estado === 'APROVADA' && 
-  user.hasPermission('ORDEM_CONCLUIR', ordem.filialId)
-
-const canCancelar = (ordem, user) => 
-  ordem.estado !== 'CONCLUIDA' && 
-  (user.hasPermission('ORDEM_CANCELAR', ordem.filialId) || user.role === 'ADMIN_GLOBAL')
-```
-
-### 9.3 Real-time Sync (WebSocket)
-
+### Diagram
 ```mermaid
-sequenceDiagram
-    participant B as Backend (WebSocket Broker)
-    participant F1 as Frontend User A (Técnico)
-    participant F2 as Frontend User B (Aprovador)
+stateDiagram-v2
+    [*] --> ABERTO
+    ABERTO --> EM_ANALISE: atribuir [papel_autorizado ∧ nao_atribuido]
+    ABERTO --> RESOLVIDO: auto_resolver [condicao_normalizada]
+    EM_ANALISE --> RECONHECIDO: reconhecer [responsavel ∧ causa_documentada]
+    EM_ANALISE --> ABERTO: reabrir [GESTOR/ADMIN]
+    RECONHECIDO --> EM_RESOLUCAO: iniciar_resolucao [plano_iniciado]
+    RECONHECIDO --> ABERTO: reabrir [GESTOR/ADMIN]
+    EM_RESOLUCAO --> RESOLVIDO: resolver [acao_ok ∧ metricas_ok]
+    EM_RESOLUCAO --> RECONHECIDO: escalar [bloqueio ∧ GESTOR/ADMIN]
+    RESOLVIDO --> FECHADO: validar_fechar [GESTOR/ADMIN ∧ validacao_ok]
+    RESOLVIDO --> EM_ANALISE: reabrir [GESTOR/ADMIN ∧ reincidencia]
+    ABERTO --> SUPPRIMIDO_LGPD: anonimizar_lgpd [solicitacao_valida]
+    EM_ANALISE --> SUPPRIMIDO_LGPD: anonimizar_lgpd [solicitacao_valida]
+    RECONHECIDO --> SUPPRIMIDO_LGPD: anonimizar_lgpd [solicitacao_valida]
+    EM_RESOLUCAO --> SUPPRIMIDO_LGPD: anonimizar_lgpd [solicitacao_valida]
+    RESOLVIDO --> SUPPRIMIDO_LGPD: anonimizar_lgpd [solicitacao_valida]
+    FECHADO --> SUPPRIMIDO_LGPD: anonimizar_lgpd [solicitacao_valida]
+    FECHADO --> [*]
+    SUPPRIMIDO_LGPD --> [*]
     
-    F1->>B: WS Connect (JWT + filialId)
-    F2->>B: WS Connect (JWT + filialId)
-    
-    F1->>B: PATCH /ordens/123/iniciar
-    B->>B: Processa + Persiste + Auditoria
-    B->>F1: 200 OK (estado: EM_ANDAMENTO)
-    B->>F2: WS Event: ordem.iniciada {ordemId: 123, estado: EM_ANDAMENTO, executor: "João"}
-    F2->>F2: Pinia: atualiza ordem local → Badge muda para "Em Andamento" (otimista)
-    
-    Note over F1,F2: Mesmo para: aprovada, concluida, cancelada, health.check.critico, preditiva.alerta, sla.breach
+    note right of FECHADO: Estado final SOX 7 anos\nImutável (WORM)
+    note right of SUPPRIMIDO_LGPD: Estado final LGPD\nImutável
 ```
 
 ---
 
-## 10. Rastreabilidade State Machines ↔ Artefatos
+## 5. Core State Machine: Usuario (User)
 
-| State Machine | Use Cases | API Spec | User Stories | Componentes Frontend | Testes |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **SolicitacaoManutencao** | UC-13 a UC-20 | `/api/v1/ordens` + `/iniciar`, `/aprovar`, `/concluir`, `/cancelar` | US-ORD-001 a 015 | `OrderBadge`, `OrderActions`, `OrderTimeline`, `CostForm` | OrdemControllerIT, StateMachineTest, Cypress E2E |
-| **Ativo** | UC-06 a UC-12 | `/api/v1/ativos` + `/baixar`, `/transferir` | US-ASV-001 a 018 | `AssetBadge`, `AtivoForm`, `TransferModal`, `BaixaModal` | AtivoControllerIT, StateMachineTest |
-| **ManutencaoPreventiva** | UC-21 a UC-24 | `/api/v1/preventivas` + `/pausar`, `/reativar` | US-PRE-001 a 005 | `PreventivaBadge`, `PreventivaPlanForm`, `PreventivaCalendar` | PreventivaSchedulerIT, PreventivaControllerIT |
-| **HealthCheck/PrevisaoFalha** | UC-25 a UC-28 | `/api/v1/health-check`, `/dashboard/preditiva`, `/previsao-falha` | US-PRD-001 a 008 | `HealthCheckForm`, `HealthScore`, `PrevisaoTable`, `PreditivaDashboard` | ManutencaoPreditivaServiceTest, HealthCheckServiceTest |
-| **Usuario/Auth** | UC-32 a UC-38 | `/api/v1/auth`, `/admin/usuarios` | US-SEC-001 a 014 | `LoginForm`, `UserBadge`, `RoleMatrix`, `TenantSelector` | SecurityConfigIT, AuthControllerIT, AegisShieldTest |
-| **Multi-tenancy Context** | UC-35 | Header `X-Tenant-Id` / JWT claim | US-SEC-005 | `TenantSelector`, `GlobalDashboard` | MultiTenancyIT |
-| **Auditoria/Envers** | UC-36, UC-43 a UC-45 | `/api/v1/auditoria` | US-SEC-005, US-LGD-001 | `AuditTimeline`, `AuditDiff`, `ExportButton` | AuditoriaControllerIT, EnversTest |
+### Purpose
+Ciclo de vida de usuários do sistema (internos/colaboradores) com RBAC estrito (BR-01: roles `ADMIN`, `AUDITOR`, `GESTOR`, `OPERADOR`). Integra com futuro Identity Provider (OIDC/SAML/AD — NFR-SEC02, BRD#7). Suporta MFA obrigatório para ADMIN, expiração de credenciais, e LGPD.
+
+### Valid States
+| Estado | Descrição | É estado final? |
+| :--- | :--- | :--- |
+| `CONVIDADO` | Convite enviado (e-mail/token); aguarda aceite e definição de senha/MFA. | Não |
+| `ATIVO` | Credenciais configuradas; acesso liberado conforme roles. | Não |
+| `BLOQUEADO` | Bloqueio temporário (tentativas de login falhas, admin manual, MFA não configurado para ADMIN). | Não |
+| `EXPIRADO` | Credenciais expiradas (senha > 90 dias, certificado, token); requer reset. | Não |
+| `INATIVO` | Desligamento/afastamento longo; acesso revogado, dados mantidos. | Não |
+| `ANONIMIZADO_LGPD` | Dados pessoais removidos/anônimos por "direito ao esquecimento" (NFR-C01); mantém PK para auditoria. | **Sim** |
+
+> [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] `CONVIDADO` para fluxo de onboarding (não no código atual). `BLOQUEADO`/`EXPIRADO`/`INATIVO` separados para políticas de segurança (NFR-SEC02: MFA ADMIN, rotação 90 dias NFR-SEC04). Integração IdP futura pode externalizar estados.
+
+### Transition Matrix
+| Estado Atual | Evento | Próximo Estado | Guarda (Condição) | Side Effects |
+| :--- | :--- | :--- | :--- | :--- |
+| `CONVIDADO` | `aceitar_convite` | `ATIVO` | `token_valido` ∧ `senha_definida` ∧ `(papel != ADMIN ∨ mfa_configurado)` | `AuditoriaLog.criar(USUARIO_ATIVADO)`; gera JWT refresh token; provisiona roles |
+| `ATIVO` | `bloquear_tentativas` | `BLOQUEADO` | `tentativas_login_falhas >= 5` (configurável) | `AuditoriaLog.criar(USUARIO_BLOQUEADO_AUTO, {tentativas})`; notifica ADMIN |
+| `ATIVO` | `bloquear_manual` | `BLOQUEADO` | `usuario.temPapel(ADMIN)` ∧ `motivo_fornecido` | `AuditoriaLog.criar(USUARIO_BLOQUEADO_MANUAL, {motivo, por_quem})` |
+| `ATIVO` | `expirar_credenciais` | `EXPIRADO` | `senha_idade > 90_dias ∨ certificado_expirado ∨ token_revogado` | `AuditoriaLog.criar(USUARIO_CREDENCIAIS_EXPIRADAS)`; notifica usuário |
+| `ATIVO` | `desligar` | `INATIVO` | `usuario.temPapel(ADMIN)` ∧ `processo_rh_confirmado` | `AuditoriaLog.criar(USUARIO_DESLIGADO)`; revoga tokens; remove sessões |
+| `BLOQUEADO` | `desbloquear` | `ATIVO` | `usuario.temPapel(ADMIN)` ∧ `causa_resolvida` (ex.: reset senha, MFA configurado) | `AuditoriaLog.criar(USUARIO_DESBLOQUEADO)`; notifica usuário |
+| `EXPIRADO` | `resetar_credenciais` | `ATIVO` | `token_reset_valido` ∧ `nova_senha_forte` ∧ `(papel != ADMIN ∨ mfa_reconfigurado)` | `AuditoriaLog.criar(USUARIO_CREDENCIAIS_RESETADAS)`; rotação segredos (NFR-SEC04) |
+| `INATIVO` | `reativar` | `ATIVO` | `usuario.temPapel(ADMIN)` ∧ `processo_rh_reativacao` ∧ `credenciais_validas` | `AuditoriaLog.criar(USUARIO_REATIVADO)`; provisiona roles |
+| `CONVIDADO` \| `ATIVO` \| `BLOQUEADO` \| `EXPIRADO` \| `INATIVO` | `anonimizar_lgpd` | `ANONIMIZADO_LGPD` | `solicitacao_lgpd_valida(titular)` ∧ `nao_existe_obrigacao_legal_retencao(usuario)` | `AuditoriaLog.criar(LGPD_ANONIMIZACAO_USUARIO)`; anonimiza `Funcionario`, `AuditoriaLog` vinculados; mantém PK |
+| `ANONIMIZADO_LGPD` | — | — | **Estado final** | Imutável; apenas leitura de PK para integridade referencial |
+
+> [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] Guarda `mfa_configurado` para ADMIN atende NFR-SEC02. `expirar_credenciais` automático (job diário) alinha com rotação 90 dias (NFR-SEC04). `desligar`/`reativar` exigem processo RH (integração futura).
+
+### Invalid Transitions (Explicitamente Proibidas)
+| De | Evento | Para | Motivo da Proibição |
+| :--- | :--- | :--- | :--- |
+| `ANONIMIZADO_LGPD` | qualquer | — | Estado final LGPD; imutável |
+| `CONVIDADO` | `bloquear_manual` | `BLOQUEADO` | Usuário ainda não ativou; cancele convite |
+| `INATIVO` | `bloquear_tentativas` | `BLOQUEADO` | Já sem acesso; bloqueio redundante |
+| `EXPIRADO` | `desligar` | `INATIVO` | Use `reativar` + `desligar` ou fluxo RH direto |
+| `BLOQUEADO` | `expirar_credenciais` | `EXPIRADO` | Já bloqueado; expiração verificada no desbloqueio |
+
+### Diagram
+```mermaid
+stateDiagram-v2
+    [*] --> CONVIDADO
+    CONVIDADO --> ATIVO: aceitar_convite [token_ok ∧ senha ∧ (mfa_se_admin)]
+    ATIVO --> BLOQUEADO: bloquear_tentativas [≥5_falhas]
+    ATIVO --> BLOQUEADO: bloquear_manual [ADMIN ∧ motivo]
+    ATIVO --> EXPIRADO: expirar_credenciais [>90d ∨ cert_expirado]
+    ATIVO --> INATIVO: desligar [ADMIN ∧ RH_ok]
+    BLOQUEADO --> ATIVO: desbloquear [ADMIN ∧ causa_resolvida]
+    EXPIRADO --> ATIVO: resetar_credenciais [token_ok ∧ senha_forte ∧ (mfa_se_admin)]
+    INATIVO --> ATIVO: reativar [ADMIN ∧ RH_ok ∧ creds_validas]
+    CONVIDADO --> ANONIMIZADO_LGPD: anonimizar_lgpd [solicitacao_valida]
+    ATIVO --> ANONIMIZADO_LGPD: anonimizar_lgpd [solicitacao_valida]
+    BLOQUEADO --> ANONIMIZADO_LGPD: anonimizar_lgpd [solicitacao_valida]
+    EXPIRADO --> ANONIMIZADO_LGPD: anonimizar_lgpd [solicitacao_valida]
+    INATIVO --> ANONIMIZADO_LGPD: anonimizar_lgpd [solicitacao_valida]
+    ANONIMIZADO_LGPD --> [*]
+    
+    note right of ANONIMIZADO_LGPD: Estado final LGPD\nImutável (PK mantida)
+```
 
 ---
 
-*Documento regenerado completamente com 6 state machines principais (Ordem, Ativo, Preventiva, Preditiva, Usuario, Multi-tenancy) + Auditoria + Frontend UI Mapping + Real-time Sync. Baseado em análise AST Java (domain entities, enums, service transitions, scheduler, security). Substitui versão 1.0 que continha apenas FSM de Ordem de Manutenção frontend.*
+## 6. Idempotency & Concorrência
+
+### Estratégia de Lock
+| Entidade | Estratégia | Detalhes |
+| :--- | :--- | :--- |
+| `Ativo` | **Optimistic Locking** (`@Version` JPA / coluna `versao` BIGINT) | Transições de estado (`aprovar`, `iniciar_manutencao`, `solicitar_baixa`) incrementam versão; `OptimisticLockException` → retry com backoff (max 3). |
+| `Manutencao` | **Optimistic Locking** + **Pessimistic Lock** em `iniciar`/`concluir` | `SELECT ... FOR UPDATE` na transação de `iniciar`/`concluir` para evitar race condition entre técnico e job de SLA. |
+| `HealthCheck` | **Idempotência por chave natural** (`ativo_id` + `janela_execucao`) | Job `updateHealthCheck` usa `INSERT ... ON CONFLICT (ativo_id, janela) DO UPDATE` (upsert) — evita duplicatas se job reexecutar. |
+| `Alerta` | **Deduplicação por fingerprint** (`tipo` + `ativo_id` + `regra` + `janela`) | `checkResourceUsageAlerts` gera fingerprint SHA-256; `INSERT ... ON CONFLICT DO NOTHING` — alerta duplicado não cria novo registro. |
+| `Usuario` | **Optimistic Locking** (`versao`) | Mudanças de estado (`bloquear`, `desbloquear`, `resetar_credenciais`) usam versão; concorrência admin vs auto-bloqueio resolvida por retry. |
+
+> [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] Stack usa **SQL cru / JPA nativo** (SAD Seção 2) — `@Version` JPA disponível se `spring-boot-starter-data-jpa` presente; caso contrário, coluna `versao` gerenciada manualmente em queries nativas. `ON CONFLICT` sintaxe PostgreSQL; adaptar para Oracle (`MERGE`), SQL Server (`MERGE`), MySQL (`ON DUPLICATE KEY`).
+
+### Comportamento em Transição Duplicada
+- **Idempotente (no-op com 200/204):** `aprovar` (já aprovado), `concluir` (já concluído), `fechar` (já fechado), `auto_resolver` (já resolvido), `desbloquear` (já ativo).
+- **Erro 409 Conflict:** `iniciar` (já em andamento), `atribuir` (já atribuído a outro), `anonimizar_lgpd` (já anonimizado).
+- **Retry automático (client-side):** Frontend `api.js:request` (complexidade 13) deve implementar retry com `Idempotency-Key` header para `POST`/`PUT`/`PATCH` mutantes.
+
+### Race Conditions Conhecidas
+1. **Ativo + Manutencao simultânea:** Dois técnicos `iniciar` manutenções diferentes do mesmo ativo → ambos veem `ATIVO`, ambos transicionam para `EM_MANUTENCAO`. **Mitigação:** Lock pessimista em `Ativo` durante `iniciar_manutencao` (curto, < 100ms).
+2. **HealthCheck concorrente:** Job agendado + trigger manual mesma janela → upsert resolve (chave natural).
+3. **Alerta auto-resolve vs. reconhecimento humano:** Job marca `RESOLVIDO` enquanto operador `reconhece` → versão otimista detecta; operador recebe 409, recarrega, vê `RESOLVIDO`.
+
+---
+
+## 7. Persistência do Estado
+
+### Onde o Estado é Armazenado
+| Entidade | Tabela (Inferida) | Coluna de Estado | Tipo | Índice |
+| :--- | :--- | :--- | :--- | :--- |
+| `Ativo` | `ativo` | `estado` | `VARCHAR(30)` | `idx_ativo_estado` (parcial: `WHERE estado NOT IN ('BAIXADO','ANONIMIZADO_LGPD')`) |
+| `Manutencao` | `manutencao` | `estado` | `VARCHAR(30)` | `idx_manutencao_estado_ativo` (`estado`, `ativo_id`) |
+| `HealthCheck` | `health_check` | `estado` | `VARCHAR(30)` | `idx_hc_ativo_janela` (`ativo_id`, `janela_execucao`) **UNIQUE** |
+| `Alerta` | `alerta` | `estado` | `VARCHAR(30)` | `idx_alerta_estado_prioridade` (`estado`, `prioridade`, `criado_em`) |
+| `Usuario` | `usuario` | `estado` | `VARCHAR(30)` | `idx_usuario_estado` (`estado`) |
+
+> [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] Tabelas/colunas **não detectadas no diagnóstico** (schema não escaneado). Nomes seguem convenção `snake_case` plural (padrão Spring/JPA). Índices parciais/únicos alinhados com `ManutencaoSpecification.build` (complexidade 14) e NFR-CO02.
+
+### Auditoria de Transições
+- **Tabela:** `auditoria_transicao_estado` (append-only, WORM via `AuditoriaService`)
+- **Colunas:** `id` (UUID), `entidade` (ex.: `Ativo`), `entidade_id` (PK), `estado_anterior`, `estado_novo`, `evento`, `ator_id` (FK `usuario`), `ator_papel`, `timestamp` (ISO-8601 UTC), `payload_json` (snapshot completo pré-transição), `correlacao_id` (traceId OpenTelemetry), `hash_sha256` (encadeamento imutável).
+- **Gravação:** Assíncrona via `@Async` (thread pool `audit`) → `AuditoriaService` → WORM storage (S3/MinIO + Object Lock) + réplica no banco primário (dual-write para query recente).
+- **Retenção:** 7 anos SOX (NFR-C02) + LGPD conforme matriz de retenção (Gap #5).
+
+---
+
+## 8. Error & Recovery States
+
+| Estado de Erro | Entidade(s) Afetadas | Origem | Como se Recupera |
+| :--- | :--- | :--- | :--- |
+| `HEALTHCHECK_FALHOU` | `HealthCheck` | Timeout/erro coleta métricas (rede, permissão, agente) | Job `updateHealthCheck` agenda retry com backoff exponencial (1m, 5m, 15m, max 1h). Após 3 falhas → `Alerta` tipo `HEALTHCHECK_FALHA_PERSISTENTE` (prioridade ALTA). |
+| `ALERTA_NOTIFICACAO_FALHA` | `Alerta` | Falha envio e-mail/webhook/SMTP (provider indisponível) | `AlertNotificationService` usa `Resilience4j` Circuit Breaker + retry (3x, 30s). Falha final → `AuditoriaLog.criar(ALERTA_NOTIFICACAO_FALHA)`; fila dead-letter (tabela `alerta_notificacao_dlq`) para reprocessamento manual. |
+| `MANUTENCAO_SLA_VENCIDO` | `Manutencao` | `EM_ANDAMENTO`/`AGUARDANDO_PECA` > SLA configurado (ex.: 4h/24h) | Job diário varre `manutencao` com `estado ∈ {EM_ANDAMENTO, AGUARDANDO_PECA} ∧ sla_vencido` → cria `Alerta` tipo `SLA_MANUTENCAO_VENCIDO` (prioridade CRITICA); notifica GESTOR/ADMIN. |
+| `ATIVO_INCONSISTENTE` | `Ativo` | Estado `EM_MANUTENCAO` sem `Manutencao` aberta (bug, rollback falho) | Job de reconciliação noturno: `SELECT a.* FROM ativo a LEFT JOIN manutencao m ON m.ativo_id=a.id AND m.estado='EM_ANDAMENTO' WHERE a.estado='EM_MANUTENCAO' AND m.id IS NULL` → corrige para `ATIVO` + `AuditoriaLog.criar(ATIVO_CORRIGIDO_INCONSISTENCIA)`. |
+| `USUARIO_SEM_PAPEL` | `Usuario` | `ATIVO` mas `roles` vazio (migração, bug IdP sync) | Login bloqueia com erro `ACESSO_NEGADO_SEM_PAPEL`; admin corrige via painel; job diário reporta contagem. |
+| `WORM_WRITE_FAILURE` | Todas (auditoria) | Object Storage indisponível / Object Lock error | `AuditoriaService` buffer local (arquivo rotativo em disco criptografado) + retry infinito com backoff (1m, 5m, 15m...). Alerta `WORM_STORAGE_INDISPONIVEL` (CRITICA) → on-call. Recuperação: replay buffer quando storage volta. |
+
+> [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] Jobs de recuperação (reconciliação, SLA, retry) inferidos baseados em `TaskScheduler` (SAD Seção 3) e NFR-O02. `WORM_WRITE_FAILURE` atende NFR-SEC05 (auditoria não pode perder eventos).
+
+---
+
+## 9. Testes Obrigatórios (Checklist de Validação)
+
+- [ ] **Ativo**: Todas 10 transições válidas cobertas (incl. `anonimizar_lgpd` de 3 estados origem)
+- [ ] **Ativo**: 6 transições inválidas rejeitadas com `IllegalStateTransitionException` (código 409)
+- [ ] **Manutencao**: 9 transições válidas + 6 inválidas (incl. `pausar_peca`/`peca_chegou`)
+- [ ] **HealthCheck**: 5 transições válidas + 4 inválidas; teste de idempotência upsert (mesma janela)
+- [ ] **Alerta**: 10 transições válidas + 6 inválidas; teste `auto_resolver` concorrente com `reconhecer`
+- [ ] **Usuario**: 9 transições válidas + 5 inválidas; teste MFA obrigatório ADMIN em `aceitar_convite`/`resetar_credenciais`
+- [ ] **Idempotência**: Requisição duplicada com mesmo `Idempotency-Key` retorna 200/204 (não 201) e não duplica auditoria
+- [ ] **Concorrência**: 10 threads concorrentes `iniciar_manutencao` mesmo ativo → apenas 1 sucesso, 9 `OptimisticLockException` → retry → 409
+- [ ] **Estados Finais**: Tentativa de transição a partir de `BAIXADO`, `ANONIMIZADO_LGPD`, `CONCLUIDA`, `CANCELADA`, `FECHADO`, `SUPPRIMIDO_LGPD` lança exceção e não persiste
+- [ ] **Auditoria**: Cada transição válida gera 1 registro em `auditoria_transicao_estado` com `hash_sha256` encadeado corretamente
+- [ ] **WORM**: Escrita de auditoria em storage com Object Lock verificada (tentativa `DELETE` → 403)
+- [ ] **LGPD**: `anonimizar_lgpd` remove PII de `Funcionario`, `Usuario`, `AuditoriaLog` vinculados mantendo PKs e FKs íntegras
+- [ ] **Performance**: `checkResourceUsageAlerts` processa 12k ativos em ≤ 30s (NFR-P04) com máquina de estado `Alerta` (dedup + upsert)
+
+---
+
+## 10. O que Falta Verificar (Gaps para Sprint 0)
+
+1. **Schema físico real:** Confirmar tabelas, colunas `estado`, constraints, índices com DBA (diagnóstico não escaneou `application.yml`/`schema.sql`).
+2. **Enumeração de estados no código:** Verificar se `AtivoEstado`, `ManutencaoEstado`, etc. existem como `enum` Java ou `CHECK CONSTRAINT` no banco.
+3. **Thresholds de HealthCheck/Alerta:** Valores exatos (CPU 70/85%, disco 80/90%) com Infra/Opers.
+4. **SLA de Manutencao:** Regras de `AGUARDANDO_PECA` pausar SLA? SLA por prioridade/tipo?
+5. **Integração IdP:** Estados `CONVIDADO`/`EXPIRADO`/`BLOQUEADO` podem ser delegados ao Keycloak/Azure AD (NFR-SEC02).
+6. **Matriz de retenção LGPD/SOX:** Aprovação Legal/Compliance para `ANONIMIZADO_LGPD` vs `BAIXADO` (Gap #5 do SAD).
+7. **Dialeto SQL para upsert/lock:** PostgreSQL (`ON CONFLICT`), Oracle (`MERGE`), SQL Server (`MERGE`), MySQL (`ON DUPLICATE KEY`) — depende do motor (Gap #1 do SAD).
+8. **Eventos de domínio publicados:** Se futuro Strangler Fig (SAD Seção 13) extrair serviços, definir `DomainEvent` (Kafka/Outbox) para cada transição crítica.

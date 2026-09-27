@@ -363,7 +363,7 @@ class ManutencaoServiceTest {
     @Test
     @DisplayName("CustoTotalPorAtivo: Deve retornar o custo total de manutenções concluídas")
     void custoTotalPorAtivo_deveRetornarSoma() {
-        when(ativoRepository.existsById(1L)).thenReturn(true);
+        when(ativoRepository.findById(1L)).thenReturn(Optional.of(ativo));
         when(manutencaoRepository.findCustoTotalManutencaoPorAtivo(1L)).thenReturn(new BigDecimal("150.75"));
 
         BigDecimal custo = manutencaoService.custoTotalPorAtivo(1L);
@@ -374,7 +374,7 @@ class ManutencaoServiceTest {
     @Test
     @DisplayName("CustoTotalPorAtivo: Deve retornar ZERO se não houver custos")
     void custoTotalPorAtivo_semCustos_deveRetornarZero() {
-        when(ativoRepository.existsById(1L)).thenReturn(true);
+        when(ativoRepository.findById(1L)).thenReturn(Optional.of(ativo));
         when(manutencaoRepository.findCustoTotalManutencaoPorAtivo(1L)).thenReturn(null);
 
         BigDecimal custo = manutencaoService.custoTotalPorAtivo(1L);
@@ -385,8 +385,46 @@ class ManutencaoServiceTest {
     @Test
     @DisplayName("CustoTotalPorAtivo: Deve lançar exceção se ativo não existe")
     void custoTotalPorAtivo_comAtivoInexistente_deveLancarExcecao() {
-        when(ativoRepository.existsById(99L)).thenReturn(false);
+        when(ativoRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> manutencaoService.custoTotalPorAtivo(99L));
+    }
+
+    @Test
+    @DisplayName("Criar: USER de outra filial deve receber AccessDeniedException sem salvar")
+    void criar_comUserDeOutraFilial_deveLancarAccessDeniedSemSave() {
+        ManutencaoRequestDTO request = new ManutencaoRequestDTO(1L, TipoManutencao.CORRETIVA, 10L, null, null, "Tela quebrada", null, null, null, null);
+        when(userContextService.isAdmin()).thenReturn(false);
+        when(userContextService.getUserFiliais()).thenReturn(Set.of(99L)); // usuário da filial 99, ativo na filial 1
+        when(ativoRepository.findById(1L)).thenReturn(Optional.of(ativo));
+        when(funcionarioRepository.findById(10L)).thenReturn(Optional.of(solicitante));
+
+        assertThrows(AccessDeniedException.class, () -> manutencaoService.criar(request));
+        verify(manutencaoRepository, never()).save(any(Manutencao.class));
+    }
+
+    @Test
+    @DisplayName("Criar: USER da mesma filial deve criar com sucesso")
+    void criar_comUserDaMesmaFilial_deveCriar() {
+        ManutencaoRequestDTO request = new ManutencaoRequestDTO(1L, TipoManutencao.CORRETIVA, 10L, null, null, "Tela quebrada", null, null, null, null);
+        when(userContextService.isAdmin()).thenReturn(false);
+        when(userContextService.getUserFiliais()).thenReturn(Set.of(1L));
+        when(ativoRepository.findById(1L)).thenReturn(Optional.of(ativo));
+        when(funcionarioRepository.findById(10L)).thenReturn(Optional.of(solicitante));
+        when(manutencaoRepository.save(any(Manutencao.class))).thenReturn(manutencao);
+
+        assertNotNull(manutencaoService.criar(request));
+        verify(manutencaoRepository).save(any(Manutencao.class));
+    }
+
+    @Test
+    @DisplayName("CustoTotalPorAtivo: USER de outra filial deve receber AccessDeniedException")
+    void custoTotalPorAtivo_comUserDeOutraFilial_deveLancarAccessDenied() {
+        when(userContextService.isAdmin()).thenReturn(false);
+        when(userContextService.getUserFiliais()).thenReturn(Set.of(99L)); // usuário da filial 99, ativo na filial 1
+        when(ativoRepository.findById(1L)).thenReturn(Optional.of(ativo));
+
+        assertThrows(AccessDeniedException.class, () -> manutencaoService.custoTotalPorAtivo(1L));
+        verify(manutencaoRepository, never()).findCustoTotalManutencaoPorAtivo(anyLong());
     }
 }

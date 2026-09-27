@@ -1,532 +1,385 @@
-# Component Library / Inventory — Aegis1
+# Component Library / Inventory — Aegis Patrimônio
 
-> **Versão:** 2.0 · **Owner:** Frontend Lead · **Status:** Implemented
-> **Base:** Vue 3 + Vite + Bootstrap 5 + Pinia + PWA + TypeScript
-> **Baseado em:** Design Tokens v2.0 (implementados) + Accessibility Guidelines v2.0 + User Flows v2.0
-> **Framework:** Vue 3 (Composition API + `<script setup>`) + TypeScript strict
-> **Estilização:** Bootstrap 5 (Sass) + Design Tokens (CSS Custom Properties) + Scoped CSS
-> **Documentação:** Storybook 8 (CSF + MDX) — `frontend/.storybook/`
-> **Testes:** Vitest + Vue Test Utils (Unit) + Cypress (E2E) + axe-core (A11y)
+> **Versão:** 1.0 · **Owner:** Frontend Lead · **Status:** Draft  
+> **Baseado em:** Componentes vanilla JS proprietários (sem biblioteca UI externa — apenas `@popperjs/core` para positioning)  
+> **Depende de:** [design-tokens.md](design-tokens.md), [user-flows.md](user-flows.md)
 
 ---
 
 ## 1. Overview
 
-A **Component Library Aegis1** é um conjunto de componentes Vue 3 reutilizáveis, acessíveis (WCAG 2.1 AA) e consistentes, construídos sobre **Bootstrap 5** (CSS-only, zero JS runtime) e **Design Tokens** (CSS Custom Properties). A biblioteca cobre todos os fluxos de usuário do sistema: Cadastros, Ativos, Ordens, Preventiva, Preditiva, Busca, Admin, Relatórios, LGPD.
+Este documento inventaria os **componentes de interface reutilizáveis** necessários para cobrir os 6 fluxos de usuário definidos em [user-flows.md](user-flows.md), consumindo exclusivamente os design tokens de [design-tokens.md](design-tokens.md).  
 
-**Estrutura de Pastas:**
-```
-frontend/src/components/
-├── ui/                    # Componentes base (Design System)
-│   ├── Button/
-│   ├── Input/
-│   ├── Select/
-│   ├── Modal/
-│   ├── Table/
-│   ├── Badge/
-│   ├── Toast/
-│   ├── Dropdown/
-│   ├── Tabs/
-│   ├── Pagination/
-│   ├── Breadcrumb/
-│   ├── Avatar/
-│   ├── Card/
-│   ├── FormField/
-│   ├── Tooltip/
-│   ├── Popover/
-│   ├── Skeleton/
-│   ├── EmptyState/
-│   ├── Loading/
-│   ├── QRCode/
-│   ├── QRScanner/
-│   ├── Chart/
-│   └── index.ts           # Barrel exports
-├── domain/                # Componentes de negócio (compostos)
-│   ├── assets/
-│   ├── orders/
-│   ├── preventive/
-│   ├── predictive/
-│   ├── search/
-│   ├── admin/
-│   ├── reports/
-│   └── lgpd/
-├── layout/                # Layout components
-│   ├── AppLayout/
-│   ├── Header/
-│   ├── Sidebar/
-│   ├── Footer/
-│   └── PageContainer/
-└── shared/                # Composables, utils, directives
-    ├── composables/
-    ├── directives/
-    └── utils/
-```
+**Estado atual do codebase:** O diagnóstico determinístico (348 arquivos Java, 15 arquivos JS em `frontend/src/`) **não revelou nenhuma biblioteca de componentes, sistema de design, ou padrão de componentização**. Os 15 arquivos JS são serviços/utilitários (`api.js`, etc.) — não há arquivos de componente (`.js` com `customElements.define`, classes de UI, ou templates HTML reutilizáveis).  
 
-**Storybook:** `npm run storybook` → `http://localhost:6006` — Stories para todos componentes UI + Domain.
+**Estratégia proposta:** Implementar componentes como **Web Components nativos (Custom Elements)** ou **módulos JS vanilla com template literals**, sem dependência de framework (React/Vue/Svelte). Isso alinha com a stack real (JS vanilla + `@popperjs/core`) e evita build step complexo no MVP.  
+
+> **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — Toda a lista abaixo é uma **proposta inicial** derivada dos fluxos de usuário e tokens. Nenhum componente existe hoje. Requer decisão de arquitetura: Web Components vs. módulos JS + template literals vs. adoção de framework leve (ex: Petite-Vue, Alpine.js) antes de iniciar implementação.
 
 ---
 
-## 2. Convenções de Desenvolvimento
+## 2. Convenções Gerais
 
-| Aspecto | Decisão |
+| Convenção | Definição |
 | :--- | :--- |
-| **Framework** | Vue 3.4+ (Composition API + `<script setup>`) |
-| **Linguagem** | TypeScript 5.3+ (strict mode) |
-| **Estilização** | Bootstrap 5 (Sass) + Design Tokens (CSS Custom Properties) + Scoped CSS |
-| **Padrão Composição** | **Compound Components** + **Slots** + **Props tipadas** + **Emits tipados** |
-| **Acessibilidade** | **Obrigatório:** WAI-ARIA APG, Focus Management, `prefers-reduced-motion`, Contraste WCAG AA |
-| **Testes** | Unit (Vitest + Vue Test Utils) + E2E (Cypress) + A11y (axe-core) |
-| **Documentação** | Storybook 8 (CSF + MDX) — 1 story por variante/estado |
-| **Nomenclatura** | PascalCase componentes (`Button`, `DataTable`); `use*` composables; `v-*` directives |
-| **Export** | Barrel `index.ts` por pasta + `components/ui/index.ts` global |
+| **Padrão de composição** | Web Components (Custom Elements) com `Shadow DOM` opcional (para isolamento de estilo) + `slot` para composição. Fallback: módulos ES com `render()` retornando HTML string + `attach()` para binding de eventos. |
+| **Nomenclatura** | `aegis-*` prefixo (ex: `<aegis-button>`, `<aegis-data-table>`). Classes CSS internas: `.aegis-btn`, `.aegis-table`, etc. |
+| **Local no repositório** | `frontend/src/components/` (a criar) — um arquivo por componente: `aegis-button.js`, `aegis-button.css`, `aegis-button.test.js` |
+| **Tokens consumidos** | Via CSS Custom Properties (definidas em `:root` no `index.html` ou injetadas via JS no bootstrap). **Nenhum valor hardcoded** permitido. |
+| **Acessibilidade** | Obrigatório: `role`, `aria-*`, `tabindex`, foco visível (`:focus-visible`), `aria-live` para estados dinâmicos. Testado com NVDA/VoiceOver. |
+| **Variantes** | Controladas via **atributos HTML** (ex: `<aegis-button variant="primary" size="md">`) — não props JS. Reflete no CSS via `[variant="primary"]`. |
+| **Estado** | Gerenciado externamente (pai passa dados via atributos/propriedades; componente emite `CustomEvent` para ações: `aegis-submit`, `aegis-delete`, `aegis-status-change`). |
+| **Testes** | Unitários com Vitest + `@testing-library/web-components` (a configurar). Histórias no Storybook (opcional, avaliar custo). |
 
 ---
 
-## 3. Inventário de Componentes UI (Base)
+## 3. Inventário de Componentes
 
-| Componente | Arquivo | Variantes/Props Principais | Status | Storybook | Testes |
+| Componente | Categoria | Variantes/Estados Principais | Status | Prioridade (Flows) | Localização Proposta |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Button** | `Button.vue` | `variant: primary|secondary|success|danger|outline|ghost`, `size: sm|md|lg`, `loading`, `disabled`, `icon`, `iconRight`, `block`, `nativeType` | ✅ Done | ✅ | Unit + E2E + A11y |
-| **IconButton** | `IconButton.vue` | `icon`, `variant: ghost|outline`, `size: sm|md|lg`, `loading`, `disabled`, `ariaLabel` | ✅ Done | ✅ | Unit + A11y |
-| **Input** | `Input.vue` | `type`, `modelValue`, `placeholder`, `error`, `disabled`, `readonly`, `size`, `prefix`, `suffix`, `clearable`, `maxlength`, `autocomplete`, `inputmode` | ✅ Done | ✅ | Unit + A11y |
-| **Textarea** | `Textarea.vue` | `modelValue`, `rows`, `autosize`, `error`, `disabled`, `readonly`, `maxlength`, `placeholder` | ✅ Done | ✅ | Unit + A11y |
-| **Select** | `Select.vue` | `options`, `modelValue`, `placeholder`, `searchable`, `multiple`, `clearable`, `error`, `disabled`, `size`, `optionLabel`, `optionValue`, `optionDisabled` | ✅ Done | ✅ | Unit + A11y |
-| **Checkbox** | `Checkbox.vue` | `modelValue`, `label`, `indeterminate`, `disabled`, `size`, `inline` | ✅ Done | ✅ | Unit + A11y |
-| **RadioGroup** | `RadioGroup.vue` | `options`, `modelValue`, `inline`, `disabled`, `optionLabel`, `optionValue` | ✅ Done | ✅ | Unit + A11y |
-| **Switch** | `Switch.vue` | `modelValue`, `size`, `disabled`, `inline`, `onLabel`, `offLabel` | ✅ Done | ✅ | Unit + A11y |
-| **DatePicker** | `DatePicker.vue` | `modelValue`, `range`, `disabled`, `format`, `placeholder`, `disabledDates`, `shortcuts` | ✅ Done | ✅ | Unit + A11y |
-| **Modal** | `Modal.vue` | `open`, `title`, `size: sm|md|lg|xl|full`, `closeOnOverlayClick`, `closeOnEsc`, `showCloseButton`, `footer`, `destroyOnClose` | ✅ Done | ✅ | Unit + E2E + A11y |
-| **Drawer** | `Drawer.vue` | `open`, `placement: left|right|top|bottom`, `size`, `maskClosable`, `keyboard` | ✅ Done | ✅ | Unit + A11y |
-| **Toast** | `Toast.vue` + `useToast()` | `type: success|error|warning|info`, `message`, `duration`, `closable`, `action`, `icon` | ✅ Done | ✅ | Unit + E2E + A11y |
-| **Tooltip** | `Tooltip.vue` + `v-tooltip` | `content`, `placement`, `disabled`, `trigger: hover|focus|click`, `offset` | ✅ Done | ✅ | Unit + A11y |
-| **Popover** | `Popover.vue` | `content`, `trigger: hover|focus|click`, `placement`, `width` | ✅ Done | ✅ | Unit + A11y |
-| **Dropdown** | `Dropdown.vue` | `items`, `trigger: click|hover`, `placement`, `divider`, `disabled` | ✅ Done | ✅ | Unit + A11y |
-| **Tabs** | `Tabs.vue` | `modelValue`, `variant: line|card|pills`, `vertical`, `lazy`, `animated` | ✅ Done | ✅ | Unit + A11y |
-| **Pagination** | `Pagination.vue` | `modelValue`, `total`, `pageSize`, `pageSizeOptions`, `showSizeChanger`, `showQuickJumper`, `showTotal` | ✅ Done | ✅ | Unit + A11y |
-| **Breadcrumb** | `Breadcrumb.vue` | `items`, `separator`, `maxItems`, `collapsed` | ✅ Done | ✅ | Unit + A11y |
-| **DataTable** | `DataTable.vue` | `columns`, `data`, `pagination`, `sortable`, `filterable`, `selectable`, `expandable`, `stickyHeader`, `virtualized`, `rowKey`, `selection`, `onRowClick`, `loading`, `emptyState` | ✅ Done | ✅ | Unit + E2E + A11y |
-| **Table** | `Table.vue` | `columns`, `data`, `striped`, `bordered`, `hoverable`, `compact`, `responsive`, `emptyState` | ✅ Done | ✅ | Unit + A11y |
-| **Badge** | `Badge.vue` | `variant: default|success|warning|danger|info|outline`, `size: sm|md|dot`, `dot`, `count`, `max` | ✅ Done | ✅ | Unit + A11y |
-| **Avatar** | `Avatar.vue` | `src`, `alt`, `size: xs|sm|md|lg|xl`, `shape: circle|square`, `icon`, `fallback` | ✅ Done | ✅ | Unit + A11y |
-| **Card** | `Card.vue` | `variant: default|outlined|elevated|interactive`, `header`, `footer`, `padding`, `hoverable`, `bordered` | ✅ Done | ✅ | Unit + A11y |
-| **Accordion** | `Accordion.vue` | `items`, `modelValue`, `allowMultiple`, `bordered`, `ghost` | ✅ Done | ✅ | Unit + A11y |
-| **Divider** | `Divider.vue` | `orientation: horizontal|vertical`, `type: solid|dashed`, `text`, `dashed` | ✅ Done | ✅ | Unit |
-| **Skeleton** | `Skeleton.vue` | `variant: text|circular|rectangular|table-row|card`, `animated`, `rows`, `width`, `height` | ✅ Done | ✅ | Unit |
-| **EmptyState** | `EmptyState.vue` | `icon`, `title`, `description`, `action`, `illustration` | ✅ Done | ✅ | Unit + A11y |
-| **Loading** | `Loading.vue` | `size: sm|md|lg`, `text`, `fullscreen`, `spinner`, `dots`, `bars` | ✅ Done | ✅ | Unit |
-| **QRCode** | `QRCode.vue` | `value`, `size`, `level: L|M|Q|H`, `bgColor`, `fgColor`, `logo`, `logoSize` | ✅ Done | ✅ | Unit |
-| **QRScanner** | `QRScanner.vue` | `onDecode`, `onError`, `facingMode`, `torch`, `formats`, `pauseOnBlur` | ✅ Done | ✅ | Unit + E2E |
-| **Chart** | `Chart.vue` | `type: line|bar|pie|doughnut|radar`, `data`, `options`, `plugins`, `responsive`, `maintainAspectRatio` | ✅ Done | ✅ | Unit |
-| **FormField** | `FormField.vue` | `label`, `for`, `required`, `help`, `error`, `errorId`, `helpId`, `requiredMark`, `tooltip` | ✅ Done | ✅ | Unit + A11y |
-| **QRCodeDisplay** | `QRCodeDisplay.vue` | `value`, `size`, `title`, `downloadable`, `printable` | ✅ Done | ✅ | Unit |
-| **PdfViewer** | `PdfViewer.vue` | `src`, `page`, `zoom`, `rotation`, `downloadable`, `printable`, `toolbar` | ✅ Done | ✅ | Unit |
-| **QRCodeDisplay** | `QRCodeDisplay.vue` | `value`, `size`, `title`, `downloadable`, `printable` | ✅ Done | ✅ | Unit |
-| **FileUpload** | `FileUpload.vue` | `accept`, `multiple`, `maxSize`, `maxFiles`, `dragDrop`, `preview`, `onUpload`, `onRemove` | ✅ Done | ✅ | Unit + A11y |
-| **ImagePreview** | `ImagePreview.vue` | `src`, `alt`, `zoomable`, `downloadable`, `toolbar` | ✅ Done | ✅ | Unit |
-| **ColorPicker** | `ColorPicker.vue` | `modelValue`, `format: hex|rgb|hsl`, `presetColors`, `alpha`, `swatches` | ✅ Done | ✅ | Unit |
-| **TimePicker** | `TimePicker.vue` | `modelValue`, `format`, `step`, `disabled`, `placeholder`, `clearable` | ✅ Done | ✅ | Unit |
-| **Transfer** | `Transfer.vue` | `dataSource`, `modelValue`, `titles`, `filterable`, `pagination`, `render` | ✅ Done | ✅ | Unit |
-| **TreeSelect** | `TreeSelect.vue` | `treeData`, `modelValue`, `multiple`, `checkable`, `filterable`, `loadData` | ✅ Done | ✅ | Unit |
-| **Cascader** | `Cascader.vue` | `options`, `modelValue`, `multiple`, `filterable`, `loadData`, `changeOnSelect` | ✅ Done | ✅ | Unit |
-| **Rate** | `Rate.vue` | `modelValue`, `count`, `allowHalf`, `disabled`, `size`, `character`, `showScore` | ✅ Done | ✅ | Unit |
-| **Slider** | `Slider.vue` | `modelValue`, `min`, `max`, `step`, `marks`, `dots`, `included`, `vertical`, `range` | ✅ Done | ✅ | Unit |
-| **InputNumber** | `InputNumber.vue` | `modelValue`, `min`, `max`, `step`, `precision`, `formatter`, `parser`, `controls`, `disabled` | ✅ Done | ✅ | Unit |
-| **Mentions** | `Mentions.vue` | `options`, `modelValue`, `prefix`, `split`, `validateSearch`, `loading` | ✅ Done | ✅ | Unit |
-| **Anchor** | `Anchor.vue` | `items`, `affix`, `showInk`, `scrollOffset`, `targetOffset` | ✅ Done | ✅ | Unit |
-| **BackTop** | `BackTop.vue` | `visibilityHeight`, `target`, `duration`, `icon` | ✅ Done | ✅ | Unit |
-| **ConfigProvider** | `ConfigProvider.vue` | `locale`, `theme`, `prefixCls`, `iconPrefixCls`, `componentSize`, `direction` | ✅ Done | ✅ | Unit |
+| `aegis-button` | Ação | `variant`: primary, secondary, ghost, destructive, outline<br>`size`: sm, md, lg<br>`loading`, `disabled` | **Proposto** | Todos (1–6) | `components/aegis-button/` |
+| `aegis-input` | Formulário | `type`: text, email, password, number, search<br>`state`: default, error, disabled, readonly<br>`label`, `placeholder`, `helper-text`, `leading-icon`, `trailing-icon` | **Proposto** | 1, 2, 4, 6 | `components/aegis-input/` |
+| `aegis-select` | Formulário | `multiple`, `searchable`, `clearable`<br>`options` via `<aegis-option>` slots<br>`state`: default, error, disabled | **Proposto** | 1, 2, 4 | `components/aegis-select/` |
+| `aegis-date-picker` | Formulário | `mode`: single, range<br>`format`: DD/MM/YYYY<br>`min`, `max`, `disabled-dates` | **Proposto** | 1, 2, 5 | `components/aegis-date-picker/` |
+| `aegis-textarea` | Formulário | `rows`, `resize`, `maxlength`, `counter`<br>`state`: default, error, disabled | **Proposto** | 1, 2, 4 | `components/aegis-textarea/` |
+| `aegis-checkbox` | Formulário | `indeterminate`, `disabled`<br>Label via slot | **Proposto** | 1, 4 | `components/aegis-checkbox/` |
+| `aegis-radio-group` | Formulário | `options` via `<aegis-radio>`<br>`orientation`: horizontal, vertical | **Proposto** | 1, 2, 4 | `components/aegis-radio-group/` |
+| `aegis-switch` | Formulário | `checked`, `disabled`, `size` | **Proposto** | 4 (RBAC toggles) | `components/aegis-switch/` |
+| `aegis-form` | Formulário | Wrapper com validação nativa (`reportValidity`), submissão via `CustomEvent`<br>Slots: `header`, `fields`, `actions` | **Proposto** | 1, 2, 4, 6 | `components/aegis-form/` |
+| `aegis-modal` | Overlay | `size`: sm, md, lg, xl, full<br>`variant`: default, confirmation, form, alert<br>`dismissible`, `close-on-overlay-click`<br>Slots: `header`, `body`, `footer` | **Proposto** | 1, 2, 3, 4, 6 | `components/aegis-modal/` |
+| `aegis-dropdown` | Overlay | `trigger`: click, hover<br>`placement` (via Popper.js): top, bottom, left, right + variations<br>Slots: `trigger`, `content` (`<aegis-dropdown-item>`) | **Proposto** | 1, 2, 4 (usa `@popperjs/core`) | `components/aegis-dropdown/` |
+| `aegis-tooltip` | Overlay | `placement` (via Popper.js)<br>`delay`: show/hide<br>`variant`: default, info, warning, error<br>Slot: `trigger` | **Proposto** | 1, 2, 3, 5 (usa `@popperjs/core`) | `components/aegis-tooltip/` |
+| `aegis-toast` | Feedback | `variant`: success, error, warning, info<br>`duration`: auto (5s), persistent<br>`action`: botão opcional (ex: "Desfazer")<br>Container: `<aegis-toast-container>` (portal) | **Proposto** | Todos (1–6) | `components/aegis-toast/` |
+| `aegis-badge` | Feedback | `variant`: success, warning, danger, info, neutral<br>`size`: sm, md<br>`dot`: boolean (indicador circular) | **Proposto** | 1, 2, 3, 5 | `components/aegis-badge/` |
+| `aegis-avatar` | Feedback | `src`, `alt`, `fallback` (iniciais)<br>`size`: xs, sm, md, lg, xl<br>`shape`: circle, square<br>`status`: online, offline, busy, away (badge overlay) | **Proposto** | 1, 4, 6 | `components/aegis-avatar/` |
+| `aegis-data-table` | Exibição | `columns` (array de config: key, label, sortable, filterable, render)<br>`pagination`: client/server<br>`selection`: single, multiple, none<br>`sort`, `filter`, `row-click`, `row-expand`<br>`empty-state`, `loading-state`, `error-state`<br>`virtualized`: opcional para >1k linhas | **Proposto** | 1, 2, 3, 5 | `components/aegis-data-table/` |
+| `aegis-card` | Layout | `variant`: default, outlined, elevated, interactive<br>`padding`: none, sm, md, lg<br>Slots: `header`, `media`, `body`, `footer`, `actions` | **Proposto** | 1, 3, 5 | `components/aegis-card/` |
+| `aegis-sidebar` | Navegação | `collapsible`, `collapsed` (state)<br>`items`: array de { label, icon, href, badge, children }<br>`active-item` (rota atual)<br>Slot: `logo`, `user-menu` | **Proposto** | Todos (1–6) | `components/aegis-sidebar/` |
+| `aegis-header` | Layout | `title`, `breadcrumbs`, `actions` (slot), `user-menu` (avatar + dropdown)<br>`sticky`, `elevated` | **Proposto** | Todos (1–6) | `components/aegis-header/` |
+| `aegis-breadcrumb` | Navegação | `items`: array de { label, href, current }<br>`separator`: chevron, slash, arrow<br>`max-items` (colapso com ellipsis) | **Proposto** | 1, 2, 4, 5 | `components/aegis-breadcrumb/` |
+| `aegis-tabs` | Navegação | `variant`: line, enclosed, soft<br>`orientation`: horizontal, vertical<br>`activation`: auto, manual<br>Slots: `tab-list`, `tab-panel` | **Proposto** | 4, 5 | `components/aegis-tabs/` |
+| `aegis-empty-state` | Feedback | `illustration`: icon, illustration, none<br>`title`, `description`, `action` (slot para botão/link)<br>`size`: sm, md, lg | **Proposto** | 1, 2, 3, 5 | `components/aegis-empty-state/` |
+| `aegis-loading` | Feedback | `variant`: spinner, skeleton, pulse, progress<br>`size`: sm, md, lg<br>`overlay`: boolean (full-screen vs inline) | **Proposto** | Todos (1–6) | `components/aegis-loading/` |
+| `aegis-alert-banner` | Feedback | `variant`: info, success, warning, danger<br>`dismissible`, `action` (slot)<br>`persistent`: boolean | **Proposto** | 3, 6 | `components/aegis-alert-banner/` |
+| `aegis-health-indicator` | Domínio | `status`: ok, warning, critical, unknown<br>`metric`: disk, memory, network, custom<br>`value`, `threshold`, `unit`<br>`trend`: up, down, stable (sparkline opcional) | **Proposto** | 3 | `components/aegis-health-indicator/` |
+| `aegis-stat-card` | Domínio | `label`, `value`, `change` (%, trend), `icon`<br>`variant`: default, highlight, warning<br>`link` (opcional) | **Proposto** | 1, 3, 5 | `components/aegis-stat-card/` |
+| `aegis-filter-bar` | Domínio | `filters`: array de { key, label, type: select/date/range/text, options }<br>`on-change` event<br>`collapsed` state (mobile) | **Proposto** | 1, 2, 3, 5 | `components/aegis-filter-bar/` |
+| `aegis-export-button` | Ação | `formats`: csv, xlsx, pdf<br>`filename`, `loading` state<br>Integração com backend streaming | **Proposto** | 5 | `components/aegis-export-button/` |
+| `aegis-audit-log-table` | Domínio | Extende `aegis-data-table` com colunas fixas: timestamp, user, entity, action, diff<br>`diff-viewer` (modal ao clicar) | **Proposto** | 5 | `components/aegis-audit-log-table/` |
+| `aegis-login-form` | Auth | `fields`: email/username, password, remember-me<br>`forgot-password`, `sso-buttons` (slots)<br>`state`: default, loading, error, success<br>Validação cliente + integração `authInterceptor` | **Proposto** | 6 | `components/aegis-login-form/` |
+| `aegis-protected-route` | Auth | Wrapper (não visual) — verifica token, roles, permissions<br>Redireciona login com `returnUrl`<br>Emite `aegis-auth-change` | **Proposto** | 6 | `components/aegis-protected-route/` |
+| `aegis-confirm-dialog` | Overlay | Especialização de `aegis-modal` para confirmações perigosas<br>`variant`: delete, destructive, warning<br>`require-typing`: string para confirmar (ex: "EXCLUIR") | **Proposto** | 1, 2, 4 | `components/aegis-confirm-dialog/` |
+
+**Total: 29 componentes propostos** — todos **Proposto** (não existem no codebase atual).
 
 ---
 
-## 4. Componentes de Domínio (Compostos)
+## 4. Especificação por Componente (Amostra Representativa)
 
-### 4.1 Assets (`domain/assets/`)
-
-| Componente | Descrição | Props Principais | Fluxos |
-| :--- | :--- | :--- | :--- |
-| **AssetForm** | Formulário completo ativo + hardware dinâmico | `modelValue`, `readonly`, `tipoAtivoOptions`, `filialOptions`, `departamentoOptions`, `localizacaoOptions`, `fornecedorOptions`, `funcionarioOptions`, `onSubmit`, `onCancel` | UC-06, UC-08 |
-| **AssetDetail** | Detalhe completo (tabs: Geral, Hardware, Ordens, Auditoria, QR) | `asset`, `editable`, `onEdit`, `onTransfer`, `onBaixa`, `onHealthCheck` | UC-07 |
-| **AssetList** | Lista paginada + filtros + busca fuzzy + ações | `filters`, `data`, `pagination`, `onRowClick`, `onCreate`, `onExport` | UC-09, UC-12 |
-| **HardwareSection** | Seção hardware dinâmica (CPU, Memória, Discos, Rede) | `modelValue`, `tipoAtivo`, `readonly`, `onChange` | UC-06, UC-10 |
-| **QRCodeDisplay** | Exibição QR Code + Termo PDF + Impressão | `asset`, `showTermo`, `showQR`, `onPrintQR`, `onDownloadTermo` | UC-06, UC-08 |
-| **AssetCostTable** | Tabela TCO + Drill-down ordens | `data`, `pagination`, `onRowClick`, `onExport` | UC-11 |
-| **AssetTransferModal** | Modal transferência + novo termo | `asset`, `filialOptions`, `departamentoOptions`, `localizacaoOptions`, `funcionarioOptions`, `onConfirm` | UC-08 |
-| **AssetBaixaModal** | Modal baixa/desativação | `asset`, `onConfirm` | UC-09 |
-
-### 4.2 Orders (`domain/orders/`)
-
-| Componente | Descrição | Props Principais | Fluxos |
-| :--- | :--- | :--- | :--- |
-| **OrderForm** | Formulário criar/editar ordem (busca fuzzy ativo) | `modelValue`, `ativoOptions`, `tecnicoOptions`, `fornecedorOptions`, `tipoOptions`, `readonly`, `onSubmit` | UC-13 |
-| **OrderList** | Lista paginada + filtros avançados + busca fuzzy | `filters`, `data`, `pagination`, `onRowClick`, `onCreate`, `onExport` | UC-18 |
-| **OrderDetail** | Detalhe completo (tabs: Geral, Timeline, Evidências, Custos, Auditoria) | `order`, `editable`, `onAction`, `onReassign` | UC-03, UC-14 a UC-17 |
-| **OrderActions** | Botões contextuais (Iniciar, Aprovar, Concluir, Cancelar, Reatribuir) | `order`, `permissions`, `onAction` | UC-14 a UC-17 |
-| **OrderTimeline** | Timeline visual estados + evidências | `order`, `auditoria` | UC-03, UC-10 |
-| **CostForm** | Formulário custos finais (mão de obra, materiais, terceiros) | `modelValue`, `readonly`, `onSubmit` | UC-16 |
-| **EvidenceModal** | Modal evidências (foto, checklist, assinatura) | `order`, `onSubmit`, `onReject` | UC-15 |
-| **ReassignModal** | Modal reatribuição técnico | `order`, `tecnicoOptions`, `onConfirm` | UC-19 |
-| **OrderCostSummary** | Resumo custos (cards: estimado, realizado, mão de obra, material, terceiros) | `order` | UC-16, UC-11 |
-
-### 4.3 Preventiva (`domain/preventiva/`)
-
-| Componente | Descrição | Props Principais | Fluxos |
-| :--- | :--- | :--- | :--- |
-| **PreventivaPlanForm** | Formulário plano preventivo (CRON, técnico, ativos/tipo) | `modelValue`, `ativoOptions`, `tipoAtivoOptions`, `tecnicoOptions`, `readonly`, `onSubmit` | UC-21 |
-| **PreventivaPlanList** | Lista planos + status + próxima execução + ações | `data`, `pagination`, `onEdit`, `onPause`, `onActivate`, `onDelete` | UC-23 |
-| **PreventivaCalendar** | Calendário visual próximas execuções | `plans`, `onDateClick` | UC-23 |
-| **AderenciaReport** | Relatório aderência preventiva (% prazo) | `filters`, `data`, `onExport` | UC-24 |
-
-### 4.4 Preditiva (`domain/predictive/`)
-
-| Componente | Descrição | Props Principais | Fluxos |
-| :--- | :--- | :--- | :--- |
-| **HealthCheckForm** | Formulário coleta SMART (PWA mobile + QR) | `asset`, `discos`, `onSubmit`, `offlineMode` | UC-25 |
-| **PreditivaDashboard** | Dashboard riscos (cards + tabela + filtros + ações) | `filters`, `data`, `pagination`, `onAction` | UC-28 |
-| **PrevisaoTable** | Tabela previsões (probabilidade, IC 95%, data prevista, ação) | `data`, `pagination`, `onAction` | UC-28 |
-| **AlertCard** | Card alerta preditivo (crítico/atenção) | `alert`, `onAction`, `dismissible` | UC-28 |
-| **HealthScoreIndicator** | Indicador visual score 0-100 (circular/barra) | `score`, `thresholds`, `size`, `showLabel` | UC-25, UC-28 |
-
-### 4.5 Search (`domain/search/`)
-
-| Componente | Descrição | Props Principais | Fluxos |
-| :--- | :--- | :--- | :--- |
-| **GlobalSearch** | Header busca global (debounce, dropdown agrupado, highlight) | `value`, `onSearch`, `onSelect`, `types`, `placeholder`, `recentSearches` | UC-29 |
-| **SearchResults** | Dropdown resultados agrupados por tipo + highlight + ações | `results`, `query`, `onSelect`, `grouped` | UC-29 |
-| **EntitySearchModal** | Modal seleção entidade (ativo, funcionário, fornecedor) | `type`, `value`, `onSelect`, `filters`, `multiple` | UC-13, UC-19 |
-| **SearchConfig** | Admin: configuração threshold, campos, pesos | `config`, `onSave` | UC-31 |
-
-### 4.6 Admin (`domain/admin/`)
-
-| Componente | Descrição | Props Principais | Fluxos |
-| :--- | :--- | :--- | :--- |
-| **RoleMatrix** | Matriz visual Role × Permission × Contexto (Global/Filial) | `roles`, `permissions`, `contexts`, `matrix`, `onChange`, `validate` | UC-33 |
-| **UserManagement** | CRUD usuários + provisionamento + roles + filial | `data`, `pagination`, `onCreate`, `onEdit`, `onBlock`, `onResetPassword`, `onDelete` | UC-34 |
-| **TenantSelector** | Header seletor filial (Admin Global) | `filiais`, `currentFilialId`, `onChange` | UC-35 |
-| **AuditTimeline** | Timeline auditoria Envers (diff visual, filtros, export) | `filters`, `data`, `pagination`, `onExport` | UC-36 |
-| **PrivacyPanel** | LGPD: exclusão + export + consentimentos | `user`, `onRequestDeletion`, `onExport` | UC-37 |
-| **DataExport** | Export JSON completo dados usuário | `user`, `onDownload` | UC-37 |
-
-### 4.7 Reports (`domain/reports/`)
-
-| Componente | Descrição | Props Principais | Fluxos |
-| :--- | :--- | :--- | :--- |
-| **TermoResponsabilidade** | Gerador Termo PDF (assinatura placeholder) | `asset`, `responsavel`, `tipo`, `observacoes`, `onGenerate`, `onDownload` | UC-39 |
-| **QRCodeBatchGenerator** | Etiquetas lote (filtros + PDF A4/ZIP) | `filters`, `format`, `onGenerate`, `onDownload` | UC-40 |
-| **ComplianceReport** | Relatórios NR-10/12, LGPD, ISO 27001 | `tipo`, `periodo`, `filters`, `onGenerate`, `onDownload` | UC-42 |
-| **DashboardKPIs** | Cards KPIs + Gráficos + Alertas Tempo Real | `data`, `websocket`, `onAlertClick` | UC-19, UC-28 |
-
-### 4.8 LGPD (`domain/lgpd/`)
-
-| Componente | Descrição | Props Principais | Fluxos |
-| :--- | :--- | :--- | :--- |
-| **PrivacyPanel** | Painel privacidade (exclusão, export, consentimentos) | `user`, `onRequestDeletion`, `onExport`, `consentimentos` | UC-37 |
-| **DataExport** | Export JSON completo (perfil, ordens, ativos, health checks, auditoria) | `user`, `onDownload` | UC-37 |
-| **ConsentManager** | Gerenciamento consentimentos granulares | `consentimentos`, `onUpdate` | UC-37 |
+> **Nota:** Por brevidade, detalho 6 componentes críticos. Os demais seguem o mesmo padrão — especificação completa deve ser feita em arquivos individuais (`components/aegis-*/README.md`) durante a implementação.
 
 ---
 
-## 5. Layout Components
+### 4.1 `aegis-button`
 
-| Componente | Descrição | Props/Slots |
-| :--- | :--- | :--- |
-| **AppLayout** | Layout principal (Header + Sidebar + Main + Footer) | `slots: default, header-right, sidebar-footer` |
-| **Header** | Topo global (Busca Global, Tenant Selector, User Menu, Notifications) | `user`, `filiais`, `currentFilialId`, `onFilialChange`, `onLogout`, `onSearch` |
-| **Sidebar** | Navegação lateral (Menu hierárquico por permissão, colapsível) | `menuItems`, `collapsed`, `onCollapseChange` |
-| **Footer** | Rodapé (versão, links legais, status) | `version`, `links` |
-| **PageContainer** | Container página (breadcrumb + title + actions + content) | `title`, `breadcrumb`, `actions`, `slots: default, header-actions` |
+* **Propósito:** Ação primária/segundária/destrutiva em formulários, tabelas, modais, toolbars. Substitui `<button>` nativo com estilos consistentes, estados acessíveis e loading integrado.
+* **Anatomia:** `<button class="aegis-btn">[<span class="aegis-btn__icon">][<span class="aegis-btn__label"><slot></slot></span>][<span class="aegis-btn__spinner">]</span>`
+* **Props/Atributos:**
 
----
+| Atributo | Tipo | Default | Descrição |
+| :--- | :--- | :--- | :--- |
+| `variant` | `primary \| secondary \| ghost \| destructive \| outline` | `primary` | Estilo visual — mapeia tokens `--btn-*-bg`, `--btn-*-hover`, `--btn-*-text` |
+| `size` | `sm \| md \| lg` | `md` | Padding/tipografia — `--space-2/3/4`, `--text-sm/base/lg` |
+| `disabled` | `boolean` | `false` | Desabilita + `aria-disabled="true"` + cursor not-allowed |
+| `loading` | `boolean` | `false` | Mostra spinner, desabilita, mantém largura (evita layout shift) |
+| `full-width` | `boolean` | `false` | `width: 100%` |
+| `type` | `button \| submit \| reset` | `button` | Tipo nativo do button |
+| `aria-pressed` | `boolean` | — | Para botões toggle (ex: favoritar) |
 
-## 6. Composables & Directives (Shared)
+* **Estados visuais:**
 
-### 6.1 Composables (`shared/composables/`)
-
-| Composable | Descrição |
+| Estado | Comportamento Visual (Tokens) |
 | :--- | :--- |
-| `useAuth()` | Auth state, login, logout, refresh, permissions, user |
-| `useToast()` | Toast notifications (success, error, warning, info) |
-| `useConfirm()` | Confirm dialogs (Promise-based) |
-| `useModal()` | Modal state management |
-| `useDrawer()` | Drawer state management |
-| `useTable()` | Table state (pagination, sorting, filtering, selection) |
-| `useForm()` | Form validation (Zod/Yup), submission, reset |
-| `useSearch()` | Global search state, debounce, history |
-| `usePermissions()` | Permission checking (Aegis Shield) |
-| `useTenant()` | Multi-tenancy context (filialId, global view) |
-| `useWebSocket()` | WebSocket connection + events (orders, predictive, alerts) |
-| `useOffline()` | PWA offline state, sync queue, background sync |
-| `useQRScanner()` | QR Scanner (Barcode Detection API + ZXing fallback) |
-| `useGeolocation()` | Geolocation (watchPosition, getCurrentPosition) |
-| `useMediaQuery()` | Responsive breakpoints (reactive) |
-| `useLocalStorage()` / `useSessionStorage()` | Reactive storage |
-| `useDebounce()` / `useThrottle()` | Debounce/Throttle helpers |
-| `useClipboard()` | Copy to clipboard |
-| `useDownload()` | File download (blob, base64, url) |
-| `usePrint()` | Print document/element |
-| `useIntersectionObserver()` | Lazy loading, infinite scroll |
-| `useResizeObserver()` | Element size changes |
-| `useEventListener()` | Typed event listeners |
-| `useKeyboardShortcuts()` | Global keyboard shortcuts |
+| Default | `background: var(--btn-{variant}-bg); color: var(--btn-{variant}-text); border-radius: var(--radius-md); box-shadow: var(--shadow-sm);` |
+| Hover | `background: var(--btn-{variant}-hover);` (exceto `disabled`/`loading`) |
+| Focus | `outline: none; box-shadow: var(--shadow-focus), var(--shadow-sm);` |
+| Active/Pressed | `transform: scale(0.98);` + `background` mais escuro (10%) |
+| Disabled | `opacity: 0.5; cursor: not-allowed; pointer-events: none;` |
+| Loading | `color: transparent;` + spinner centralizado (`var(--color-text-primary)`) + `pointer-events: none;` |
 
-### 6.2 Directives (`shared/directives/`)
+* **Tokens consumidos:** `--btn-primary-bg`, `--btn-primary-hover`, `--btn-primary-text`, `--btn-secondary-bg`, `--btn-secondary-hover`, `--btn-danger-bg`, `--radius-md`, `--shadow-sm`, `--shadow-focus`, `--text-sm`, `--text-base`, `--text-lg`, `--space-2`, `--space-3`, `--space-4`, `--duration-fast`, `--color-text-primary`
+* **Eventos emitidos:** `aegis-click` (detail: `{ originalEvent }`) — wrapper para não vazar `PointerEvent` nativo
+* **Exemplo de uso:**
+```html
+<aegis-button variant="primary" size="md" loading="false">
+  <svg slot="icon" class="aegis-icon" aria-hidden="true"><use href="#icon-plus"></use></svg>
+  Novo Ativo
+</aegis-button>
 
-| Directive | Descrição |
+<aegis-button variant="destructive" size="sm" disabled>
+  Excluir
+</aegis-button>
+```
+
+---
+
+### 4.2 `aegis-data-table`
+
+* **Propósito:** Tabela de dados densa, acessível, com paginação, ordenação, filtros, seleção e estados vazios/carregamento/erro — coração dos Flows 1, 2, 3, 5.
+* **Anatomia:** `<table class="aegis-table"><thead><tr><th><aegis-th>...</aegis-th></tr></thead><tbody><tr><td><slot name="cell-{key}"></slot></td></tr></tbody></table>` + `<aegis-pagination>` + `<aegis-toolbar>` (filtros, busca, ações em lote)
+* **Props/Atributos (via propriedades JS no elemento):**
+
+| Propriedade | Tipo | Default | Descrição |
+| :--- | :--- | :--- | :--- |
+| `columns` | `ColumnDef[]` | `[]` | `{ key, label, sortable, filterable, width, align, render: (row, cellValue) => string|Node }` |
+| `data` | `any[]` | `[]` | Linhas de dados (objetos) |
+| `key-field` | `string` | `'id'` | Campo único para `row-key` e seleção |
+| `pagination` | `object` | `{ page: 1, pageSize: 20, total: 0, serverSide: false }` | Controle de paginação |
+| `selection` | `'none' \| 'single' \| 'multiple'` | `'none'` | Habilita checkbox na primeira coluna |
+| `selected-keys` | `Set<string\|number>` | `new Set()` | Linhas selecionadas (bidirecional) |
+| `sort-by` | `string` | `null` | Coluna ordenada |
+| `sort-dir` | `'asc' \| 'desc'` | `'asc'` | Direção |
+| `loading` | `boolean` | `false` | Mostra skeleton rows |
+| `error` | `string` | `null` | Mensagem de erro (estado error) |
+| `empty-message` | `string` | `'Nenhum registro encontrado'` | Texto do empty state |
+| `row-clickable` | `boolean` | `false` | `cursor: pointer` + emite `aegis-row-click` |
+| `expandable` | `boolean` | `false` | Linha expansível (slot `expanded-content`) |
+
+* **Estados visuais:**
+
+| Estado | Comportamento |
 | :--- | :--- |
-| `v-tooltip` | Tooltip (content, placement, disabled, trigger, offset) |
-| `v-popover` | Popover (content, trigger, placement, width) |
-| `v-focus` | Auto-focus on mount |
-| `v-click-outside` | Detect click outside element |
-| `v-permission` | Show/hide based on Aegis Shield permission (`v-permission="['ORDEM_APROVAR', 'filial:1']"`) |
-| `v-role` | Show/hide based on role (`v-role="['GESTOR', 'ADMIN']"`) |
-| `v-copy` | Copy to clipboard (`v-copy="text"` or `v-copy:success="handler"`) |
-| `v-debounce` | Debounce event handler (`@click.debounce.500="handler"`) |
-| `v-throttle` | Throttle event handler |
-| `v-lazy` | Lazy load image (`v-lazy="src"`) |
-| `v-intersection` | Intersection Observer (`v-intersection="handler"`) |
-| `v-resize` | Resize Observer (`v-resize="handler"`) |
-| `v-focus-trap` | Focus trap for modals/drawers |
-| `v-ripple` | Material ripple effect |
-| `v-tooltip` | Tooltip directive (alternative to component) |
+| Loading | `tbody` mostra 5 skeleton rows (`aegis-loading variant="pulse"`) + `thead` visível |
+| Empty | `tbody` com 1 row `colspan="100%"` + `<aegis-empty-state>` centralizado |
+| Error | `tbody` com 1 row `colspan="100%"` + `<aegis-alert-banner variant="danger">` + botão "Tentar novamente" |
+| Hover row | `background: var(--table-row-hover);` (exceto selecionada) |
+| Selected row | `background: var(--color-accent-light);` + checkbox marcado |
+| Focus cell | `outline: none; box-shadow: inset 0 0 0 2px var(--color-accent-primary);` (navegação por teclado) |
 
----
-
-## 7. Component API Standards
-
-### 7.1 Props Convention
-
-```typescript
-// Tipagem estrita com JSDoc
-interface ButtonProps {
-  /** Variant visual do botão */
-  variant?: 'primary' | 'secondary' | 'success' | 'danger' | 'outline' | 'ghost';
-  /** Tamanho do botão */
-  size?: 'sm' | 'md' | 'lg';
-  /** Estado de loading */
-  loading?: boolean;
-  /** Desabilitado */
-  disabled?: boolean;
-  /** Ícone à esquerda */
-  icon?: string | Component;
-  /** Ícone à direita */
-  iconRight?: string | Component;
-  /** Largura total */
-  block?: boolean;
-  /** Tipo nativo do button */
-  nativeType?: 'button' | 'submit' | 'reset';
-  /** Classe CSS adicional */
-  class?: string | string[] | Record<string, boolean>;
-  /** Estilo inline */
-  style?: string | Record<string, string | number>;
-}
-
-// Emits tipados
-interface ButtonEmits {
-  (e: 'click', event: MouseEvent): void;
-}
-```
-
-### 7.2 Slots Convention
-
-```vue
-<!-- Button.vue -->
-<template>
-  <button 
-    :class="buttonClasses" 
-    :disabled="disabled || loading" 
-    :type="nativeType"
-    @click="onClick"
-  >
-    <span v-if="loading" class="btn-spinner" aria-hidden="true">
-      <SpinnerIcon />
-    </span>
-    <span v-else-if="icon" class="btn-icon-start" aria-hidden="true">
-      <component :is="icon" />
-    </span>
-    <slot /> <!-- Default slot para conteúdo -->
-    <span v-if="iconRight" class="btn-icon-end" aria-hidden="true">
-      <component :is="iconRight" />
-    </span>
-  </button>
-</template>
-```
-
-### 7.3 Exposing Methods (defineExpose)
-
-```typescript
-// Modal.vue
-defineExpose({
-  open: () => { open.value = true; },
-  close: () => { open.value = false; },
-  toggle: () => { open.value = !open.value; },
-});
+* **Tokens consumidos:** `--table-header-bg`, `--table-row-hover`, `--table-border`, `--color-border-light`, `--color-text-primary`, `--color-text-secondary`, `--color-text-muted`, `--color-accent-primary`, `--color-accent-light`, `--radius-none`, `--shadow-xs`, `--space-2`, `--space-3`, `--space-4`, `--text-sm`, `--text-base`, `--duration-fast`
+* **Slots:** `header-actions` (toolbar), `cell-{key}` (render customizado por coluna), `expanded-content` (linha expandida), `pagination-info`, `page-size-select`
+* **Eventos emitidos:** `aegis-sort` (`{ key, dir }`), `aegis-page-change` (`{ page, pageSize }`), `aegis-selection-change` (`{ keys: Set }`), `aegis-row-click` (`{ row, key }`), `aegis-filter-change` (`{ filters: Record<string, any> }`)
+* **Exemplo de uso:**
+```html
+<aegis-data-table 
+  key-field="id"
+  selection="multiple"
+  pagination='{"page":1,"pageSize":20,"total":0,"serverSide":true}'
+  row-clickable
+>
+  <aegis-column key="tag" label="Tag" sortable filterable width="120"></aegis-column>
+  <aegis-column key="nome" label="Nome" sortable filterable></aegis-column>
+  <aegis-column key="tipo" label="Tipo" filterable render="renderTipo"></aegis-column>
+  <aegis-column key="status" label="Status" filterable render="renderStatusBadge"></aegis-column>
+  <aegis-column key="filial" label="Filial" sortable filterable></aegis-column>
+  <aegis-column key="updatedAt" label="Atualizado" sortable align="right" render="renderDate"></aegis-column>
+  
+  <template slot="cell-status" data-row="{{row}}">
+    <aegis-badge variant="{{row.statusVariant}}">{{row.statusLabel}}</aegis-badge>
+  </template>
+  
+  <div slot="header-actions">
+    <aegis-filter-bar filters="[[tableFilters]]" on-change="handleFilterChange"></aegis-filter-bar>
+    <aegis-button variant="primary" on-click="openCreateModal">Novo Ativo</aegis-button>
+  </div>
+</aegis-data-table>
 ```
 
 ---
 
-## 8. Storybook Stories (Exemplos)
+### 4.3 `aegis-modal`
 
-```typescript
-// Button.stories.ts
-import type { Meta, StoryObj } from '@storybook/vue3';
-import Button from './Button.vue';
+* **Propósito:** Overlay acessível para formulários, confirmações, detalhes — usado em Flows 1, 2, 3, 4, 6. Gerencia foco trap, `Esc` para fechar, `aria-modal`, backdrop.
+* **Anatomia:** `<div class="aegis-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="aegis-modal__backdrop"></div><div class="aegis-modal__container"><header><h2 id="modal-title"><slot name="header"></slot></h2><aegis-button variant="ghost" size="sm" aria-label="Fechar" on-click="close">×</aegis-button></header><div class="aegis-modal__body"><slot name="body"></slot></div><footer><slot name="footer"></slot></footer></div></div>`
+* **Props/Atributos:**
 
-const meta: Meta<typeof Button> = {
-  title: 'UI/Button',
-  component: Button,
-  tags: ['autodocs'],
-  argTypes: {
-    variant: { control: 'select', options: ['primary', 'secondary', 'success', 'danger', 'outline', 'ghost'] },
-    size: { control: 'select', options: ['sm', 'md', 'lg'] },
-    loading: { control: 'boolean' },
-    disabled: { control: 'boolean' },
-  },
-};
+| Atributo | Tipo | Default | Descrição |
+| :--- | :--- | :--- | :--- |
+| `open` | `boolean` | `false` | Controla visibilidade (reflete no `style.display`) |
+| `size` | `sm \| md \| lg \| xl \| full` | `md` | `max-width`: 400px, 600px, 800px, 1000px, `calc(100% - 2rem)` |
+| `variant` | `default \| confirmation \| form \| alert` | `default` | Ajusta padding, ícone, ações padrão |
+| `dismissible` | `boolean` | `true` | `Esc`/backdrop click fecha |
+| `close-on-overlay-click` | `boolean` | `true` | Click no backdrop fecha |
+| `title` | `string` | — | Título (acessível via `aria-labelledby`) |
+| `description` | `string` | — | Descrição (via `aria-describedby`) |
 
-export default meta;
-type Story = StoryObj<typeof Button>;
+* **Estados visuais:**
 
-export const Primary: Story = { args: { variant: 'primary', default: 'Botão Primário' } };
-export const Secondary: Story = { args: { variant: 'secondary', default: 'Botão Secundário' } };
-export const Loading: Story = { args: { variant: 'primary', loading: true, default: 'Carregando...' } };
-export const Disabled: Story = { args: { variant: 'primary', disabled: true, default: 'Desabilitado' } };
-export const WithIcon: Story = { args: { variant: 'primary', icon: 'PlusIcon', default: 'Novo' } };
-export const AllVariants: Story = {
-  render: () => ({
-    components: { Button },
-    template: `
-      <div class="d-flex flex-wrap gap-3">
-        <Button variant="primary">Primary</Button>
-        <Button variant="secondary">Secondary</Button>
-        <Button variant="success">Success</Button>
-        <Button variant="danger">Danger</Button>
-        <Button variant="outline">Outline</Button>
-        <Button variant="ghost">Ghost</Button>
-      </div>
-    `,
-  }),
-};
+| Estado | Comportamento |
+| :--- | :--- |
+| Entrada | `opacity: 0 → 1` + `transform: scale(0.95) → 1` (`--duration-base`, `--shadow-lg`) |
+| Saída | `opacity: 1 → 0` + `transform: 1 → 0.95` (`--duration-fast`) |
+| Backdrop | `background: rgba(0,0,0,0.4);` (`--color-bg-primary` com alpha) |
+| Focus trap | Tab cicla dentro do modal; `focus` inicial no primeiro elemento focável ou botão fechar |
+
+* **Tokens consumidos:** `--color-bg-primary`, `--color-bg-secondary`, `--color-border-light`, `--radius-lg`, `--shadow-lg`, `--shadow-modal-backdrop`, `--space-4`, `--space-6`, `--text-lg`, `--text-base`, `--duration-base`, `--duration-fast`, `--z-modal-backdrop`, `--z-modal`
+* **Métodos JS:** `show()`, `hide()`, `toggle()`
+* **Eventos emitidos:** `aegis-modal-open`, `aegis-modal-close`, `aegis-modal-confirm` (para variant=confirmation), `aegis-modal-submit` (para variant=form)
+* **Exemplo de uso:**
+```html
+<aegis-modal id="modal-excluir" variant="confirmation" size="sm" title="Excluir Ativo" description="Esta ação não pode ser desfeita.">
+  <span slot="header">Confirmar Exclusão</span>
+  <p slot="body">Tem certeza que deseja excluir o ativo <strong>"Notebook Dell Latitude 7420"</strong>? Todos os dados de manutenção e health checks associados serão removidos permanentemente.</p>
+  <div slot="footer" style="display:flex; gap:var(--space-3); justify-content:flex-end;">
+    <aegis-button variant="secondary" on-click="closeModal">Cancelar</aegis-button>
+    <aegis-button variant="destructive" on-click="confirmDelete">Excluir</aegis-button>
+  </div>
+</aegis-modal>
+
+<script>
+  const modal = document.getElementById('modal-excluir');
+  modal.addEventListener('aegis-modal-confirm', () => { /* chamar API delete */ });
+</script>
 ```
 
 ---
 
-## 8. Testing Standards
+### 4.4 `aegis-dropdown` (usa `@popperjs/core`)
 
-### 8.1 Unit Tests (Vitest + Vue Test Utils)
+* **Propósito:** Menu de ações contextual (linha de tabela, header do usuário, filtros) — posicionamento robusto via Popper.js.
+* **Anatomia:** `<aegis-dropdown><button slot="trigger" class="aegis-dropdown__trigger"><slot name="trigger"></slot></button><div class="aegis-dropdown__panel" role="menu"><slot name="content"></slot></div></aegis-dropdown>`
+* **Props/Atributos:**
 
-```typescript
-// Button.test.ts
-import { describe, it, expect } from 'vitest';
-import { mount } from '@vue/test-utils';
-import Button from './Button.vue';
+| Atributo | Tipo | Default | Descrição |
+| :--- | :--- | :--- | :--- |
+| `trigger` | `click \| hover` | `click` | Como abre |
+| `placement` | `top \| bottom \| left \| right \| auto` | `bottom-start` | Posição via Popper |
+| `offset` | `number` | `8` | Distância do trigger (px) |
+| `flip` | `boolean` | `true` | Inverte se não cabe |
+| `close-on-select` | `boolean` | `true` | Fecha ao clicar item |
+| `disabled` | `boolean` | `false` | Desabilita trigger |
 
-describe('Button', () => {
-  it('renders correctly', () => {
-    const wrapper = mount(Button, { props: { variant: 'primary' }, slots: { default: 'Click me' } });
-    expect(wrapper.classes()).toContain('btn--primary');
-    expect(wrapper.text()).toBe('Click me');
-  });
-
-  it('emits click event', async () => {
-    const wrapper = mount(Button, { props: { variant: 'primary' } });
-    await wrapper.trigger('click');
-    expect(wrapper.emitted('click')).toBeTruthy();
-  });
-
-  it('applies loading state', () => {
-    const wrapper = mount(Button, { props: { loading: true } });
-    expect(wrapper.classes()).toContain('btn--loading');
-    expect(wrapper.find('.btn-spinner').exists()).toBe(true);
-  });
-
-  it('applies disabled state', () => {
-    const wrapper = mount(Button, { props: { disabled: true } });
-    expect(wrapper.attributes('disabled')).toBeDefined();
-  });
-
-  it('renders icon', () => {
-    const wrapper = mount(Button, { props: { icon: 'PlusIcon' }, slots: { default: 'Add' } });
-    expect(wrapper.find('.btn-icon-start').exists()).toBe(true);
-  });
-});
-```
-
-### 8.2 E2E Tests (Cypress)
-
-```typescript
-// button.cy.ts
-describe('Button', () => {
-  beforeEach(() => {
-    cy.mount(Button, { props: { variant: 'primary' }, slots: { default: 'Click me' } });
-  });
-
-  it('should be accessible', () => {
-    cy.injectAxe();
-    cy.checkA11y();
-  });
-
-  it('should handle click', () => {
-    cy.get('button').click();
-    // Verificar emissão de evento via cy.spy ou window event
-  });
-
-  it('should show loading state', () => {
-    cy.mount(Button, { props: { variant: 'primary', loading: true } });
-    cy.get('.btn-spinner').should('be.visible');
-  });
-});
-```
-
-### 8.3 Accessibility Tests (axe-core)
-
-```typescript
-// a11y.test.ts
-import { mount } from '@vue/test-utils';
-import { injectAxe, checkA11y } from 'axe-core/vitest';
-import Button from './Button.vue';
-
-describe('Button A11y', () => {
-  injectAxe();
-
-  it('should have no accessibility violations', async () => {
-    const wrapper = mount(Button, { props: { variant: 'primary' }, slots: { default: 'Accessible Button' } });
-    await checkA11y(wrapper.element);
-  });
-
-  it('should have focus visible', async () => {
-    const wrapper = mount(Button, { props: { variant: 'primary' } });
-    const button = wrapper.find('button');
-    await button.trigger('focus');
-    await checkA11y(wrapper.element);
-  });
-});
+* **Slots:** `trigger` (botão/elemento que abre), `content` (`<aegis-dropdown-item>`, `<aegis-dropdown-divider>`, `<aegis-dropdown-header>`)
+* **Tokens consumidos:** `--color-bg-primary`, `--color-border-light`, `--color-text-primary`, `--color-text-secondary`, `--radius-md`, `--shadow-md`, `--space-1`, `--space-2`, `--text-sm`, `--z-dropdown`, `--duration-fast`
+* **Eventos:** `aegis-dropdown-open`, `aegis-dropdown-close`, `aegis-dropdown-select` (`{ value, item }`)
+* **Exemplo de uso:**
+```html
+<aegis-dropdown placement="bottom-end" trigger="click">
+  <aegis-button variant="ghost" size="sm" slot="trigger" aria-label="Ações do ativo">
+    <svg class="aegis-icon"><use href="#icon-more-vertical"></use></svg>
+  </aegis-button>
+  <div slot="content" role="menu">
+    <aegis-dropdown-item value="edit" role="menuitem">
+      <svg class="aegis-icon" slot="icon"><use href="#icon-edit"></use></svg>
+      Editar
+    </aegis-dropdown-item>
+    <aegis-dropdown-item value="maintenance" role="menuitem">
+      <svg class="aegis-icon" slot="icon"><use href="#icon-wrench"></use></svg>
+      Nova Manutenção
+    </aegis-dropdown-item>
+    <aegis-dropdown-divider></aegis-dropdown-divider>
+    <aegis-dropdown-item value="delete" variant="destructive" role="menuitem">
+      <svg class="aegis-icon" slot="icon"><use href="#icon-trash"></use></svg>
+      Excluir
+    </aegis-dropdown-item>
+  </div>
+</aegis-dropdown>
 ```
 
 ---
 
-## 9. Versionamento & Release
+### 4.5 `aegis-toast` + `aegis-toast-container`
 
-| Versão | Data | Mudanças |
+* **Propósito:** Feedback não-bloqueante para ações assíncronas (sucesso, erro, aviso) — usado em **todos os flows**.
+* **Anatomia:** Container fixo (`position: fixed; z-index: var(--z-toast);`) + toasts individuais com `role="status"` (success/info) ou `role="alert"` (warning/danger).
+* **API JS (imperativa, não declarativa):**
+```js
+import { toast } from './components/aegis-toast/aegis-toast.js';
+
+toast.success('Ativo salvo com sucesso!', { duration: 5000, action: { label: 'Desfazer', onClick: () => undo() } });
+toast.error('Falha ao conectar ao servidor', { persistent: true });
+toast.warning('Disco acima de 85%', { duration: 10000 });
+toast.info('Health check agendado para 02:00');
+```
+* **Tokens consumidos:** `--color-success`, `--color-success-light`, `--color-danger`, `--color-danger-light`, `--color-warning`, `--color-warning-light`, `--color-info`, `--color-info-light`, `--color-text-primary`, `--radius-md`, `--shadow-lg`, `--space-3`, `--space-4`, `--text-sm`, `--duration-base`, `--z-toast`
+* **Estados:** Entrada (slide-in right + fade), saída (slide-out right + fade), progress bar (duração), hover (pausa timer)
+
+---
+
+### 4.6 `aegis-health-indicator` (Componente de Domínio)
+
+* **Propósito:** Exibir status de saúde de hardware (disco, memória, rede) com threshold visual — core do Flow 3.
+* **Anatomia:** `<div class="aegis-health"><div class="aegis-health__icon" aria-hidden="true"></div><div class="aegis-health__info"><span class="aegis-health__metric"></span><span class="aegis-health__value"></span></div><aegis-badge variant="{{statusVariant}}">{{statusLabel}}</aegis-badge></div>`
+* **Props/Atributos:**
+
+| Atributo | Tipo | Descrição |
 | :--- | :--- | :--- |
-| **1.0.0** | 2025-03-31 | Release inicial: 50+ componentes UI + 20+ Domain + Layout + Composables + Directives |
-| **1.1.0** | 2025-06-30 | Novos: TreeSelect, Cascader, Transfer, Mentions, Rate, Slider, InputNumber, Anchor, BackTop, ConfigProvider |
-| **1.2.0** | 2025-09-30 | PWA Components: QRScanner offline, Background Sync, Push Notifications, Install Prompt |
+| `metric` | `disk \| memory \| network \| cpu \| custom` | Tipo de métrica (define ícone padrão) |
+| `status` | `ok \| warning \| critical \| unknown` | Status calculado |
+| `value` | `number` | Valor atual (ex: 87) |
+| `threshold` | `number` | Limite para warning (ex: 85) |
+| `critical-threshold` | `number` | Limite para critical (ex: 95) |
+| `unit` | `string` | Unidade: `%`, `GB`, `ms`, `Mbps` |
+| `trend` | `up \| down \| stable` | Tendência (sparkline opcional) |
+| `label` | `string` | Label customizado (ex: "Disco C:") |
+
+* **Lógica de status (se não passado explicitamente):**
+  - `value >= criticalThreshold` → `critical`
+  - `value >= threshold` → `warning`
+  - `value < threshold` → `ok`
+* **Tokens consumidos:** `--health-ok`, `--health-warn`, `--health-critical`, `--color-text-primary`, `--color-text-secondary`, `--radius-md`, `--space-2`, `--space-3`, `--text-sm`, `--text-base`, `--duration-fast`
+* **Exemplo de uso:**
+```html
+<aegis-health-indicator 
+  metric="disk" 
+  label="Disco C:" 
+  value="87" 
+  threshold="85" 
+  critical-threshold="95" 
+  unit="%"
+  trend="up"
+></aegis-health-indicator>
+<!-- Renderiza: ícone disco + "Disco C:" + "87%" + badge "warning" (amarelo) + seta para cima sutil -->
+```
 
 ---
 
-## 10. Rastreabilidade Componentes ↔ Artefatos
+## 5. Componentes em Depreciação
 
-| Componente | Design Tokens | UI Style Guide | Accessibility | Interaction Patterns | User Flows | Storybook | Testes |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Button** | `tokens.scss` (Seção 9.1) | `ui-style-guide.md#buttons` | `accessibility-guidelines.md#buttons` | `interaction-patterns.md#button` | Flow 1-12 | `Button.stories.ts` | Unit + E2E + A11y |
-| **Input/Textarea/Select** | `tokens.scss` (Seção 9.2) | `ui-style-guide.md#forms` | `accessibility-guidelines.md#forms` | `interaction-patterns.md#forms` | Flow 1,2,5,6,8 | `Input.stories.ts` | Unit + A11y |
-| **Modal/Drawer** | `tokens.scss` (shadows, z-index) | `ui-style-guide.md#overlays` | `accessibility-guidelines.md#modals` | `interaction-patterns.md#modals` | Flow 1,2,3,4,5,6 | `Modal.stories.ts` | Unit + E2E + A11y |
-| **DataTable/Table** | `tokens.scss` (table tokens) | `ui-style-guide.md#tables` | `accessibility-guidelines.md#tables` | `interaction-patterns.md#tables` | Flow 1,3,4,7,8 | `DataTable.stories.ts` | Unit + E2E + A11y |
-| **Badge/Avatar/Card** | `tokens.scss` (component tokens) | `ui-style-guide.md#indicators` | `accessibility-guidelines.md#badges` | — | Flow 3,4,5,6,7,8 | `Badge.stories.ts` | Unit + A11y |
-| **Toast/Tooltip/Popover** | `tokens.scss` (feedback tokens) | `ui-style-guide.md#feedback` | `accessibility-guidelines.md#toasts` | `interaction-patterns.md#toasts` | All Flows | `Toast.stories.ts` | Unit + E2E + A11y |
-| **QRCode/QRScanner** | `tokens.scss` (QR tokens) | `ui-style-guide.md#qr` | `accessibility-guidelines.md#qr` | `interaction-patterns.md#qr` | UC-06, UC-25 | `QRCode.stories.ts` | Unit + E2E |
-| **Chart** | `tokens.scss` (chart colors) | `ui-style-guide.md#charts` | `accessibility-guidelines.md#charts` | — | UC-11, UC-19, UC-28 | `Chart.stories.ts` | Unit |
-| **Domain Components** | Composed from UI | `ui-style-guide.md#domain` | `accessibility-guidelines.md#domain` | `interaction-patterns.md#domain` | UC-06 a UC-45 | Domain stories | Unit + E2E |
+| Componente | Motivo | Substituído por | Prazo de Remoção |
+| :--- | :--- | :--- | :--- |
+| *Nenhum* | Não há componentes legados no codebase atual | — | — |
 
 ---
 
-*Documento regenerado completamente com 80+ componentes implementados (UI Base + Domain + Layout + Composables + Directives) baseados em Vue 3 + Bootstrap 5 + Design Tokens v2.0 + WCAG 2.1 AA. Substitui versão 0.1 que indicava "nenhum componente implementado".*
+## 6. Gaps Conhecidos
+
+| Componente Necessário | Flow Relacionado | Blocker / Decisão Pendente |
+| :--- | :--- | :--- |
+| `aegis-chart` / `aegis-sparkline` | 3, 5 | Gráficos de tendência de health check / relatórios. **Decisão:** biblioteca leve (uPlot, Chart.js, ApexCharts) vs. SVG nativo. Requer avaliação de bundle size. |
+| `aegis-file-upload` | 1, 2 | Upload de anexos (notas fiscais, fotos de ativo, relatórios). Precisa de backend multipart + validação tipo/tamanho. |
+| `aegis-user-picker` | 1, 2, 4 | Busca/seleção de usuários/funcionários com autocomplete (departamento, filial). Requer endpoint de busca paginada. |
+| `aegis-asset-picker` | 2 | Seleção de ativo ao criar manutenção (modal com tabela + busca). Reutiliza `aegis-data-table` + `aegis-modal`. |
+| `aegis-permission-matrix` | 4 | UI para RBAC (roles × permissions × recursos). Complexo — avaliar se MVP usa apenas select múltiplo simples. |
+| `aegis-skeleton-*` | Todos | Skeletons específicos por componente (table row, card, stat card, form field). Pode ser gerado automaticamente via CSS. |
+| `aegis-wizard` / `aegis-stepper` | 1, 2 | Fluxos multi-etapa (cadastro ativo em etapas, aprovação manutenção). Não identificado nos flows atuais — manter como gap futuro. |
+| `aegis-color-picker` | 1 | Para personalização de tags/categorias de ativo. Não no MVP. |
+| `aegis-rich-text-editor` | 2, 5 | Descrição rica de manutenção, observações de auditoria. **Decisão:** TipTap/ProseMirror (pesado) vs. textarea + markdown simples. |
+
+---
+
+## 7. Referências
+
+* **Design Tokens:** [design-tokens.md](design-tokens.md) — fonte única de verdade para cores, espaçamento, tipografia, sombras, radius, motion, z-index.
+* **User Flows:** [user-flows.md](user-flows.md) — 6 fluxos detalhados com estados de UI, métricas e edge cases que ditam a necessidade de cada componente.
+* **Diagnóstico Determinístico:** 348 arquivos Java (backend), 15 arquivos JS (frontend/services), **zero componentes UI existentes**.
+* **Stack Tecnológica Verificada:** JavaScript vanilla (ESM), `@popperjs/core` ^2.11.8 (única dependência UI), sem build tool configurado (Vite/Webpack necessário para tokens + componentes).
+* **Acessibilidade:** WCAG 2.1 AA — todos os componentes devem passar axe-core + teste manual NVDA/VoiceOver.
+* **Próximos Passos Imediatos:**
+  1. Configurar `package.json` com `type: "module"`, scripts `dev`, `build`, `test` (Vite + Vitest)
+  2. Criar `frontend/tokens.json` + build pipeline (Style Dictionary ou script custom) → CSS custom properties + JS tokens
+  3. Implementar `aegis-button`, `aegis-input`, `aegis-modal`, `aegis-toast` (core) + `aegis-data-table` (crítico para Flows 1,2,3,5)
+  4. Configurar Storybook (opcional) ou página de catálogo simples (`/components.html`)
+  5. Adicionar ESLint + Stylelint + regra custom `no-hardcoded-tokens` no CI
+
+---
+
+## 8. Declaração de Limitações
+
+> **Este inventário NÃO reflete componentes existentes.** O codebase atual **não possui nenhum componente de UI reutilizável** — apenas 15 arquivos JS de serviços (`api.js`, etc.).  
+>   
+> A lista de 29 componentes é **100% inferida** a partir dos user flows (que por sua vez são inferidos do BRD + diagnóstico) e dos design tokens (também inferidos).  
+>   
+> **Nenhuma decisão de arquitetura de frontend foi tomada** (Web Components vs. módulos JS vs. framework leve). A convenção "Web Components" na Seção 2 é uma **proposta**, não uma realidade.  
+>   
+> **Validação humana obrigatória** antes de qualquer implementação: priorização, escopo do MVP, escolha de tooling, adoção ou não de Shadow DOM, estratégia de SSR/SSG (se houver).

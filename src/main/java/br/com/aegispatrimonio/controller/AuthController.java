@@ -76,8 +76,15 @@ public class AuthController {
             // Autentica o usuário com o Spring Security
             authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(loginRequest.email(), loginRequest.password()));
+        } catch (org.springframework.security.core.AuthenticationException e) {
+            // Credenciais inválidas são um evento esperado (não um erro de sistema):
+            // log WARN curto, sem stacktrace e sem dados sensíveis. O 401 continua vindo
+            // do AuthenticationEntryPoint via rethrow.
+            log.warn("Tentativa de login com credenciais inválidas: email={}", loginRequest.email());
+            throw e;
         } catch (Exception e) {
-            log.error("Erro na autenticação: ", e);
+            // Falhas inesperadas de infraestrutura permanecem em ERROR com stacktrace
+            log.error("Erro inesperado na autenticação do usuário {}: ", loginRequest.email(), e);
             throw e;
         }
 

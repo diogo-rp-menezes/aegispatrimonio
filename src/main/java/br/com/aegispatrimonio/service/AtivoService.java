@@ -30,6 +30,13 @@ import java.util.stream.Collectors;
 @Service
 public class AtivoService implements IAtivoService {
 
+    /**
+     * Tamanho de página usado quando a listagem é "unpaged" (export/relatório):
+     * itera o resultado em chunks para evitar carregar todo o parque de ativos
+     * (com 4-6 JOINs FETCH) em uma única query.
+     */
+    private static final int UNPAGED_FETCH_PAGE_SIZE = 500;
+
     private final AtivoRepository ativoRepository;
     private final AtivoMapper ativoMapper;
     private final TipoAtivoRepository tipoAtivoRepository;
@@ -109,6 +116,10 @@ public class AtivoService implements IAtivoService {
         }
 
         // 2. Fuzzy Search Path (Shift Left Optimization)
+        // TODO(perf): Este caminho carrega até 1000 candidatos (id+nome) e faz ranking
+        // Levenshtein em memória — aceitável para MVP. Revisar quando o parque de ativos
+        // superar ~5k registros ou quando o p95 de latência da busca ultrapassar o SLO
+        // (medição antes de otimizar; candidatos: ranking no banco via pg_trgm/ILIKE).
         if (isFuzzySearch) {
             List<AtivoNameDTO> candidates;
             // Fetch candidates matching other filters, ignoring name (limited to 1000 for
@@ -155,21 +166,36 @@ public class AtivoService implements IAtivoService {
         boolean unpaged = effectivePageable.isUnpaged();
         boolean hasFilters = (filialId != null) || (tipoAtivoId != null) || (status != null) || (health != null);
 
+        // M2 (audit): o caminho unpaged carregava TODOS os ativos com 4-6 JOINs FETCH em
+        // uma única query. Substituído por iteração de páginas de 500 registros, limitando
+        // o pico de memória por query. O contrato Page<AtivoDTO> com total correto é
+        // preservado (PageImpl com Pageable.unpaged() e total acumulado).
+        if (unpaged && !hasFilters) {
+            List<AtivoDTO> allContent = new java.util.ArrayList<>();
+            long total = 0;
+            int pageNumber = 0;
+            org.springframework.data.domain.Page<Ativo> page;
+            do {
+                org.springframework.data.domain.Pageable chunk = org.springframework.data.domain.PageRequest
+                        .of(pageNumber, UNPAGED_FETCH_PAGE_SIZE);
+                page = isAdmin
+                        ? ativoRepository.findByFilters(null, null, null, null, null, null, null, chunk)
+                        : ativoRepository.findByFilialIdsAndFilters(userFiliais, null, null, null, null, null, null,
+                                null, chunk);
+                page.getContent().forEach(a -> allContent.add(ativoMapper.toDTO(a)));
+                total = page.getTotalElements();
+                pageNumber++;
+            } while (pageNumber < page.getTotalPages());
+
+            return new PageImpl<>(allContent, effectivePageable, total);
+        }
+
         if (isAdmin) {
-            if (unpaged && !hasFilters) {
-                return new PageImpl<>(ativoRepository.findAllWithDetails().stream().map(ativoMapper::toDTO)
-                        .collect(Collectors.toList()));
-            }
             return ativoRepository.findByFilters(filialId, tipoAtivoId, status, null, minDate, maxDate, hasPrediction,
                     effectivePageable).map(ativoMapper::toDTO);
-        } else {
-            if (unpaged && !hasFilters) {
-                return new PageImpl<>(ativoRepository.findByFilialIdInWithDetails(userFiliais).stream()
-                        .map(ativoMapper::toDTO).collect(Collectors.toList()));
-            }
-            return ativoRepository.findByFilialIdsAndFilters(userFiliais, filialId, tipoAtivoId, status, null, minDate,
-                    maxDate, hasPrediction, effectivePageable).map(ativoMapper::toDTO);
         }
+        return ativoRepository.findByFilialIdsAndFilters(userFiliais, filialId, tipoAtivoId, status, null, minDate,
+                maxDate, hasPrediction, effectivePageable).map(ativoMapper::toDTO);
     }
 
     @Override

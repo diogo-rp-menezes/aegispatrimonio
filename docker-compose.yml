@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   app:
     build:
@@ -67,8 +65,10 @@ services:
       MYSQL_DATABASE: aegis-patrimonio
     volumes:
       - db_data:/var/lib/mysql
-    ports:
-      - "3306:3306"
+    # Porta NÃO publicada no host: o app acessa via rede interna (db:3306).
+    # Para debug com ferramenta local, descomente:
+    # ports:
+    #   - "127.0.0.1:3306:3306"
     networks:
       - aegis-network
     deploy:

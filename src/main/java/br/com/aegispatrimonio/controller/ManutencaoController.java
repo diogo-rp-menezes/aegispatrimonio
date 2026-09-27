@@ -35,7 +35,7 @@ public class ManutencaoController {
     private final ManutencaoService manutencaoService;
 
     @PostMapping
-    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'CREATE', null)")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'MANUTENCAO', 'CREATE', null)")
     @Operation(summary = "Criar manutenção", description = "Cria uma nova solicitação de manutenção")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "201", description = "Manutenção criada com sucesso"),
@@ -47,7 +47,7 @@ public class ManutencaoController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'READ', null)")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'MANUTENCAO', 'READ', null)")
     @Operation(summary = "Buscar manutenção por ID", description = "Recupera uma manutenção específica")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Manutenção encontrada"),
@@ -61,7 +61,7 @@ public class ManutencaoController {
     }
 
     @GetMapping
-    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'READ', null)")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'MANUTENCAO', 'READ', null)")
     @Operation(summary = "Listar e filtrar manutenções", description = "Retorna manutenções paginadas com filtros dinâmicos")
     @ApiResponse(responseCode = "200", description = "Manutenções listadas com sucesso")
     public ResponseEntity<Page<ManutencaoResponseDTO>> listar(
@@ -82,7 +82,7 @@ public class ManutencaoController {
     }
 
     @PostMapping("/aprovar/{id}")
-    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'UPDATE', null)")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'MANUTENCAO', 'UPDATE', null)")
     @Operation(summary = "Aprovar manutenção", description = "Aprova uma manutenção solicitada")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Manutenção aprovada"),
@@ -95,7 +95,7 @@ public class ManutencaoController {
     }
 
     @PostMapping("/iniciar/{id}")
-    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'UPDATE', null)")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'MANUTENCAO', 'UPDATE', null)")
     @Operation(summary = "Iniciar manutenção", description = "Inicia a execução de uma manutenção aprovada")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Manutenção iniciada"),
@@ -109,7 +109,7 @@ public class ManutencaoController {
     }
 
     @PostMapping("/concluir/{id}")
-    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'UPDATE', null)")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'MANUTENCAO', 'UPDATE', null)")
     @Operation(summary = "Concluir manutenção", description = "Conclui uma manutenção em andamento")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Manutenção concluída"),
@@ -123,7 +123,7 @@ public class ManutencaoController {
     }
 
     @PostMapping("/cancelar/{id}")
-    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'UPDATE', null)")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'MANUTENCAO', 'UPDATE', null)")
     @Operation(summary = "Cancelar manutenção", description = "Cancela uma manutenção")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Manutenção cancelada"),
@@ -137,7 +137,7 @@ public class ManutencaoController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'DELETE', null)")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'MANUTENCAO', 'DELETE', null)")
     @Operation(summary = "Deletar manutenção", description = "Remove uma manutenção do sistema")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "204", description = "Manutenção deletada"),
@@ -150,7 +150,7 @@ public class ManutencaoController {
     }
 
     @GetMapping("/custo-total")
-    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'ATIVO', 'READ', null)")
+    @PreAuthorize("@permissionService.hasPermission(authentication, null, 'MANUTENCAO', 'READ', null)")
     @Operation(summary = "Obter custo total por ativo", description = "Calcula custo total de manutenções concluídas")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Custo calculado"),

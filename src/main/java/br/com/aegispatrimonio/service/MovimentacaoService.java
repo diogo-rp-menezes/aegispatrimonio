@@ -40,6 +40,7 @@ public class MovimentacaoService {
         }
 
         Movimentacao movimentacao = convertToEntity(request);
+        requireAcessoFilialAtivo(movimentacao.getAtivo());
         Movimentacao savedMovimentacao = movimentacaoRepository.save(movimentacao);
         return convertToResponseDTO(savedMovimentacao);
     }
@@ -185,6 +186,18 @@ public class MovimentacaoService {
         return movimentacaoRepository.findById(id)
                 .map(this::requireAcessoFilial)
                 .orElseThrow(() -> new ResourceNotFoundException("Movimentação não encontrada com ID: " + id));
+    }
+
+    /**
+     * Garante que não-ADMIN só crie/acesse registros de ativos pertencentes às suas filiais.
+     */
+    private void requireAcessoFilialAtivo(Ativo ativo) {
+        if (!isAdmin()) {
+            Set<Long> userFiliais = getUserFiliais();
+            if (!userFiliais.contains(ativo.getFilial().getId())) {
+                throw new AccessDeniedException("Você não tem permissão para acessar ativos desta filial.");
+            }
+        }
     }
 
     /**

@@ -40,6 +40,8 @@ public class TipoAtivoControllerIT extends BaseIT {
     @Autowired private UsuarioRepository usuarioRepository;
     @Autowired private FilialRepository filialRepository;
     @Autowired private DepartamentoRepository departamentoRepository;
+    @Autowired private br.com.aegispatrimonio.repository.RoleRepository roleRepository;
+    @Autowired private br.com.aegispatrimonio.repository.PermissionRepository permissionRepository;
 
     @Autowired
     private JwtService jwtService;
@@ -63,10 +65,12 @@ public class TipoAtivoControllerIT extends BaseIT {
         Filial filial = createFilial("Matriz Teste", "MTRZ", "53.436.470/0001-02");
         Departamento depto = createDepartamento("TI Teste", filial);
 
-        Funcionario adminFunc = createFuncionarioAndUsuario("Admin", "admin@aegis.com", "ROLE_ADMIN", depto, Set.of(filial));
+        Funcionario adminFunc = createFuncionarioAndUsuario("Admin",
+                "admin.tipoativo." + java.util.UUID.randomUUID() + "@aegis.com", "ROLE_ADMIN", depto, Set.of(filial));
         this.adminToken = jwtService.generateToken(new CustomUserDetails(adminFunc.getUsuario()));
 
-        Funcionario userFunc = createFuncionarioAndUsuario("User", "user@aegis.com", "ROLE_USER", depto, Set.of(filial));
+        Funcionario userFunc = createFuncionarioAndUsuario("User",
+                "user.tipoativo." + java.util.UUID.randomUUID() + "@aegis.com", "ROLE_USER", depto, Set.of(filial));
         this.userToken = jwtService.generateToken(new CustomUserDetails(userFunc.getUsuario()));
     }
 
@@ -152,6 +156,35 @@ public class TipoAtivoControllerIT extends BaseIT {
         user.setRole(role);
         user.setStatus(Status.ATIVO);
         user.setFuncionario(func);
+        // Autorização granular: o admin bypass do PermissionServiceImpl exige o vínculo
+        // rbac_user_role com a role ROLE_ADMIN (coluna legada 'role' não é consultada).
+        if ("ROLE_ADMIN".equals(role)) {
+            br.com.aegispatrimonio.model.Role adminRole = roleRepository.findByName("ROLE_ADMIN")
+                    .orElseGet(() -> {
+                        br.com.aegispatrimonio.model.Role r = new br.com.aegispatrimonio.model.Role();
+                        r.setName("ROLE_ADMIN");
+                        r.setDescription("Administrador com acesso total");
+                        return roleRepository.save(r);
+                    });
+            // HashSet mutável: Hibernate faz clear() na coleção ao persistir o vínculo.
+            user.setRoles(new java.util.HashSet<>(Set.of(adminRole)));
+        } else if ("ROLE_USER".equals(role)) {
+            // H1c: controller usa TIPO_ATIVO:READ; USER precisa do par granular.
+            br.com.aegispatrimonio.model.Permission pRead = permissionRepository
+                    .findByResourceAndAction("TIPO_ATIVO", "READ")
+                    .orElseGet(() -> permissionRepository.save(
+                            new br.com.aegispatrimonio.model.Permission(null, "TIPO_ATIVO", "READ", "Ler Tipos de Ativo", null)));
+            br.com.aegispatrimonio.model.Role userRole = roleRepository.findByName("ROLE_USER")
+                    .orElseGet(() -> {
+                        br.com.aegispatrimonio.model.Role r = new br.com.aegispatrimonio.model.Role();
+                        r.setName("ROLE_USER");
+                        r.setDescription("Usuário padrão");
+                        return roleRepository.save(r);
+                    });
+            userRole.setPermissions(new java.util.HashSet<>(Set.of(pRead)));
+            roleRepository.save(userRole);
+            user.setRoles(new java.util.HashSet<>(Set.of(userRole)));
+        }
 
         // Save Usuario
         user = usuarioRepository.saveAndFlush(user);

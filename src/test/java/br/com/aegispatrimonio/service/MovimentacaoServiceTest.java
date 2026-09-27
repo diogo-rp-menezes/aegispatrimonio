@@ -190,6 +190,37 @@ class MovimentacaoServiceTest {
     }
 
     @Test
+    @DisplayName("Criar: USER de outra filial deve receber AccessDeniedException sem salvar")
+    void criar_comUserDeOutraFilial_deveLancarAccessDeniedSemSave() {
+        MovimentacaoRequestDTO request = new MovimentacaoRequestDTO(1L, 1L, 2L, 1L, 2L, LocalDate.now(), "Motivo", null);
+        when(userContextService.isAdmin()).thenReturn(false);
+        when(userContextService.getUserFiliais()).thenReturn(Set.of(99L)); // usuário da filial 99, ativo na filial 1
+        when(movimentacaoRepository.existsByAtivoIdAndStatus(1L, StatusMovimentacao.PENDENTE)).thenReturn(false);
+        when(ativoRepository.findById(1L)).thenReturn(Optional.of(ativo));
+        when(localizacaoRepository.findById(2L)).thenReturn(Optional.of(localizacaoDestino));
+        when(funcionarioRepository.findById(2L)).thenReturn(Optional.of(funcionarioDestino));
+
+        assertThrows(AccessDeniedException.class, () -> movimentacaoService.criar(request));
+        verify(movimentacaoRepository, never()).save(any(Movimentacao.class));
+    }
+
+    @Test
+    @DisplayName("Criar: USER da mesma filial deve criar com sucesso")
+    void criar_comUserDaMesmaFilial_deveSalvar() {
+        MovimentacaoRequestDTO request = new MovimentacaoRequestDTO(1L, 1L, 2L, 1L, 2L, LocalDate.now(), "Motivo", null);
+        when(userContextService.isAdmin()).thenReturn(false);
+        when(userContextService.getUserFiliais()).thenReturn(Set.of(1L));
+        when(movimentacaoRepository.existsByAtivoIdAndStatus(1L, StatusMovimentacao.PENDENTE)).thenReturn(false);
+        when(ativoRepository.findById(1L)).thenReturn(Optional.of(ativo));
+        when(localizacaoRepository.findById(2L)).thenReturn(Optional.of(localizacaoDestino));
+        when(funcionarioRepository.findById(2L)).thenReturn(Optional.of(funcionarioDestino));
+        when(movimentacaoRepository.save(any(Movimentacao.class))).thenReturn(movimentacao);
+
+        assertDoesNotThrow(() -> movimentacaoService.criar(request));
+        verify(movimentacaoRepository).save(any(Movimentacao.class));
+    }
+
+    @Test
     @DisplayName("Efetivar: Deve efetivar movimentação pendente")
     void efetivarMovimentacao_quandoPendente_deveAtualizarAtivoEStatus() {
         when(movimentacaoRepository.findById(1L)).thenReturn(Optional.of(movimentacao));

@@ -1,5 +1,6 @@
 package br.com.aegispatrimonio.service;
 
+import br.com.aegispatrimonio.exception.QRCodeGenerationException;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.MultiFormatWriter;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
@@ -18,7 +19,7 @@ public class QRCodeService {
             MatrixToImageWriter.writeToStream(bitMatrix, "PNG", pngOutputStream);
             return pngOutputStream.toByteArray();
         } catch (Exception e) {
-            throw new RuntimeException("Erro ao gerar QR Code: " + e.getMessage(), e);
+            throw new QRCodeGenerationException("Erro ao gerar QR Code: " + e.getMessage(), e);
         }
     }
 }

@@ -42,6 +42,7 @@ class AlertaControllerIT extends BaseIT {
     @Autowired private FuncionarioRepository funcionarioRepository;
     @Autowired private UsuarioRepository usuarioRepository;
     @Autowired private RoleRepository roleRepository;
+    @Autowired private br.com.aegispatrimonio.repository.PermissionRepository permissionRepository;
 
     private Ativo ativoExistente;
     private Usuario usuarioAdmin;
@@ -62,11 +63,13 @@ class AlertaControllerIT extends BaseIT {
 
         this.ativoExistente = createAtivo("Server-01", "PAT-SRV-01", filial1, tipo, forn, func, loc);
 
-        this.usuarioAdmin = createUsuario(func, "admin-alert@example.com", "ROLE_ADMIN");
+        this.usuarioAdmin = createUsuario(func,
+                "admin.alert." + java.util.UUID.randomUUID() + "@aegis.com", "ROLE_ADMIN");
 
         // User with access only to Filial 1
         Funcionario funcUser = createFuncionario("User Alert", depto, Set.of(filial1));
-        this.usuarioUser = createUsuario(funcUser, "user-alert@example.com", "ROLE_USER");
+        this.usuarioUser = createUsuario(funcUser,
+                "user.alert." + java.util.UUID.randomUUID() + "@aegis.com", "ROLE_USER");
     }
 
     @AfterEach
@@ -173,6 +176,19 @@ class AlertaControllerIT extends BaseIT {
             r.setName(roleName);
             return roleRepository.save(r);
         });
+        // H1c: controllers usam pares granulares (ALERTA:READ/UPDATE) com context null.
+        // Garante que a role tenha as permissões do recurso (admin passa pelo bypass).
+        if ("ROLE_USER".equals(roleName)) {
+            java.util.Set<Permission> perms = new java.util.HashSet<>();
+            for (String action : new String[]{"READ", "UPDATE"}) {
+                Permission p = permissionRepository.findByResourceAndAction("ALERTA", action)
+                        .orElseGet(() -> permissionRepository.save(
+                                new Permission(null, "ALERTA", action, "Alerta " + action, null)));
+                perms.add(p);
+            }
+            rbacRole.setPermissions(perms);
+            roleRepository.save(rbacRole);
+        }
         u.setRoles(Set.of(rbacRole));
 
         return usuarioRepository.save(u);

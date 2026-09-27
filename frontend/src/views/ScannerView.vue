@@ -5,7 +5,6 @@ import QrScanner from '../components/QrScanner.vue';
 const router = useRouter();
 
 function handleResult(decodedText) {
-  console.log(`Scan result: ${decodedText}`);
 
   try {
     // Expected format: http://.../ativos/123 or just /ativos/123 or just 123

@@ -40,6 +40,7 @@ public class ManutencaoService {
     @Transactional
     public ManutencaoResponseDTO criar(ManutencaoRequestDTO request) {
         Manutencao manutencao = convertToEntity(request);
+        requireAcessoFilialAtivo(manutencao.getAtivo());
         Manutencao savedManutencao = manutencaoRepository.save(manutencao);
 
         Usuario auditor = currentUserProvider.getCurrentUsuario();
@@ -188,9 +189,9 @@ public class ManutencaoService {
     @Transactional(readOnly = true)
     public BigDecimal custoTotalPorAtivo(Long ativoId) {
         log.debug("Calculando custo total para ativo ID: {}", ativoId);
-        if (!ativoRepository.existsById(ativoId)) {
-            throw new ResourceNotFoundException("Ativo não encontrado com ID: " + ativoId);
-        }
+        Ativo ativo = ativoRepository.findById(ativoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ativo não encontrado com ID: " + ativoId));
+        requireAcessoFilialAtivo(ativo);
         BigDecimal custoTotal = manutencaoRepository.findCustoTotalManutencaoPorAtivo(ativoId);
         return custoTotal != null ? custoTotal : BigDecimal.ZERO;
     }
@@ -199,6 +200,19 @@ public class ManutencaoService {
         return manutencaoRepository.findById(id)
                 .map(this::requireAcessoFilial)
                 .orElseThrow(() -> new ResourceNotFoundException("Manutenção não encontrada com ID: " + id));
+    }
+
+    /**
+     * Garante que não-ADMIN só acesse ativos pertencentes às suas filiais (usado em criação
+     * e agregações por ativo, onde ainda não existe a entidade Manutencao).
+     */
+    private void requireAcessoFilialAtivo(Ativo ativo) {
+        if (!userContextService.isAdmin()) {
+            Set<Long> userFiliais = userContextService.getUserFiliais();
+            if (!userFiliais.contains(ativo.getFilial().getId())) {
+                throw new AccessDeniedException("Você não tem permissão para acessar ativos desta filial.");
+            }
+        }
     }
 
     /**

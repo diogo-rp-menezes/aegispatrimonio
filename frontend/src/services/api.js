@@ -19,8 +19,16 @@ export const handleResponse = async (response) => {
   // 403: não redireciona — usuário autenticado sem permissão vê o erro na view
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(error || 'Erro na requisição');
+    const raw = await response.text();
+    // Extrai mensagem legível de ProblemDetail (RFC 7807); fallback texto/status
+    let message = '';
+    try {
+      const body = JSON.parse(raw);
+      message = body.detail || body.title || '';
+    } catch {
+      message = raw;
+    }
+    throw new Error(message || 'Erro na requisição (HTTP ' + response.status + ')');
   }
 
   // Se a resposta for 204 (No Content), retorna null

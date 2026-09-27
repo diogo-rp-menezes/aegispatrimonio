@@ -34,12 +34,6 @@
           {{ loading ? 'Entrando...' : 'Entrar' }}
         </button>
 
-        <div class="mt-3">
-          <hr>
-          <a :href="googleLoginUrl" class="btn btn-outline-danger w-100" :class="{ disabled: loading }">
-            <i class="bi bi-google me-2"></i> Entrar com Google
-          </a>
-        </div>
       </form>
 
       <div class="mt-4">

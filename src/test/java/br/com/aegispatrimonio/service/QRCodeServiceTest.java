@@ -1,5 +1,6 @@
 package br.com.aegispatrimonio.service;
 
+import br.com.aegispatrimonio.exception.QRCodeGenerationException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -20,5 +21,13 @@ public class QRCodeServiceTest {
             Assertions.assertEquals((byte) 0x4E, qrCode[2]);
             Assertions.assertEquals((byte) 0x47, qrCode[3]);
         }
+    }
+
+    @Test
+    public void testGenerateQRCode_comTextoVazio_deveLancarExcecaoDeDominio() {
+        QRCodeService qrCodeService = new QRCodeService();
+
+        Assertions.assertThrows(QRCodeGenerationException.class,
+                () -> qrCodeService.generateQRCode("", 200, 200));
     }
 }

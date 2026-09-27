@@ -76,9 +76,12 @@ public class ManutencaoControllerIT extends BaseIT {
         // Setup de Dados
         Filial filial = createFilial("Matriz", "MTRZ", "00.000.000/0001-00");
         Departamento depto = createDepartamento("TI", filial);
-        this.solicitante = createFuncionarioAndUsuario("Solicitante", "solicitante@aegis.com", "ROLE_USER", depto, Set.of(filial));
-        this.tecnico = createFuncionarioAndUsuario("Tecnico", "tecnico@aegis.com", "ROLE_USER", depto, Set.of(filial));
-        Funcionario adminFunc = createFuncionarioAndUsuario("Admin", "admin@aegis.com", "ROLE_ADMIN", depto, Set.of(filial));
+        this.solicitante = createFuncionarioAndUsuario("Solicitante",
+                "solicitante.manut." + java.util.UUID.randomUUID() + "@aegis.com", "ROLE_USER", depto, Set.of(filial));
+        this.tecnico = createFuncionarioAndUsuario("Tecnico",
+                "tecnico.manut." + java.util.UUID.randomUUID() + "@aegis.com", "ROLE_USER", depto, Set.of(filial));
+        Funcionario adminFunc = createFuncionarioAndUsuario("Admin",
+                "admin.manut." + java.util.UUID.randomUUID() + "@aegis.com", "ROLE_ADMIN", depto, Set.of(filial));
         this.adminToken = jwtService.generateToken(new CustomUserDetails(adminFunc.getUsuario()));
 
         Localizacao local = createLocalizacao("Sala 101", filial);

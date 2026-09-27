@@ -27,7 +27,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+// Nota L6 (audit): AntPathRequestMatcher foi removido em favor de patterns String,
+// que em Spring Security 6.4 + Spring MVC resolvem para MvcRequestMatcher (PathPattern).
+// PathPatternRequestMatcher só existe a partir do Spring Security 6.5+ (Boot 3.5+).
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -65,26 +67,26 @@ public class SecurityConfig {
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(new AntPathRequestMatcher("/api/v1/auth/**")).permitAll()
-                        .requestMatchers(new AntPathRequestMatcher("/api/auth/**")).permitAll()
+                        .requestMatchers("/api/v1/auth/**").permitAll()
+                        .requestMatchers("/api/auth/**").permitAll()
                         // Protected API
-                        .requestMatchers(new AntPathRequestMatcher("/api/**")).authenticated()
+                        .requestMatchers("/api/**").authenticated()
                         // Actuator: only health probes are public (k8s/docker liveness/readiness);
                         // everything else (prometheus, metrics, env, ...) requires ROLE_ADMIN
-                        .requestMatchers(new AntPathRequestMatcher("/actuator/health/**")).permitAll()
-                        .requestMatchers(new AntPathRequestMatcher("/actuator/**")).hasRole("ADMIN")
+                        .requestMatchers("/actuator/health/**").permitAll()
+                        .requestMatchers("/actuator/**").hasRole("ADMIN")
                         // Public/System
-                        .requestMatchers(new AntPathRequestMatcher("/swagger-ui/**")).permitAll()
-                        .requestMatchers(new AntPathRequestMatcher("/v3/api-docs/**")).permitAll()
-                        .requestMatchers(new AntPathRequestMatcher("/error/**")).permitAll()
+                        .requestMatchers("/swagger-ui/**").permitAll()
+                        .requestMatchers("/v3/api-docs/**").permitAll()
+                        .requestMatchers("/error/**").permitAll()
                         // Embedded SPA (served from classpath:/static): shell, assets and PWA files.
                         // SPA routes (e.g. /dashboard) are forwarded to /index.html by SpaWebFilter.
-                        .requestMatchers(new AntPathRequestMatcher("/")).permitAll()
-                        .requestMatchers(new AntPathRequestMatcher("/index.html")).permitAll()
-                        .requestMatchers(new AntPathRequestMatcher("/assets/**")).permitAll()
-                        .requestMatchers(new AntPathRequestMatcher("/favicon.ico")).permitAll()
-                        .requestMatchers(new AntPathRequestMatcher("/manifest.webmanifest")).permitAll()
-                        .requestMatchers(new AntPathRequestMatcher("/pwa-*.png")).permitAll()
+                        .requestMatchers("/").permitAll()
+                        .requestMatchers("/index.html").permitAll()
+                        .requestMatchers("/assets/**").permitAll()
+                        .requestMatchers("/favicon.ico").permitAll()
+                        .requestMatchers("/manifest.webmanifest").permitAll()
+                        .requestMatchers("/pwa-*.png").permitAll()
                         // Default deny: anything not explicitly allowed above requires authentication
                         .anyRequest().authenticated())
                 .oauth2Login(oauth2 -> oauth2
