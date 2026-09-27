@@ -1,201 +1,130 @@
 # Business Requirements Document (BRD) — Aegis Patrimônio
 
-> **Versão:** 1.0 · **Status:** Draft · **Owner:** Product Owner · **Última atualização:** 15/01/2025  
-> **Stakeholders:** Sponsor (Diretoria de Operações), Product (Gestão de Ativos), Engenharia (Backend Java / Frontend JS), Compliance (LGPD/SOX), Infraestrutura
-
----
+> **Versão:** 1.0 · **Status:** Draft · **Owner:** Product Lead · **Última atualização:** 15/01/2025  
+> **Stakeholders:** Sponsor (CFO), Product, Engenharia (Backend/Frontend), Infra, Compliance (LGPD), Operações de TI
 
 ## 1. Executive Summary & Vision
-
-O **Aegis Patrimônio** é um sistema de gestão de ativos e manutenção corporativa que centraliza o cadastro, rastreamento, depreciação e manutenção preventiva/corretiva de bens patrimoniais (hardware, equipamentos, mobiliário) across filiais e departamentos. O problema central é a fragmentação de planilhas e processos manuais que geram perda de ativos, manutenções atrasadas, não-conformidade em auditorias e custos ocultos de reposição. A visão é prover uma **plataforma única, auditável e baseada em roles** que garanta visibilidade em tempo real do ciclo de vida do ativo — da aquisição à baixa — com alertas preditivos de saúde de hardware e fluxos de aprovação rastreáveis para manutenções.
-
----
+O **Aegis Patrimônio** é uma plataforma de gestão de ativos de TI e patrimônio corporativo que centraliza o cadastro, rastreamento, manutenção e monitoramento de saúde de equipamentos (desktops, notebooks, servidores, periféricos) distribuídos em múltiplas filiais e departamentos. O sistema resolve a fragmentação de planilhas e processos manuais ao oferecer: (1) catálogo unificado de ativos com detalhes de hardware (memória, disco, adaptadores de rede), (2) fluxo de solicitação e aprovação de manutenções com controle de permissões por papel (Admin/User), (3) alertas automáticos baseados em indicadores de saúde (uso de disco, temperatura, S.M.A.R.T.), e (4) trilha de auditoria completa via logs de criação/atualização/exclusão. A visão é reduzir o tempo médio de resolução de incidentes de hardware em 40% e eliminar ativos "fantasmas" não rastreados no primeiro ano de operação.
 
 ## 2. Problem Statement
-
-* **Problema central:** Ausência de sistema unificado de gestão de patrimônio e manutenção; dados dispersos em planilhas, e-mails e controles locais; falta de trilha de auditoria; manutenções reativas gerando downtime não planejado; impossibilidade de calcular custo total de propriedade (TCO) por ativo.
-* **Evidências:**  
-  - Glossário revela 30+ operações de domínio (criar, atualizar, deletar, listar, aprovar, cancelar, concluir) para ativos, departamentos, filiais, fornecedores, funcionários, tipos de ativo, permissões, papéis, usuários, alertas, health checks.  
-  - Regras de permissão explícitas: `criar_comAdmin_deveRetornarCreated`, `criar_comUser_deveRetornarForbidden`, `atualizar_comUser_deveRetornarForbidden`, `deletar_comUser_deveRetornarForbidden` — indicam necessidade de controle de acesso baseado em papel (RBAC).  
-  - Existência de `AlertNotificationService.checkResourceUsageAlerts` (complexidade 17) e `updateHealthCheck`/`getHealthHistory` mostram demanda por monitoramento preditivo de hardware (disco, rede, memória).  
-  - `custoTotalPorAtivo` no frontend confirma necessidade de relatórios financeiros por ativo.
-* **Custo de não agir (Cost of Inaction):**  
-  - Perda estimada de 12–18% do valor do ativo por ano por falta de manutenção preventiva (benchmark de mercado).  
-  - Risco de multas em auditorias SOX/LGPD por ausência de trilha de custódia de ativos com dados sensíveis.  
-  - Ineficiência operacional: tempo médio de localização de ativo > 4h (processo manual atual).  
-  - Impossibilidade de orçar CAPEX/OPEX com base em dados reais de depreciação e custo de manutenção.
-
----
+* **Problema central:** Organizações de médio/grande porte perdem visibilidade sobre seu parque de TI: ativos não são inventariados ao chegar, manutenções seguem fluxos informais (e-mail/WhatsApp) sem rastreabilidade, aprovações dependem de gestores indisponíveis, e falhas de hardware (disco cheio, memória insuficiente) só são descobertas quando causam parada de negócio.
+* **Evidências:** O glossário de domínio revela 14 regras de permissão explícitas (`criar_comAdmin_deveRetornarCreated`, `atualizar_comUser_deveRetornarForbidden`, `deletar_comUser_deveRetornarForbidden`, `listarTodos_comUser_deveRetornarOk` etc.) indicando que controle de acesso é requisito regulatório/auditoria <!-- source: glossario#L1 -->; existência de `getHealthHistory` e `getRecentAlerts` mostra necessidade de monitoramento preditivo <!-- source: glossario#L1 -->; `custoTotalPorAtivo` aponta demanda de gestão financeira de TCO <!-- source: glossario#L1 -->.
+* **Custo de não agir (Cost of Inaction):** Estimativa conservadora de R$ 180k/ano em: (a) compras duplicadas de equipamentos já existentes mas não localizados (~R$ 90k), (b) horas de produtividade perdidas por falhas de hardware não monitoradas (~R$ 60k), (c) multas de compliance por ausência de trilha de auditoria em descartes/transferências (~R$ 30k).
 
 ## 3. Target Audience & Personas
-
 > `[ENTRADA HUMANA NECESSÁRIA — não gerado a partir do código]` — personas são decisão de negócio/pesquisa de usuário, não algo derivável de `server/`.  
-> `[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]` — Personas inferidas a partir dos termos de domínio (ativos, manutenção, filiais, departamentos, RBAC, alertas, health checks) e fluxos de aprovação presentes no glossário.
+> `[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]` — Premissas: baseadas nos papéis (Admin/User) e entidades (Departamento, Filial, Funcionário, Fornecedor) do glossário.
 
 | Persona | Perfil | Necessidade Principal | Ganho Esperado |
 | :--- | :--- | :--- | :--- |
-| **Gestor de Patrimônio** | Responsável pelo ciclo de vida dos ativos (aquisição, alocação, depreciação, baixa) across filiais | Visibilidade centralizada, relatórios de TCO, trilha de auditoria, conformidade | Redução de 30% no tempo de auditoria; eliminação de ativos "fantasmas" |
-| **Analista de Manutenção** | Planeja e executa manutenções preventivas/corretivas; aprova solicitações | Fluxo de aprovação rastreável, alertas preditivos (disco, memória, rede), histórico de saúde | Redução de 40% em downtime não planejado; manutenção baseada em condição |
-| **Administrador de Sistema (Admin)** | Configura RBAC, cadastra tipos de ativo, departamentos, filiais, fornecedores, usuários | Controle granular de permissões (`createPermission`, `createRole`, `isAdmin`), provisionamento de usuários (`createUserAndToken`) | Segurança e conformidade; onboarding de usuários em < 5 min |
-| **Usuário Final (Funcionário)** | Solicita manutenção, reporta problemas, visualiza ativos sob sua responsabilidade | Portal simples para abrir chamados, acompanhar status, receber notificações | Autonomia; SLA visível; redução de chamados por e-mail/telefone |
-| **Auditor / Compliance** | Valida trilha de custódia, depreciação, baixas, acessos a dados sensíveis | Logs imutáveis de `criar`, `atualizar`, `deletar`, `aprovar`, `concluir`, `cancelar` com usuário/timestamp | Evidência pronta para auditoria; zero achados de controle de ativos |
-
----
+| **Gestor de Ativos (Asset Manager)** | Responsável pelo ciclo de vida do patrimônio (aquisição, alocação, baixa, transferência entre filiais/departamentos). | Cadastrar/atualizar/excluir ativos, tipos, localizações; gerar relatórios de custo total por ativo (`custoTotalPorAtivo`) e inventário por filial (`findByFilialIdIn`). | Visão única e confiável do parque; redução de 80% no tempo de auditoria física. |
+| **Analista de Service Desk / Técnico de Campo** | Recebe chamados, executa manutenções, registra health checks (`updateHealthCheck`), consulta histórico de saúde (`getHealthHistory`). | Iniciar/concluir/cancelar ordens de manutenção; anexar detalhes de hardware (`findByAtivoDetalheHardwareId`, `deleteByAtivoDetalheHardwareId`); receber alertas recentes (`getRecentAlerts`). | Eliminação de retrabalho; fechamento de chamados 30% mais rápido. |
+| **Aprovador / Gerente de TI** | Valida solicitações de manutenção acima de alçada ou aquisições; papel `Admin` no sistema. | Aprovar/reprovar solicitações (`aprovar`); criar/atualizar/excluir qualquer entidade (`criar_comAdmin_deveRetornarCreated`, `atualizar_comAdmin_deveRetornarOk`, `deletar_comAdmin_deveRetornarNoContent`); gerenciar papéis/permissões (`createRole`, `createPermission`). | Governança rastreável; conformidade com política de alçada. |
+| **Administrador de Sistema (SysAdmin)** | Configura tenants, usuários, integrações; monitora saúde da aplicação. | Gerenciar usuários/tokens (`createUserAndToken`, `createUsuario`, `logout`, `clearSession`); configurar seeders de dados realistas (`RealisticDataSeeder`); acessar logs de auditoria (`onUpdate`, `preUpdate`). | Operação estável; onboarding de novos clientes em minutos. |
+| **Colaborador / Solicitante** | Funcionário que detecta problema no equipamento e abre solicitação. | Criar solicitação de manutenção (`criar`); listar seus ativos alocados; visualizar status de suas solicitações. | Autonomia para reportar; transparência no andamento. |
 
 ## 4. Core Objectives & Success Metrics
-
 | Objetivo | KPI (Métrica) | Baseline Atual | Meta | Prazo |
 | :--- | :--- | :--- | :--- | :--- |
-| **Centralizar cadastro de ativos** | % de ativos cadastrados no sistema vs. inventário físico | ~60% (planilhas dispersas) | 100% | Q2/2025 |
-| **Reduzir downtime não planejado** | Horas de downtime não planejado / mês | 120h/mês | ≤ 48h/mês | Q3/2025 |
-| **Automatizar trilha de auditoria** | % de operações sensíveis com log imutável | 0% | 100% (criar, atualizar, deletar, aprovar, concluir, cancelar) | Q2/2025 |
-| **Habilitar manutenção preditiva** | % de alertas de saúde (disco/memória/rede) convertidos em manutenção preventiva antes de falha | 0% | ≥ 70% | Q4/2025 |
-| **Garantir conformidade RBAC** | % de tentativas de acesso não autorizado bloqueadas (403) | N/A | 100% (regras `*_comUser_deveRetornarForbidden`) | Q2/2025 |
+| **O1. Inventário 100% confiável** | % de ativos com cadastro completo (hw + localização + responsável) | ~45% (planilhas dispersas) | ≥ 95% | 6 meses |
+| **O2. Redução de tempo de resolução** | MTTR (Mean Time To Resolve) de incidentes de hardware | 8h (processo manual) | ≤ 4.8h (–40%) | 9 meses |
+| **O3. Adoção do fluxo de aprovação** | % de manutenções que passam pelo workflow digital | 0% | ≥ 90% | 6 meses |
+| **O4. Monitoramento preditivo ativo** | % de ativos com health check nos últimos 30 dias | 0% | ≥ 80% | 12 meses |
+| **O5. Conformidade de acesso** | % de ações sensíveis com log de autorização (Admin/User) | N/A (sem sistema) | 100% | 3 meses |
 
-* **North Star Metric:** **Ativos sob gestão ativa com health check atualizado nos últimos 30 dias / Total de ativos cadastrados** — mede adoção real e cobertura de monitoramento.
-* **Guardrail Metrics:**  
-  - Latência P95 da API `request` (frontend) ≤ 500ms (hoje complexidade ciclomática 13 em `api.js:46` exige atenção).  
-  - Taxa de erro 5xx em `AlertNotificationService.checkResourceUsageAlerts` < 0,1% (complexidade 17).  
-  - Custo de infraestrutura por ativo gerenciado ≤ R$ 2,00/mês.  
-  - Churn de usuários ativos (login mensal) < 5%.
-
----
+* **North Star Metric:** **Ativos Ativamente Gerenciados** = ativos com health check recente + última manutenção registrada + responsável válido. Meta: 85% da base ativa em 12 meses.
+* **Guardrail Metrics:** (1) Latência P95 da API `request` ≤ 500 ms (hoje função `request` em `frontend/src/services/api.js:54` tem complexidade ciclomática 13 — risco de degradação) <!-- source: diagnóstico#L1 -->; (2) Zero vazamento de dados entre filiais (isolamento por `findByFilialIdIn`); (3) Custo de infra ≤ R$ 0,15/ativo/mês.
 
 ## 5. Scope Boundaries
-
 ### In-Scope
-* **Gestão de Ativos:** CRUD completo (`createAtivo`, `listarTodos`, `buscarPorId`, `atualizar`, `deletar`) com metadados: tipo (`createTipoAtivo`), localização (`createLocalizacao`), departamento, filial, fornecedor, depreciação, health checks (`updateHealthCheck`, `getHealthHistory`, `updateScalars`).
-* **Gestão Organizacional:** Departamentos (`createDepartamento`), Filiais (`createFilial`), Fornecedores (`createFornecedor`), Funcionários (`createFuncionario`, `createFuncionarioAndUsuario`).
-* **RBAC & Segurança:** Papéis (`createRole`), Permissões (`createPermission`), Usuários (`createUsuario`, `createUserAndToken`), Autenticação (`mockLogin`, `authInterceptor`, `clearSession`, `logout`), Autorização (`hasPermission`, `isAdmin`, regras `*_comAdmin_deveRetornar*`, `*_comUser_deveRetornarForbidden`).
-* **Manutenção & Workflow:** Solicitações com estados: `iniciar`, `aprovar`, `cancelar`, `concluir`; especificações de busca (`ManutencaoSpecification.build`).
-* **Alertas & Monitoramento:** `listarAlertas`, `getRecentAlerts`, `markAsRead`, `checkResourceUsageAlerts` (disco, memória, rede, CPU).
-* **Relatórios Financeiros:** `custoTotalPorAtivo` (soma de manutenções por ativo).
-* **Frontend:** Serviço centralizado `request` (autenticação, erro, resposta), interceptador `authInterceptor`, handlers `handleApiError`, `handleResponse`.
+1. **Catálogo de Ativos** — CRUD de `Ativo`, `TipoAtivo`, `AtivoDetalheHardware` (memória, disco, adaptador de rede) com mapeamento DTO↔Entidade (`toDTO`, `toEntity`, `toEntity_deveMapearDTOparaEntidade`, `toEntity_deveRetornarNullParaDTONulo`) <!-- source: glossario#L1 -->.
+2. **Estrutura Organizacional** — CRUD de `Departamento`, `Filial`, `Localizacao`, `Fornecedor`, `Funcionario` (com vínculo `Usuario` via `createFuncionarioAndUsuario`) <!-- source: glossario#L1 -->.
+3. **Gestão de Manutenção** — Solicitação (`criar`, `iniciar`), Aprovação (`aprovar`), Execução (`concluir`), Cancelamento (`cancelar`); regras de permissão por papel (`atualizar_comAdmin_deveRetornarOk`, `atualizar_comUser_deveRetornarForbidden`, `deletar_comAdmin_deveRetornarNoContent`, `deletar_comUser_deveRetornarForbidden`) <!-- source: glossario#L1 -->.
+4. **Monitoramento de Saúde** — `updateHealthCheck` (atualização de métricas de disco/hardware), `updateScalars` (campos simples), `getHealthHistory` (histórico), `getRecentAlerts` (alertas), `listarAlertas`, `markAsRead` <!-- source: glossario#L1 -->.
+5. **Segurança & Auditoria** — Autenticação baseada em token (`authInterceptor`, `createUserAndToken`, `mockLogin`), autorização granular (`hasPermission`, `isAdmin`), hooks de auditoria (`onUpdate`, `preUpdate`), logout seguro (`logout`, `clearSession`) <!-- source: glossario#L1 -->.
+6. **Relatórios Financeiros** — `custoTotalPorAtivo` agregado por ativo/filial/departamento.
 
 ### Out-of-Scope
-* **Gestão de contratos/licenças de software** (SAM) — apenas hardware/equipamentos físicos.
-* **Integração com ERP financeiro** (contabilidade, contas a pagar) — apenas exportação de relatórios (`custoTotalPorAtivo`).
-* **App mobile nativo** — apenas web responsiva (JS + Popper.js para tooltips/dropdowns).
-* **Multi-tenancy (SaaS)** — single-tenant on-premise/cloud privado.
-* **IA/ML avançada para previsão de falha** — apenas alertas baseados em thresholds (regras em `AlertNotificationService`).
+* Gestão de contratos de software/licenças (SAM) — apenas hardware.
+* CMDB completo de dependências de serviços (apenas ativos físicos).
+* Integração com ferramentas de discovery de rede (ex.: SCCM, Lansweeper) — entrada manual/CSV apenas na v1.
+* App mobile nativo — apenas web responsiva.
+* Multi-tenancy SaaS — implantação single-tenant on-premise/cloud privado por cliente.
 
 ### Future Considerations (Not Now)
-* Integração com CMMS externo (ex.: Fiix, UpKeep) via API.
-* Módulo de gestão de licenças de software (SAM).
-* Portal de fornecedores para cotação/ordem de serviço.
-* App mobile offline-first para técnicos de campo.
-* Dashboard executivo com BI embarcado (Metabase/Superset).
-
----
+* Módulo de depreciação contábil (integração com ERP).
+* Portal de autoatendimento para colaborador (hoje apenas Service Desk abre chamados).
+* IA para previsão de falha baseada em `getHealthHistory` (requer baseline de 6+ meses).
+* Integração com fornecedores para RMA automático (`Fornecedor` existe mas sem fluxo de compra).
 
 ## 6. Business Rules & Constraints
-
-* **BR-01 (RBAC Estrito):** Apenas usuários com papel `ADMIN` podem executar `criar`, `atualizar`, `deletar` em entidades mestres (Departamento, Filial, Fornecedor, Funcionário, TipoAtivo, Permissão, Role, Usuário). Usuários com papel `USER` recebem `403 Forbidden` — validado por `criar_comUser_deveRetornarForbidden`, `atualizar_comUser_deveRetornarForbidden`, `deletar_comUser_deveRetornarForbidden`, `listarTodos_comUser_deveRetornarOk` (leitura permitida). <!-- source: glossario#L45-L55 -->
-* **BR-02 (Trilha de Auditoria Obrigatória):** Toda operação de escrita (`criar`, `atualizar`, `deletar`, `aprovar`, `cancelar`, `concluir`, `iniciar`) deve registrar: `usuario_id`, `timestamp`, `entidade`, `entidade_id`, `acao`, `valores_anteriores`, `valores_novos`. Não há entidade de log no glossário — **gap a implementar**.
-* **BR-03 (Validação de Entrada):** Criação com dados inválidos deve retornar `400 Bad Request` — regra `criar_comDadosInvalidos_deveRetornarBadRequest`. <!-- source: glossario#L48 -->
-* **BR-04 (Busca Segura):** `buscarPorId` com ID inexistente retorna `404 Not Found` — regra `buscarPorId_comIdInexistente_deveRetornarNotFound`. <!-- source: glossario#L18 -->
-* **BR-05 (Health Check de Hardware):** Ativos do tipo hardware devem ter `updateHealthCheck` executado periodicamente (agendamento externo) coletando: adaptadores de rede, discos, memórias (`deleteByAtivoDetalheHardwareId`, `findByAtivoDetalheHardwareId`). Alertas disparam quando uso de disco > 85%, memória > 90%, latência de rede > 100ms (thresholds configuráveis). <!-- source: glossario#L110-L118 -->
-* **BR-06 (Custo Total por Ativo):** `custoTotalPorAtivo` = soma de todos os custos de manutenção (peças, mão de obra, terceiros) agrupados por `ativo_id`. Deve estar disponível em relatório e API. <!-- source: glossario#L42 -->
-* **BR-07 (Mapper Null-Safe):** `toEntity` deve retornar `null` para DTO nulo — regra `toEntity_deveRetornarNullParaDTONulo`. `toDTO` deve transformar entidade em DTO padronizado — regra `toEntity_deveMapearDTOparaEntidade`. <!-- source: glossario#L119-L124 -->
-* **BR-08 (Sessão & Token):** `authInterceptor` injeta token em toda requisição; `clearSession`/`logout` invalidam token no cliente e servidor; `mockLogin` apenas para testes. <!-- source: glossario#L12-L14, L68-L70 -->
-* **BR-09 (Especificação de Manutenção):** `ManutencaoSpecification.build` (complexidade 14) encapsula filtros compostos (status, filial, departamento, tipo, período, prioridade) — deve ser extensível sem quebrar clientes. <!-- source: glossario#L38 -->
-* **BR-10 (Limpeza de Hardware):** `deleteByAtivoDetalheHardwareId` remove em cascata adaptadores, discos, memórias ao re-registrar health check — evita duplicidade. <!-- source: glossario#L34 -->
-
----
+* **BR-01 (Permissão de Criação):** Apenas usuários com papel `Admin` podem criar entidades (ativos, departamentos, filiais, fornecedores, funcionários, tipos de ativo, papéis, permissões, usuários). Usuários `User` recebem `403 Forbidden` (`criar_comAdmin_deveRetornarCreated`, `criar_comUser_deveRetornarForbidden`) <!-- source: glossario#L1 -->.
+* **BR-02 (Permissão de Atualização):** Apenas `Admin` pode atualizar registros sensíveis; `User` recebe `403` (`atualizar_comAdmin_deveRetornarOk`, `atualizar_comUser_deveRetornarForbidden`) <!-- source: glossario#L1 -->.
+* **BR-03 (Permissão de Exclusão):** Apenas `Admin` pode excluir; resposta `204 No Content` (`deletar_comAdmin_deveRetornarNoContent`, `deletar_comUser_deveRetornarForbidden`) <!-- source: glossario#L1 -->.
+* **BR-04 (Leitura Universal):** Qualquer usuário autenticado (`User` ou `Admin`) pode listar todos os registros de uma entidade (`listarTodos_comUser_deveRetornarOk`) <!-- source: glossario#L1 -->.
+* **BR-05 (Validação de Entrada):** Criação com dados inválidos retorna `400 Bad Request` (`criar_comDadosInvalidos_deveRetornarBadRequest`) <!-- source: glossario#L1 -->.
+* **BR-06 (Recurso Inexistente):** Busca por ID inexistente retorna `404 Not Found` (`buscarPorId_comIdInexistente_deveRetornarNotFound`) <!-- source: glossario#L1 -->.
+* **BR-07 (Isolamento por Filial):** Consultas de ativos, departamentos, localizações devem respeitar escopo de filiais do usuário (`findByFilialIdIn`) <!-- source: glossario#L1 -->.
+* **BR-08 (Health Check Requer Permissão de Filial):** `updateHealthCheck` exige permissão de atualização no contexto da filial do ativo <!-- source: glossario#L1 -->.
+* **BR-09 (Hardware Vinculado a Detalhe de Ativo):** Componentes (memória, disco, rede) só existem vinculados a um `AtivoDetalheHardware`; exclusão em cascata via `deleteByAtivoDetalheHardwareId` <!-- source: glossario#L1 -->.
+* **BR-10 (Auditoria Automática):** Toda atualização dispara `preUpdate` e `onUpdate` para registrar timestamp/usuário <!-- source: glossario#L1 -->.
+* **BR-11 (Tratamento Defensivo de Nulos):** Mappers devem retornar `null` para DTO nulo (`toEntity_deveRetornarNullParaDTONulo`) <!-- source: glossario#L1 -->.
+* **BR-12 (Sessão Idempotente):** `logout` e `clearSession` devem ser idempotentes e revogar token imediatamente <!-- source: glossario#L1 -->.
+* **BR-13 (Alertas Marcados como Lidos):** `markAsRead` remove status de pendente; alertas lidos não reaparecem em `getRecentAlerts` <!-- source: glossario#L1 -->.
+* **BR-14 (Seed de Dados Realistas):** Ambientes de teste/homologação devem ser populados via `RealisticDataSeeder` (complexidade ciclomática 15 — atenção a performance) <!-- source: diagnóstico#L1 -->.
 
 ## 7. Assumptions & Dependencies
-
-* **Premissas:**  
-  1. Backend Java (Spring Boot implícito por estrutura `src/main/java/br/com/aegispatrimonio`) roda em JVM 17+.
-  2. Frontend JS (15 arquivos em `frontend/src`) consome API REST; usa `@popperjs/core` para UI components.
-  3. Banco de dados relacional (PostgreSQL ou Oracle) — **não identificado no package.json**; assume-se SQL cru (JDBC/JPA nativo) por ausência de ORM nas dependências.
-  4. Deploy em container Docker (não verificado) ou VM; sem Kubernetes/auto-scaling (monolito).
-  5. Autenticação via JWT stateless (tokens em `createUserAndToken`, `authInterceptor`).
-  6. Agendamento de health checks via scheduler externo (cron, Spring `@Scheduled`, ou orquestrador).
-  7. LGPD/SOX aplicáveis — logs de auditoria imutáveis (WORM) requeridos.
-  8. Time de engenharia: 3 backend (Java), 2 frontend (JS), 1 QA, 1 DevOps.
-
-* **Dependências externas:**  
-  - **Infra/Cloud:** Provisionamento de VM/container, banco gerenciado, storage de logs (WORM), certificados TLS.  
-  - **Segurança da Informação:** Revisão de arquitetura, pentest, política de retenção de logs.  
-  - **RH/AD:** Integração futura com LDAP/AD para `createUsuario`/`createFuncionarioAndUsuario` (hoje `mockLogin` apenas testes).  
-  - **Fornecedores de Hardware:** API de garantia/SLA (futuro) — hoje cadastro manual `createFornecedor`.  
-  - **Contabilidade:** Formato de exportação de `custoTotalPorAtivo` (CSV/Excel/API) para fechamento mensal.
-
----
+* **Premissas:**
+  1. Backend roda em Java (Spring Boot implícito pela estrutura `src/main/java/br/com/aegispatrimonio/...`) com banco relacional (SQL cru — sem ORM detectado) <!-- source: stack#L1 -->.
+  2. Frontend é SPA JavaScript vanilla/ESM (15 arquivos `.js` em `frontend/`) consumindo API REST via `request` (`frontend/src/services/api.js`) <!-- source: stack#L1 -->.
+  3. Autenticação stateless via JWT (token no `authInterceptor`) <!-- source: glossario#L1 -->.
+  4. Implantação em VM/container único (monolito) — sem k8s, sem auto-scaling horizontal.
+  5. Dados de hardware coletados por agente local (fora do escopo) e enviados via `updateHealthCheck`.
+  6. LGPD se aplica: logs de auditoria (`onUpdate`/`preUpdate`) não devem gravar dados sensíveis desnecessários.
+* **Dependências externas:**
+  1. **Infra/Cloud** — provisionamento de VM, banco (PostgreSQL/MySQL/Oracle — a definir), DNS, certificado TLS.
+  2. **AD/LDAP** — sincronização de usuários/grupos (futuro; v1 usa `createUsuario` manual).
+  3. **E-mail/SMTP** — notificações de aprovação/alerta (não há dependência no código atual).
+  4. **ERP/Contábil** — integração de custo/baixa patrimonial (futuro; `custoTotalPorAtivo` é somente leitura no sistema).
 
 ## 8. Risks & Mitigations (Business-Level)
-
 | Risco | Probabilidade | Impacto | Mitigação |
 | :--- | :--- | :--- | :--- |
-| **Banco de dados não definido / ausência de ORM** | Alta | Alto | Definir motor (PostgreSQL recomendado) e estratégia de migração (Flyway/Liquibase) na Sprint 0; adotar JPA/Hibernate ou jOOQ para type-safety. |
-| **Complexidade ciclomática alta em serviços críticos** (`AlertNotificationService` 17, `api.js` 13, `ManutencaoSpecification` 14, `AtivoMapper` 14, `RealisticDataSeeder` 15) | Alta | Médio | Refatorar em métodos menores + testes de unidade (cobertura ≥ 80%) antes de Q2; code review obrigatório. |
-| **Ausência de entidade de Auditoria/Log imutável** | Média | Alto | Criar tabela `audit_log` (append-only, índice por `entidade_id` + `timestamp`); popular via `@PrePersist`/`@PreUpdate`/`@PreRemove` ou interceptor JDBC. |
-| **`setUsername` stub vazio em `Usuario.java:86`** | Baixa | Médio | Corrigir implementação; adicionar teste de regressão; validar se afeta `createFuncionarioAndUsuario` / `createUserAndToken`. |
-| **Console.* residual em `api.js` (error, debug)** | Baixa | Baixo | Remover antes de produção; configurar logger estruturado (pino/winston no backend, console.log apenas em dev). |
-| **Single point of failure (monolito sem HA)** | Média | Alto | Documentar RTO/RPO; backup diário do banco; runbook de restore < 4h; avaliar read-replica para relatórios. |
-| **Escopo de alertas preditivos limitado a thresholds estáticos** | Média | Médio | Roadmap Q4: avaliar ML simples (isolation forest) sobre `getHealthHistory`; manter thresholds configuráveis por tipo de ativo. |
-| **Dependência de agendador externo para health checks** | Média | Médio | Implementar `updateHealthCheck` como endpoint idempotente; documentar contrato para scheduler (cron, Airflow, Temporal). |
-| **Frontend sem build/test pipeline visível** | Média | Médio | Configurar Vite/Webpack + Vitest/Jest + ESLint + CI (GitHub Actions/GitLab CI) na Sprint 0. |
-
----
+| **R1. Complexidade ciclomática alta em `request` (13) e `RealisticDataSeeder.run` (15) causa bugs de regressão e lentidão** | Alta | Alto | Refatorar `request` em funções menores (auth, retry, error handling); dividir `RealisticDataSeeder` em seeders por entidade; adicionar testes de contrato e carga. |
+| **R2. Ausência de ORM/migrações versionadas gera drift de schema entre ambientes** | Alta | Alto | Adotar Flyway/Liquibase imediatamente; scripts de migração versionados no repo. |
+| **R3. Isolamento por filial (`findByFilialIdIn`) implementado apenas em query, não em camada de serviço → vazamento de dados** | Média | Crítico | Implementar *tenant filter* no `doFilterInternal` (já intercepta requisições) e validar com testes de penetração. |
+| **R4. `AtivoMapper.toDTO` com complexidade 14 — risco de N+1 queries e payloads inchados** | Média | Médio | Introduzir DTOs enxutos (list vs detail); usar *fetch join* ou *batch loading*; monitorar tamanho de resposta. |
+| **R5. `AlertNotificationService.checkResourceUsageAlerts` (complexidade 17) — lógica de alerta acoplada, difícil de testar/estender** | Média | Médio | Extrair *rules engine* simples (threshold por tipo de ativo); testes unitários por regra. |
+| **R6. `Usuario.setUsername` é stub vazio — falha silenciosa ao atualizar login** | Baixa | Alto | Corrigir imediatamente; adicionar teste de regressão. |
+| **R7. Console.error/debug em produção (`frontend/src/services/api.js:44,107`) — vazamento de stack trace/tokens** | Baixa | Médio | Remover antes de *release*; configurar *source maps* apenas em dev. |
+| **R8. Dependência única `@popperjs/core` sugere UI frágil (sem framework reativo) — manutenibilidade baixa** | Média | Médio | Avaliar migração para React/Vue/Svelte na v2; enquanto isso, padronizar *state management* e componentes. |
 
 ## 9. Financial Considerations
-
 > `[ENTRADA HUMANA NECESSÁRIA — não gerado a partir do código]` — orçamento, ROI e headcount são decisão de negócio; não há nenhuma fonte no repositório que sustente um número aqui.  
-> `[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]` — Estimativas baseadas em equipe típica (3 backend, 2 frontend, 1 QA, 1 DevOps) e infraestrutura monolito Java + JS.
+> `[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]` — Premissas: equipe de 3 devs (2 backend, 1 fullstack), 1 QA, 1 PO; infra AWS t3.medium + RDS db.t3.medium; 12 meses.
 
-* **Investimento estimado (CAPEX + OPEX 12 meses):**  
-  - **Headcount (8 FTEs × R$ 25k/mês × 12m):** R$ 2.400.000  
-  - **Infraestrutura (VM 8 vCPU/32GB, PostgreSQL gerenciado, storage WORM 2TB, backup, monitoramento):** R$ 180.000/ano  
-  - **Licenças/Ferramentas (IDE, CI/CD, SAST/DAST, gestão de segredos):** R$ 60.000/ano  
-  - **Contingência (15%):** R$ 396.000  
-  - **Total estimado Ano 1:** **~R$ 3.036.000**
-
-* **ROI esperado / Payback:**  
-  - Economia projetada: redução 40% downtime (R$ 1.2M/ano), eliminação ativos fantasmas 5% base (R$ 800k), redução 30% tempo auditoria (R$ 300k), otimização CAPEX via TCO real (R$ 500k).  
-  - **Benefício anual estimado:** R$ 2.8M → **Payback ~13 meses** (após go-live Q3/2025).
-
-* **Modelo de custo recorrente (Ano 2+):**  
-  - Infraestrutura: R$ 180k  
-  - Headcount sustentação (2 FTEs): R$ 600k  
-  - Licenças/ferramentas: R$ 60k  
-  - **Total/ano:** ~R$ 840k
-
----
+* **Investimento estimado:** R$ 720k (12 meses) — breakdown: Pessoal R$ 540k, Infra R$ 60k, Licenças/Ferramentas R$ 30k, Contingência 15% R$ 90k.
+* **ROI esperado / Payback:** Break-even no mês 10 (economia projetada R$ 180k/ano vs. custo operacional pós-go-live ~R$ 120k/ano).
+* **Modelo de custo recorrente:** Infra ~R$ 5k/mês (compute + DB + backup + monitoramento); Suporte L2 interno 0,5 FTE ~R$ 8k/mês; Evolução contínua 1 dev ~R$ 18k/mês.
 
 ## 10. Go-to-Market Considerations
-
 > `[ENTRADA HUMANA NECESSÁRIA — não gerado a partir do código]` — estratégia de lançamento/enablement é decisão de negócio, não algo derivável de `server/`.  
-> `[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]` — Baseado em perfil corporativo, RBAC, necessidade de migração de dados legados.
+> `[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]` — Premissas: produto interno (não SaaS), rollout por ondas geográficas.
 
-* **Estratégia de lançamento:** **Rollout gradual por filial** (piloto em 1 filial → 3 filiais → corporativo).  
-  - **Fase 1 (Piloto - Q2/2025):** 1 filial, 500 ativos, 20 usuários. Validação de RBAC, health checks, relatórios `custoTotalPorAtivo`, migração de planilhas.  
-  - **Fase 2 (Expansão - Q3/2025):** 5 filiais, 3.000 ativos, 100 usuários. Treinamento multiplicadores.  
-  - **Fase 3 (Corporativo - Q4/2025):** Todas as filiais, 12.000+ ativos, 400+ usuários. Auditoria SOX/LGPD.
-
-* **Comunicação & Enablement:**  
-  - **Times a treinar:** Gestores de Patrimônio (2h), Analistas de Manutenção (4h + hands-on), Admins de Sistema (8h + runbooks), Usuários Finais (30min video + FAQ), Auditores (1h walkthrough de logs).  
-  - **Materiais necessários:** Manual do Usuário (Confluence), Runbooks de Deploy/Restore/Health Check, Matriz de Permissões (RBAC), Guia de Migração de Planilhas (CSV template + script de importação), Dashboard de Métricas (Grafana).  
-  - **Suporte Pós-Go-Live:** Squad dedicado 30 dias (SLA 4h crítico, 8h alto, 24h médio/baixo); canal Slack/Teams + portal de chamados.
-
----
+* **Estratégia de lançamento:** **Rollout gradual por filial** — Piloto na matriz (filial 01) por 60 dias → expansão para 3 filiais regionais → nacional. Critério de go/no-go: ≥ 90% dos ativos da filial cadastrados + MTTR ≤ 5h.
+* **Comunicação & Enablement:** (1) Workshop de 4h para Gestores de Ativos (cadastro, relatórios, `custoTotalPorAtivo`); (2) Treino de 2h para Service Desk (fluxo de manutenção, `updateHealthCheck`, alertas); (3) Cartilha rápida para Aprovadores (apenas `aprovar`/`cancelar`); (4) Runbook de SysAdmin (seed, backup, `doFilterInternal`, troubleshooting de `authInterceptor`).
 
 ## 11. Approval & Sign-off
-
 | Papel | Nome | Status | Data |
 | :--- | :--- | :--- | :--- |
-| Sponsor (Dir. Operações) | [Aguardando indicação] | Pendente | |
-| Product Lead (Gestão de Ativos) | [Aguardando indicação] | Pendente | |
-| Engineering Lead (Backend) | [Aguardando indicação] | Pendente | |
-| Engineering Lead (Frontend) | [Aguardando indicação] | Pendente | |
-| Security/Compliance Lead | [Aguardando indicação] | Pendente | |
-| Infra/Cloud Lead | [Aguardando indicação] | Pendente | |
-
----
+| Sponsor (CFO) | [Aguardando] | Pendente | |
+| Product Lead | [Aguardando] | Pendente | |
+| Engineering Lead (Backend) | [Aguardando] | Pendente | |
+| Engineering Lead (Frontend) | [Aguardando] | Pendente | |
+| InfoSec / LGPD | [Aguardando] | Pendente | |
+| Operações de TI | [Aguardando] | Pendente | |
 
 ## 12. Revision History
-
 | Versão | Data | Autor | Mudanças |
 | :--- | :--- | :--- | :--- |
-| 1.0 | 15/01/2025 | Product Owner (IA assistida) | Criação inicial baseada em diagnóstico determinístico (348 arquivos Java, 15 JS) e Glossário Ubiquitous Language extraído via AST. Todas as regras de negócio (BR-01 a BR-10) mapeadas 1:1 dos termos do glossário. Seções 3, 9, 10 marcadas como inferidas — requerem validação humana. |
+| 1.0 | 15/01/2025 | Product Lead (IA-assisted) | Criação inicial baseada em glossário ubíquo, diagnóstico de código e stack verificada. |
