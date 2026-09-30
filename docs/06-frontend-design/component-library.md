@@ -1,20 +1,18 @@
-# Component Library / Inventory — Aegis Patrimônio
+# Component Library / Inventory — Aegis Patrimonio
 
 > **Versão:** 1.0 · **Owner:** Frontend Lead · **Status:** Draft  
-> **Baseado em:** Componentes vanilla JS proprietários (sem biblioteca UI externa — apenas `@popperjs/core` para positioning)  
-> **Depende de:** [design-tokens.md](design-tokens.md), [user-flows.md](user-flows.md)
+> **Baseado em:** Componentes vanilla JavaScript (ES6+) + `@popperjs/core` para posicionamento  
+> **Depende de:** `design-tokens.md` (tokens de cor, espaçamento, tipografia, motion, z-index), `user-flows.md` (fluxos que definem componentes necessários)
 
 ---
 
 ## 1. Overview
 
-Este documento inventaria os **componentes de interface reutilizáveis** necessários para cobrir os 6 fluxos de usuário definidos em [user-flows.md](user-flows.md), consumindo exclusivamente os design tokens de [design-tokens.md](design-tokens.md).  
+Este inventário documenta os **componentes de interface reutilizáveis** para o frontend do Aegis Patrimonio — uma aplicação **vanilla JavaScript (ES6 modules)** sem framework de componentes (React, Vue, Svelte) ou biblioteca de UI (shadcn/ui, Material, Bootstrap). O único dependência de UI é **`@popperjs/core`** para posicionamento de tooltips, dropdowns e popovers.
 
-**Estado atual do codebase:** O diagnóstico determinístico (348 arquivos Java, 15 arquivos JS em `frontend/src/`) **não revelou nenhuma biblioteca de componentes, sistema de design, ou padrão de componentização**. Os 15 arquivos JS são serviços/utilitários (`api.js`, etc.) — não há arquivos de componente (`.js` com `customElements.define`, classes de UI, ou templates HTML reutilizáveis).  
+Os componentes são implementados como **funções factory / classes ES6** que criam e gerenciam elementos DOM, consomem **CSS Custom Properties** definidas em `design-tokens.md` e seguem o padrão de **Web Components leves** (sem Shadow DOM obrigatório) para compatibilidade com a stack atual.
 
-**Estratégia proposta:** Implementar componentes como **Web Components nativos (Custom Elements)** ou **módulos JS vanilla com template literals**, sem dependência de framework (React/Vue/Svelte). Isso alinha com a stack real (JS vanilla + `@popperjs/core`) e evita build step complexo no MVP.  
-
-> **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — Toda a lista abaixo é uma **proposta inicial** derivada dos fluxos de usuário e tokens. Nenhum componente existe hoje. Requer decisão de arquitetura: Web Components vs. módulos JS + template literals vs. adoção de framework leve (ex: Petite-Vue, Alpine.js) antes de iniciar implementação.
+> **Estado atual (diagnóstico determinístico):** O workspace contém **15 arquivos `.js` em `frontend/src/`** — majoritariamente services (`api.js`, `auth.js`) e utilitários. **Nenhum arquivo de componente UI foi detectado** na varredura AST. Este inventário define a **especificação a ser implementada** com base nos fluxos de usuário (`user-flows.md`) e tokens de design (`design-tokens.md`).
 
 ---
 
@@ -22,314 +20,846 @@ Este documento inventaria os **componentes de interface reutilizáveis** necess�
 
 | Convenção | Definição |
 | :--- | :--- |
-| **Padrão de composição** | Web Components (Custom Elements) com `Shadow DOM` opcional (para isolamento de estilo) + `slot` para composição. Fallback: módulos ES com `render()` retornando HTML string + `attach()` para binding de eventos. |
-| **Nomenclatura** | `aegis-*` prefixo (ex: `<aegis-button>`, `<aegis-data-table>`). Classes CSS internas: `.aegis-btn`, `.aegis-table`, etc. |
-| **Local no repositório** | `frontend/src/components/` (a criar) — um arquivo por componente: `aegis-button.js`, `aegis-button.css`, `aegis-button.test.js` |
-| **Tokens consumidos** | Via CSS Custom Properties (definidas em `:root` no `index.html` ou injetadas via JS no bootstrap). **Nenhum valor hardcoded** permitido. |
-| **Acessibilidade** | Obrigatório: `role`, `aria-*`, `tabindex`, foco visível (`:focus-visible`), `aria-live` para estados dinâmicos. Testado com NVDA/VoiceOver. |
-| **Variantes** | Controladas via **atributos HTML** (ex: `<aegis-button variant="primary" size="md">`) — não props JS. Reflete no CSS via `[variant="primary"]`. |
-| **Estado** | Gerenciado externamente (pai passa dados via atributos/propriedades; componente emite `CustomEvent` para ações: `aegis-submit`, `aegis-delete`, `aegis-status-change`). |
-| **Testes** | Unitários com Vitest + `@testing-library/web-components` (a configurar). Histórias no Storybook (opcional, avaliar custo). |
+| **Padrão de composição** | Funções factory `createComponentName(config)` que retornam objeto com `{ element, destroy, update, show, hide }` + event emitters via `CustomEvent` |
+| **Nomenclatura** | `create[PascalCase]` para factories (ex: `createButton`, `createDataTable`); arquivos em `kebab-case` (`button.js`, `data-table.js`) |
+| **Local no repositório** | `frontend/src/components/` (a criar) — um arquivo por componente + `index.js` para barrel export |
+| **Estilização** | **Apenas CSS Custom Properties** (tokens) — zero CSS-in-JS, zero utility classes. Classes CSS BEM-style opcionais para estados (`is-loading`, `is-disabled`, `has-error`) |
+| **Acessibilidade** | Obrigatório: `role`, `aria-*`, `tabindex`, focus management, `aria-live` para toasts/alertas |
+| **Tokens consumidos** | Referência direta a `design-tokens.md` — ex: `var(--color-accent-primary)`, `var(--space-4)`, `var(--duration-base)` |
+| **Popper.js** | Usado **apenas** para: `Tooltip`, `Dropdown`, `Popover`, `Select` (positioning strategy `flip`, `shift`, `offset`) |
 
 ---
 
 ## 3. Inventário de Componentes
 
-| Componente | Categoria | Variantes/Estados Principais | Status | Prioridade (Flows) | Localização Proposta |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| `aegis-button` | Ação | `variant`: primary, secondary, ghost, destructive, outline<br>`size`: sm, md, lg<br>`loading`, `disabled` | **Proposto** | Todos (1–6) | `components/aegis-button/` |
-| `aegis-input` | Formulário | `type`: text, email, password, number, search<br>`state`: default, error, disabled, readonly<br>`label`, `placeholder`, `helper-text`, `leading-icon`, `trailing-icon` | **Proposto** | 1, 2, 4, 6 | `components/aegis-input/` |
-| `aegis-select` | Formulário | `multiple`, `searchable`, `clearable`<br>`options` via `<aegis-option>` slots<br>`state`: default, error, disabled | **Proposto** | 1, 2, 4 | `components/aegis-select/` |
-| `aegis-date-picker` | Formulário | `mode`: single, range<br>`format`: DD/MM/YYYY<br>`min`, `max`, `disabled-dates` | **Proposto** | 1, 2, 5 | `components/aegis-date-picker/` |
-| `aegis-textarea` | Formulário | `rows`, `resize`, `maxlength`, `counter`<br>`state`: default, error, disabled | **Proposto** | 1, 2, 4 | `components/aegis-textarea/` |
-| `aegis-checkbox` | Formulário | `indeterminate`, `disabled`<br>Label via slot | **Proposto** | 1, 4 | `components/aegis-checkbox/` |
-| `aegis-radio-group` | Formulário | `options` via `<aegis-radio>`<br>`orientation`: horizontal, vertical | **Proposto** | 1, 2, 4 | `components/aegis-radio-group/` |
-| `aegis-switch` | Formulário | `checked`, `disabled`, `size` | **Proposto** | 4 (RBAC toggles) | `components/aegis-switch/` |
-| `aegis-form` | Formulário | Wrapper com validação nativa (`reportValidity`), submissão via `CustomEvent`<br>Slots: `header`, `fields`, `actions` | **Proposto** | 1, 2, 4, 6 | `components/aegis-form/` |
-| `aegis-modal` | Overlay | `size`: sm, md, lg, xl, full<br>`variant`: default, confirmation, form, alert<br>`dismissible`, `close-on-overlay-click`<br>Slots: `header`, `body`, `footer` | **Proposto** | 1, 2, 3, 4, 6 | `components/aegis-modal/` |
-| `aegis-dropdown` | Overlay | `trigger`: click, hover<br>`placement` (via Popper.js): top, bottom, left, right + variations<br>Slots: `trigger`, `content` (`<aegis-dropdown-item>`) | **Proposto** | 1, 2, 4 (usa `@popperjs/core`) | `components/aegis-dropdown/` |
-| `aegis-tooltip` | Overlay | `placement` (via Popper.js)<br>`delay`: show/hide<br>`variant`: default, info, warning, error<br>Slot: `trigger` | **Proposto** | 1, 2, 3, 5 (usa `@popperjs/core`) | `components/aegis-tooltip/` |
-| `aegis-toast` | Feedback | `variant`: success, error, warning, info<br>`duration`: auto (5s), persistent<br>`action`: botão opcional (ex: "Desfazer")<br>Container: `<aegis-toast-container>` (portal) | **Proposto** | Todos (1–6) | `components/aegis-toast/` |
-| `aegis-badge` | Feedback | `variant`: success, warning, danger, info, neutral<br>`size`: sm, md<br>`dot`: boolean (indicador circular) | **Proposto** | 1, 2, 3, 5 | `components/aegis-badge/` |
-| `aegis-avatar` | Feedback | `src`, `alt`, `fallback` (iniciais)<br>`size`: xs, sm, md, lg, xl<br>`shape`: circle, square<br>`status`: online, offline, busy, away (badge overlay) | **Proposto** | 1, 4, 6 | `components/aegis-avatar/` |
-| `aegis-data-table` | Exibição | `columns` (array de config: key, label, sortable, filterable, render)<br>`pagination`: client/server<br>`selection`: single, multiple, none<br>`sort`, `filter`, `row-click`, `row-expand`<br>`empty-state`, `loading-state`, `error-state`<br>`virtualized`: opcional para >1k linhas | **Proposto** | 1, 2, 3, 5 | `components/aegis-data-table/` |
-| `aegis-card` | Layout | `variant`: default, outlined, elevated, interactive<br>`padding`: none, sm, md, lg<br>Slots: `header`, `media`, `body`, `footer`, `actions` | **Proposto** | 1, 3, 5 | `components/aegis-card/` |
-| `aegis-sidebar` | Navegação | `collapsible`, `collapsed` (state)<br>`items`: array de { label, icon, href, badge, children }<br>`active-item` (rota atual)<br>Slot: `logo`, `user-menu` | **Proposto** | Todos (1–6) | `components/aegis-sidebar/` |
-| `aegis-header` | Layout | `title`, `breadcrumbs`, `actions` (slot), `user-menu` (avatar + dropdown)<br>`sticky`, `elevated` | **Proposto** | Todos (1–6) | `components/aegis-header/` |
-| `aegis-breadcrumb` | Navegação | `items`: array de { label, href, current }<br>`separator`: chevron, slash, arrow<br>`max-items` (colapso com ellipsis) | **Proposto** | 1, 2, 4, 5 | `components/aegis-breadcrumb/` |
-| `aegis-tabs` | Navegação | `variant`: line, enclosed, soft<br>`orientation`: horizontal, vertical<br>`activation`: auto, manual<br>Slots: `tab-list`, `tab-panel` | **Proposto** | 4, 5 | `components/aegis-tabs/` |
-| `aegis-empty-state` | Feedback | `illustration`: icon, illustration, none<br>`title`, `description`, `action` (slot para botão/link)<br>`size`: sm, md, lg | **Proposto** | 1, 2, 3, 5 | `components/aegis-empty-state/` |
-| `aegis-loading` | Feedback | `variant`: spinner, skeleton, pulse, progress<br>`size`: sm, md, lg<br>`overlay`: boolean (full-screen vs inline) | **Proposto** | Todos (1–6) | `components/aegis-loading/` |
-| `aegis-alert-banner` | Feedback | `variant`: info, success, warning, danger<br>`dismissible`, `action` (slot)<br>`persistent`: boolean | **Proposto** | 3, 6 | `components/aegis-alert-banner/` |
-| `aegis-health-indicator` | Domínio | `status`: ok, warning, critical, unknown<br>`metric`: disk, memory, network, custom<br>`value`, `threshold`, `unit`<br>`trend`: up, down, stable (sparkline opcional) | **Proposto** | 3 | `components/aegis-health-indicator/` |
-| `aegis-stat-card` | Domínio | `label`, `value`, `change` (%, trend), `icon`<br>`variant`: default, highlight, warning<br>`link` (opcional) | **Proposto** | 1, 3, 5 | `components/aegis-stat-card/` |
-| `aegis-filter-bar` | Domínio | `filters`: array de { key, label, type: select/date/range/text, options }<br>`on-change` event<br>`collapsed` state (mobile) | **Proposto** | 1, 2, 3, 5 | `components/aegis-filter-bar/` |
-| `aegis-export-button` | Ação | `formats`: csv, xlsx, pdf<br>`filename`, `loading` state<br>Integração com backend streaming | **Proposto** | 5 | `components/aegis-export-button/` |
-| `aegis-audit-log-table` | Domínio | Extende `aegis-data-table` com colunas fixas: timestamp, user, entity, action, diff<br>`diff-viewer` (modal ao clicar) | **Proposto** | 5 | `components/aegis-audit-log-table/` |
-| `aegis-login-form` | Auth | `fields`: email/username, password, remember-me<br>`forgot-password`, `sso-buttons` (slots)<br>`state`: default, loading, error, success<br>Validação cliente + integração `authInterceptor` | **Proposto** | 6 | `components/aegis-login-form/` |
-| `aegis-protected-route` | Auth | Wrapper (não visual) — verifica token, roles, permissions<br>Redireciona login com `returnUrl`<br>Emite `aegis-auth-change` | **Proposto** | 6 | `components/aegis-protected-route/` |
-| `aegis-confirm-dialog` | Overlay | Especialização de `aegis-modal` para confirmações perigosas<br>`variant`: delete, destructive, warning<br>`require-typing`: string para confirmar (ex: "EXCLUIR") | **Proposto** | 1, 2, 4 | `components/aegis-confirm-dialog/` |
+| Componente | Categoria | Variantes / Configurações | Status | Localização (planejada) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Button** | Ação | `variant: 'primary' \| 'secondary' \| 'danger' \| 'ghost'`, `size: 'sm' \| 'md' \| 'lg'`, `loading`, `disabled`, `iconOnly` | **Planejado** | `frontend/src/components/button.js` |
+| **IconButton** | Ação | `variant`, `size`, `aria-label` obrigatório | **Planejado** | `frontend/src/components/icon-button.js` |
+| **Input** | Formulário | `type: 'text' \| 'email' \| 'password' \| 'number' \| 'date'`, `label`, `error`, `disabled`, `required`, `helperText` | **Planejado** | `frontend/src/components/input.js` |
+| **Select** | Formulário | `options[]`, `placeholder`, `searchable`, `multiple`, `error`, `disabled` (usa Popper para dropdown) | **Planejado** | `frontend/src/components/select.js` |
+| **Textarea** | Formulário | `label`, `error`, `disabled`, `rows`, `maxLength` | **Planejado** | `frontend/src/components/textarea.js` |
+| **Checkbox** | Formulário | `label`, `indeterminate`, `disabled` | **Planejado** | `frontend/src/components/checkbox.js` |
+| **RadioGroup** | Formulário | `options[]`, `orientation: 'horizontal' \| 'vertical'`, `disabled` | **Planejado** | `frontend/src/components/radio-group.js` |
+| **Switch** | Formulário | `label`, `checked`, `disabled` | **Planejado** | `frontend/src/components/switch.js` |
+| **DataTable** | Exibição | `columns[]`, `data[]`, `sortable`, `filterable`, `selectable`, `pagination`, `rowActions[]`, `emptyState`, `loading`, `density: 'compact' \| 'comfortable'` | **Planejado** | `frontend/src/components/data-table.js` |
+| **Modal** | Overlay | `size: 'sm' \| 'md' \| 'lg' \| 'xl'`, `title`, `closable`, `footerActions[]`, `trapFocus` | **Planejado** | `frontend/src/components/modal.js` |
+| **Drawer** | Overlay | `position: 'left' \| 'right'`, `size`, `closable` | **Planejado** | `frontend/src/components/drawer.js` |
+| **Toast** | Feedback | `variant: 'success' \| 'warning' \| 'danger' \| 'info'`, `title`, `message`, `duration`, `action`, `persistent` | **Planejado** | `frontend/src/components/toast.js` |
+| **Alert** | Feedback | `variant`, `title`, `message`, `dismissible`, `icon` | **Planejado** | `frontend/src/components/alert.js` |
+| **Badge** | Status | `variant: 'ativo' \| 'manutencao' \| 'baixa' \| 'critico' \| 'info' \| 'warning' \| 'success' \| 'neutral'`, `dot`, `removable` | **Planejado** | `frontend/src/components/badge.js` |
+| **Tooltip** | Feedback | `content`, `placement`, `delay`, `interactive` (usa Popper) | **Planejado** | `frontend/src/components/tooltip.js` |
+| **Dropdown** | Navegação | `trigger`, `items[]`, `align`, `divider` (usa Popper) | **Planejado** | `frontend/src/components/dropdown.js` |
+| **Tabs** | Navegação | `tabs[]`, `variant: 'line' \| 'enclosed'`, `orientation` | **Planejado** | `frontend/src/components/tabs.js` |
+| **Breadcrumb** | Navegação | `items[]`, `separator`, `currentPage` | **Planejado** | `frontend/src/components/breadcrumb.js` |
+| **Pagination** | Navegação | `total`, `page`, `pageSize`, `onChange`, `showSizeChanger` | **Planejado** | `frontend/src/components/pagination.js` |
+| **Avatar** | Exibição | `src`, `alt`, `fallback` (iniciais), `size: 'xs' \| 'sm' \| 'md' \| 'lg'`, `status` | **Planejado** | `frontend/src/components/avatar.js` |
+| **Card** | Layout | `header`, `footer`, `hoverable`, `bordered`, `elevation` | **Planejado** | `frontend/src/components/card.js` |
+| **Sidebar** | Layout | `collapsible`, `items[]`, `activeItem`, `logo`, `userMenu` | **Planejado** | `frontend/src/components/sidebar.js` |
+| **Header** | Layout | `title`, `actions[]`, `userMenu`, `notificationBell`, `themeToggle` | **Planejado** | `frontend/src/components/header.js` |
+| **FormLayout** | Layout | `fields[]`, `colCount: 1 \| 2 \| 3`, `labelPosition: 'top' \| 'left'` | **Planejado** | `frontend/src/components/form-layout.js` |
+| **EmptyState** | Feedback | `icon`, `title`, `description`, `action` | **Planejado** | `frontend/src/components/empty-state.js` |
+| **Skeleton** | Feedback | `variant: 'text' \| 'card' \| 'table' \| 'avatar'`, `animation: 'pulse' \| 'wave'` | **Planejado** | `frontend/src/components/skeleton.js` |
+| **FileUpload** | Formulário | `accept`, `maxSize`, `multiple`, `dragDrop`, `preview` | **Planejado** | `frontend/src/components/file-upload.js` |
+| **DatePicker** | Formulário | `range`, `format`, `disabledDates`, `minDate`, `maxDate` (usa Popper) | **Planejado** | `frontend/src/components/date-picker.js` |
 
-**Total: 29 componentes propostos** — todos **Proposto** (não existem no codebase atual).
+> **Total:** 27 componentes planejados. **0 implementados** (diagnóstico não detectou componentes UI no codebase atual).
 
 ---
 
-## 4. Especificação por Componente (Amostra Representativa)
+## 4. Especificação por Componente
 
-> **Nota:** Por brevidade, detalho 6 componentes críticos. Os demais seguem o mesmo padrão — especificação completa deve ser feita em arquivos individuais (`components/aegis-*/README.md`) durante a implementação.
+> **Convenção de documentação:** Cada seção abaixo segue o template do item 4 do template. Tokens referenciam `design-tokens.md` via `var(--token-name)`. Exemplos de uso mostram **vanilla JS** (sem JSX/TSX).
 
 ---
 
-### 4.1 `aegis-button`
+### 4.1 Button
 
-* **Propósito:** Ação primária/segundária/destrutiva em formulários, tabelas, modais, toolbars. Substitui `<button>` nativo com estilos consistentes, estados acessíveis e loading integrado.
-* **Anatomia:** `<button class="aegis-btn">[<span class="aegis-btn__icon">][<span class="aegis-btn__label"><slot></slot></span>][<span class="aegis-btn__spinner">]</span>`
-* **Props/Atributos:**
+* **Propósito:** Ação principal/secundária/destrutiva em formulários, tabelas, modais, toolbars. Usado em **todos os fluxos** (Flow 2–7).
+* **Anatomia:** `<button>` nativo + `span` para label + `slot` opcional para ícone (leading/trailing).
 
-| Atributo | Tipo | Default | Descrição |
+#### Props/API
+
+| Prop | Tipo | Default | Descrição |
 | :--- | :--- | :--- | :--- |
-| `variant` | `primary \| secondary \| ghost \| destructive \| outline` | `primary` | Estilo visual — mapeia tokens `--btn-*-bg`, `--btn-*-hover`, `--btn-*-text` |
-| `size` | `sm \| md \| lg` | `md` | Padding/tipografia — `--space-2/3/4`, `--text-sm/base/lg` |
-| `disabled` | `boolean` | `false` | Desabilita + `aria-disabled="true"` + cursor not-allowed |
-| `loading` | `boolean` | `false` | Mostra spinner, desabilita, mantém largura (evita layout shift) |
-| `full-width` | `boolean` | `false` | `width: 100%` |
-| `type` | `button \| submit \| reset` | `button` | Tipo nativo do button |
-| `aria-pressed` | `boolean` | — | Para botões toggle (ex: favoritar) |
+| `variant` | `'primary' \| 'secondary' \| 'danger' \| 'ghost'` | `'primary'` | Estilo visual — mapeia tokens de cor/borda |
+| `size` | `'sm' \| 'md' \| 'lg'` | `'md'` | Altura/padding — `--btn-height-*`, `--btn-padding-x-*` |
+| `disabled` | `boolean` | `false` | Desabilita interação + estilo `--color-text-muted` |
+| `loading` | `boolean` | `false` | Exibe spinner (CSS animation) + desabilita |
+| `icon` | `HTMLElement \| string` | `undefined` | Ícone leading (antes do label) |
+| `iconTrailing` | `HTMLElement \| string` | `undefined` | Ícone trailing (após label) |
+| `fullWidth` | `boolean` | `false` | `width: 100%` |
+| `type` | `'button' \| 'submit' \| 'reset'` | `'button'` | Atributo nativo |
+| `onClick` | `(event: MouseEvent) => void` | `undefined` | Handler de clique |
 
-* **Estados visuais:**
+#### Estados visuais
 
-| Estado | Comportamento Visual (Tokens) |
+| Estado | Comportamento Visual |
 | :--- | :--- |
-| Default | `background: var(--btn-{variant}-bg); color: var(--btn-{variant}-text); border-radius: var(--radius-md); box-shadow: var(--shadow-sm);` |
-| Hover | `background: var(--btn-{variant}-hover);` (exceto `disabled`/`loading`) |
-| Focus | `outline: none; box-shadow: var(--shadow-focus), var(--shadow-sm);` |
-| Active/Pressed | `transform: scale(0.98);` + `background` mais escuro (10%) |
-| Disabled | `opacity: 0.5; cursor: not-allowed; pointer-events: none;` |
-| Loading | `color: transparent;` + spinner centralizado (`var(--color-text-primary)`) + `pointer-events: none;` |
+| **Default** | `background: var(--btn-primary-bg)`, `color: var(--btn-primary-text)`, `border: none`, `border-radius: var(--btn-radius)` |
+| **Hover** | `background: var(--btn-primary-hover)` (primary) / `background: var(--btn-secondary-hover)` (secondary) |
+| **Focus** | `box-shadow: var(--shadow-focus)` (outline acessível) |
+| **Active/Pressed** | `transform: scale(0.98)`, `transition: var(--duration-instant)` |
+| **Disabled** | `opacity: 0.5`, `cursor: not-allowed`, `pointer-events: none` |
+| **Loading** | `position: relative`, label oculto, spinner centralizado (`animation: spin var(--duration-base) linear infinite`) |
+| **Ghost variant** | `background: transparent`, `color: var(--color-accent-primary)`, `border: 1px solid transparent` → hover: `background: var(--color-accent-light)` |
 
-* **Tokens consumidos:** `--btn-primary-bg`, `--btn-primary-hover`, `--btn-primary-text`, `--btn-secondary-bg`, `--btn-secondary-hover`, `--btn-danger-bg`, `--radius-md`, `--shadow-sm`, `--shadow-focus`, `--text-sm`, `--text-base`, `--text-lg`, `--space-2`, `--space-3`, `--space-4`, `--duration-fast`, `--color-text-primary`
-* **Eventos emitidos:** `aegis-click` (detail: `{ originalEvent }`) — wrapper para não vazar `PointerEvent` nativo
-* **Exemplo de uso:**
-```html
-<aegis-button variant="primary" size="md" loading="false">
-  <svg slot="icon" class="aegis-icon" aria-hidden="true"><use href="#icon-plus"></use></svg>
-  Novo Ativo
-</aegis-button>
+#### Tokens consumidos
 
-<aegis-button variant="destructive" size="sm" disabled>
-  Excluir
-</aegis-button>
-```
+`--btn-height-*`, `--btn-padding-x-*`, `--btn-font-size`, `--btn-font-weight`, `--btn-radius`, `--btn-primary-bg`, `--btn-primary-hover`, `--btn-primary-text`, `--btn-secondary-bg`, `--btn-secondary-hover`, `--btn-secondary-text`, `--btn-danger-bg`, `--btn-danger-hover`, `--color-text-muted`, `--shadow-focus`, `--duration-instant`, `--duration-base`, `--radius-md`
 
----
+#### Composição/Slots
 
-### 4.2 `aegis-data-table`
-
-* **Propósito:** Tabela de dados densa, acessível, com paginação, ordenação, filtros, seleção e estados vazios/carregamento/erro — coração dos Flows 1, 2, 3, 5.
-* **Anatomia:** `<table class="aegis-table"><thead><tr><th><aegis-th>...</aegis-th></tr></thead><tbody><tr><td><slot name="cell-{key}"></slot></td></tr></tbody></table>` + `<aegis-pagination>` + `<aegis-toolbar>` (filtros, busca, ações em lote)
-* **Props/Atributos (via propriedades JS no elemento):**
-
-| Propriedade | Tipo | Default | Descrição |
-| :--- | :--- | :--- | :--- |
-| `columns` | `ColumnDef[]` | `[]` | `{ key, label, sortable, filterable, width, align, render: (row, cellValue) => string|Node }` |
-| `data` | `any[]` | `[]` | Linhas de dados (objetos) |
-| `key-field` | `string` | `'id'` | Campo único para `row-key` e seleção |
-| `pagination` | `object` | `{ page: 1, pageSize: 20, total: 0, serverSide: false }` | Controle de paginação |
-| `selection` | `'none' \| 'single' \| 'multiple'` | `'none'` | Habilita checkbox na primeira coluna |
-| `selected-keys` | `Set<string\|number>` | `new Set()` | Linhas selecionadas (bidirecional) |
-| `sort-by` | `string` | `null` | Coluna ordenada |
-| `sort-dir` | `'asc' \| 'desc'` | `'asc'` | Direção |
-| `loading` | `boolean` | `false` | Mostra skeleton rows |
-| `error` | `string` | `null` | Mensagem de erro (estado error) |
-| `empty-message` | `string` | `'Nenhum registro encontrado'` | Texto do empty state |
-| `row-clickable` | `boolean` | `false` | `cursor: pointer` + emite `aegis-row-click` |
-| `expandable` | `boolean` | `false` | Linha expansível (slot `expanded-content`) |
-
-* **Estados visuais:**
-
-| Estado | Comportamento |
-| :--- | :--- |
-| Loading | `tbody` mostra 5 skeleton rows (`aegis-loading variant="pulse"`) + `thead` visível |
-| Empty | `tbody` com 1 row `colspan="100%"` + `<aegis-empty-state>` centralizado |
-| Error | `tbody` com 1 row `colspan="100%"` + `<aegis-alert-banner variant="danger">` + botão "Tentar novamente" |
-| Hover row | `background: var(--table-row-hover);` (exceto selecionada) |
-| Selected row | `background: var(--color-accent-light);` + checkbox marcado |
-| Focus cell | `outline: none; box-shadow: inset 0 0 0 2px var(--color-accent-primary);` (navegação por teclado) |
-
-* **Tokens consumidos:** `--table-header-bg`, `--table-row-hover`, `--table-border`, `--color-border-light`, `--color-text-primary`, `--color-text-secondary`, `--color-text-muted`, `--color-accent-primary`, `--color-accent-light`, `--radius-none`, `--shadow-xs`, `--space-2`, `--space-3`, `--space-4`, `--text-sm`, `--text-base`, `--duration-fast`
-* **Slots:** `header-actions` (toolbar), `cell-{key}` (render customizado por coluna), `expanded-content` (linha expandida), `pagination-info`, `page-size-select`
-* **Eventos emitidos:** `aegis-sort` (`{ key, dir }`), `aegis-page-change` (`{ page, pageSize }`), `aegis-selection-change` (`{ keys: Set }`), `aegis-row-click` (`{ row, key }`), `aegis-filter-change` (`{ filters: Record<string, any> }`)
-* **Exemplo de uso:**
-```html
-<aegis-data-table 
-  key-field="id"
-  selection="multiple"
-  pagination='{"page":1,"pageSize":20,"total":0,"serverSide":true}'
-  row-clickable
->
-  <aegis-column key="tag" label="Tag" sortable filterable width="120"></aegis-column>
-  <aegis-column key="nome" label="Nome" sortable filterable></aegis-column>
-  <aegis-column key="tipo" label="Tipo" filterable render="renderTipo"></aegis-column>
-  <aegis-column key="status" label="Status" filterable render="renderStatusBadge"></aegis-column>
-  <aegis-column key="filial" label="Filial" sortable filterable></aegis-column>
-  <aegis-column key="updatedAt" label="Atualizado" sortable align="right" render="renderDate"></aegis-column>
-  
-  <template slot="cell-status" data-row="{{row}}">
-    <aegis-badge variant="{{row.statusVariant}}">{{row.statusLabel}}</aegis-badge>
-  </template>
-  
-  <div slot="header-actions">
-    <aegis-filter-bar filters="[[tableFilters]]" on-change="handleFilterChange"></aegis-filter-bar>
-    <aegis-button variant="primary" on-click="openCreateModal">Novo Ativo</aegis-button>
-  </div>
-</aegis-data-table>
-```
-
----
-
-### 4.3 `aegis-modal`
-
-* **Propósito:** Overlay acessível para formulários, confirmações, detalhes — usado em Flows 1, 2, 3, 4, 6. Gerencia foco trap, `Esc` para fechar, `aria-modal`, backdrop.
-* **Anatomia:** `<div class="aegis-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="aegis-modal__backdrop"></div><div class="aegis-modal__container"><header><h2 id="modal-title"><slot name="header"></slot></h2><aegis-button variant="ghost" size="sm" aria-label="Fechar" on-click="close">×</aegis-button></header><div class="aegis-modal__body"><slot name="body"></slot></div><footer><slot name="footer"></slot></footer></div></div>`
-* **Props/Atributos:**
-
-| Atributo | Tipo | Default | Descrição |
-| :--- | :--- | :--- | :--- |
-| `open` | `boolean` | `false` | Controla visibilidade (reflete no `style.display`) |
-| `size` | `sm \| md \| lg \| xl \| full` | `md` | `max-width`: 400px, 600px, 800px, 1000px, `calc(100% - 2rem)` |
-| `variant` | `default \| confirmation \| form \| alert` | `default` | Ajusta padding, ícone, ações padrão |
-| `dismissible` | `boolean` | `true` | `Esc`/backdrop click fecha |
-| `close-on-overlay-click` | `boolean` | `true` | Click no backdrop fecha |
-| `title` | `string` | — | Título (acessível via `aria-labelledby`) |
-| `description` | `string` | — | Descrição (via `aria-describedby`) |
-
-* **Estados visuais:**
-
-| Estado | Comportamento |
-| :--- | :--- |
-| Entrada | `opacity: 0 → 1` + `transform: scale(0.95) → 1` (`--duration-base`, `--shadow-lg`) |
-| Saída | `opacity: 1 → 0` + `transform: 1 → 0.95` (`--duration-fast`) |
-| Backdrop | `background: rgba(0,0,0,0.4);` (`--color-bg-primary` com alpha) |
-| Focus trap | Tab cicla dentro do modal; `focus` inicial no primeiro elemento focável ou botão fechar |
-
-* **Tokens consumidos:** `--color-bg-primary`, `--color-bg-secondary`, `--color-border-light`, `--radius-lg`, `--shadow-lg`, `--shadow-modal-backdrop`, `--space-4`, `--space-6`, `--text-lg`, `--text-base`, `--duration-base`, `--duration-fast`, `--z-modal-backdrop`, `--z-modal`
-* **Métodos JS:** `show()`, `hide()`, `toggle()`
-* **Eventos emitidos:** `aegis-modal-open`, `aegis-modal-close`, `aegis-modal-confirm` (para variant=confirmation), `aegis-modal-submit` (para variant=form)
-* **Exemplo de uso:**
-```html
-<aegis-modal id="modal-excluir" variant="confirmation" size="sm" title="Excluir Ativo" description="Esta ação não pode ser desfeita.">
-  <span slot="header">Confirmar Exclusão</span>
-  <p slot="body">Tem certeza que deseja excluir o ativo <strong>"Notebook Dell Latitude 7420"</strong>? Todos os dados de manutenção e health checks associados serão removidos permanentemente.</p>
-  <div slot="footer" style="display:flex; gap:var(--space-3); justify-content:flex-end;">
-    <aegis-button variant="secondary" on-click="closeModal">Cancelar</aegis-button>
-    <aegis-button variant="destructive" on-click="confirmDelete">Excluir</aegis-button>
-  </div>
-</aegis-modal>
-
-<script>
-  const modal = document.getElementById('modal-excluir');
-  modal.addEventListener('aegis-modal-confirm', () => { /* chamar API delete */ });
-</script>
-```
-
----
-
-### 4.4 `aegis-dropdown` (usa `@popperjs/core`)
-
-* **Propósito:** Menu de ações contextual (linha de tabela, header do usuário, filtros) — posicionamento robusto via Popper.js.
-* **Anatomia:** `<aegis-dropdown><button slot="trigger" class="aegis-dropdown__trigger"><slot name="trigger"></slot></button><div class="aegis-dropdown__panel" role="menu"><slot name="content"></slot></div></aegis-dropdown>`
-* **Props/Atributos:**
-
-| Atributo | Tipo | Default | Descrição |
-| :--- | :--- | :--- | :--- |
-| `trigger` | `click \| hover` | `click` | Como abre |
-| `placement` | `top \| bottom \| left \| right \| auto` | `bottom-start` | Posição via Popper |
-| `offset` | `number` | `8` | Distância do trigger (px) |
-| `flip` | `boolean` | `true` | Inverte se não cabe |
-| `close-on-select` | `boolean` | `true` | Fecha ao clicar item |
-| `disabled` | `boolean` | `false` | Desabilita trigger |
-
-* **Slots:** `trigger` (botão/elemento que abre), `content` (`<aegis-dropdown-item>`, `<aegis-dropdown-divider>`, `<aegis-dropdown-header>`)
-* **Tokens consumidos:** `--color-bg-primary`, `--color-border-light`, `--color-text-primary`, `--color-text-secondary`, `--radius-md`, `--shadow-md`, `--space-1`, `--space-2`, `--text-sm`, `--z-dropdown`, `--duration-fast`
-* **Eventos:** `aegis-dropdown-open`, `aegis-dropdown-close`, `aegis-dropdown-select` (`{ value, item }`)
-* **Exemplo de uso:**
-```html
-<aegis-dropdown placement="bottom-end" trigger="click">
-  <aegis-button variant="ghost" size="sm" slot="trigger" aria-label="Ações do ativo">
-    <svg class="aegis-icon"><use href="#icon-more-vertical"></use></svg>
-  </aegis-button>
-  <div slot="content" role="menu">
-    <aegis-dropdown-item value="edit" role="menuitem">
-      <svg class="aegis-icon" slot="icon"><use href="#icon-edit"></use></svg>
-      Editar
-    </aegis-dropdown-item>
-    <aegis-dropdown-item value="maintenance" role="menuitem">
-      <svg class="aegis-icon" slot="icon"><use href="#icon-wrench"></use></svg>
-      Nova Manutenção
-    </aegis-dropdown-item>
-    <aegis-dropdown-divider></aegis-dropdown-divider>
-    <aegis-dropdown-item value="delete" variant="destructive" role="menuitem">
-      <svg class="aegis-icon" slot="icon"><use href="#icon-trash"></use></svg>
-      Excluir
-    </aegis-dropdown-item>
-  </div>
-</aegis-dropdown>
-```
-
----
-
-### 4.5 `aegis-toast` + `aegis-toast-container`
-
-* **Propósito:** Feedback não-bloqueante para ações assíncronas (sucesso, erro, aviso) — usado em **todos os flows**.
-* **Anatomia:** Container fixo (`position: fixed; z-index: var(--z-toast);`) + toasts individuais com `role="status"` (success/info) ou `role="alert"` (warning/danger).
-* **API JS (imperativa, não declarativa):**
 ```js
-import { toast } from './components/aegis-toast/aegis-toast.js';
-
-toast.success('Ativo salvo com sucesso!', { duration: 5000, action: { label: 'Desfazer', onClick: () => undo() } });
-toast.error('Falha ao conectar ao servidor', { persistent: true });
-toast.warning('Disco acima de 85%', { duration: 10000 });
-toast.info('Health check agendado para 02:00');
+// Uso: createButton({ variant: 'primary', label: 'Salvar', onClick: handleSave })
+// Com ícone: createButton({ variant: 'secondary', label: 'Exportar', icon: downloadIconSvg })
 ```
-* **Tokens consumidos:** `--color-success`, `--color-success-light`, `--color-danger`, `--color-danger-light`, `--color-warning`, `--color-warning-light`, `--color-info`, `--color-info-light`, `--color-text-primary`, `--radius-md`, `--shadow-lg`, `--space-3`, `--space-4`, `--text-sm`, `--duration-base`, `--z-toast`
-* **Estados:** Entrada (slide-in right + fade), saída (slide-out right + fade), progress bar (duração), hover (pausa timer)
+
+#### Exemplo de uso
+
+```js
+import { createButton } from './components/button.js';
+
+const btnSalvar = createButton({
+  variant: 'primary',
+  size: 'md',
+  label: 'Salvar ativo',
+  icon: '<svg class="icon" aria-hidden="true">...</svg>',
+  onClick: async (e) => {
+    e.target.disabled = true; // loading gerenciado externamente
+    await salvarAtivo(formData);
+    btnSalvar.update({ loading: false });
+  }
+});
+
+// Inserir no DOM
+document.querySelector('#form-actions').appendChild(btnSalvar.element);
+```
 
 ---
 
-### 4.6 `aegis-health-indicator` (Componente de Domínio)
+### 4.2 IconButton
 
-* **Propósito:** Exibir status de saúde de hardware (disco, memória, rede) com threshold visual — core do Flow 3.
-* **Anatomia:** `<div class="aegis-health"><div class="aegis-health__icon" aria-hidden="true"></div><div class="aegis-health__info"><span class="aegis-health__metric"></span><span class="aegis-health__value"></span></div><aegis-badge variant="{{statusVariant}}">{{statusLabel}}</aegis-badge></div>`
-* **Props/Atributos:**
+* **Propósito:** Ações apenas com ícone (toolbar de tabela, header, ações de linha). **Obrigatório `aria-label`** para acessibilidade.
+* **Anatomia:** `<button>` + `span.icon` + `span.sr-only` (label para screen readers).
 
-| Atributo | Tipo | Descrição |
-| :--- | :--- | :--- |
-| `metric` | `disk \| memory \| network \| cpu \| custom` | Tipo de métrica (define ícone padrão) |
-| `status` | `ok \| warning \| critical \| unknown` | Status calculado |
-| `value` | `number` | Valor atual (ex: 87) |
-| `threshold` | `number` | Limite para warning (ex: 85) |
-| `critical-threshold` | `number` | Limite para critical (ex: 95) |
-| `unit` | `string` | Unidade: `%`, `GB`, `ms`, `Mbps` |
-| `trend` | `up \| down \| stable` | Tendência (sparkline opcional) |
-| `label` | `string` | Label customizado (ex: "Disco C:") |
+#### Props/API
 
-* **Lógica de status (se não passado explicitamente):**
-  - `value >= criticalThreshold` → `critical`
-  - `value >= threshold` → `warning`
-  - `value < threshold` → `ok`
-* **Tokens consumidos:** `--health-ok`, `--health-warn`, `--health-critical`, `--color-text-primary`, `--color-text-secondary`, `--radius-md`, `--space-2`, `--space-3`, `--text-sm`, `--text-base`, `--duration-fast`
-* **Exemplo de uso:**
-```html
-<aegis-health-indicator 
-  metric="disk" 
-  label="Disco C:" 
-  value="87" 
-  threshold="85" 
-  critical-threshold="95" 
-  unit="%"
-  trend="up"
-></aegis-health-indicator>
-<!-- Renderiza: ícone disco + "Disco C:" + "87%" + badge "warning" (amarelo) + seta para cima sutil -->
+| Prop | Tipo | Default | Descrição |
+| :--- | :--- | :--- | :--- |
+| `variant` | `'primary' \| 'secondary' \| 'danger' \| 'ghost'` | `'ghost'` | Estilo — ghost padrão para toolbar |
+| `size` | `'sm' \| 'md' \| 'lg'` | `'md'` | `--btn-height-*` |
+| `ariaLabel` | `string` | **obrigatório** | Label acessível (ex: "Editar ativo", "Excluir manutenção") |
+| `icon` | `HTMLElement \| string` | **obrigatório** | SVG ou elemento de ícone |
+| `disabled` | `boolean` | `false` | — |
+| `loading` | `boolean` | `false` | Spinner substitui ícone |
+| `onClick` | `(event) => void` | `undefined` | — |
+
+#### Estados visuais
+
+| Estado | Comportamento Visual |
+| :--- | :--- |
+| **Default (ghost)** | `background: transparent`, `color: var(--color-text-secondary)`, `border: none` |
+| **Hover** | `background: var(--color-bg-tertiary)`, `color: var(--color-text-primary)` |
+| **Focus** | `box-shadow: var(--shadow-focus)` |
+| **Disabled** | `opacity: 0.4`, `cursor: not-allowed` |
+
+#### Tokens consumidos
+
+`--btn-height-*`, `--btn-padding-x-*` (padding igual em X/Y para quadrado), `--color-text-secondary`, `--color-text-primary`, `--color-bg-tertiary`, `--shadow-focus`, `--duration-fast`
+
+#### Exemplo de uso
+
+```js
+import { createIconButton } from './components/icon-button.js';
+
+const btnEditar = createIconButton({
+  variant: 'ghost',
+  size: 'sm',
+  ariaLabel: 'Editar ativo',
+  icon: editIconSvg,
+  onClick: () => abrirModalEdicao(ativoId)
+});
+
+const btnExcluir = createIconButton({
+  variant: 'danger',
+  size: 'sm',
+  ariaLabel: 'Excluir ativo',
+  icon: trashIconSvg,
+  onClick: () => confirmarExclusao(ativoId)
+});
+
+// Em DataTable rowActions:
+rowActions: [
+  { component: btnEditar.element },
+  { component: btnExcluir.element }
+]
+```
+
+---
+
+### 4.3 Input
+
+* **Propósito:** Campo de texto único — usado em **todos os formulários** (Flow 2, 3, 4, 7).
+* **Anatomia:** `<label>` + `<input>` + `<span.helper-text>` + `<span.error-text>` (condicional).
+
+#### Props/API
+
+| Prop | Tipo | Default | Descrição |
+| :--- | :--- | :--- | :--- |
+| `type` | `'text' \| 'email' \| 'password' \| 'number' \| 'date' \| 'tel' \| 'url'` | `'text'` | Tipo nativo |
+| `label` | `string` | `undefined` | Label associado via `for/id` |
+| `placeholder` | `string` | `''` | Placeholder nativo |
+| `value` | `string` | `''` | Valor controlado |
+| `error` | `string \| null` | `null` | Mensagem de erro — adiciona `aria-invalid="true"` |
+| `helperText` | `string` | `undefined` | Texto auxiliar abaixo do input |
+| `disabled` | `boolean` | `false` | — |
+| `required` | `boolean` | `false` | Adiciona `aria-required="true"` + asterisco no label |
+| `maxLength` | `number` | `undefined` | Atributo nativo + contador opcional |
+| `autocomplete` | `string` | `undefined` | Atributo nativo (ex: `organization`, `email`) |
+| `onChange` | `(value: string, event: Event) => void` | `undefined` | Handler de mudança |
+| `onBlur` | `(event: FocusEvent) => void` | `undefined` | Handler de blur (validação on blur) |
+
+#### Estados visuais
+
+| Estado | Comportamento Visual |
+| :--- | :--- |
+| **Default** | `border: 1px solid var(--input-border)`, `background: var(--input-bg)`, `height: var(--input-height)`, `padding: 0 var(--input-padding-x)`, `border-radius: var(--radius-sm)` |
+| **Hover** | `border-color: var(--input-border-hover)` |
+| **Focus** | `border-color: var(--input-border-focus)`, `box-shadow: var(--shadow-focus)`, `outline: none` |
+| **Disabled** | `background: var(--color-bg-tertiary)`, `color: var(--color-text-muted)`, `cursor: not-allowed` |
+| **Error** | `border-color: var(--error-border-color)`, focus: `box-shadow: 0 0 0 3px rgb(220 38 38 / 0.4)` |
+| **Label** | `font-size: var(--label-font-size)`, `font-weight: var(--label-font-weight)`, `color: var(--color-text-primary)`, `margin-bottom: var(--label-gap)` |
+| **Helper text** | `font-size: var(--text-xs)`, `color: var(--color-text-muted)` |
+| **Error text** | `font-size: var(--text-xs)`, `color: var(--error-text-color)`, `display: flex`, `align-items: center`, `gap: var(--space-1)` |
+
+#### Tokens consumidos
+
+`--input-height`, `--input-padding-x`, `--input-bg`, `--input-border`, `--input-border-hover`, `--input-border-focus`, `--input-placeholder-color`, `--label-font-size`, `--label-font-weight`, `--label-gap`, `--error-text-color`, `--error-border-color`, `--radius-sm`, `--space-1`, `--space-2`, `--space-3`, `--text-xs`, `--color-text-primary`, `--color-text-muted`, `--color-bg-tertiary`, `--shadow-focus`, `--duration-base`
+
+#### Exemplo de uso
+
+```js
+import { createInput } from './components/input.js';
+
+const inputTag = createInput({
+  type: 'text',
+  label: 'Tag do Ativo *',
+  placeholder: 'Ex: AT-2024-001',
+  required: true,
+  maxLength: 50,
+  helperText: 'Código único de identificação do ativo',
+  onChange: (value) => formData.tag = value,
+  onBlur: (e) => validarTagUnica(e.target.value)
+});
+
+// Em FormLayout:
+formLayout.addField(inputTag);
+```
+
+---
+
+### 4.4 Select
+
+* **Propósito:** Seleção única/múltipla com busca — usado para **FKs** (filial, departamento, tipo ativo, fornecedor, localização) nos formulários de ativos/manutenções (Flow 3, 4).
+* **Anatomia:** `Input` (trigger) + `Popper` (dropdown) + `ul[role="listbox"]` + `li[role="option"]`.
+
+#### Props/API
+
+| Prop | Tipo | Default | Descrição |
+| :--- | :--- | :--- | :--- |
+| `options` | `Array<{ value: string, label: string, disabled?: boolean }>` | `[]` | Opções — pode ser carregado assincronamente |
+| `placeholder` | `string` | `'Selecione...'` | Texto quando vazio |
+| `value` | `string \| string[]` | `''` | Valor(es) selecionado(s) |
+| `multiple` | `boolean` | `false` | Modo múltiplo (chips + checkbox no dropdown) |
+| `searchable` | `boolean` | `true` | Input de busca no dropdown |
+| `error` | `string \| null` | `null` | — |
+| `disabled` | `boolean` | `false` | — |
+| `label` | `string` | `undefined` | Label do campo |
+| `helperText` | `string` | `undefined` | — |
+| `onChange` | `(value: string \| string[]) => void` | `undefined` | — |
+| `loadOptions` | `(query: string) => Promise<Option[]>` | `undefined` | Lazy loading para listas grandes (>50 itens) |
+
+#### Estados visuais
+
+| Estado | Comportamento Visual |
+| :--- | :--- |
+| **Trigger (default)** | Mesmo estilo de `Input` + `background-image: url("data:image/svg+xml,<chevron-down>")` |
+| **Open** | `border-color: var(--input-border-focus)`, `box-shadow: var(--shadow-focus)`, chevron rotacionado 180° |
+| **Dropdown (Popper)** | `background: var(--color-panel)`, `border: 1px solid var(--color-border-light)`, `border-radius: var(--radius-md)`, `box-shadow: var(--shadow-md)`, `max-height: 280px`, `overflow-y: auto` |
+| **Option hover/selected** | `background: var(--color-accent-light)`, `color: var(--color-accent-primary)` |
+| **Option disabled** | `color: var(--color-text-muted)`, `cursor: not-allowed` |
+| **Search input** | `padding: var(--space-2) var(--space-3)`, `border-bottom: 1px solid var(--color-border-light)` |
+| **Multi-select chips** | `display: inline-flex`, `gap: var(--space-1)`, `background: var(--color-accent-light)`, `border-radius: var(--radius-full)`, `padding: 2px var(--space-2)`, botão remover com `aria-label="Remover {label}"` |
+
+#### Tokens consumidos
+
+Todos de `Input` + `--color-panel`, `--color-border-light`, `--shadow-md`, `--color-accent-light`, `--color-accent-primary`, `--color-text-muted`, `--radius-md`, `--radius-full`, `--space-1`, `--space-2`, `--space-3`, `--duration-base` (animação dropdown)
+
+#### Exemplo de uso
+
+```js
+import { createSelect } from './components/select.js';
+
+const selectFilial = createSelect({
+  label: 'Filial *',
+  placeholder: 'Selecione a filial',
+  required: true,
+  options: [], // carregado via API
+  loadOptions: async (query) => {
+    const response = await api.get('/filiais', { params: { q: query, limit: 50 } });
+    return response.data.map(f => ({ value: f.id, label: f.nome }));
+  },
+  onChange: (value) => formData.filialId = value
+});
+```
+
+---
+
+### 4.5 DataTable
+
+* **Propósito:** Tabela de dados densa, paginada, ordenável, filtrável — **componente central** do Aegis Patrimonio (Flow 3: lista de ativos, Flow 4: lista de manutenções, Flow 5: lista de alertas, Flow 6: relatórios).
+* **Anatomia:** `table` + `thead` (sticky) + `tbody` + `tfoot` (pagination) + `caption` (acessibilidade) + toolbar opcional (filtros, busca, ações em lote).
+
+#### Props/API
+
+| Prop | Tipo | Default | Descrição |
+| :--- | :--- | :--- | :--- |
+| `columns` | `Column[]` | **obrigatório** | Definição de colunas (ver abaixo) |
+| `data` | `any[]` | `[]` | Dados da página atual |
+| `total` | `number` | `0` | Total de registros (para paginação server-side) |
+| `page` | `number` | `1` | Página atual |
+| `pageSize` | `number` | `20` | Registros por página |
+| `sortable` | `boolean` | `true` | Habilita ordenação por clique no header |
+| `filterable` | `boolean` | `false` | Habilita filtros por coluna (header com input/select) |
+| `selectable` | `boolean` | `false` | Checkbox na primeira coluna + header "select all" |
+| `rowKey` | `string` | `'id'` | Campo único para `row-id` e seleção |
+| `rowActions` | `RowAction[]` | `[]` | Ações por linha (IconButton array) |
+| `emptyState` | `EmptyStateConfig` | `undefined` | Configuração de estado vazio |
+| `loading` | `boolean` | `false` | Exibe skeleton rows |
+| `density` | `'compact' \| 'comfortable'` | `'compact'` | Padding das células |
+| `stickyHeader` | `boolean` | `true` | Header fixo no scroll |
+| `onSort` | `(column: string, direction: 'asc' \| 'desc') => void` | `undefined` | — |
+| `onFilter` | `(filters: Record<string, any>) => void` | `undefined` | — |
+| `onPageChange` | `(page: number, pageSize: number) => void` | `undefined` | — |
+| `onSelectionChange` | `(selectedIds: string[]) => void` | `undefined` | — |
+| `onRowClick` | `(rowData: any, event: MouseEvent) => void` | `undefined` | Navega para detalhe (Flow 3) |
+
+#### Column Definition
+
+```ts
+interface Column {
+  key: string;           // campo no objeto data
+  label: string;         // header
+  width?: string;        // ex: '120px', '15%'
+  minWidth?: string;     // para colunas flexíveis
+  align?: 'left' | 'center' | 'right';
+  sortable?: boolean;    // override global
+  filterable?: boolean;  // override global
+  render?: (value: any, row: any, index: number) => HTMLElement | string; // custom renderer
+  className?: string;    // classe CSS na célula
+}
+```
+
+#### RowAction Definition
+
+```ts
+interface RowAction {
+  component: HTMLElement; // IconButton.element
+  show?: (row: any) => boolean; // condicional por role/estado
+}
+```
+
+#### Estados visuais
+
+| Estado | Comportamento Visual |
+| :--- | :--- |
+| **Table** | `width: 100%`, `border-collapse: collapse`, `font-size: var(--table-font-size)` |
+| **Header** | `background: var(--table-header-bg)`, `color: var(--table-header-text)`, `font-weight: 600`, `position: sticky`, `top: 0`, `z-index: var(--z-sticky)` |
+| **Cell** | `padding: var(--table-cell-padding-y) var(--table-cell-padding-x)`, `border-bottom: 1px solid var(--table-border-color)`, `vertical-align: middle` |
+| **Row hover** | `background: var(--table-row-hover-bg)` |
+| **Row selected** | `background: var(--table-row-selected-bg)` |
+| **Sortable header** | `cursor: pointer`, `user-select: none`, ícone seta (asc/desc/none) |
+| **Loading** | `tbody` exibe `Skeleton` rows (3-5 linhas) |
+| **Empty** | `td[colspan="N"]` com `EmptyState` centralizado |
+| **Pagination** | `display: flex`, `justify-content: space-between`, `align-items: center`, `padding: var(--space-3)`, `border-top: 1px solid var(--table-border-color)` |
+
+#### Tokens consumidos
+
+`--table-header-bg`, `--table-header-text`, `--table-row-hover-bg`, `--table-row-selected-bg`, `--table-border-color`, `--table-cell-padding-y`, `--table-cell-padding-x`, `--table-font-size`, `--text-sm`, `--color-text-secondary`, `--color-bg-tertiary`, `--color-accent-light`, `--color-border-light`, `--z-sticky`, `--shadow-xs`, `--space-2`, `--space-3`, `--duration-fast`
+
+#### Exemplo de uso (Flow 3 - Lista de Ativos)
+
+```js
+import { createDataTable } from './components/data-table.js';
+import { createIconButton } from './components/icon-button.js';
+
+const columns = [
+  { key: 'tag', label: 'Tag', width: '120px', sortable: true },
+  { key: 'nome', label: 'Nome', minWidth: '200px', sortable: true },
+  { key: 'tipo', label: 'Tipo', width: '150px', sortable: true,
+    render: (v) => `<span class="badge badge--info">${v}</span>` },
+  { key: 'filial', label: 'Filial', width: '180px', sortable: true },
+  { key: 'departamento', label: 'Departamento', width: '180px' },
+  { key: 'status', label: 'Status', width: '130px', sortable: true,
+    render: (v) => createBadge({ variant: v.toLowerCase() }).element.outerHTML },
+  { key: 'actions', label: '', width: '100px', align: 'center',
+    render: (_, row) => {
+      const btnVer = createIconButton({ ariaLabel: `Ver detalhes de ${row.nome}`, icon: eyeIcon, onClick: () => router.navigate(`/ativos/${row.id}`) });
+      const btnEditar = createIconButton({ ariaLabel: `Editar ${row.nome}`, icon: editIcon, onClick: () => abrirModalEdicao(row.id), show: (r) => isAdmin });
+      const btnExcluir = createIconButton({ ariaLabel: `Excluir ${row.nome}`, icon: trashIcon, variant: 'danger', onClick: () => confirmarExclusao(row.id), show: (r) => isAdmin });
+      return `<div class="action-group">${btnVer.element.outerHTML}${btnEditar.element.outerHTML}${btnExcluir.element.outerHTML}</div>`;
+    }
+  }
+];
+
+const table = createDataTable({
+  columns,
+  data: [],
+  total: 0,
+  page: 1,
+  pageSize: 20,
+  sortable: true,
+  filterable: true,
+  selectable: true,
+  rowKey: 'id',
+  density: 'compact',
+  stickyHeader: true,
+  emptyState: { title: 'Nenhum ativo encontrado', description: 'Cadastre o primeiro ativo ou ajuste os filtros.', action: { label: 'Novo Ativo', onClick: () => abrirModalCriacao() } },
+  onSort: (col, dir) => carregarAtivos({ sort: col, order: dir }),
+  onFilter: (filters) => carregarAtivos({ filters }),
+  onPageChange: (page, size) => carregarAtivos({ page, pageSize: size }),
+  onSelectionChange: (ids) => toolbarBulkActions.update({ visible: ids.length > 0, count: ids.length }),
+  onRowClick: (row) => router.navigate(`/ativos/${row.id}`)
+});
+
+// Carregamento inicial
+async function carregarAtivos(params) {
+  table.update({ loading: true });
+  const { data, total } = await api.get('/ativos', { params });
+  table.update({ data, total, loading: false });
+}
+```
+
+---
+
+### 4.6 Modal
+
+* **Propósito:** Diálogo modal para criação/edição de entidades (Flow 2, 3, 4), confirmações destrutivas, formulários complexos.
+* **Anatomia:** `div[role="dialog"]` + `div.modal-backdrop` + `div.modal-container` + `header` + `main` + `footer`.
+
+#### Props/API
+
+| Prop | Tipo | Default | Descrição |
+| :--- | :--- | :--- | :--- |
+| `size` | `'sm' \| 'md' \| 'lg' \| 'xl'` | `'md'` | `max-width`: sm=400px, md=560px, lg=720px, xl=960px |
+| `title` | `string` | `''` | Título no header (aria-labelledby) |
+| `closable` | `boolean` | `true` | Botão fechar (X) + ESC + click backdrop |
+| `footerActions` | `ButtonConfig[]` | `[]` | Botões no footer (ex: Cancelar, Salvar) |
+| `content` | `HTMLElement \| string` | `''` | Conteúdo do body (formulário, texto, etc.) |
+| `trapFocus` | `boolean` | `true` | Focus trap dentro do modal |
+| `onClose` | `() => void` | `undefined` | Callback ao fechar |
+| `onOpen` | `() => void` | `undefined` | Callback ao abrir |
+
+#### Estados visuais
+
+| Estado | Comportamento Visual |
+| :--- | :--- |
+| **Backdrop** | `position: fixed`, `inset: 0`, `background: rgba(0,0,0,0.5)`, `z-index: var(--z-modal-backdrop)`, `animation: fadeIn var(--duration-base)` |
+| **Container** | `background: var(--color-panel)`, `border-radius: var(--radius-lg)`, `box-shadow: var(--shadow-lg)`, `z-index: var(--z-modal)`, `max-height: 90vh`, `display: flex`, `flex-direction: column`, `animation: slideUp var(--duration-base)` |
+| **Header** | `padding: var(--space-4) var(--space-6)`, `border-bottom: 1px solid var(--color-border-light)`, `display: flex`, `justify-content: space-between`, `align-items: center` |
+| **Body** | `padding: var(--space-6)`, `overflow-y: auto`, `flex: 1` |
+| **Footer** | `padding: var(--space-4) var(--space-6)`, `border-top: 1px solid var(--color-border-light)`, `display: flex`, `justify-content: flex-end`, `gap: var(--space-3)` |
+| **Close button** | `IconButton` ghost, `aria-label="Fechar"` |
+
+#### Tokens consumidos
+
+`--color-panel`, `--color-border-light`, `--radius-lg`, `--shadow-lg`, `--z-modal-backdrop`, `--z-modal`, `--space-3`, `--space-4`, `--space-6`, `--duration-base`, `--color-text-primary`, `--color-text-secondary`
+
+#### Exemplo de uso (Flow 3 - Criação de Ativo)
+
+```js
+import { createModal } from './components/modal.js';
+import { createButton } from './components/button.js';
+import { createFormLayout } from './components/form-layout.js';
+
+const modalCriarAtivo = createModal({
+  size: 'lg',
+  title: 'Novo Ativo',
+  closable: true,
+  content: formLayout.element, // FormLayout com todos os campos
+  footerActions: [
+    createButton({ variant: 'secondary', label: 'Cancelar', onClick: () => modalCriarAtivo.hide() }),
+    createButton({ variant: 'primary', label: 'Criar Ativo', loading: false, onClick: async () => {
+      const btn = footerActions[1];
+      btn.update({ loading: true });
+      try {
+        await api.post('/ativos', formLayout.getValues());
+        toast.success('Ativo criado com sucesso');
+        modalCriarAtivo.hide();
+        table.refresh();
+      } catch (err) {
+        formLayout.setErrors(err.response.data.errors);
+      } finally {
+        btn.update({ loading: false });
+      }
+    }})
+  ],
+  onClose: () => formLayout.reset()
+});
+
+// Abrir
+document.querySelector('#btn-novo-ativo').addEventListener('click', () => {
+  formLayout.reset();
+  modalCriarAtivo.show();
+});
+```
+
+---
+
+### 4.7 Toast
+
+* **Propósito:** Notificações globais não-bloqueantes (sucesso, erro, aviso, info) — usado em **todos os fluxos** para feedback de ações assíncronas.
+* **Anatomia:** `div[role="alert" \| "status"]` + `icon` + `div.content` (title + message) + `button.close` (opcional) + `div.progress` (auto-dismiss).
+
+#### Props/API
+
+| Prop | Tipo | Default | Descrição |
+| :--- | :--- | :--- | :--- |
+| `variant` | `'success' \| 'warning' \| 'danger' \| 'info'` | `'info'` | Define cor/ícone |
+| `title` | `string` | `''` | Título em negrito |
+| `message` | `string` | `''` | Mensagem detalhada |
+| `duration` | `number` | `5000` | ms para auto-dismiss (0 = persistente) |
+| `persistent` | `boolean` | `false` | Não auto-dismiss (erros críticos) |
+| `action` | `{ label: string, onClick: () => void }` | `undefined` | Botão de ação (ex: "Desfazer") |
+| `onDismiss` | `() => void` | `undefined` | Callback ao fechar |
+
+#### Estados visuais
+
+| Estado | Comportamento Visual |
+| :--- | :--- |
+| **Container (toast stack)** | `position: fixed`, `bottom: var(--toast-offset)`, `right: var(--toast-offset)`, `z-index: var(--z-toast)`, `display: flex`, `flex-direction: column`, `gap: var(--space-2)` |
+| **Toast** | `display: flex`, `gap: var(--alert-gap)`, `padding: var(--alert-padding)`, `border-radius: var(--alert-radius)`, `box-shadow: var(--shadow-lg)`, `min-width: 320px`, `max-width: 480px`, `animation: slideInRight var(--duration-base)` |
+| **Success** | `background: var(--color-success-bg)`, `border-left: 4px solid var(--color-success)`, `color: var(--color-success)` |
+| **Warning** | `background: var(--color-warning-bg)`, `border-left: 4px solid var(--color-warning)`, `color: var(--color-warning)` |
+| **Danger** | `background: var(--color-danger-bg)`, `border-left: 4px solid var(--color-danger)`, `color: var(--color-danger)` |
+| **Info** | `background: var(--color-info-bg)`, `border-left: 4px solid var(--color-info)`, `color: var(--color-info)` |
+| **Icon** | `width: var(--alert-icon-size)`, `height: var(--alert-icon-size)`, `flex-shrink: 0` |
+| **Progress bar** | `position: absolute`, `bottom: 0`, `left: 0`, `height: 3px`, `background: currentColor`, `opacity: 0.3`, `animation: progress var(--toast-duration) linear forwards` |
+| **Exit** | `animation: slideOutRight var(--duration-fast)` |
+
+#### Tokens consumidos
+
+`--toast-offset`, `--z-toast`, `--alert-padding`, `--alert-radius`, `--alert-gap`, `--alert-icon-size`, `--toast-duration`, `--color-success-bg`, `--color-success`, `--color-warning-bg`, `--color-warning`, `--color-danger-bg`, `--color-danger`, `--color-info-bg`, `--color-info`, `--shadow-lg`, `--space-2`, `--duration-base`, `--duration-fast`
+
+#### Exemplo de uso (Singleton ToastManager)
+
+```js
+import { createToast } from './components/toast.js';
+
+// ToastManager global (singleton)
+const toast = {
+  success: (title, message, opts = {}) => createToast({ variant: 'success', title, message, ...opts }).show(),
+  warning: (title, message, opts = {}) => createToast({ variant: 'warning', title, message, ...opts }).show(),
+  danger: (title, message, opts = {}) => createToast({ variant: 'danger', title, message, persistent: true, ...opts }).show(),
+  info: (title, message, opts = {}) => createToast({ variant: 'info', title, message, ...opts }).show()
+};
+
+// Uso em qualquer lugar
+toast.success('Ativo criado', 'O ativo AT-2024-001 foi cadastrado com sucesso.');
+toast.danger('Erro ao salvar', 'Tag já cadastrada. Informe uma tag única.', { 
+  action: { label: 'Tentar novamente', onClick: () => modalCriarAtivo.show() } 
+});
+```
+
+---
+
+### 4.8 Badge
+
+* **Propósito:** Indicador de status visual para ativos, manutenções, alertas (Flow 3, 4, 5). **Nunca comunica status apenas por cor** — sempre com texto + ícone opcional.
+* **Anatomia:** `span.badge` + `span.dot` (opcional) + `span.text`.
+
+#### Props/API
+
+| Prop | Tipo | Default | Descrição |
+| :--- | :--- | :--- | :--- |
+| `variant` | `'ativo' \| 'manutencao' \| 'baixa' \| 'critico' \| 'info' \| 'warning' \| 'success' \| 'neutral'` | `'neutral'` | Mapeia tokens semânticos |
+| `label` | `string` | `''` | Texto exibido |
+| `dot` | `boolean` | `false` | Indicador circular antes do label |
+| `removable` | `boolean` | `false` | Botão fechar (para chips em multi-select) |
+| `onRemove` | `() => void` | `undefined` | Handler de remoção |
+
+#### Estados visuais
+
+| Variante | Background | Texto | Uso |
+| :--- | :--- | :--- | :--- |
+| `ativo` | `var(--badge-status-ativo-bg)` | `var(--badge-status-ativo-text)` | Ativo operacional |
+| `manutencao` | `var(--badge-status-manutencao-bg)` | `var(--badge-status-manutencao-text)` | Em manutenção / Aguardando aprovação |
+| `baixa` | `var(--badge-status-baixa-bg)` | `var(--badge-status-baixa-text)` | Baixado / Inativo |
+| `critico` | `var(--badge-status-alerta-critico-bg)` | `var(--badge-status-alerta-critico-text)` | Alerta disco/saúde crítico |
+| `success` | `var(--color-success-bg)` | `var(--color-success)` | Genérico sucesso |
+| `warning` | `var(--color-warning-bg)` | `var(--color-warning)` | Genérico aviso |
+| `info` | `var(--color-info-bg)` | `var(--color-info)` | Genérico info |
+| `neutral` | `var(--color-bg-tertiary)` | `var(--color-text-secondary)` | Neutro |
+
+#### Tokens consumidos
+
+`--badge-padding-x`, `--badge-padding-y`, `--badge-font-size`, `--badge-font-weight`, `--badge-radius`, `--badge-status-*-bg`, `--badge-status-*-text`, `--color-success-bg`, `--color-success`, `--color-warning-bg`, `--color-warning`, `--color-info-bg`, `--color-info`, `--color-bg-tertiary`, `--color-text-secondary`, `--radius-full`, `--text-xs`, `--space-2`
+
+#### Exemplo de uso
+
+```js
+import { createBadge } from './components/badge.js';
+
+// Em DataTable render de status
+render: (status) => {
+  const variantMap = {
+    'ATIVO': 'ativo',
+    'EM_MANUTENCAO': 'manutencao',
+    'AGUARDANDO_APROVACAO': 'manutencao',
+    'BAIXADO': 'baixa',
+    'CANCELADO': 'neutral'
+  };
+  return createBadge({ variant: variantMap[status] || 'neutral', label: status, dot: true }).element.outerHTML;
+}
+```
+
+---
+
+### 4.9 Tooltip
+
+* **Propósito:** Texto contextual em hover/focus — ícones de ação, headers de tabela truncados, badges. **Usa `@popperjs/core`** para posicionamento.
+* **Anatomia:** `div[role="tooltip"]` + `div.arrow` + `div.content`.
+
+#### Props/API
+
+| Prop | Tipo | Default | Descrição |
+| :--- | :--- | :--- | :--- |
+| `content` | `string \| HTMLElement` | **obrigatório** | Conteúdo do tooltip |
+| `placement` | `'top' \| 'bottom' \| 'left' \| 'right'` | `'top'` | Posição relativa ao trigger |
+| `trigger` | `'hover' \| 'focus' \| 'click'` | `'hover'` | Evento que abre |
+| `delay` | `number` | `200` | ms para mostrar/esconder |
+| `interactive` | `boolean` | `false` | Permite hover no próprio tooltip |
+| `offset` | `number` | `8` | Distância do trigger (px) |
+
+#### Estados visuais
+
+| Estado | Comportamento Visual |
+| :--- | :--- |
+| **Default** | `background: var(--color-text-primary)`, `color: var(--color-text-inverse)`, `padding: var(--space-1) var(--space-2)`, `border-radius: var(--radius-sm)`, `font-size: var(--text-xs)`, `white-space: nowrap`, `box-shadow: var(--shadow-md)`, `z-index: var(--z-tooltip)` |
+| **Arrow** | `::before` com `border-color: var(--color-text-primary) transparent` |
+| **Animation** | `opacity: 0 → 1`, `transform: translateY(-4px) → 0`, `transition: var(--duration-fast)` |
+
+#### Tokens consumidos
+
+`--color-text-primary`, `--color-text-inverse`, `--space-1`, `--space-2`, `--radius-sm`, `--text-xs`, `--shadow-md`, `--z-tooltip`, `--duration-fast`
+
+#### Exemplo de uso
+
+```js
+import { createTooltip } from './components/tooltip.js';
+
+// Em IconButton da tabela
+const btnEditar = createIconButton({ ariaLabel: 'Editar ativo', icon: editIcon });
+const tooltipEditar = createTooltip({
+  trigger: btnEditar.element,
+  content: 'Editar ativo',
+  placement: 'top',
+  delay: 150
+});
+
+// Cleanup
+btnEditar.element.addEventListener('remove', () => tooltipEditar.destroy());
+```
+
+---
+
+### 4.10 Sidebar
+
+* **Propósito:** Navegação principal lateral — **componente de layout** presente em todas as telas autenticadas (Flow 1–7). Responsivo: fixa em `≥ --bp-lg`, drawer em `< --bp-lg`.
+* **Anatomia:** `aside[role="navigation"]` + `nav` + `ul` + `li` + `a`/`button` + `div.user-menu` (bottom).
+
+#### Props/API
+
+| Prop | Tipo | Default | Descrição |
+| :--- | :--- | :--- | :--- |
+| `items` | `NavItem[]` | `[]` | Itens de navegação (ver abaixo) |
+| `collapsible` | `boolean` | `true` | Permite colapsar para ícones apenas |
+| `collapsed` | `boolean` | `false` | Estado inicial |
+| `activeItem` | `string` | `undefined` | Key do item ativo |
+| `logo` | `{ src: string, alt: string, href: string }` | `undefined` | Logo no topo |
+| `userMenu` | `UserMenuConfig` | `undefined` | Menu do usuário no rodapé |
+| `onNavigate` | `(href: string) => void` | `undefined` | Handler de navegação (SPA router) |
+| `onToggleCollapse` | `(collapsed: boolean) => void` | `undefined` | Persiste em localStorage |
+
+#### NavItem
+
+```ts
+interface NavItem {
+  key: string;           // ex: 'ativos', 'manutencoes'
+  label: string;         // ex: 'Ativos'
+  icon: HTMLElement;     // SVG icon
+  href?: string;         // rota (se não tiver children)
+  children?: NavItem[];  // submenu (accordion)
+  badge?: string | number; // contador (ex: alertas não lidos)
+  roles?: ('ADMIN' | 'USER')[]; // controle de visibilidade por role
+}
+```
+
+#### Estados visuais
+
+| Estado | Comportamento Visual |
+| :--- | :--- |
+| **Sidebar expandida** | `width: 260px`, `transition: width var(--duration-base)` |
+| **Sidebar colapsada** | `width: 72px`, labels ocultos (`opacity: 0`, `pointer-events: none`), tooltips nos ícones |
+| **Item ativo** | `background: var(--color-accent-light)`, `color: var(--color-accent-primary)`, `border-right: 3px solid var(--color-accent-primary)` |
+| **Item hover** | `background: var(--color-bg-tertiary)` |
+| **Submenu aberto** | `max-height: 0 → auto`, `transition: max-height var(--duration-base)` |
+| **Mobile (drawer)** | `position: fixed`, `left: 0`, `top: 0`, `height: 100vh`, `z-index: var(--z-sidebar)`, `transform: translateX(-100%) → 0`, backdrop `var(--z-modal-backdrop)` |
+
+#### Tokens consumidos
+
+`--color-bg-secondary`, `--color-bg-tertiary`, `--color-accent-light`, `--color-accent-primary`, `--color-text-primary`, `--color-text-secondary`, `--color-text-muted`, `--space-3`, `--space-4`, `--space-6`, `--radius-md`, `--shadow-md`, `--z-sidebar`, `--z-modal-backdrop`, `--duration-base`, `--bp-lg`
+
+#### Exemplo de uso
+
+```js
+import { createSidebar } from './components/sidebar.js';
+
+const navItems = [
+  { key: 'dashboard', label: 'Dashboard', icon: homeIcon, href: '/dashboard', roles: ['ADMIN', 'USER'] },
+  { key: 'ativos', label: 'Ativos', icon: boxIcon, href: '/ativos', roles: ['ADMIN', 'USER'] },
+  { key: 'manutencoes', label: 'Manutenções', icon: toolIcon, href: '/manutencoes', badge: 3, roles: ['ADMIN', 'USER'] },
+  { key: 'alertas', label: 'Alertas', icon: bellIcon, href: '/alertas', badge: 7, roles: ['ADMIN', 'USER'] },
+  { key: 'cadastros', label: 'Cadastros', icon: databaseIcon, children: [
+    { key: 'filiais', label: 'Filiais', href: '/cadastros/filiais', roles: ['ADMIN'] },
+    { key: 'departamentos', label: 'Departamentos', href: '/cadastros/departamentos', roles: ['ADMIN'] },
+    { key: 'tipos-ativo', label: 'Tipos de Ativo', href: '/cadastros/tipos-ativo', roles: ['ADMIN'] },
+    { key: 'fornecedores', label: 'Fornecedores', href: '/cadastros/fornecedores', roles: ['ADMIN'] },
+    { key: 'localizacoes', label: 'Localizações', href: '/cadastros/localizacoes', roles: ['ADMIN'] }
+  ], roles: ['ADMIN'] },
+  { key: 'relatorios', label: 'Relatórios', icon: chartIcon, href: '/relatorios', roles: ['ADMIN'] },
+  { key: 'auditoria', label: 'Auditoria', icon: shieldIcon, href: '/auditoria', roles: ['ADMIN'] },
+  { key: 'usuarios', label: 'Usuários', icon: usersIcon, href: '/usuarios', roles: ['ADMIN'] }
+];
+
+const sidebar = createSidebar({
+  items: navItems,
+  collapsible: true,
+  collapsed: localStorage.getItem('sidebarCollapsed') === 'true',
+  logo: { src: '/logo.svg', alt: 'Aegis Patrimonio', href: '/dashboard' },
+  userMenu: {
+    name: currentUser.nome,
+    email: currentUser.email,
+    avatar: currentUser.avatarUrl,
+    items: [
+      { label: 'Meu Perfil', icon: userIcon, onClick: () => router.navigate('/perfil') },
+      { label: 'Preferências', icon: settingsIcon, onClick: () => router.navigate('/preferencias') },
+      { type: 'divider' },
+      { label: 'Sair', icon: logoutIcon, variant: 'danger', onClick: () => auth.logout() }
+    ]
+  },
+  onNavigate: (href) => router.navigate(href),
+  onToggleCollapse: (collapsed) => localStorage.setItem('sidebarCollapsed', collapsed)
+});
+
+// Render
+document.querySelector('#app-layout').prepend(sidebar.element);
+```
+
+---
+
+### 4.11 FormLayout
+
+* **Propósito:** Layout de formulário responsivo (grid 1/2/3 colunas) com labels alinhados — usado em **todos os modais de criação/edição** (Flow 2, 3, 4, 7).
+* **Anatomia:** `form` + `div.form-grid` + `div.form-field` (label + input + helper/error) + `div.form-actions` (footer).
+
+#### Props/API
+
+| Prop | Tipo | Default | Descrição |
+| :--- | :--- | :--- | :--- |
+| `fields` | `FormField[]` | `[]` | Array de campos (ver abaixo) |
+| `colCount` | `1 \| 2 \| 3` | `2` | Colunas no desktop (≥ `--bp-lg`) |
+| `labelPosition` | `'top' \| 'left'` | `'top'` | Label acima ou à esquerda do input |
+| `onSubmit` | `(data: Record<string, any>) => Promise<void>` | `undefined` | Handler de submit |
+| `submitButton` | `ButtonConfig` | `undefined` | Config do botão submit |
+| `cancelButton` | `ButtonConfig` | `undefined` | Config do botão cancelar |
+
+#### FormField
+
+```ts
+interface FormField {
+  key: string;                    // nome do campo no objeto de dados
+  component: HTMLElement;         // Input.element, Select.element, etc.
+  span?: number;                  // col-span (1 a colCount)
+  required?: boolean;             // asterisco no label
+  validator?: (value: any) => string | null; // validação síncrona
+  asyncValidator?: (value: any) => Promise<string | null>; // validação assíncrona
+}
+```
+
+#### Estados visuais
+
+| Estado | Comportamento Visual |
+| :--- | :--- |
+| **Grid** | `display: grid`, `grid-template-columns: repeat(var(--col-count), 1fr)`, `gap: var(--space-4) var(--space-6)` |
+| **Responsive** | `@media (max-width: 768px) { grid-template-columns: 1fr }` |
+| **Field** | `display: flex`, `flex-direction: column`, `gap: var(--label-gap)` |
+| **Label** | `font-size: var(--label-font-size)`, `font-weight: var(--label-font-weight)` |
+| **Error state** | Input com `aria-invalid="true"`, error text com `role="alert"` |
+| **Actions** | `display: flex`, `justify-content: flex-end`, `gap: var(--space-3)`, `padding-top: var(--space-4)`, `border-top: 1px solid var(--color-border-light)`, `margin-top: var(--space-6)` |
+
+#### Tokens consumidos
+
+`--space-3`, `--space-4`, `--space-6`, `--label-font-size`, `--label-font-weight`, `--label-gap`, `--color-border-light`, `--color-text-primary`, `--color-text-secondary`, `--color-text-muted`, `--duration-base`
+
+#### Exemplo de uso (Flow 3 - Formulário de Ativo)
+
+```js
+import { createFormLayout } from './components/form-layout.js';
+import { createInput } from './components/input.js';
+import { createSelect } from './components/select.js';
+import { createDatePicker } from './components/date-picker.js';
+import { createTextarea } from './components/textarea.js';
+
+const fields = [
+  { key: 'tag', component: createInput({ label: 'Tag *', required: true, maxLength: 50 }).element, span: 1, required: true },
+  { key: 'nome', component: createInput({ label: 'Nome *', required: true, maxLength: 200 }).element, span: 2, required: true },
+  { key: 'descricao', component: createTextarea({ label: 'Descrição', rows: 3 }).element, span: 3 },
+  { key: 'tipoId', component: createSelect({ label: 'Tipo de Ativo *', required: true, loadOptions: loadTiposAtivo }).element, span: 1, required: true },
+  { key: 'filialId', component: createSelect({ label: 'Filial *', required: true, loadOptions: loadFiliais }).element, span: 1, required: true },
+  { key: 'departamentoId', component: createSelect({ label: 'Departamento *', required: true, loadOptions: loadDepartamentos }).element, span: 1, required: true },
+  { key: 'localizacaoId', component: createSelect({ label: 'Localização', loadOptions: loadLocalizacoes }).element, span: 1 },
+  { key: 'fornecedorId', component: createSelect({ label: 'Fornecedor', loadOptions: loadFornecedores }).element, span: 1 },
+  { key: 'dataAquisicao', component: createDatePicker({ label: 'Data de Aquisição *', required: true, maxDate: new Date() }).element, span: 1, required: true },
+  { key: 'valorAquisicao', component: createInput({ label: 'Valor de Aquisição (R$)', type: 'number', step: '0.01', min: 0 }).element, span: 1 },
+  { key: 'vidaUtilAnos', component: createInput({ label: 'Vida Útil (anos)', type: 'number', min: 1, max: 50 }).element, span: 1 },
+  { key: 'status', component: createSelect({ label: 'Status *', required: true, options: [
+    { value: 'ATIVO', label: 'Ativo' },
+    { value: 'EM_MANUTENCAO', label: 'Em Manutenção' },
+    { value: 'AGUARDANDO_APROVACAO', label: 'Aguardando Aprovação' },
+    { value: 'BAIXADO', label: 'Baixado' }
+  ]}).element, span: 1, required: true }
+];
+
+const formLayout = createFormLayout({
+  fields,
+  colCount: 3,
+  labelPosition: 'top',
+  submitButton: { variant: 'primary', label: 'Salvar', loading: false },
+  cancelButton: { variant: 'secondary', label: 'Cancelar' },
+  onSubmit: async (data) => {
+    if (editingId) {
+      await api.put(`/ativos/${editingId}`, data);
+      toast.success('Ativo atualizado');
+    } else {
+      await api.post('/ativos', data);
+      toast.success('Ativo criado');
+    }
+    modalCriarAtivo.hide();
+    table.refresh();
+  }
+});
 ```
 
 ---
@@ -338,48 +868,43 @@ toast.info('Health check agendado para 02:00');
 
 | Componente | Motivo | Substituído por | Prazo de Remoção |
 | :--- | :--- | :--- | :--- |
-| *Nenhum* | Não há componentes legados no codebase atual | — | — |
+| *Nenhum* | Primeira versão do design system — não há componentes legados | — | — |
 
 ---
 
 ## 6. Gaps Conhecidos
 
-| Componente Necessário | Flow Relacionado | Blocker / Decisão Pendente |
-| :--- | :--- | :--- |
-| `aegis-chart` / `aegis-sparkline` | 3, 5 | Gráficos de tendência de health check / relatórios. **Decisão:** biblioteca leve (uPlot, Chart.js, ApexCharts) vs. SVG nativo. Requer avaliação de bundle size. |
-| `aegis-file-upload` | 1, 2 | Upload de anexos (notas fiscais, fotos de ativo, relatórios). Precisa de backend multipart + validação tipo/tamanho. |
-| `aegis-user-picker` | 1, 2, 4 | Busca/seleção de usuários/funcionários com autocomplete (departamento, filial). Requer endpoint de busca paginada. |
-| `aegis-asset-picker` | 2 | Seleção de ativo ao criar manutenção (modal com tabela + busca). Reutiliza `aegis-data-table` + `aegis-modal`. |
-| `aegis-permission-matrix` | 4 | UI para RBAC (roles × permissions × recursos). Complexo — avaliar se MVP usa apenas select múltiplo simples. |
-| `aegis-skeleton-*` | Todos | Skeletons específicos por componente (table row, card, stat card, form field). Pode ser gerado automaticamente via CSS. |
-| `aegis-wizard` / `aegis-stepper` | 1, 2 | Fluxos multi-etapa (cadastro ativo em etapas, aprovação manutenção). Não identificado nos flows atuais — manter como gap futuro. |
-| `aegis-color-picker` | 1 | Para personalização de tags/categorias de ativo. Não no MVP. |
-| `aegis-rich-text-editor` | 2, 5 | Descrição rica de manutenção, observações de auditoria. **Decisão:** TipTap/ProseMirror (pesado) vs. textarea + markdown simples. |
+| Componente Necessário | Contexto / Fluxo | Prioridade | Observações |
+| :--- | :--- | :--- | :--- |
+| **Wizard / Stepper** | Flow 3 (Criação de Ativo com hardware em abas), Flow 4 (Fluxo de manutenção multi-etapas) | Alta | Necessário para formulários complexos em etapas |
+| **TreeSelect** | Flow 2 (Hierarquia de filiais/departamentos/localizações) | Média | Seleção em árvore com busca |
+| **DataGrid (virtualizado)** | Flow 3 (Lista de ativos > 10k registros) | Média | DataTable atual não virtualiza — performance em listas grandes |
+| **Chart / Sparkline** | Flow 5 (Histórico de saúde de disco), Flow 6 (Dashboards TCO) | Média | Gráficos simples (linha, barra, área) — considerar `uPlot` ou `Chart.js` leve |
+| **RichTextEditor** | Flow 4 (Descrição detalhada de manutenção com formatação) | Baixa | Apenas se requisito de negócio exigir |
+| **Calendar / DateRangePicker** | Flow 6 (Filtros de período em relatórios) | Média | Atualmente só `DatePicker` single |
+| **Command Palette (Cmd+K)** | Transversal — navegação rápida, ações globais | Baixa | Melhoria de UX para power users (ADMIN) |
+| **Tour / Onboarding** | Flow 1 (Primeiro acesso) | Baixa | Guias interativos para novos usuários |
 
 ---
 
 ## 7. Referências
 
-* **Design Tokens:** [design-tokens.md](design-tokens.md) — fonte única de verdade para cores, espaçamento, tipografia, sombras, radius, motion, z-index.
-* **User Flows:** [user-flows.md](user-flows.md) — 6 fluxos detalhados com estados de UI, métricas e edge cases que ditam a necessidade de cada componente.
-* **Diagnóstico Determinístico:** 348 arquivos Java (backend), 15 arquivos JS (frontend/services), **zero componentes UI existentes**.
-* **Stack Tecnológica Verificada:** JavaScript vanilla (ESM), `@popperjs/core` ^2.11.8 (única dependência UI), sem build tool configurado (Vite/Webpack necessário para tokens + componentes).
-* **Acessibilidade:** WCAG 2.1 AA — todos os componentes devem passar axe-core + teste manual NVDA/VoiceOver.
-* **Próximos Passos Imediatos:**
-  1. Configurar `package.json` com `type: "module"`, scripts `dev`, `build`, `test` (Vite + Vitest)
-  2. Criar `frontend/tokens.json` + build pipeline (Style Dictionary ou script custom) → CSS custom properties + JS tokens
-  3. Implementar `aegis-button`, `aegis-input`, `aegis-modal`, `aegis-toast` (core) + `aegis-data-table` (crítico para Flows 1,2,3,5)
-  4. Configurar Storybook (opcional) ou página de catálogo simples (`/components.html`)
-  5. Adicionar ESLint + Stylelint + regra custom `no-hardcoded-tokens` no CI
+* **Design Tokens:** `design-tokens.md` (este repositório) — fonte única de verdade para cores, espaçamento, tipografia, motion, z-index, breakpoints, tokens semânticos de componente
+* **User Flows:** `user-flows.md` (este repositório) — define quais componentes são necessários em cada fluxo e seus estados
+* **Glossário Ubíquo:** `docs/glossario.md` <!-- source: glossario#L1-L75 --> — nomenclatura de domínio (Ativo, Manutenção, Filial, etc.)
+* **Business Requirements Document:** `docs/brd.md` (seções 3, 4, 6) — regras de negócio (BR-01 a BR-10), KPIs, personas
+* **Diagnóstico Determinístico:** `docs/diagnostico.md` — confirma stack vanilla JS + Popper.js only, 0 componentes UI existentes
+* **Popper.js Docs:** https://popper.js.org/docs/v2/ — posicionamento de Tooltip, Dropdown, Select, DatePicker
+* **WCAG 2.1 AA:** https://www.w3.org/WAI/WCAG21/quickref/ — checklist de acessibilidade aplicado a todos os componentes
 
 ---
 
-## 8. Declaração de Limitações
-
-> **Este inventário NÃO reflete componentes existentes.** O codebase atual **não possui nenhum componente de UI reutilizável** — apenas 15 arquivos JS de serviços (`api.js`, etc.).  
->   
-> A lista de 29 componentes é **100% inferida** a partir dos user flows (que por sua vez são inferidos do BRD + diagnóstico) e dos design tokens (também inferidos).  
->   
-> **Nenhuma decisão de arquitetura de frontend foi tomada** (Web Components vs. módulos JS vs. framework leve). A convenção "Web Components" na Seção 2 é uma **proposta**, não uma realidade.  
->   
-> **Validação humana obrigatória** antes de qualquer implementação: priorização, escopo do MVP, escolha de tooling, adoção ou não de Shadow DOM, estratégia de SSR/SSG (se houver).
+> **Próximos passos (action items):**
+> 1. [ ] Criar diretório `frontend/src/components/` e `index.js` barrel export
+> 2. [ ] Implementar `Button`, `Input`, `Select`, `Modal`, `Toast` (core para formulários)
+> 3. [ ] Implementar `DataTable` (componente mais complexo — prioridade alta)
+> 4. [ ] Implementar `Sidebar`, `Header`, `FormLayout` (layout base da aplicação)
+> 5. [ ] Implementar `Badge`, `Tooltip`, `IconButton`, `Alert`, `EmptyState`, `Skeleton`
+> 6. [ ] Configurar CSS Custom Properties globais (`tokens.css`) importado no entry point
+> 7. [ ] Adicionar testes de acessibilidade (axe-core) e visuais (Playwright) por componente
+> 8. [ ] Documentar cada componente com exemplos em `frontend/docs/components/` (ou Storybook se adotado futuramente)

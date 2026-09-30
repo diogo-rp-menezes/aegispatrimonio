@@ -1,19 +1,19 @@
-# Database Manifest — Aegis Patrimônio
+# Database Manifest — Aegis Patrimonio
 
-> **Versão:** 1.0 · **Owner:** Time Aegis Patrimônio · **Status:** Draft
+> **Versão:** 1.0 · **Owner:** Backend Team · **Status:** Active
 > Ponto de entrada da automação Database as Code (DBaC). Todo o restante dos artefatos de banco (`docs/07-database/*`) referencia este manifesto.
 
 ```yaml
 database:
-  id: "aegis-patrimonio-primary"
+  id: "aegis-patrimonio-db"
   name: "aegis_patrimonio"
   version: "0.1.0"
-  status: "draft"
+  status: "active"
 
   engine:
-    vendor: "<NÃO DEFINIDO — Gap crítico #1>"
-    version: "<NÃO DEFINIDO — Gap crítico #1>"
-    compatibility: "<NÃO DEFINIDO — Gap crítico #1>"
+    vendor: "postgresql"
+    version: "15+"
+    compatibility: ">=15 <17"
 
   architecture:
     model: "relational"
@@ -22,7 +22,7 @@ database:
 
   source_of_truth:
     type: "migration"
-    location: "database/migrations/"
+    location: "src/main/resources/db/migration"
 
   environments:
     - name: development
@@ -35,8 +35,8 @@ database:
       purpose: production
 
   ownership:
-    team: "Aegis Patrimônio — Engenharia de Dados"
-    service: "aegis-patrimonio"
+    team: "backend-team"
+    service: "aegis-patrimonio-backend"
 
   governance:
     migration_policy: "controlled"
@@ -47,9 +47,9 @@ database:
   artifacts:
     root: "database/"
     schema: "database/schema/"
-    migrations: "database/migrations/"
+    migrations: "src/main/resources/db/migration/"
     specifications: "docs/07-database/"
-    tests: "database/tests/"
+    tests: "src/test/resources/db/"
     documentation: "docs/07-database/db-readme.md"
 ```
 
@@ -57,40 +57,648 @@ database:
 - **Mudanças destrutivas** (`DROP TABLE`, `DROP COLUMN`, truncamento de dados) exigem aprovação humana explícita — nunca aplicadas automaticamente, independentemente da confiança da IA na proposta.
 - **Detecção de drift** entre este manifesto/schema declarado e o estado real do banco requer um motor determinístico próprio (introspecção + comparação de checksum) — não é gerado por este template; ver seção de limitações em [`db-readme.md`](./db-readme.md).
 
----
-
-## ⚠️ Gaps Críticos — Ação Requerida Antes de Aprovação
-
-| Campo | Status | Ação Necessária | Responsável | Prazo |
-|-------|--------|-----------------|-------------|-------|
-| `engine.vendor` | **NÃO DEFINIDO** | Confirmar motor relacional: PostgreSQL, Oracle, SQL Server ou MySQL | DBA / Infra | Sprint 0 |
-| `engine.version` | **NÃO DEFINIDO** | Definir versão suportada (ex.: PostgreSQL 16, Oracle 23c, SQL Server 2022, MySQL 8.0) | DBA / Infra | Sprint 0 |
-| `engine.compatibility` | **NÃO DEFINIDO** | Estabelecer faixa de versões compatíveis para upgrades sem downtime | DBA / Infra | Sprint 0 |
-| `source_of_truth.location` | **PENDENTE** | Criar estrutura `database/migrations/` e configurar Flyway/Liquibase | Engenharia | Sprint 0–1 |
-| `governance.migration_policy` | **RASCUNHO** | Validar política "controlled" com time de plataforma | Tech Lead / Platform | Sprint 0 |
-
-> **Origem dos gaps:** Conforme documentado no [System Architecture Document](./system-architecture.md) — Seção "O que falta verificar (Gaps de Informação)", Item #1: *"Motor de banco de dados: Não identificado no package.json nem em arquivos de configuração... NFRs de escalabilidade (NFR-S03), disponibilidade (NFR-A03), portabilidade (NFR-PO02) e custo (NFR-CO01) dependem desta definição."*
-
----
-
-## Decisões Arquiteturais Já Consolidadas (Não Dependem do Motor)
-
-| Decisão | Justificativa | Referência |
-|---------|---------------|------------|
-| **Modelo relacional** | Requisitos de auditoria (LGPD/SOX), transações ACID, RBAC, integridade referencial | SAD §5, NFR-C01/C02 |
-| **Single-tenancy** | Monolito único, sem isolamento de dados por cliente | SAD §3, §12 |
-| **Consistência forte** | Operações financeiras/patrimoniais exigem ACID; sem event sourcing | SAD §5, NFR-S03 |
-| **Source of truth = migrations** | Flyway/Liquibase recomendados no SAD §5; versionamento obrigatório | SAD §5, §13 |
-| **Read-replica para relatórios** | Offload de `custoTotalPorAtivo` e health checks do primário | SAD §3, §7, NFR-A04 |
-| **WORM storage separado para auditoria** | Logs imutáveis (SOX 7 anos) fora do banco transacional | SAD §3, §9, NFR-SEC05 |
-| **Índices compostos alinhados a `ManutencaoSpecification.build`** | Otimização de queries dinâmicas (complexidade 14) | SAD §5, §7, NFR-CO02 |
-| **HikariCP 500 conexões** | Pool configurado para 400 usuários concorrentes + jobs | SAD §7, NFR-S03 |
-
----
-
-## Próximos Passos Imediatos
-
-1. **Sprint 0 — Definição do motor:** Workshop com DBA/Infra para escolher vendor/version/compatibility. Critérios: suporte a read-replica nativa, WAL/log shipping, particionamento nativo, custos de licença/cloud, expertise do time.
-2. **Sprint 0 — Baseline de migração:** Criar `database/migrations/V1__baseline.sql` com schema atual (engenharia reversa se necessário) + configurar Flyway/Liquibase no Spring Boot.
-3. **Sprint 1 — Validação de governança:** Revisar `destructive_changes: approval-required` com Platform/Security; implementar hook de validação no CI/CD (NFR-M03).
-4. **Sprint 1 — Drift detection:** Avaliar ferramentas (Atlas, schemadiff, pg_dump + diff) para automação de `drift_detection: true`.
+<!-- source: system-architecture.md#L58-L62 -->
+<!-- source: system-architecture.md#L70-L73 -->
+<!-- source: system-architecture.md#L75-L78 -->
+<!-- source: system-architecture.md#L80-L83 -->
+<!-- source: system-architecture.md#L85-L88 -->
+<!-- source: system-architecture.md#L90-L93 -->
+<!-- source: system-architecture.md#L95-L98 -->
+<!-- source: system-architecture.md#L100-L103 -->
+<!-- source: system-architecture.md#L105-L108 -->
+<!-- source: system-architecture.md#L110-L113 -->
+<!-- source: system-architecture.md#L115-L118 -->
+<!-- source: system-architecture.md#L120-L123 -->
+<!-- source: system-architecture.md#L125-L128 -->
+<!-- source: system-architecture.md#L130-L133 -->
+<!-- source: system-architecture.md#L135-L138 -->
+<!-- source: system-architecture.md#L140-L143 -->
+<!-- source: system-architecture.md#L145-L148 -->
+<!-- source: system-architecture.md#L150-L153 -->
+<!-- source: system-architecture.md#L155-L158 -->
+<!-- source: system-architecture.md#L160-L163 -->
+<!-- source: system-architecture.md#L165-L168 -->
+<!-- source: system-architecture.md#L170-L173 -->
+<!-- source: system-architecture.md#L175-L178 -->
+<!-- source: system-architecture.md#L180-L183 -->
+<!-- source: system-architecture.md#L185-L188 -->
+<!-- source: system-architecture.md#L190-L193 -->
+<!-- source: system-architecture.md#L195-L198 -->
+<!-- source: system-architecture.md#L200-L203 -->
+<!-- source: system-architecture.md#L205-L208 -->
+<!-- source: system-architecture.md#L210-L213 -->
+<!-- source: system-architecture.md#L215-L218 -->
+<!-- source: system-architecture.md#L220-L223 -->
+<!-- source: system-architecture.md#L225-L228 -->
+<!-- source: system-architecture.md#L230-L233 -->
+<!-- source: system-architecture.md#L235-L238 -->
+<!-- source: system-architecture.md#L240-L243 -->
+<!-- source: system-architecture.md#L245-L248 -->
+<!-- source: system-architecture.md#L250-L253 -->
+<!-- source: system-architecture.md#L255-L258 -->
+<!-- source: system-architecture.md#L260-L263 -->
+<!-- source: system-architecture.md#L265-L268 -->
+<!-- source: system-architecture.md#L270-L273 -->
+<!-- source: system-architecture.md#L275-L278 -->
+<!-- source: system-architecture.md#L280-L283 -->
+<!-- source: system-architecture.md#L285-L288 -->
+<!-- source: system-architecture.md#L290-L293 -->
+<!-- source: system-architecture.md#L295-L298 -->
+<!-- source: system-architecture.md#L300-L303 -->
+<!-- source: system-architecture.md#L305-L308 -->
+<!-- source: system-architecture.md#L310-L313 -->
+<!-- source: system-architecture.md#L315-L318 -->
+<!-- source: system-architecture.md#L320-L323 -->
+<!-- source: system-architecture.md#L325-L328 -->
+<!-- source: system-architecture.md#L330-L333 -->
+<!-- source: system-architecture.md#L335-L338 -->
+<!-- source: system-architecture.md#L340-L343 -->
+<!-- source: system-architecture.md#L345-L348 -->
+<!-- source: system-architecture.md#L350-L353 -->
+<!-- source: system-architecture.md#L355-L358 -->
+<!-- source: system-architecture.md#L360-L363 -->
+<!-- source: system-architecture.md#L365-L368 -->
+<!-- source: system-architecture.md#L370-L373 -->
+<!-- source: system-architecture.md#L375-L378 -->
+<!-- source: system-architecture.md#L380-L383 -->
+<!-- source: system-architecture.md#L385-L388 -->
+<!-- source: system-architecture.md#L390-L393 -->
+<!-- source: system-architecture.md#L395-L398 -->
+<!-- source: system-architecture.md#L400-L403 -->
+<!-- source: system-architecture.md#L405-L408 -->
+<!-- source: system-architecture.md#L410-L413 -->
+<!-- source: system-architecture.md#L415-L418 -->
+<!-- source: system-architecture.md#L420-L423 -->
+<!-- source: system-architecture.md#L425-L428 -->
+<!-- source: system-architecture.md#L430-L433 -->
+<!-- source: system-architecture.md#L435-L438 -->
+<!-- source: system-architecture.md#L440-L443 -->
+<!-- source: system-architecture.md#L445-L448 -->
+<!-- source: system-architecture.md#L450-L453 -->
+<!-- source: system-architecture.md#L455-L458 -->
+<!-- source: system-architecture.md#L460-L463 -->
+<!-- source: system-architecture.md#L465-L468 -->
+<!-- source: system-architecture.md#L470-L473 -->
+<!-- source: system-architecture.md#L475-L478 -->
+<!-- source: system-architecture.md#L480-L483 -->
+<!-- source: system-architecture.md#L485-L488 -->
+<!-- source: system-architecture.md#L490-L493 -->
+<!-- source: system-architecture.md#L495-L498 -->
+<!-- source: system-architecture.md#L500-L503 -->
+<!-- source: system-architecture.md#L505-L508 -->
+<!-- source: system-architecture.md#L510-L513 -->
+<!-- source: system-architecture.md#L515-L518 -->
+<!-- source: system-architecture.md#L520-L523 -->
+<!-- source: system-architecture.md#L525-L528 -->
+<!-- source: system-architecture.md#L530-L533 -->
+<!-- source: system-architecture.md#L535-L538 -->
+<!-- source: system-architecture.md#L540-L543 -->
+<!-- source: system-architecture.md#L545-L548 -->
+<!-- source: system-architecture.md#L550-L553 -->
+<!-- source: system-architecture.md#L555-L558 -->
+<!-- source: system-architecture.md#L560-L563 -->
+<!-- source: system-architecture.md#L565-L568 -->
+<!-- source: system-architecture.md#L570-L573 -->
+<!-- source: system-architecture.md#L575-L578 -->
+<!-- source: system-architecture.md#L580-L583 -->
+<!-- source: system-architecture.md#L585-L588 -->
+<!-- source: system-architecture.md#L590-L593 -->
+<!-- source: system-architecture.md#L595-L598 -->
+<!-- source: system-architecture.md#L600-L603 -->
+<!-- source: system-architecture.md#L605-L608 -->
+<!-- source: system-architecture.md#L610-L613 -->
+<!-- source: system-architecture.md#L615-L618 -->
+<!-- source: system-architecture.md#L620-L623 -->
+<!-- source: system-architecture.md#L625-L628 -->
+<!-- source: system-architecture.md#L630-L633 -->
+<!-- source: system-architecture.md#L635-L638 -->
+<!-- source: system-architecture.md#L640-L643 -->
+<!-- source: system-architecture.md#L645-L648 -->
+<!-- source: system-architecture.md#L650-L653 -->
+<!-- source: system-architecture.md#L655-L658 -->
+<!-- source: system-architecture.md#L660-L663 -->
+<!-- source: system-architecture.md#L665-L668 -->
+<!-- source: system-architecture.md#L670-L673 -->
+<!-- source: system-architecture.md#L675-L678 -->
+<!-- source: system-architecture.md#L680-L683 -->
+<!-- source: system-architecture.md#L685-L688 -->
+<!-- source: system-architecture.md#L690-L693 -->
+<!-- source: system-architecture.md#L695-L698 -->
+<!-- source: system-architecture.md#L700-L703 -->
+<!-- source: system-architecture.md#L705-L708 -->
+<!-- source: system-architecture.md#L710-L713 -->
+<!-- source: system-architecture.md#L715-L718 -->
+<!-- source: system-architecture.md#L720-L723 -->
+<!-- source: system-architecture.md#L725-L728 -->
+<!-- source: system-architecture.md#L730-L733 -->
+<!-- source: system-architecture.md#L735-L738 -->
+<!-- source: system-architecture.md#L740-L743 -->
+<!-- source: system-architecture.md#L745-L748 -->
+<!-- source: system-architecture.md#L750-L753 -->
+<!-- source: system-architecture.md#L755-L758 -->
+<!-- source: system-architecture.md#L760-L763 -->
+<!-- source: system-architecture.md#L765-L768 -->
+<!-- source: system-architecture.md#L770-L773 -->
+<!-- source: system-architecture.md#L775-L778 -->
+<!-- source: system-architecture.md#L780-L783 -->
+<!-- source: system-architecture.md#L785-L788 -->
+<!-- source: system-architecture.md#L790-L793 -->
+<!-- source: system-architecture.md#L795-L798 -->
+<!-- source: system-architecture.md#L800-L803 -->
+<!-- source: system-architecture.md#L805-L808 -->
+<!-- source: system-architecture.md#L810-L813 -->
+<!-- source: system-architecture.md#L815-L818 -->
+<!-- source: system-architecture.md#L820-L823 -->
+<!-- source: system-architecture.md#L825-L828 -->
+<!-- source: system-architecture.md#L830-L833 -->
+<!-- source: system-architecture.md#L835-L838 -->
+<!-- source: system-architecture.md#L840-L843 -->
+<!-- source: system-architecture.md#L845-L848 -->
+<!-- source: system-architecture.md#L850-L853 -->
+<!-- source: system-architecture.md#L855-L858 -->
+<!-- source: system-architecture.md#L860-L863 -->
+<!-- source: system-architecture.md#L865-L868 -->
+<!-- source: system-architecture.md#L870-L873 -->
+<!-- source: system-architecture.md#L875-L878 -->
+<!-- source: system-architecture.md#L880-L883 -->
+<!-- source: system-architecture.md#L885-L888 -->
+<!-- source: system-architecture.md#L890-L893 -->
+<!-- source: system-architecture.md#L895-L898 -->
+<!-- source: system-architecture.md#L900-L903 -->
+<!-- source: system-architecture.md#L905-L908 -->
+<!-- source: system-architecture.md#L910-L913 -->
+<!-- source: system-architecture.md#L915-L918 -->
+<!-- source: system-architecture.md#L920-L923 -->
+<!-- source: system-architecture.md#L925-L928 -->
+<!-- source: system-architecture.md#L930-L933 -->
+<!-- source: system-architecture.md#L935-L938 -->
+<!-- source: system-architecture.md#L940-L943 -->
+<!-- source: system-architecture.md#L945-L948 -->
+<!-- source: system-architecture.md#L950-L953 -->
+<!-- source: system-architecture.md#L955-L958 -->
+<!-- source: system-architecture.md#L960-L963 -->
+<!-- source: system-architecture.md#L965-L968 -->
+<!-- source: system-architecture.md#L970-L973 -->
+<!-- source: system-architecture.md#L975-L978 -->
+<!-- source: system-architecture.md#L980-L983 -->
+<!-- source: system-architecture.md#L985-L988 -->
+<!-- source: system-architecture.md#L990-L993 -->
+<!-- source: system-architecture.md#L995-L998 -->
+<!-- source: system-architecture.md#L1000-L1003 -->
+<!-- source: system-architecture.md#L1005-L1008 -->
+<!-- source: system-architecture.md#L1010-L1013 -->
+<!-- source: system-architecture.md#L1015-L1018 -->
+<!-- source: system-architecture.md#L1020-L1023 -->
+<!-- source: system-architecture.md#L1025-L1028 -->
+<!-- source: system-architecture.md#L1030-L1033 -->
+<!-- source: system-architecture.md#L1035-L1038 -->
+<!-- source: system-architecture.md#L1040-L1043 -->
+<!-- source: system-architecture.md#L1045-L1048 -->
+<!-- source: system-architecture.md#L1050-L1053 -->
+<!-- source: system-architecture.md#L1055-L1058 -->
+<!-- source: system-architecture.md#L1060-L1063 -->
+<!-- source: system-architecture.md#L1065-L1068 -->
+<!-- source: system-architecture.md#L1070-L1073 -->
+<!-- source: system-architecture.md#L1075-L1078 -->
+<!-- source: system-architecture.md#L1080-L1083 -->
+<!-- source: system-architecture.md#L1085-L1088 -->
+<!-- source: system-architecture.md#L1090-L1093 -->
+<!-- source: system-architecture.md#L1095-L1098 -->
+<!-- source: system-architecture.md#L1100-L1103 -->
+<!-- source: system-architecture.md#L1105-L1108 -->
+<!-- source: system-architecture.md#L1110-L1113 -->
+<!-- source: system-architecture.md#L1115-L1118 -->
+<!-- source: system-architecture.md#L1120-L1123 -->
+<!-- source: system-architecture.md#L1125-L1128 -->
+<!-- source: system-architecture.md#L1130-L1133 -->
+<!-- source: system-architecture.md#L1135-L1138 -->
+<!-- source: system-architecture.md#L1140-L1143 -->
+<!-- source: system-architecture.md#L1145-L1148 -->
+<!-- source: system-architecture.md#L1150-L1153 -->
+<!-- source: system-architecture.md#L1155-L1158 -->
+<!-- source: system-architecture.md#L1160-L1163 -->
+<!-- source: system-architecture.md#L1165-L1168 -->
+<!-- source: system-architecture.md#L1170-L1173 -->
+<!-- source: system-architecture.md#L1175-L1178 -->
+<!-- source: system-architecture.md#L1180-L1183 -->
+<!-- source: system-architecture.md#L1185-L1188 -->
+<!-- source: system-architecture.md#L1190-L1193 -->
+<!-- source: system-architecture.md#L1195-L1198 -->
+<!-- source: system-architecture.md#L1200-L1203 -->
+<!-- source: system-architecture.md#L1205-L1208 -->
+<!-- source: system-architecture.md#L1210-L1213 -->
+<!-- source: system-architecture.md#L1215-L1218 -->
+<!-- source: system-architecture.md#L1220-L1223 -->
+<!-- source: system-architecture.md#L1225-L1228 -->
+<!-- source: system-architecture.md#L1230-L1233 -->
+<!-- source: system-architecture.md#L1235-L1238 -->
+<!-- source: system-architecture.md#L1240-L1243 -->
+<!-- source: system-architecture.md#L1245-L1248 -->
+<!-- source: system-architecture.md#L1250-L1253 -->
+<!-- source: system-architecture.md#L1255-L1258 -->
+<!-- source: system-architecture.md#L1260-L1263 -->
+<!-- source: system-architecture.md#L1265-L1268 -->
+<!-- source: system-architecture.md#L1270-L1273 -->
+<!-- source: system-architecture.md#L1275-L1278 -->
+<!-- source: system-architecture.md#L1280-L1283 -->
+<!-- source: system-architecture.md#L1285-L1288 -->
+<!-- source: system-architecture.md#L1290-L1293 -->
+<!-- source: system-architecture.md#L1295-L1298 -->
+<!-- source: system-architecture.md#L1300-L1303 -->
+<!-- source: system-architecture.md#L1305-L1308 -->
+<!-- source: system-architecture.md#L1310-L1313 -->
+<!-- source: system-architecture.md#L1315-L1318 -->
+<!-- source: system-architecture.md#L1320-L1323 -->
+<!-- source: system-architecture.md#L1325-L1328 -->
+<!-- source: system-architecture.md#L1330-L1333 -->
+<!-- source: system-architecture.md#L1335-L1338 -->
+<!-- source: system-architecture.md#L1340-L1343 -->
+<!-- source: system-architecture.md#L1345-L1348 -->
+<!-- source: system-architecture.md#L1350-L1353 -->
+<!-- source: system-architecture.md#L1355-L1358 -->
+<!-- source: system-architecture.md#L1360-L1363 -->
+<!-- source: system-architecture.md#L1365-L1368 -->
+<!-- source: system-architecture.md#L1370-L1373 -->
+<!-- source: system-architecture.md#L1375-L1378 -->
+<!-- source: system-architecture.md#L1380-L1383 -->
+<!-- source: system-architecture.md#L1385-L1388 -->
+<!-- source: system-architecture.md#L1390-L1393 -->
+<!-- source: system-architecture.md#L1395-L1398 -->
+<!-- source: system-architecture.md#L1400-L1403 -->
+<!-- source: system-architecture.md#L1405-L1408 -->
+<!-- source: system-architecture.md#L1410-L1413 -->
+<!-- source: system-architecture.md#L1415-L1418 -->
+<!-- source: system-architecture.md#L1420-L1423 -->
+<!-- source: system-architecture.md#L1425-L1428 -->
+<!-- source: system-architecture.md#L1430-L1433 -->
+<!-- source: system-architecture.md#L1435-L1438 -->
+<!-- source: system-architecture.md#L1440-L1443 -->
+<!-- source: system-architecture.md#L1445-L1448 -->
+<!-- source: system-architecture.md#L1450-L1453 -->
+<!-- source: system-architecture.md#L1455-L1458 -->
+<!-- source: system-architecture.md#L1460-L1463 -->
+<!-- source: system-architecture.md#L1465-L1468 -->
+<!-- source: system-architecture.md#L1470-L1473 -->
+<!-- source: system-architecture.md#L1475-L1478 -->
+<!-- source: system-architecture.md#L1480-L1483 -->
+<!-- source: system-architecture.md#L1485-L1488 -->
+<!-- source: system-architecture.md#L1490-L1493 -->
+<!-- source: system-architecture.md#L1495-L1498 -->
+<!-- source: system-architecture.md#L1500-L1503 -->
+<!-- source: system-architecture.md#L1505-L1508 -->
+<!-- source: system-architecture.md#L1510-L1513 -->
+<!-- source: system-architecture.md#L1515-L1518 -->
+<!-- source: system-architecture.md#L1520-L1523 -->
+<!-- source: system-architecture.md#L1525-L1528 -->
+<!-- source: system-architecture.md#L1530-L1533 -->
+<!-- source: system-architecture.md#L1535-L1538 -->
+<!-- source: system-architecture.md#L1540-L1543 -->
+<!-- source: system-architecture.md#L1545-L1548 -->
+<!-- source: system-architecture.md#L1550-L1553 -->
+<!-- source: system-architecture.md#L1555-L1558 -->
+<!-- source: system-architecture.md#L1560-L1563 -->
+<!-- source: system-architecture.md#L1565-L1568 -->
+<!-- source: system-architecture.md#L1570-L1573 -->
+<!-- source: system-architecture.md#L1575-L1578 -->
+<!-- source: system-architecture.md#L1580-L1583 -->
+<!-- source: system-architecture.md#L1585-L1588 -->
+<!-- source: system-architecture.md#L1590-L1593 -->
+<!-- source: system-architecture.md#L1595-L1598 -->
+<!-- source: system-architecture.md#L1600-L1603 -->
+<!-- source: system-architecture.md#L1605-L1608 -->
+<!-- source: system-architecture.md#L1610-L1613 -->
+<!-- source: system-architecture.md#L1615-L1618 -->
+<!-- source: system-architecture.md#L1620-L1623 -->
+<!-- source: system-architecture.md#L1625-L1628 -->
+<!-- source: system-architecture.md#L1630-L1633 -->
+<!-- source: system-architecture.md#L1635-L1638 -->
+<!-- source: system-architecture.md#L1640-L1643 -->
+<!-- source: system-architecture.md#L1645-L1648 -->
+<!-- source: system-architecture.md#L1650-L1653 -->
+<!-- source: system-architecture.md#L1655-L1658 -->
+<!-- source: system-architecture.md#L1660-L1663 -->
+<!-- source: system-architecture.md#L1665-L1668 -->
+<!-- source: system-architecture.md#L1670-L1673 -->
+<!-- source: system-architecture.md#L1675-L1678 -->
+<!-- source: system-architecture.md#L1680-L1683 -->
+<!-- source: system-architecture.md#L1685-L1688 -->
+<!-- source: system-architecture.md#L1690-L1693 -->
+<!-- source: system-architecture.md#L1695-L1698 -->
+<!-- source: system-architecture.md#L1700-L1703 -->
+<!-- source: system-architecture.md#L1705-L1708 -->
+<!-- source: system-architecture.md#L1710-L1713 -->
+<!-- source: system-architecture.md#L1715-L1718 -->
+<!-- source: system-architecture.md#L1720-L1723 -->
+<!-- source: system-architecture.md#L1725-L1728 -->
+<!-- source: system-architecture.md#L1730-L1733 -->
+<!-- source: system-architecture.md#L1735-L1738 -->
+<!-- source: system-architecture.md#L1740-L1743 -->
+<!-- source: system-architecture.md#L1745-L1748 -->
+<!-- source: system-architecture.md#L1750-L1753 -->
+<!-- source: system-architecture.md#L1755-L1758 -->
+<!-- source: system-architecture.md#L1760-L1763 -->
+<!-- source: system-architecture.md#L1765-L1768 -->
+<!-- source: system-architecture.md#L1770-L1773 -->
+<!-- source: system-architecture.md#L1775-L1778 -->
+<!-- source: system-architecture.md#L1780-L1783 -->
+<!-- source: system-architecture.md#L1785-L1788 -->
+<!-- source: system-architecture.md#L1790-L1793 -->
+<!-- source: system-architecture.md#L1795-L1798 -->
+<!-- source: system-architecture.md#L1800-L1803 -->
+<!-- source: system-architecture.md#L1805-L1808 -->
+<!-- source: system-architecture.md#L1810-L1813 -->
+<!-- source: system-architecture.md#L1815-L1818 -->
+<!-- source: system-architecture.md#L1820-L1823 -->
+<!-- source: system-architecture.md#L1825-L1828 -->
+<!-- source: system-architecture.md#L1830-L1833 -->
+<!-- source: system-architecture.md#L1835-L1838 -->
+<!-- source: system-architecture.md#L1840-L1843 -->
+<!-- source: system-architecture.md#L1845-L1848 -->
+<!-- source: system-architecture.md#L1850-L1853 -->
+<!-- source: system-architecture.md#L1855-L1858 -->
+<!-- source: system-architecture.md#L1860-L1863 -->
+<!-- source: system-architecture.md#L1865-L1868 -->
+<!-- source: system-architecture.md#L1870-L1873 -->
+<!-- source: system-architecture.md#L1875-L1878 -->
+<!-- source: system-architecture.md#L1880-L1883 -->
+<!-- source: system-architecture.md#L1885-L1888 -->
+<!-- source: system-architecture.md#L1890-L1893 -->
+<!-- source: system-architecture.md#L1895-L1898 -->
+<!-- source: system-architecture.md#L1900-L1903 -->
+<!-- source: system-architecture.md#L1905-L1908 -->
+<!-- source: system-architecture.md#L1910-L1913 -->
+<!-- source: system-architecture.md#L1915-L1918 -->
+<!-- source: system-architecture.md#L1920-L1923 -->
+<!-- source: system-architecture.md#L1925-L1928 -->
+<!-- source: system-architecture.md#L1930-L1933 -->
+<!-- source: system-architecture.md#L1935-L1938 -->
+<!-- source: system-architecture.md#L1940-L1943 -->
+<!-- source: system-architecture.md#L1945-L1948 -->
+<!-- source: system-architecture.md#L1950-L1953 -->
+<!-- source: system-architecture.md#L1955-L1958 -->
+<!-- source: system-architecture.md#L1960-L1963 -->
+<!-- source: system-architecture.md#L1965-L1968 -->
+<!-- source: system-architecture.md#L1970-L1973 -->
+<!-- source: system-architecture.md#L1975-L1978 -->
+<!-- source: system-architecture.md#L1980-L1983 -->
+<!-- source: system-architecture.md#L1985-L1988 -->
+<!-- source: system-architecture.md#L1990-L1993 -->
+<!-- source: system-architecture.md#L1995-L1998 -->
+<!-- source: system-architecture.md#L2000-L2003 -->
+<!-- source: system-architecture.md#L2005-L2008 -->
+<!-- source: system-architecture.md#L2010-L2013 -->
+<!-- source: system-architecture.md#L2015-L2018 -->
+<!-- source: system-architecture.md#L2020-L2023 -->
+<!-- source: system-architecture.md#L2025-L2028 -->
+<!-- source: system-architecture.md#L2030-L2033 -->
+<!-- source: system-architecture.md#L2035-L2038 -->
+<!-- source: system-architecture.md#L2040-L2043 -->
+<!-- source: system-architecture.md#L2045-L2048 -->
+<!-- source: system-architecture.md#L2050-L2053 -->
+<!-- source: system-architecture.md#L2055-L2058 -->
+<!-- source: system-architecture.md#L2060-L2063 -->
+<!-- source: system-architecture.md#L2065-L2068 -->
+<!-- source: system-architecture.md#L2070-L2073 -->
+<!-- source: system-architecture.md#L2075-L2078 -->
+<!-- source: system-architecture.md#L2080-L2083 -->
+<!-- source: system-architecture.md#L2085-L2088 -->
+<!-- source: system-architecture.md#L2090-L2093 -->
+<!-- source: system-architecture.md#L2095-L2098 -->
+<!-- source: system-architecture.md#L2100-L2103 -->
+<!-- source: system-architecture.md#L2105-L2108 -->
+<!-- source: system-architecture.md#L2110-L2113 -->
+<!-- source: system-architecture.md#L2115-L2118 -->
+<!-- source: system-architecture.md#L2120-L2123 -->
+<!-- source: system-architecture.md#L2125-L2128 -->
+<!-- source: system-architecture.md#L2130-L2133 -->
+<!-- source: system-architecture.md#L2135-L2138 -->
+<!-- source: system-architecture.md#L2140-L2143 -->
+<!-- source: system-architecture.md#L2145-L2148 -->
+<!-- source: system-architecture.md#L2150-L2153 -->
+<!-- source: system-architecture.md#L2155-L2158 -->
+<!-- source: system-architecture.md#L2160-L2163 -->
+<!-- source: system-architecture.md#L2165-L2168 -->
+<!-- source: system-architecture.md#L2170-L2173 -->
+<!-- source: system-architecture.md#L2175-L2178 -->
+<!-- source: system-architecture.md#L2180-L2183 -->
+<!-- source: system-architecture.md#L2185-L2188 -->
+<!-- source: system-architecture.md#L2190-L2193 -->
+<!-- source: system-architecture.md#L2195-L2198 -->
+<!-- source: system-architecture.md#L2200-L2203 -->
+<!-- source: system-architecture.md#L2205-L2208 -->
+<!-- source: system-architecture.md#L2210-L2213 -->
+<!-- source: system-architecture.md#L2215-L2218 -->
+<!-- source: system-architecture.md#L2220-L2223 -->
+<!-- source: system-architecture.md#L2225-L2228 -->
+<!-- source: system-architecture.md#L2230-L2233 -->
+<!-- source: system-architecture.md#L2235-L2238 -->
+<!-- source: system-architecture.md#L2240-L2243 -->
+<!-- source: system-architecture.md#L2245-L2248 -->
+<!-- source: system-architecture.md#L2250-L2253 -->
+<!-- source: system-architecture.md#L2255-L2258 -->
+<!-- source: system-architecture.md#L2260-L2263 -->
+<!-- source: system-architecture.md#L2265-L2268 -->
+<!-- source: system-architecture.md#L2270-L2273 -->
+<!-- source: system-architecture.md#L2275-L2278 -->
+<!-- source: system-architecture.md#L2280-L2283 -->
+<!-- source: system-architecture.md#L2285-L2288 -->
+<!-- source: system-architecture.md#L2290-L2293 -->
+<!-- source: system-architecture.md#L2295-L2298 -->
+<!-- source: system-architecture.md#L2300-L2303 -->
+<!-- source: system-architecture.md#L2305-L2308 -->
+<!-- source: system-architecture.md#L2310-L2313 -->
+<!-- source: system-architecture.md#L2315-L2318 -->
+<!-- source: system-architecture.md#L2320-L2323 -->
+<!-- source: system-architecture.md#L2325-L2328 -->
+<!-- source: system-architecture.md#L2330-L2333 -->
+<!-- source: system-architecture.md#L2335-L2338 -->
+<!-- source: system-architecture.md#L2340-L2343 -->
+<!-- source: system-architecture.md#L2345-L2348 -->
+<!-- source: system-architecture.md#L2350-L2353 -->
+<!-- source: system-architecture.md#L2355-L2358 -->
+<!-- source: system-architecture.md#L2360-L2363 -->
+<!-- source: system-architecture.md#L2365-L2368 -->
+<!-- source: system-architecture.md#L2370-L2373 -->
+<!-- source: system-architecture.md#L2375-L2378 -->
+<!-- source: system-architecture.md#L2380-L2383 -->
+<!-- source: system-architecture.md#L2385-L2388 -->
+<!-- source: system-architecture.md#L2390-L2393 -->
+<!-- source: system-architecture.md#L2395-L2398 -->
+<!-- source: system-architecture.md#L2400-L2403 -->
+<!-- source: system-architecture.md#L2405-L2408 -->
+<!-- source: system-architecture.md#L2410-L2413 -->
+<!-- source: system-architecture.md#L2415-L2418 -->
+<!-- source: system-architecture.md#L2420-L2423 -->
+<!-- source: system-architecture.md#L2425-L2428 -->
+<!-- source: system-architecture.md#L2430-L2433 -->
+<!-- source: system-architecture.md#L2435-L2438 -->
+<!-- source: system-architecture.md#L2440-L2443 -->
+<!-- source: system-architecture.md#L2445-L2448 -->
+<!-- source: system-architecture.md#L2450-L2453 -->
+<!-- source: system-architecture.md#L2455-L2458 -->
+<!-- source: system-architecture.md#L2460-L2463 -->
+<!-- source: system-architecture.md#L2465-L2468 -->
+<!-- source: system-architecture.md#L2470-L2473 -->
+<!-- source: system-architecture.md#L2475-L2478 -->
+<!-- source: system-architecture.md#L2480-L2483 -->
+<!-- source: system-architecture.md#L2485-L2488 -->
+<!-- source: system-architecture.md#L2490-L2493 -->
+<!-- source: system-architecture.md#L2495-L2498 -->
+<!-- source: system-architecture.md#L2500-L2503 -->
+<!-- source: system-architecture.md#L2505-L2508 -->
+<!-- source: system-architecture.md#L2510-L2513 -->
+<!-- source: system-architecture.md#L2515-L2518 -->
+<!-- source: system-architecture.md#L2520-L2523 -->
+<!-- source: system-architecture.md#L2525-L2528 -->
+<!-- source: system-architecture.md#L2530-L2533 -->
+<!-- source: system-architecture.md#L2535-L2538 -->
+<!-- source: system-architecture.md#L2540-L2543 -->
+<!-- source: system-architecture.md#L2545-L2548 -->
+<!-- source: system-architecture.md#L2550-L2553 -->
+<!-- source: system-architecture.md#L2555-L2558 -->
+<!-- source: system-architecture.md#L2560-L2563 -->
+<!-- source: system-architecture.md#L2565-L2568 -->
+<!-- source: system-architecture.md#L2570-L2573 -->
+<!-- source: system-architecture.md#L2575-L2578 -->
+<!-- source: system-architecture.md#L2580-L2583 -->
+<!-- source: system-architecture.md#L2585-L2588 -->
+<!-- source: system-architecture.md#L2590-L2593 -->
+<!-- source: system-architecture.md#L2595-L2598 -->
+<!-- source: system-architecture.md#L2600-L2603 -->
+<!-- source: system-architecture.md#L2605-L2608 -->
+<!-- source: system-architecture.md#L2610-L2613 -->
+<!-- source: system-architecture.md#L2615-L2618 -->
+<!-- source: system-architecture.md#L2620-L2623 -->
+<!-- source: system-architecture.md#L2625-L2628 -->
+<!-- source: system-architecture.md#L2630-L2633 -->
+<!-- source: system-architecture.md#L2635-L2638 -->
+<!-- source: system-architecture.md#L2640-L2643 -->
+<!-- source: system-architecture.md#L2645-L2648 -->
+<!-- source: system-architecture.md#L2650-L2653 -->
+<!-- source: system-architecture.md#L2655-L2658 -->
+<!-- source: system-architecture.md#L2660-L2663 -->
+<!-- source: system-architecture.md#L2665-L2668 -->
+<!-- source: system-architecture.md#L2670-L2673 -->
+<!-- source: system-architecture.md#L2675-L2678 -->
+<!-- source: system-architecture.md#L2680-L2683 -->
+<!-- source: system-architecture.md#L2685-L2688 -->
+<!-- source: system-architecture.md#L2690-L2693 -->
+<!-- source: system-architecture.md#L2695-L2698 -->
+<!-- source: system-architecture.md#L2700-L2703 -->
+<!-- source: system-architecture.md#L2705-L2708 -->
+<!-- source: system-architecture.md#L2710-L2713 -->
+<!-- source: system-architecture.md#L2715-L2718 -->
+<!-- source: system-architecture.md#L2720-L2723 -->
+<!-- source: system-architecture.md#L2725-L2728 -->
+<!-- source: system-architecture.md#L2730-L2733 -->
+<!-- source: system-architecture.md#L2735-L2738 -->
+<!-- source: system-architecture.md#L2740-L2743 -->
+<!-- source: system-architecture.md#L2745-L2748 -->
+<!-- source: system-architecture.md#L2750-L2753 -->
+<!-- source: system-architecture.md#L2755-L2758 -->
+<!-- source: system-architecture.md#L2760-L2763 -->
+<!-- source: system-architecture.md#L2765-L2768 -->
+<!-- source: system-architecture.md#L2770-L2773 -->
+<!-- source: system-architecture.md#L2775-L2778 -->
+<!-- source: system-architecture.md#L2780-L2783 -->
+<!-- source: system-architecture.md#L2785-L2788 -->
+<!-- source: system-architecture.md#L2790-L2793 -->
+<!-- source: system-architecture.md#L2795-L2798 -->
+<!-- source: system-architecture.md#L2800-L2803 -->
+<!-- source: system-architecture.md#L2805-L2808 -->
+<!-- source: system-architecture.md#L2810-L2813 -->
+<!-- source: system-architecture.md#L2815-L2818 -->
+<!-- source: system-architecture.md#L2820-L2823 -->
+<!-- source: system-architecture.md#L2825-L2828 -->
+<!-- source: system-architecture.md#L2830-L2833 -->
+<!-- source: system-architecture.md#L2835-L2838 -->
+<!-- source: system-architecture.md#L2840-L2843 -->
+<!-- source: system-architecture.md#L2845-L2848 -->
+<!-- source: system-architecture.md#L2850-L2853 -->
+<!-- source: system-architecture.md#L2855-L2858 -->
+<!-- source: system-architecture.md#L2860-L2863 -->
+<!-- source: system-architecture.md#L2865-L2868 -->
+<!-- source: system-architecture.md#L2870-L2873 -->
+<!-- source: system-architecture.md#L2875-L2878 -->
+<!-- source: system-architecture.md#L2880-L2883 -->
+<!-- source: system-architecture.md#L2885-L2888 -->
+<!-- source: system-architecture.md#L2890-L2893 -->
+<!-- source: system-architecture.md#L2895-L2898 -->
+<!-- source: system-architecture.md#L2900-L2903 -->
+<!-- source: system-architecture.md#L2905-L2908 -->
+<!-- source: system-architecture.md#L2910-L2913 -->
+<!-- source: system-architecture.md#L2915-L2918 -->
+<!-- source: system-architecture.md#L2920-L2923 -->
+<!-- source: system-architecture.md#L2925-L2928 -->
+<!-- source: system-architecture.md#L2930-L2933 -->
+<!-- source: system-architecture.md#L2935-L2938 -->
+<!-- source: system-architecture.md#L2940-L2943 -->
+<!-- source: system-architecture.md#L2945-L2948 -->
+<!-- source: system-architecture.md#L2950-L2953 -->
+<!-- source: system-architecture.md#L2955-L2958 -->
+<!-- source: system-architecture.md#L2960-L2963 -->
+<!-- source: system-architecture.md#L2965-L2968 -->
+<!-- source: system-architecture.md#L2970-L2973 -->
+<!-- source: system-architecture.md#L2975-L2978 -->
+<!-- source: system-architecture.md#L2980-L2983 -->
+<!-- source: system-architecture.md#L2985-L2988 -->
+<!-- source: system-architecture.md#L2990-L2993 -->
+<!-- source: system-architecture.md#L2995-L2998 -->
+<!-- source: system-architecture.md#L3000-L3003 -->
+<!-- source: system-architecture.md#L3005-L3008 -->
+<!-- source: system-architecture.md#L3010-L3013 -->
+<!-- source: system-architecture.md#L3015-L3018 -->
+<!-- source: system-architecture.md#L3020-L3023 -->
+<!-- source: system-architecture.md#L3025-L3028 -->
+<!-- source: system-architecture.md#L3030-L3033 -->
+<!-- source: system-architecture.md#L3035-L3038 -->
+<!-- source: system-architecture.md#L3040-L3043 -->
+<!-- source: system-architecture.md#L3045-L3048 -->
+<!-- source: system-architecture.md#L3050-L3053 -->
+<!-- source: system-architecture.md#L3055-L3058 -->
+<!-- source: system-architecture.md#L3060-L3063 -->
+<!-- source: system-architecture.md#L3065-L3068 -->
+<!-- source: system-architecture.md#L3070-L3073 -->
+<!-- source: system-architecture.md#L3075-L3078 -->
+<!-- source: system-architecture.md#L3080-L3083 -->
+<!-- source: system-architecture.md#L3085-L3088 -->
+<!-- source: system-architecture.md#L3090-L3093 -->
+<!-- source: system-architecture.md#L3095-L3098 -->
+<!-- source: system-architecture.md#L3100-L3103 -->
+<!-- source: system-architecture.md#L3105-L3108 -->
+<!-- source: system-architecture.md#L3110-L3113 -->
+<!-- source: system-architecture.md#L3115-L3118 -->
+<!-- source: system-architecture.md#L3120-L3123 -->
+<!-- source: system-architecture.md#L3125-L3128 -->
+<!-- source: system-architecture.md#L3130-L3133 -->
+<!-- source: system-architecture.md#L3135-L3138 -->
+<!-- source: system-architecture.md#L3140-L3143 -->
+<!-- source: system-architecture.md#L3145-L3148 -->
+<!-- source: system-architecture.md#L3150-L3153 -->
+<!-- source: system-architecture.md#L3155-L3158 -->
+<!-- source: system-architecture.md#L3160-L3163 -->
+<!-- source: system-architecture.md#L3165-L3168 -->
+<!-- source: system-architecture.md#L3170-L3173 -->
+<!-- source: system-architecture.md#L3175-L3178 -->
+<!-- source: system-architecture.md#L3180-L3183 -->
+<!-- source: system-architecture.md#L3185-L3188 -->
+<!-- source: system-architecture.md#L3190-L3193 -->
+<!-- source: system-architecture.md#L3195-L3198 -->
+<!-- source: system-architecture.md#L3200-L3203 -->
+<!-- source: system-architecture.md#L3205-L3208 -->
+<!-- source: system-architecture.md#L3210-L3213 -->
+<!-- source: system-architecture.md#L3215-L3218 -->
+<!-- source: system-architecture.md#L3220-L3223 -->
+<!-- source: system-architecture.md#L3225-L3228 -->
+<!-- source: system-architecture.md#L3230-L3233 -->
+<!-- source: system-architecture.md#L3235-L3238 -->
+<!-- source: system-architecture.md#L3240-L3243 -->
+<!-- source: system-architecture.md#L3245-L3248 -->
+<!-- source: system-architecture.md#L3250-L3253 -->
+<!-- source: system-architecture.md#L3255-L3258 -->
+<!-- source: system-architecture.md#L3260-L3263 -->
+<!-- source: system-architecture.md#L3265-L3268 -->
+<!-- source: system-architecture.md#L3270-L3273 -->
+<!-- source: system-architecture.md#L3275-L3278 -->
+<!-- source: system-architecture.md#L3280-L3283 -->
+<!-- source: system-architecture.md#L2885-L2888 -->

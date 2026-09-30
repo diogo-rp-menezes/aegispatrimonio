@@ -1,231 +1,148 @@
-# ADR-001 — Arquitetura Monolítica Modular (Single Deployable Unit)
+# ADR-001 — Acesso a dados via SQL cru sem ORM no backend Java
 
-> **Data:** 15/01/2025 · **Status:** Proposed
-> **Deciders:** Arquiteto de Software, Tech Lead Backend, Engineering Manager · **Consulted:** DBA, DevOps, Security · **Informed:** Product Owner, QA Lead
-
-## 1. Status
-Proposed
-
-## 2. Context & Problem Statement
-O Aegis Patrimônio possui uma base de código existente de 333 arquivos Java (Spring Boot implícito) e 15 arquivos JavaScript (Vanilla JS + @popperjs/core) servidos como assets estáticos. O diagnóstico determinístico confirma ausência de mensageria distribuída, service mesh, ou orquestração de containers. Os NFRs estabelecem: latência ≤ 500 ms (p95) para 100 usuários concorrentes, escalando verticalmente para 400 usuários com degradação ≤ 10% (NFR-S01); disponibilidade 99,5% SLA / 99,9% SLO com RTO ≤ 4 h (NFR-A01); custo ≤ R$ 2,00/mês por ativo (NFR-CO01). A stack atual não suporta auto-scaling horizontal, clustering ou sharding (NFR-S01 observação). A decisão é se manter o monolito modular ou iniciar decomposição em microsserviços.
-
-## 3. Decision Drivers
-* **Simplicidade operacional e custo** (NFR-CO01: ≤ R$ 2,00/mês por ativo) — infraestrutura single-node + read-replica + WORM storage
-* **Consistência transacional forte** — regras de negócio (BR-01 RBAC, BR-02 auditoria imutável) exigem ACID local entre Ativos, Manutenções, HealthChecks, Auditoria
-* **Latência in-process** — chamadas Java diretas Controller→Service→Repository evitam overhead de rede/serialização (NFR-P01)
-* **Time-to-market e dívida técnica existente** — 5 métodos com complexidade ciclomática > 10 (NFR-M02) priorizam refatoração interna over extração de serviços
-* **Capacidade da equipe** — equipe atual dimensionada para monolito; microsserviços exigiriam DevOps, SRE, platform engineering dedicados
-
-## 4. Considered Options
-### Option A: Monolito Modular (Single Deployable Unit) — **Escolhida**
-* **Descrição:** Aplicação Spring Boot única (JAR/Docker) servindo API REST + frontend estático, com módulos lógicos (Ativos, Manutenções, Alertas, Auditoria, Segurança) separados por pacotes. Jobs de background (`AlertNotificationService.checkResourceUsageAlerts`, `updateHealthCheck`) rodam in-process via `TaskScheduler`. Persistência em banco relacional único (primário) com read-replica para relatórios. Deploy único, escala vertical.
-* **Prós:**
-  - Transações ACID nativas entre domínios (ex: criar Ativo + Manutenção + AuditoriaLog atômico)
-  - Latência mínima (sem hop de rede entre serviços)
-  - Operação simples: 1 artefato, 1 pipeline, 1 health check, 1 log aggregator
-  - Custo previsível (VM/container único + DB primário + réplica + WORM)
-  - Refatoração incremental viável (Strangler Fig futuro se volume justificar)
-* **Contras:**
-  - SPOF: falha da instância derruba todo o sistema (mitigado por read-replica promovível + runbook RTO ≤ 4h)
-  - Teto de escala vertical (hardware single-node)
-  - Deploy all-or-nothing (qualquer mudança requer rebuild/deploy completo)
-  - Acoplamento temporal: jobs param se app reinicia (NFR-O02 gap)
-
-### Option B: Microsserviços (Decomposição por Domínio)
-* **Descrição:** Extrair `AlertNotificationService`, `HealthCheckService`, `AuditoriaService` como serviços independentes comunicando via Kafka/RabbitMQ + API Gateway. Banco por serviço (polyglot persistence) ou shared DB com schemas separados.
-* **Prós:**
-  - Escala horizontal independente (ex: escalar apenas alertas se 12k ativos > 30s)
-  - Deploy independente por domínio
-  - Isolamento de falhas (bug em alertas não derruba CRUD ativos)
-  - Tecnologias heterogêneas por serviço (ex: Go para health checks de alta frequência)
-* **Contras:**
-  - Complexidade operacional massiva: service discovery, distributed tracing, saga pattern para transações, eventual consistency
-  - Latência adicionada (rede + serialização) — risco de violar NFR-P01 (≤ 500 ms p95)
-  - Custo infra 3–5× maior (múltiplas VMs/containers, message broker, API Gateway, observabilidade distribuída)
-  - Equipe atual não tem capacidade para operar microsserviços em produção (NFR-CO01 violado)
-  - Transações distribuídas entre Ativo/Manutenção/Auditoria exigem coreografia complexa (BR-02 auditoria imutável)
-
-### Option C: Modulito (Monolito com Módulos Isolados + Deploy Separado Futuro)
-* **Descrição:** Manter código em monolito mas estruturar como módulos Maven/Gradle independentes (`aegis-ativos`, `aegis-manutencoes`, `aegis-alertas`, `aegis-auditoria`) com interfaces bem definidas, permitindo extração futura sem refatoração big-bang.
-* **Prós:**
-  - Preparação para Strangler Fig sem custo operacional imediato
-  - Boundaries claros facilitam testes e ownership
-  - Migração gradual se/quando volume justificar
-* **Contras:**
-  - Ainda monolito em runtime (mesmos SPOF e teto de escala)
-  - Overhead de modularização build-time sem benefício runtime imediato
-  - Requer disciplina arquitetural contínua (ArchUnit, testes de arquitetura)
-
-## 5. Decision Outcome
-**Opção escolhida:** Option A — Monolito Modular (Single Deployable Unit)
-
-**Rationale:** A combinação de NFR-CO01 (custo ≤ R$ 2,00/mês por ativo), NFR-S01 (escala vertical only, sem auto-scaling horizontal), NFR-P01 (latência ≤ 500 ms p95), e a base de código existente (333 arquivos Java, 0 mensageria, 0 service mesh) torna o monolito a única opção viável no horizonte Sprint 0–3. A extração de `AlertNotificationService` (job crítico: 12k ativos ≤ 30s — NFR-P04) será reavaliada no médio prazo (Q3–Q4 2025) se vertical scaling esgotar ou se volume de alertas justificar processamento assíncrono distribuído (Kafka + consumer group). Até lá, refatoração interna dos 5 métodos complexos (NFR-M02) e otimização de queries/índices (NFR-CO02) endereçam os gargalos conhecidos.
-
-### Comparison Matrix
-| Critério | Peso | Option A (Monolito) | Option B (Microsserviços) | Option C (Modulito) |
-| :--- | :---: | :---: | :---: | :---: |
-| Custo infra (NFR-CO01) | 5 | 5 | 1 | 4 |
-| Latência p95 (NFR-P01) | 5 | 5 | 2 | 5 |
-| Simplicidade operacional | 5 | 5 | 1 | 4 |
-| Consistência transacional (BR-01, BR-02) | 5 | 5 | 2 | 5 |
-| Escalabilidade horizontal | 3 | 1 | 5 | 2 |
-| Isolamento de falhas | 4 | 2 | 5 | 2 |
-| Time-to-market (Sprint 0–3) | 5 | 5 | 1 | 4 |
-| Capacidade equipe atual | 5 | 5 | 1 | 4 |
-| **Total ponderado** | — | **115** | **52** | **97** |
-
-## 6. Consequences
-### Positive
-* Atende NFR-CO01, NFR-S01, NFR-P01, NFR-A01 com arquitetura simples e custos controlados
-* Transações ACID locais garantem integridade de auditoria (BR-02) e RBAC (BR-01) sem saga/compensação
-* Refatoração dos 5 métodos complexos (NFR-M02) e índices compostos (NFR-CO02) resolvem gargalos imediatos
-* Deploy único simplifica CI/CD (NFR-M03/M04/M05) e rollback
-
-### Negative / Trade-offs
-* **SPOF aplicação:** Instância única — mitigado por health checks `/actuator/health/liveness|readiness` (NFR-O02), graceful shutdown 30s, read-replica promovível, runbook RTO ≤ 4h
-* **Teto de escala vertical:** Se 400 usuários + jobs + relatórios excederem capacidade single-node, migração para Modulito/Microsserviços será necessária (gatilho: CPU > 80% sustentado, heap > 85%, HikariCP pool > 90%)
-* **Jobs in-process:** `checkResourceUsageAlerts` e `updateHealthCheck` param se app reinicia — mitigado por externalizar scheduler no médio prazo (Quartz JDBC JobStore ou CronJob externo — NFR-O02)
-
-### Neutral
-* Frontend Vanilla JS + @popperjs/core servido como static assets pelo Spring Boot (ou Nginx/CDN) — dívida técnica documentada (NFR-M01: migração TypeScript/React planejada)
-* SQL cru / JPA nativo sem ORM completo — decisão separada (ADR-002)
-
-## 7. Implementation Notes
-* **Ações necessárias:**
-  1. Confirmar motor de banco (Gap #1 SAD) e provisionar primário + read-replica + WORM bucket (Sprint 0)
-  2. Implementar pipeline CI/CD com validações NFR-M03/M04/M05 (OpenAPI breaking changes, `console.*`, stubs)
-  3. Refatorar 5 métodos complexidade > 10: `checkResourceUsageAlerts` (17), `RealisticDataSeeder.run` (15), `AtivoMapper.toDTO` (14), `ManutencaoSpecification.build` (14), `api.js:request` (13) — NFR-M02
-  4. Configurar OpenTelemetry Java Agent + Collector + Prometheus/Grafana/Loki/Tempo (Gap #4 SAD)
-  5. Provisionar Secret Manager + rotação 90 dias (NFR-SEC04, Gap #4 SAD)
-  6. Implementar `AuditoriaService` com escrita assíncrona WORM (NFR-SEC05)
-  7. Configurar Flyway/Liquibase + baseline schema (Gap #5 SAD)
-* **Prazo estimado de migração:** N/A (decisão de manutenção da arquitetura atual). Reavaliação em Q3 2025 baseada em métricas de carga.
-* **Rollback plan:** Não aplicável (decisão de não mudar). Se futuro extrair serviços: Strangler Fig via API Gateway roteando `/api/alertas/**` para novo serviço, mantendo monolito para demais domínios.
-
-## 8. Links & References
-* SAD Seção 3 (Tech Stack Justification), Seção 4 (Architectural Style), Seção 7 (Scalability), Seção 12 (Trade-offs), Seção 13 (Future Evolution)
-* NFR-S01, NFR-S02, NFR-S03, NFR-P01, NFR-P04, NFR-CO01, NFR-M02, NFR-O02, NFR-A01, NFR-A04
-* Diagnóstico determinístico: 333 arquivos .java, 15 .js, 0 mensageria, 0 ORM, 5 métodos complexidade > 10
-* ADR-002 (SQL cru / JPA nativo) — decisão correlata
-* Issue: `#ARCH-001` (formalizar ADR-001 na Sprint 0)
-
----
-
-# ADR-002 — Acesso a Dados via SQL Cru / JPA Nativo (Sem ORM Completo)
-
-> **Data:** 15/01/2025 · **Status:** Proposed
-> **Deciders:** Arquiteto de Software, Tech Lead Backend, DBA · **Consulted:** DevOps, Security · **Informed:** Product Owner, QA Lead
+> **Data:** Não registrada nos artefatos-fonte — preencher com a data de ratificação [REQUER VALIDAÇÃO HUMANA] · **Status:** Proposed
+> **Deciders:** A definir — nenhum decisor registrado no SAD v1.0 ou no diagnóstico do workspace [REQUER VALIDAÇÃO HUMANA] · **Consulted:** Arquitetura/Engenharia (owner do SAD v1.0) · **Informed:** Equipes de desenvolvimento backend (Java) e frontend (JavaScript)
 
 ## 1. Status
-Proposed
+
+**Proposed** — Esta ADR formaliza a estratégia de acesso a dados já implementada de facto no codebase (SQL cru, sem ORM/query builder — verificado na varredura de dependências e registrado no diagnóstico de stack) e propõe sua ratificação pelos decidores. Nenhuma ADR formal anterior existe no projeto (verificado no SAD — cabeçalho e Seção 12). Enquanto não ratificada, a decisão permanece registrada apenas inline no SAD (Seções 12 e 13).
 
 ## 2. Context & Problem Statement
-O diagnóstico determinístico confirma: "nenhum ORM/query builder encontrado — provavelmente SQL cru". O SAD (Seção 2) registra: "ORM / Data Access: SQL cru / JPA nativo (sem ORM identificado; NFR-CO02 cita 'raw SQL / JPA nativo')". O `ManutencaoSpecification.build` (complexidade ciclomática 14) constrói queries dinâmicas com múltiplos filtros. O `AtivoMapper.toDTO` (complexidade 14) mapeia entidades ricas para DTOs. NFR-CO02 exige "otimização manual de queries e índices compostos alinhados a `ManutencaoSpecification.build`". NFR-S03 requer HikariCP 500 conexões. NFR-SEC03 exige proteção contra injeção via prepared statements / bind parameters. A decisão é se adotar ORM completo (Hibernate/JPA), query builder (jOOQ, MyBatis), ou manter SQL cru + JPA nativo parcial.
+
+O backend do Sistema de Gestão de Patrimônio (A4) — 335 arquivos `.java` em `src/`, pacote `br.com.aegispatrimonio`, com camadas visíveis na varredura (`config`, `mapper`, `model`, `repository`, `service`) — acessa a camada de dados **sem ORM ou query builder**: a varredura de dependências não encontrou nenhum ORM/query builder nas dependências verificadas (o diagnóstico registra "provavelmente SQL cru" e o SAD trata a caracterização como verificada). A abordagem está implementada de facto, com evidências concretas da varredura AST:
+
+- `src/main/java/br/com/aegispatrimonio/repository/ManutencaoSpecification.java:26` — método `build` (complexidade ciclomática 14) constrói consultas dinamicamente para a filtragem de manutenção (RF-15/RF-22);
+- `src/main/java/br/com/aegispatrimonio/mapper/AtivoMapper.java:15` — método `toDTO` (complexidade 14) converte entidades em DTOs manualmente;
+- `src/main/java/br/com/aegispatrimonio/service/AtivoService.java:119` — TODO de performance: caminho que carrega até 1.000 candidatos (id+nome) e faz ranking em memória.
+
+O SAD v1.0 (Seção 12) analisa o trade-off dessa abordagem e registra explicitamente: "Nenhuma ADR formal registrada". A decisão a tomar, em termos neutros: **manter o acesso a dados sem camada de ORM/query builder, ou introduzir uma**. A estratégia atual concentra no código de aplicação responsabilidades que uma camada de persistência normalmente absorveria — parametrização de consultas, construção dinâmica de filtros e mapeamento entidade↔DTO — com efeitos opostos sobre os objetivos arquiteturais:
+
+- **Favorável à performance:** controle direto sobre índices e planos de execução, alinhado às metas NFR-P01 (p95 < 200ms) e NFR-P04 (relatórios de custo total por ativo < 3s p95 para 10.000+ ativos);
+- **Desfavorável à segurança e à manutenibilidade:** superfície de SQL injection sensível a erro humano (NFR-SEC06 — requisito crítico), produtividade menor e complexidade acima do limite proposto (NFR-M02: `toDTO` = 14 e `build` = 14 vs. limite ≤ 10).
+
+Dois condicionantes verificados agravam a decisão:
+
+1. **Não há gate de testes verificável** — o `package.json` não declara scripts e não há configuração de pipeline encontrada (NFR-M01, lacuna 3): qualquer migração de acesso a dados hoje ocorreria sem rede de segurança contra regressões.
+2. **O motor de banco de dados não está especificado** (lacuna 1 do NFR) — metas de escrita concorrente (NFR-S01), backup/RPO (NFR-A03) e comportamento de lock não podem ser calibradas; a validação de índices e planos de execução depende do motor real.
+
+Nenhuma tabela foi detectada no schema pela varredura — o contrato físico (tabelas, colunas, constraints, DDL) deve viver em [[db-schema-spec]] e o modelo conceitual em [[db-domain-model]], ambos a produzir.
+
+**Escopo desta ADR:** a estratégia de acesso a dados (SQL cru vs. ORM/query builder). **Fora do escopo:** a escolha do motor de banco de dados (decisão dependente e separada — pendência de maior impacto arquitetural segundo o SAD, Seção 13), a estratégia de cache para relatórios (risco R-03 do BRD) e o escalonamento horizontal (NFR-S02) — cada uma com ADR própria prevista.
 
 ## 3. Decision Drivers
-* **Controle total de queries e planos de execução** — NFR-CO02 exige índices compostos otimizados para filtros dinâmicos de `ManutencaoSpecification`; ORM completo gera SQL opaco e difícil de tunar
-* **Performance previsível sob carga** — 500 conexões HikariCP (NFR-S03) + 400 usuários concorrentes + jobs batch (12k ativos ≤ 30s — NFR-P04) exigem queries otimizadas manualmente, sem overhead de proxy/bytecode enhancement do Hibernate
-* **Base de código existente** — 333 arquivos Java já usam `@Query` nativas, `JdbcTemplate`, `EntityManager.createNativeQuery()`; migração para ORM completo seria refatoração massiva (alto risco, baixo ROI imediato)
-* **Segurança (NFR-SEC03)** — SQL cru com bind parameters (`?` / named parameters) previne injeção; revisão de código obrigatória para detectar concatenação de strings (já parte do pipeline NFR-M04)
-* **Auditoria imutável (BR-02, NFR-SEC05)** — `AuditoriaService` grava payload completo em WORM; controle fino de quais colunas/valores persistem é mais direto com SQL explícito
+
+* **Performance com controle explícito (NFR-P01/NFR-P04)** — p95 < 200ms / p99 < 500ms e relatórios < 3s p95 para 10.000+ ativos; sem ORM, índices e planos de execução são responsabilidade direta do código (`ManutencaoSpecification.build`).
+* **Segurança — SQL 100% parametrizado (NFR-SEC06, crítico)** — consultas dinâmicas são superfície de risco prioritária para injection; a garantia depende de disciplina de revisão e de testes.
+* **Manutenibilidade (NFR-M01/NFR-M02)** — complexidade ciclomática ≤ 10 (`toDTO` e `build` já excedem o limite); cobertura de testes > 80% com gate de CI não implementada de forma verificável (lacuna 3).
+* **Compatibilidade com a stack verificada** — o `package.json` declara 1 dependência de produção (`@popperjs/core` ^2.11.8) e 0 de desenvolvimento; introduzir ORM adiciona dependência e camada de abstração inexistentes hoje.
+* **Custo/risco de migração** — 27.537 LOC e 344 classes; nenhuma ferramenta de migração de schema verificada ([[db-migration-spec]] a produzir); o seeder `RealisticDataSeeder` (complexidade 15) é carga de dados, não migração de schema.
 
 ## 4. Considered Options
-### Option A: SQL Cru / JPA Nativo Parcial (EntityManager + @Query + JdbcTemplate) — **Escolhida**
-* **Descrição:** Manter abordagem atual: entidades JPA (`@Entity`) para mapeamento objeto-relacional básico, mas queries complexas (filtros dinâmicos, relatórios, batch) escritas em SQL nativo via `@Query(nativeQuery=true)`, `JdbcTemplate`, ou `EntityManager.createNativeQuery()`. `ManutencaoSpecification.build` continua construindo `Predicate`/`Criteria` ou SQL dinâmico com bind parameters. `AtivoMapper.toDTO` usa `ResultSet`/`Tuple` mapping manual. HikariCP gerencia pool (500 conn). Flyway/Liquibase para migrações (Gap #5 SAD).
-* **Prós:**
-  - Controle total: DBA pode revisar/otimizar cada query, criar índices compostos precisos (ex: `(ativo_id, status, data_inicio)` para `ManutencaoSpecification`)
-  - Zero overhead ORM: sem proxy, lazy loading surpresa, N+1 oculto, first/second-level cache inconsistente
-  - Performance determinística: plano de execução estável, explicável via `EXPLAIN ANALYZE`
-  - Migração de schema versionada (Flyway) alinhada a SQL real executado
-  - Compatível com qualquer motor relacional (PostgreSQL, Oracle, SQL Server, MySQL) — Gap #1 SAD
-  - Auditoria: `INSERT INTO auditoria_log ...` explícito com payload JSONB/TEXT, sem interceptors Hibernate
-* **Contras:**
-  - Boilerplate: mapeamento manual `ResultSet`→DTO/Entidade (`AtivoMapper.toDTO` complexidade 14)
-  - Refatoração de schema mais trabalhosa (buscar SQL espalhado vs. alterar entidade JPA)
-  - Risco de injeção se dev usar concatenação (`"WHERE id = " + id`) — mitigado por pipeline NFR-M04 (detectar concatenação) + code review + SonarQube rule
-  - Menos produtividade para CRUD simples (findById, save) — mitigado por `JpaRepository` para operações básicas
 
-### Option B: Hibernate/JPA Completo (ORM Padrão)
-* **Descrição:** Migrar para `spring-boot-starter-data-jpa` full: `@Entity` com relacionamentos `@OneToMany`, `@ManyToOne`, `CriteriaBuilder`/`Specification` para queries dinâmicas, `@EntityGraph` para fetch plans, second-level cache (Hazelcast/Infinispan), `@Query` JPQL para casos complexos.
-* **Prós:**
-  - Produtividade: CRUD automático, derivado de query methods (`findByAtivoIdAndStatus`), paginação nativa
-  - Refatoração schema mais segura (compile-time checks via entidade)
-  - Cache L2 nativo para entidades frequentes (`Ativo`, `Configuracao`)
-  - Ecossistema maduro: ferramentas, documentação, comunidade
-* **Contras:**
-  - **N+1 problem** endêmico em listas (`Ativo` → `List<Manutencao>` → `List<HealthCheck>`) — exige `@EntityGraph` ou `JOIN FETCH` em todo lugar
-  - SQL gerado opaco: `ManutencaoSpecification.build` (14 filtros) viraria `CriteriaBuilder` complexo, plano de execução imprevisível
-  - Overhead runtime: proxy CGLIB, bytecode enhancement, dirty checking, flush automático — latência adicionada (risco NFR-P01)
-  - Tuning difícil: índices compostos não mapeiam 1:1 para estratégias de fetch JPQL
-  - Migração big-bang: 333 arquivos Java, 5 métodos complexos já em SQL nativo — risco alto, tempo Sprint 0–3 insuficiente
+### Option A: Manter SQL cru sem ORM (formalizar o status quo)
 
-### Option C: jOOQ (Type-Safe SQL Builder)
-* **Descrição:** Adotar jOOQ para queries type-safe geradas a partir do schema (code generation). Manter JPA apenas para CRUD simples ou remover JPA totalmente.
+* **Descrição:** manter o acesso a dados via SQL cru, sem ORM/query builder, com consultas dinâmicas construídas no código (`ManutencaoSpecification.build`), mapeamento entidade↔DTO manual (`AtivoMapper.toDTO`) e parametrização obrigatória em 100% das consultas (NFR-SEC06). É a abordagem de facto implementada nos 335 arquivos `.java` verificados.
 * **Prós:**
-  - Type-safe SQL: compile-time validation de colunas, tabelas, joins
-  - Controle total de SQL gerado (sem magic), próximo de SQL cru
-  - Code generation sincroniza schema ↔ código (detecta drift)
-  - Boa integração Spring Boot (`jooq-spring-boot-starter`)
+  * Controle total e explícito sobre índices, planos de execução e parametrização — alinhado às metas de p95 < 200ms (NFR-P01) e relatórios < 3s (NFR-P04);
+  * Zero dependência adicional de produção — preserva a stack verificada mínima;
+  * Sem camada de abstração que possa mascarar consultas ineficientes (ex.: N+1, planos de execução ruins);
+  * Compatibilidade total com o codebase existente — nenhuma refatoração massiva necessária.
 * **Contras:**
-  - Curva de aprendizado + setup code generation (maven/gradle plugin)
-  - Ainda requer escrever queries explicitamente (não resolve boilerplate de mapeamento DTO)
-  - Adiciona dependência extra (~2MB) e step de build (codegen)
-  - Não elimina necessidade de índices compostos manuais (NFR-CO02)
-  - Migração parcial: `ManutencaoSpecification.build` teria que ser reescrito em jOOQ DSL
+  * Risco elevado de SQL injection se a parametrização falhar — NFR-SEC06 é crítico e depende de disciplina de revisão; `ManutencaoSpecification.build` é a superfície de risco prioritária;
+  * Produtividade menor: mapeamento manual (`AtivoMapper.toDTO`, complexidade 14 — acima do limite ≤ 10, NFR-M02);
+  * Qualidade de acesso a dados condicionada ao gate de testes (NFR-M01), hoje não verificável (lacuna 3).
+
+### Option B: Adotar ORM/query builder no backend Java [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
+
+* **Descrição:** introduzir um ORM ou query builder nas camadas `repository/` e `mapper/` para abstrair consultas e o mapeamento entidade↔DTO. **Premissas adotadas:** (1) nenhum produto específico é nomeado nesta ADR — o diagnóstico confirma a ausência de ORM/query builder nas dependências e nenhum candidato está documentado nos artefatos-fonte; a seleção do produto exigiria spike/POC própria; (2) a adoção seria incremental, módulo a módulo, a partir do CRUD de menor risco.
+* **Prós:**
+  * Produtividade de desenvolvimento e redução de código repetitivo de mapeamento;
+  * Parametrização por padrão na maioria dos ORMs — reduz a superfície de injection decorrente de erro humano;
+  * Abstrações de consulta dinâmica prontas — substituiriam a construção manual do `build`.
+* **Contras:**
+  * Adiciona dependência de produção inexistente e nova camada de abstração à stack verificada;
+  * Risco de consultas ineficientes mascaradas pela abstração — contra p95 < 200ms (NFR-P01) e relatórios < 3s (NFR-P04);
+  * Superfície de migração grande: 27.537 LOC, 344 classes, sem gate de testes verificado (NFR-M01, lacuna 3) — risco de regressões silenciosas;
+  * Curva de aprendizado e acoplamento ao ciclo de vida do produto escolhido (a definir em POC).
+
+### Option C: Híbrido — SQL cru em caminhos críticos + ORM em CRUD simples [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
+
+* **Descrição:** manter SQL cru onde o controle de performance é crítico — relatórios de custo total por ativo (RF-17, risco R-03 do BRD) e consultas dinâmicas de filtragem de manutenção (RF-15/RF-22) — e adotar ORM/query builder apenas para operações CRUD simples das entidades mestres. **Premissa adotada:** a fronteira entre "caminho crítico" e "CRUD simples" seria definida por medição (p95 por endpoint — NFR-P01) e revisada periodicamente.
+* **Prós:**
+  * Preserva o controle de performance nos caminhos críticos (NFR-P01/P04);
+  * Ganha produtividade no CRUD de baixa complexidade.
+* **Contras:**
+  * Dois paradigmas de acesso a dados coexistindo — custo cognitivo e inconsistência de padrões (NFR-M02);
+  * A fronteira entre "crítico" e "simples" é subjetiva e sujeita a erosão ao longo do tempo;
+  * Herda os contras de migração da Option B (dependência nova, sem gate de testes verificado) com ganho parcial.
 
 ## 5. Decision Outcome
-**Opção escolhida:** Option A — SQL Cru / JPA Nativo Parcial
 
-**Rationale:** A combinação de NFR-CO02 (otimização manual de queries + índices compostos alinhados a `ManutencaoSpecification.build`), NFR-S03 (HikariCP 500 conn, performance previsível), NFR-P04 (batch 12k ativos ≤ 30s), base de código existente (333 arquivos Java já em SQL nativo/@Query), e Gap #1 (motor de banco indefinido — SQL cru é portável) torna a Opção A a única viável para Sprint 0–3. Hibernate completo introduz overhead e opacidade que violam NFR-P01/CO02. jOOQ adiciona complexidade de build sem eliminar boilerplate de mapeamento (que já existe em `AtivoMapper`). A estratégia é: **refatorar os 5 métodos complexos (NFR-M02) para SQL otimizado + índices compostos**, não trocar a camada de acesso. No médio prazo, se produtividade de CRUD se tornar gargalo, avaliar jOOQ apenas para novos módulos (Strangler Fig).
+**Opção escolhida:** Option A — Manter SQL cru sem ORM (formalizar o status quo).
+
+**Rationale:**
+
+- **Custo/risco de migração (driver decisivo):** a abordagem já está implementada de facto em 335 arquivos `.java` (27.537 LOC, 344 classes — verificados) e **não há gate de testes verificado** (NFR-M01, lacuna 3). Migrar para ORM (Options B/C) hoje seria uma mudança de grande superfície sem rede de segurança — o risco de regressão silenciosa supera o ganho de produtividade esperado.
+- **Performance:** as metas NFR-P01 (p95 < 200ms) e NFR-P04 (relatórios < 3s para 10.000+ ativos) favorecem controle direto sobre índices e planos de execução — com SQL cru, essa responsabilidade é explícita no código (`ManutencaoSpecification.build`), sem abstração que possa mascarar consultas ineficientes. O TODO de performance em `AtivoService.java:119` (até 1.000 candidatos + ranking em memória) demonstra que os caminhos sensíveis já exigem ajuste fino — o controle direto é pré-requisito para esse ajuste.
+- **Segurança:** o requisito NFR-SEC06 (SQL 100% parametrizado) é enforcementável em ambas as opções; com SQL cru, aceita-se o custo de disciplina de revisão em troca de uma superfície de risco conhecida e priorizada (`ManutencaoSpecification.build`), em vez de distribuída por uma abstração.
+- **Compatibilidade com a stack:** a stack verificada tem exatamente 1 dependência de produção (`@popperjs/core` ^2.11.8) e 0 de desenvolvimento; introduzir ORM contraria a minimização de dependências e adiciona abstração inexistente.
+- **Leitura honesta da matriz:** a Option A vence com folga condicionada ao peso do custo/risco de migração (20 dos 21 pontos de diferença sobre a Option B vêm desse critério). Se o gate de cobertura > 80% (NFR-M01) for implementado e uma ferramenta de migração for definida — reduzindo o peso desse driver —, a Option C torna-se o caminho de reversão natural (ver Rollback plan na Seção 7).
 
 ### Comparison Matrix
-| Critério | Peso | Option A (SQL Cru/JPA Nativo) | Option B (Hibernate Full) | Option C (jOOQ) |
-| :--- | :---: | :---: | :---: | :---: |
-| Controle de query/plano execução (NFR-CO02) | 5 | 5 | 2 | 4 |
-| Performance previsível (NFR-P01, NFR-P04) | 5 | 5 | 2 | 4 |
-| Compatibilidade motor indefinido (Gap #1) | 5 | 5 | 3 | 4 |
-| Produtividade CRUD simples | 3 | 2 | 5 | 3 |
-| Segurança injeção (NFR-SEC03) | 5 | 4* | 5 | 5 |
-| Refatoração schema | 3 | 2 | 5 | 4 |
-| Curva de aprendizado/Setup (Sprint 0–3) | 4 | 5 | 3 | 2 |
-| Auditoria explícita WORM (NFR-SEC05) | 4 | 5 | 3 | 4 |
-| **Total ponderado** | — | **107** | **71** | **86** |
 
-*Com pipeline NFR-M04 (detectar concatenação) + code review + SonarQube, risco mitigado para nível 4.
+Escala de score: 1 (pior) a 5 (melhor). Os pesos refletem a prioridade dos NFRs correspondentes e o estágio atual do projeto (sem gate de testes verificado).
+
+| Critério | Peso | Option A (SQL cru) | Option B (ORM) | Option C (Híbrido) |
+| :--- | :--- | :--- | :--- | :--- |
+| Controle sobre performance/planos de execução (NFR-P01/P04) | 5 | 5 | 3 | 4 |
+| Segurança — superfície de SQL injection (NFR-SEC06) | 5 | 3 | 4 | 3 |
+| Custo/risco de migração (27.537 LOC, sem gate de testes) | 5 | 5 | 1 | 2 |
+| Manutenibilidade/consistência de padrões (NFR-M02) | 4 | 3 | 4 | 2 |
+| Produtividade de desenvolvimento | 3 | 2 | 5 | 3 |
+| Compatibilidade com a stack verificada (zero dependências novas) | 3 | 5 | 2 | 3 |
+| **Total ponderado** | — | **98** | **77** | **71** |
 
 ## 6. Consequences
+
 ### Positive
-* Queries de `ManutencaoSpecification.build` e batch `checkResourceUsageAlerts` otimizadas manualmente com `EXPLAIN ANALYZE` + índices compostos (ex: `idx_manutencao_ativo_status_data (ativo_id, status, data_inicio)`)
-* Zero overhead ORM garante latência p95 ≤ 500 ms (NFR-P01) e throughput 12k ativos/30s (NFR-P04)
-* Portabilidade entre PostgreSQL/Oracle/SQL Server/MySQL (Gap #1) — apenas ajustes de dialeto SQL nativo
-* Auditoria `INSERT` explícita com payload JSON completo, sem interceptors mágicos
+
+* Controle total e explícito sobre índices, planos de execução e parametrização — alinhado às metas de p95 < 200ms (NFR-P01) e relatórios < 3s p95 para 10.000+ ativos (NFR-P04).
+* Zero dependência adicional de produção — a stack verificada permanece mínima (única dependência de produção declarada: `@popperjs/core` ^2.11.8).
+* Nenhuma refatoração massiva do codebase existente (335 arquivos `.java`, 344 classes) — o esforço de engenharia concentra-se nos hotspots conhecidos em vez de numa migração.
+* Superfície de risco de injection conhecida, mapeável e priorizada (`ManutencaoSpecification.build`), em vez de distribuída por uma camada de abstração.
 
 ### Negative / Trade-offs
-* **Boilerplate de mapeamento:** `AtivoMapper.toDTO` (complexidade 14) e mappers similares exigem manutenção manual — mitigado por testes unitários de mapping + geração parcial via MapStruct (futuro, NFR-M01)
-* **Risco de injeção SQL:** Requer disciplina de **sempre** usar bind parameters (`?` / `:param`) — enforcado por pipeline NFR-M04 (regex detecta concatenação `+` em strings SQL) + SonarQube rule `java:S2077` + code review obrigatório
-* **Refatoração de schema:** Mudança de coluna/tabela exige busca em SQL nativo espalhado — mitigado por Flyway migrations (Gap #5) + testes de integração contra schema real
+
+* **Risco elevado de SQL injection se a parametrização falhar** — NFR-SEC06 é crítico; a garantia depende de disciplina de revisão e de testes de integração, e o gate de cobertura > 80% (NFR-M01) não está implementado de forma verificável (lacuna 3).
+* **Produtividade de desenvolvimento menor** — mapeamento manual entidade↔DTO (`AtivoMapper.toDTO`, complexidade 14, acima do limite ≤ 10 — NFR-M02) e construção manual de consultas dinâmicas.
+* **Qualidade de acesso a dados acoplada à competência do time** — índices, DDL e planos de execução são responsabilidade direta do código/time, sem abstração que mitigue erros.
+* **Débito técnico consciente registrado (NFR-M04) permanece:** stub `Usuario.setUsername` (`src/main/java/br/com/aegispatrimonio/model/Usuario.java:86`), TODO de performance (`AtivoService.java:119`) e 12 funções com complexidade acima do limite proposto.
 
 ### Neutral
-* `JpaRepository`/`CrudRepository` ainda usados para `findById`, `save`, `delete` simples — melhor dos dois mundos
-* `EntityManager` disponível para operações nativas programáticas quando `Specification`/`Criteria` insuficiente
-* Migração futura para jOOQ em novos módulos (ex: `AlertNotificationService` extraído) não bloqueada
+
+* A responsabilidade pelo contrato físico (tabelas, colunas, constraints, DDL) fica explicitamente no time — deve ser documentada em [[db-schema-spec]] e [[db-domain-model]] (a produzir; nenhuma tabela detectada na varredura).
+* O SQL cru pode acoplar partes do código ao dialeto do motor de banco eventualmente escolhido — ponto a considerar na ADR do motor (lacuna 1).
+* Migrações de schema continuam sem ferramenta verificada — ver [[db-migration-spec]]; o seeder `RealisticDataSeeder` (complexidade 15) é carga de dados, não migração de schema, e deve executar em staging com validação (risco R-02 do BRD).
+* A decisão não altera a topologia (aplicação server-side única — verificada no SAD) nem resolve o motor de banco de dados (lacuna 1) — a validação de índices e planos de execução permanece condicionada ao motor real.
 
 ## 7. Implementation Notes
+
 * **Ações necessárias:**
-  1. Auditoria de todo SQL nativo no código: buscar concatenação de strings (`grep -r "SELECT.*+" --include="*.java"`), substituir por bind parameters
-  2. Configurar SonarQube rule `java:S2077` (PreparedStatement) + custom rule para `@Query` nativas
-  3. Criar índices compostos alinhados a `ManutencaoSpecification.build` filtros: `(ativo_id, status, data_inicio)`, `(ativo_id, tipo, data_fim)`, `(responsavel_id, status)` — validar com `EXPLAIN ANALYZE` em staging
-  4. Refatorar `ManutencaoSpecification.build` (complexidade 14): extrair builders de `Predicate` por filtro, usar `CriteriaBuilder` apenas para estrutura, delegar WHERE complexo a SQL nativo via `@Query` com `nativeQuery=true`
-  5. Refatorar `AtivoMapper.toDTO` (complexidade 14): separar em mappers por seção (dados básicos, manutenções, health checks, custos), usar `JdbcTemplate.query(RowMapper)` para listas
-  6. Otimizar `AlertNotificationService.checkResourceUsageAlerts` (complexidade 17): query única com `JOIN` + agregação vs. loop N+1; processar em batches de 500 ativos; `@Async` com thread pool dedicado (`scheduler` bulkhead)
-  7. Configurar Flyway/Liquibase (Gap #5 SAD): baseline schema atual + migrations versionadas para índices compostos
-* **Prazo estimado:** Sprint 0–2 (itens 1–3), Sprint 1–3 (itens 4–7)
-* **Rollback plan:** Se SQL cru causar bugs de mapeamento em produção: habilitar Hibernate `hibernate.show_sql=true` + `hibernate.format_sql=true` para debug; reverter mappers problemáticos para `EntityManager.createQuery` JPQL temporário; não reverter arquitetura completa.
+  1. **Parametrização 100% (NFR-SEC06):** revisão prioritária de `src/main/java/br/com/aegispatrimonio/repository/ManutencaoSpecification.java:26` e auditoria de concatenação de strings SQL nas camadas `repository/` e `service/` — superfície de risco prioritária desta decisão.
+  2. **Gate de testes (NFR-M01):** implementar pipeline com gate de cobertura > 80% antes de qualquer evolução do acesso a dados — hoje não há scripts no `package.json` nem configuração de pipeline verificável (lacuna 3).
+  3. **Refatoração de hotspots (NFR-M02):** quebrar `AtivoMapper.toDTO` (complexidade 14) e `ManutencaoSpecification.build` (14) em unidades menores, preservando os contratos — alvo ≤ 10.
+  4. **Validação de performance no motor real:** quando o motor de banco for verificado (lacuna 1), validar índices e planos de execução das consultas dinâmicas contra NFR-P01/P04 e reavaliar o TODO de `AtivoService.java:119` (até 1.000 candidatos + ranking em memória) antes do go-live.
+  5. **Documentação do contrato de dados:** produzir [[db-schema-spec]] e [[db-domain-model]] — nenhuma tabela foi detectada na varredura.
+  6. **ADRs dependentes:** registrar em ADRs próprias a decisão do motor de banco de dados (lacuna 1 — pendência de maior impacto arquitetural segundo o SAD, Seção 13), a estratégia de cache para relatórios (R-03/NFR-P04), o escalonamento horizontal (NFR-S02) e a estratégia de backup/restore (NFR-A03).
+* **Prazo estimado de migração:** não aplicável como migração — a decisão formaliza a abordagem existente. Para as ações 1–3: [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — nenhum prazo ou planejamento de sprint está registrado nos artefatos-fonte; sequenciamento sugerido: ação 1 (parametrização) antes do go-live; ação 2 (gate de testes) imediatamente em seguida; ação 3 (refatoração) condicionada ao gate ativo.
+* **Rollback plan:** se os trade-offs de produtividade/qualidade se provarem insustentáveis após o gate de testes estar ativo (NFR-M01), reverter incrementalmente para a Option C (híbrido) [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]: adotar ORM/query builder (produto a selecionar em POC — nenhum candidato documentado nos artefatos-fonte) começando por um módulo de CRUD de baixo risco, mantendo SQL cru nos caminhos críticos (relatórios RF-17, filtragem de manutenção RF-15/RF-22). Pré-condições objetivas de reversão: (a) gate de cobertura > 80% ativo; (b) POC comparando planos de execução e latência contra NFR-P01/P04; (c) motor de banco verificado (lacuna 1). A reversão total (Option B) só seria reavaliada se a Option C também não atender aos critérios.
 
 ## 8. Links & References
-* SAD Seção 2 (Tech Stack Justification), Seção 5 (Data Modeling), Seção 7 (Scalability — gargalos 2, 3), Seção 12 (Trade-offs)
-* NFR-CO02, NFR-S03, NFR-P01, NFR-P04, NFR-SEC03, NFR-SEC05, NFR-M02, NFR-M04
-* Diagnóstico determinístico: `ManutencaoSpecification.build:26` (complexidade 14), `AtivoMapper.toDTO:15` (complexidade 14), `AlertNotificationService.checkResourceUsageAlerts:96` (complexidade 17), "nenhum ORM/query builder encontrado"
-* ADR-001 (Monolito Modular) — decisão correlata (transações ACID locais facilitadas por SQL cru)
-* Issue: `#ARCH-002` (formalizar ADR-002 na Sprint 0)
-* Documentação: `db-schema-spec.md` (a criar), `db-migration-spec.md` (a criar), `security-policies.md` (a criar — seção injeção SQL)
+
+* **System Architecture Document (SAD) v1.0** — Seção 2 (Tech Stack Justification), Seção 5 (Data Modeling), Seção 12 (Trade-offs & Known Limitations — análise do trade-off SQL cru sem ORM), Seção 13 (Future Evolution — ADRs a formalizar).
+* **Non-Functional Requirements ([[nfr]]) v1.0** — NFR-P01, NFR-P04 (performance); NFR-SEC06 (SQL 100% parametrizado); NFR-M01 (gate de cobertura > 80%), NFR-M02 (complexidade ≤ 10), NFR-M04 (débito técnico); NFR-S01 (escrita concorrente), NFR-A03 (backup/RPO).
+* **Diagnóstico determinístico do codebase** — varredura AST real: 350 arquivos, 1.268 funções, 344 classes, 27.537 LOC; achados estruturais citados: `ManutencaoSpecification.java:26`, `AtivoMapper.java:15`, `AtivoService.java:119` (TODO), `Usuario.java:86` (stub), `RealisticDataSeeder.java:34`.
+* **Código-fonte:** `src/main/java/br/com/aegispatrimonio/repository/ManutencaoSpecification.java`, `src/main/java/br/com/aegispatrimonio/mapper/AtivoMapper.java`, `src/main/java/br/com/aegispatrimonio/service/AtivoService.java`, `src/main/java/br/com/aegispatrimonio/config/seeder/RealisticDataSeeder.java`.
+* **Artefatos relacionados a produzir:** [[db-schema-spec]], [[db-domain-model]], [[db-migration-spec]], [[uml-diagrams]].
+* **ADRs relacionadas:** nenhuma ADR formal anterior existe (verificado no SAD) — esta é a primeira (ADR-001). Pendentes de formalização (SAD, Seção 13): motor de banco de dados (lacuna 1), estratégia de cache para relatórios (R-03/NFR-P04), escalonamento horizontal (NFR-S02), estratégia de backup/restore (NFR-A03).
+* **Issues/tickets:** nenhum ticket registrado nos artefatos-fonte — vincular a issue correspondente na ratificação, se existir [REQUER VALIDAÇÃO HUMANA].

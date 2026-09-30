@@ -1,531 +1,359 @@
-# UML & C4 Diagrams (Diagram as Code) — Aegis Patrimônio
+# UML & C4 Diagrams (Diagram as Code) — Sistema de Gestão de Patrimônio (A4)
 
 > **Versão:** 1.0 · **Owner:** Arquitetura/Eng Lead · **Status:** Draft
 > Este artefato segue a abordagem **Diagram as Code (DaC)**: os diagramas são texto versionado (Mermaid), nunca imagens estáticas coladas aqui. Toda alteração de arquitetura relevante deve atualizar este arquivo no mesmo PR que altera o código.
+> **Fontes:** [[system-architecture]] (SAD v1.0 — fonte primária), [[nfr]] (via SAD), diagnóstico determinístico do codebase (varredura AST real — 350 arquivos, 1.268 funções, 344 classes, 27.537 LOC).
+> **Referência cruzada:** o SAD (Seção 3) aponta este artefato como local oficial do diagrama de containers C4, que até então não havia sido produzido.
+> **Aviso de fidelidade aos dados:** a varredura determinística **não detectou rotas/handlers declarados** nem **tabelas de banco** no código. Os fluxos de sequência abaixo derivam do SAD/NFR/BRD e dos nomes de classes verificadas; caminhos de endpoint aparecem como "rota não confirmada" e os estados de manutenção como inferidos. Todo elemento não verificável no código carrega o rótulo **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** com as premissas declaradas.
 
-<!-- source: system-architecture.md#L1-L50 -->
+---
 
 ## 1. Diagrama de Containers (C4 Model — Nível 2)
 
+O sistema é um **monolito server-side único** (SAD, Seção 3): um backend Java que concentra autenticação, regras de negócio e acesso a dados, consumido por um frontend web via HTTP síncrono. **Não há filas, cache, serviços independentes nem integrações externas de negócio detectadas no codebase** (SAD, Seções 2 e 6). O único elemento externo modelado é o monitor de observabilidade, inferido do NFR-O01.
+
 ```mermaid
 C4Container
-    title Diagrama de Containers - Aegis Patrimônio
+    title Diagrama de Containers — Sistema de Gestão de Patrimônio (A4)
 
-    Person(usuario, "Usuário Final", "Gestor, Operador, Auditor ou Admin acessando via navegador")
-    Person(admin, "Administrador de Sistema", "Operações de infra, deploy, backup, rotação de segredos")
+    Person(usuario, "Usuário (Admin/User)", "Acessa via navegador desktop/tablet (NFR-U01)")
 
-    System_Boundary(sistema, "Aegis Patrimônio - Monolito Modular") {
-        Container(frontend, "Frontend (Static Assets)", "Vanilla JS ES2022 + @popperjs/core", "SPA servida como arquivos estáticos: login, dashboard, cadastro de ativos, solicitação de manutenção, visualização de alertas")
-        Container(api, "Web/API Module", "Spring Boot 3.x (Spring MVC, Security, Doc)", "Endpoints REST: CRUD Ativos, Manutenções, Health Checks, Alertas, Autenticação JWT, Auditoria; serve frontend estático")
-        Container(domain, "Domain Services", "Java Spring @Service", "Regras de negócio: AtivoService, ManutencaoService, AlertNotificationService, HealthCheckService, AuditoriaService")
-        Container(scheduler, "Scheduler / Jobs", "Spring TaskScheduler / @Scheduled", "Jobs periódicos: checkResourceUsageAlerts (≤30s/12k ativos), updateHealthCheck")
-        ContainerDb(db_primary, "Primary Database", "Motor relacional TBD (PostgreSQL/Oracle/SQL Server/MySQL)", "Persistência transacional: Ativos, Manutenções, HealthChecks, Usuários, Auditoria, Configurações; HikariCP 500 conn")
-        ContainerDb(db_replica, "Read Replica", "Mesmo motor do primário (replicação nativa)", "Consultas analíticas (custoTotalPorAtivo), health checks de leitura, offload de relatórios")
-        Container(worm, "WORM Audit Storage", "Object Storage S3/MinIO/GCS + Object Lock", "Logs de auditoria imutáveis (append-only) para operações de escrita - SOX 7 anos, LGPD")
+    System_Boundary(a4, "Sistema de Gestão de Patrimônio (A4) — monolito server-side") {
+        Container(fe, "Frontend Web", "JavaScript + @popperjs/core ^2.11.8 (sem framework SPA)", "Interface responsiva, consumo da API via services/api.js, limpeza de sessão no logout (RF-25)")
+        Container(be, "Backend / API", "Java — pacote br.com.aegispatrimonio (framework não verificado)", "Autenticação JWT (NFR-SEC01), RBAC Admin/User (NFR-SEC04), validação de entrada (NFR-SEC05), regras de negócio de ativos e manutenção")
+        ContainerDb(db, "Banco de Dados", "Motor NÃO especificado — SQL cru, sem ORM", "Ativos, manutenções, usuários e trilha de auditoria (nenhuma tabela detectada na varredura)")
     }
 
-    System_Ext(idp, "Identity Provider (Futuro)", "Keycloak / Azure AD / Okta / AD FS", "Autenticação corporativa, MFA para ADMIN, integração AD/LDAP/OIDC")
-    System_Ext(email, "Email / Notification Service", "SMTP / REST / Webhook", "Envio de alertas, aprovações, notificações")
-    System_Ext(obs, "Observability Stack", "Prometheus/Grafana/Alertmanager/Loki/Tempo (a definir)", "Coleta logs JSON, métricas Prometheus, traces OpenTelemetry, alertas")
-    System_Ext(vault, "Secret Manager", "HashiCorp Vault / AWS Secrets Manager", "Rotação de segredos a cada 90 dias (JWT keys, DB passwords, certs)")
-    System_Ext(backup, "Backup / Restore Tool", "Native DB tools / pgBackRest / RMAN", "Snapshot diário + WAL/log shipping; runbook restore < 4h")
+    System_Ext(mon, "Monitor de uptime/APM", "Ferramenta a definir — consumiria /health e /metrics, endpoints não confirmados (NFR-O01) — INFERIDO POR IA")
 
-    Rel(usuario, frontend, "Acessa via HTTPS", "TLS 1.2+")
-    Rel(frontend, api, "Requisições REST/JSON", "HTTPS/JSON")
-    Rel(api, domain, "Chamadas in-process", "Java direto")
-    Rel(domain, scheduler, "Agenda/Dispara jobs", "@Async / TaskScheduler")
-    Rel(domain, db_primary, "Lê/Escreve (JDBC/HikariCP)", "Prepared Statements / SQL cru")
-    Rel(domain, db_replica, "Lê (ReadOnly)", "JDBC ReadOnly")
-    Rel(domain, worm, "Grava auditoria (assíncrono)", "S3 API + Object Lock")
-    Rel(api, idp, "Autentica/Valida tokens", "OIDC / SAML 2.0 / LDAP")
-    Rel(domain, email, "Envia notificações", "SMTP / REST / Webhook")
-    Rel(api, obs, "Exporta métricas/logs/traces", "OTLP gRPC / Prometheus scrape / stdout JSON")
-    Rel(api, vault, "Busca segredos em runtime", "HTTPS API")
-    Rel(backup, db_primary, "Backup diário + WAL shipping", "Native protocol")
-    Rel(admin, api, "Admin endpoints /actuator/*", "HTTPS (rede restrita)")
-    Rel(admin, obs, "Dashboards / Alertas", "HTTPS")
-    Rel(db_primary, db_replica, "Replicação nativa", "Sync/Async replication")
+    Rel(usuario, fe, "Usa", "HTTPS obrigatório em produção, TLS 1.2+ (NFR-SEC03)")
+    Rel(fe, be, "Requisições HTTP síncronas com token JWT", "HTTP/JSON via função request (api.js, linha 54)")
+    Rel(be, db, "Lê e escreve via SQL 100% parametrizado", "SQL (NFR-SEC06)")
+    Rel(mon, be, "Consulta indicadores", "HTTP /health e /metrics (não confirmados)")
 ```
 
-<!-- source: system-architecture.md#L51-L150 -->
+**Premissas e observações do diagrama:**
+
+- **Monitor de uptime/APM** [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]: inferido do NFR-O01 e da topologia do SAD (Seção 11). Nenhum componente de monitoramento existe no codebase e os endpoints `/health` e `/metrics` não estão confirmados (lacuna 5 do NFR). Premissa adotada: monitor externo consumindo os endpoints via HTTP.
+- **Elementos deliberadamente não modelados:** filas/mensageria (nenhuma detectada — SAD, Seção 2), cache (nenhuma tecnologia verificada — SAD, Seção 7), integrações externas de negócio como pagamento, ERP e e-mail (nenhuma detectada — SAD, Seção 6) e balanceador/múltiplas instâncias (topologia atual — SAD, Seção 11). A topologia-alvo com balanceador (NFR-S02) permanece no SAD e não é duplicada aqui.
+- **Backend como container único:** as camadas internas (`config`, `mapper`, `model`, `repository`, `service`) não são visíveis neste nível e são detalhadas na Seção 3 deste artefato.
+- **Banco de dados:** o motor real é a lacuna de verificação de maior impacto (SAD, Seção 12, item 1); enquanto não verificado, o container permanece rotulado como "motor NÃO especificado".
+
+---
 
 ## 2. Diagramas de Sequência (Fluxos Críticos)
 
-### 2.1 Autenticação e Autorização (JWT + RBAC)
+> **Nota de fidelidade:** não há artefato `user-flows` disponível e a varredura **não detectou rotas declaradas no código**. Os fluxos abaixo derivam dos requisitos referenciados no SAD (RFs/UCs do NFR/BRD) e das classes verificadas (`AtivoService`, `AlertNotificationService`, `ManutencaoSpecification`, `AtivoMapper`, `Usuario`). Os rótulos "rota não confirmada" indicam que o caminho HTTP exato precisa ser confirmado no codebase antes de este diagrama ser considerado definitivo.
+
+### 2.1 Autenticação — Login (RF-23)
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Usuario as Usuário Final
-    participant Frontend as Frontend (Vanilla JS)
-    participant API as Web/API Module (Spring Boot)
-    participant Security as Spring Security Filter Chain
-    participant IDP as Identity Provider (Futuro)
-    participant DB as Primary Database
-    participant Vault as Secret Manager
+    actor Usuario as Usuário (Admin/User)
+    participant FE as Frontend Web (frontend/)
+    participant API as Backend Java (br.com.aegispatrimonio)
+    participant DB as Banco de Dados (motor a verificar)
 
-    Usuario->>Frontend: Insere credenciais (email/senha)
-    Frontend->>API: POST /api/auth/login {email, password}
-    API->>Security: AuthenticationManager.authenticate()
-    Security->>DB: Busca Usuario + Roles (prepared statement)
-    DB-->>Security: Usuario + Roles (ADMIN/GESTOR/OPERADOR/AUDITOR)
+    Usuario->>FE: Informa credenciais (RF-23)
+    FE->>API: Requisição de login — rota não confirmada no codebase
+    API->>DB: Consulta credenciais do Usuario (SQL parametrizado — NFR-SEC06)
+    DB-->>API: Registro do usuário
     alt Credenciais válidas
-        Security->>Vault: Busca chave de assinatura JWT (rotação 90 dias)
-        Vault-->>Security: Chave RS256/HS256
-        Security->>Security: Gera Access Token (exp ≤ 1h) + Refresh Token (rotation + jti)
-        Security-->>API: Authentication success
-        API-->>Frontend: 200 OK {accessToken, refreshToken, roles}
-        Frontend->>Frontend: Armazena tokens (memory/secure storage)
+        API-->>FE: 200 OK — access token (1h) + refresh token (7d) (NFR-SEC01)
+        FE->>FE: Armazena tokens e inicia sessão local
     else Credenciais inválidas
-        Security-->>API: AuthenticationException
-        API-->>Frontend: 401 Unauthorized
-        Frontend-->>Usuario: Exibe erro de login
-    end
-    Note over Frontend,API: Requisições subsequentes incluem Authorization: Bearer <accessToken>
-    Usuario->>Frontend: Acessa funcionalidade (ex: cadastrar ativo)
-    Frontend->>API: GET/POST /api/ativos + Bearer token
-    API->>Security: JwtAuthenticationFilter valida token (assinatura, exp, jti blocklist)
-    alt Token válido + Role autorizada (@PreAuthorize)
-        Security->>DB: Verifica permissões RBAC (BR-01)
-        DB-->>Security: Permissão concedida
-        Security-->>API: Acesso autorizado
-        API->>Domain: AtivoService.criar()
-        Domain->>DB: INSERT Ativo (prepared statement)
-        Domain->>WORM: AuditoriaService.gravar(criar, payload completo) [async]
-        DB-->>Domain: Ativo persistido
-        Domain-->>API: AtivoDTO
-        API-->>Frontend: 201 Created {ativo}
-        Frontend-->>Usuario: Sucesso
-    else Token inválido/expirado
-        Security-->>API: 401 Unauthorized
-        API-->>Frontend: 401
-        Frontend->>Frontend: Tenta refresh token / redireciona login
-    else Token válido + Role NÃO autorizada
-        Security-->>API: 403 Forbidden
-        API-->>Frontend: 403
-        Frontend-->>Usuario: Acesso negado
+        API-->>FE: 401 Unauthorized (CA-06)
+        FE-->>Usuario: Mensagem de erro de autenticação
     end
 ```
 
-<!-- source: system-architecture.md#L151-L250; NFR-SEC02, BR-01 -->
+**Observações:** o mecanismo de hash de senhas no backend **não pôde ser verificado** na varredura de dependências (SAD, Seção 9; lacuna 2 do NFR) — verificação obrigatória antes de aprovar os requisitos de autenticação. O caminho exato de validação dentro do backend não é detectável pela varredura AST.
 
-### 2.2 Cadastro e Gestão de Ativo Patrimonial
+### 2.2 Autenticação — Refresh de token (RF-24)
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Gestor as Gestor (role GESTOR/ADMIN)
-    participant Frontend as Frontend
-    participant API as Web/API Module
-    participant AtivoSvc as AtivoService
-    participant Mapper as AtivoMapper
-    participant DB as Primary Database
-    participant WORM as WORM Audit Storage
-    participant Replica as Read Replica
+    actor Usuario as Usuário (Admin/User)
+    participant FE as Frontend Web (frontend/)
+    participant API as Backend Java (br.com.aegispatrimonio)
 
-    Gestor->>Frontend: Preenche formulário "Novo Ativo" (tag, descrição, valor, local, responsável)
-    Frontend->>API: POST /api/ativos {tag, descricao, valorAquisicao, localId, responsavelId, ...}
-    API->>AtivoSvc: criar(AtivoDTO)
-    AtivoSvc->>AtivoSvc: Validações de negócio (tag única, valor > 0, local existe, responsável ativo)
-    alt Validação falha
-        AtivoSvc-->>API: ValidationException
-        API-->>Frontend: 400 Bad Request {errors}
-        Frontend-->>Gestor: Exibe erros de validação
-    else Validação OK
-        AtivoSvc->>DB: INSERT INTO ativo ... (prepared statement, generated keys)
-        DB-->>AtivoSvc: AtivoEntity (id gerado)
-        AtivoSvc->>Mapper: toDTO(AtivoEntity) [complexidade 14 - refatorar]
-        Mapper-->>AtivoSvc: AtivoDTO enriquecido
-        AtivoSvc->>WORM: AuditoriaService.gravarAsync(OPERACAO=CRIAR, ENTIDADE=ATIVO, PAYLOAD=AtivoDTO) [fire-and-forget]
-        AtivoSvc-->>API: AtivoDTO
-        API-->>Frontend: 201 Created {ativo}
-        Frontend-->>Gestor: Sucesso - ativo criado
+    Usuario->>FE: Acessa área protegida com access token expirado
+    FE->>API: Requisição com refresh token (RF-24) — rota não confirmada
+    alt Refresh token válido (dentro da janela de 7 dias)
+        API-->>FE: 200 OK — novo access token (1h) (NFR-SEC01)
+        FE->>FE: Renova sessão local
+    else Refresh token expirado ou inválido
+        API-->>FE: 401 Unauthorized (CA-06)
+        FE->>FE: clearSession — limpa sessão local (RF-25)
+        FE-->>Usuario: Redirecionamento para o login
     end
-    Note over Gestor,Replica: Consulta posterior (listagem/dashboard)
-    Gestor->>Frontend: Acessa dashboard / lista ativos
-    Frontend->>API: GET /api/ativos?page=0&size=20&sort=tag
-    API->>AtivoSvc: listarPaginado(Pageable)
-    AtivoSvc->>Replica: SELECT * FROM ativo ORDER BY tag LIMIT 20 OFFSET 0 (ReadOnly)
-    Replica-->>AtivoSvc: List<AtivoEntity>
-    AtivoSvc->>Mapper: toDTO(list) [batch mapping]
-    Mapper-->>AtivoSvc: List<AtivoDTO>
-    AtivoSvc-->>API: Page<AtivoDTO>
-    API-->>Frontend: 200 OK {content, totalElements, ...}
-    Frontend-->>Gestor: Renderiza tabela com @popperjs/core tooltips
 ```
 
-<!-- source: system-architecture.md#L251-L350; AtivoMapper.toDTO complexity 14 -->
-
-### 2.3 Solicitação e Aprovação de Manutenção
+### 2.3 Autenticação — Logout e invalidação via blocklist (RF-25 / CA-08)
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Operador as Operador (role OPERADOR)
-    actor Gestor as Gestor (role GESTOR/ADMIN)
-    participant Frontend as Frontend
-    participant API as Web/API Module
-    participant ManutSvc as ManutencaoService
-    participant Spec as ManutencaoSpecification
-    participant DB as Primary Database
-    participant WORM as WORM Audit Storage
-    participant Email as Email Service
+    actor Usuario as Usuário (Admin/User)
+    participant FE as Frontend Web (frontend/)
+    participant API as Backend Java (br.com.aegispatrimonio)
+    participant BL as Blocklist de tokens (server-side)
 
-    Operador->>Frontend: Clica "Solicitar Manutenção" no ativo
-    Frontend->>API: POST /api/manutencoes {ativoId, tipo, descricao, prioridade, dataSolicitada}
-    API->>ManutSvc: solicitar(ManutencaoDTO)
-    ManutSvc->>DB: Verifica ativo existe e está ativo
-    alt Ativo inválido
-        ManutSvc-->>API: EntityNotFoundException
-        API-->>Frontend: 404 Not Found
-    else Ativo válido
-        ManutSvc->>DB: INSERT INTO manutencao (status=SOLICITADA, solicitanteId=currentUser, ...)
-        DB-->>ManutSvc: ManutencaoEntity (id gerado)
-        ManutSvc->>WORM: AuditoriaService.gravarAsync(CRIAR, MANUTENCAO, payload)
-        ManutSvc-->>API: ManutencaoDTO
-        API-->>Frontend: 201 Created
-        Frontend-->>Operador: Solicitação enviada
-    end
-    Note over Gestor,Email: Fluxo de aprovação (pode ser horas/dias depois)
-    Gestor->>Frontend: Acessa "Manutenções Pendentes"
-    Frontend->>API: GET /api/manutencoes?status=SOLICITADA
-    API->>ManutSvc: listarPorStatus(SOLICITADA)
-    ManutSvc->>Spec: build(filtros) [complexidade 14 - índices compostos críticos]
-    Spec-->>ManutSvc: Specification<Manutencao>
-    ManutSvc->>DB: SELECT * FROM manutencao WHERE status=SOLICITADA (usando spec)
-    DB-->>ManutSvc: List<ManutencaoEntity>
-    ManutSvc-->>API: List<ManutencaoDTO>
-    API-->>Frontend: 200 OK
-    Frontend-->>Gestor: Lista exibida
-    Gestor->>Frontend: Clica "Aprovar" na manutenção #123
-    Frontend->>API: PATCH /api/manutencoes/123/aprovar {aprovadorId, observacao}
-    API->>ManutSvc: aprovar(123, aprovadorId, observacao)
-    ManutSvc->>DB: UPDATE manutencao SET status=APROVADA, aprovadorId=?, dataAprovacao=NOW() WHERE id=123
-    ManutSvc->>WORM: AuditoriaService.gravarAsync(APROVAR, MANUTENCAO, payload antes/depois)
-    ManutSvc->>Email: Notifica solicitante + equipe técnica (template aprovação)
-    Email-->>ManutSvc: Enviado (async)
-    ManutSvc-->>API: ManutencaoDTO atualizada
-    API-->>Frontend: 200 OK
-    Frontend-->>Gestor: Aprovado com sucesso
+    Usuario->>FE: Solicita logout (RF-25)
+    FE->>API: Requisição de logout com access token — rota não confirmada
+    API->>BL: Adiciona token à blocklist — invalidação server-side (CA-08)
+    BL-->>API: Token invalidado
+    API-->>FE: Confirmação de logout
+    FE->>FE: clearSession — limpa sessão local (RF-25)
+    FE-->>Usuario: Sessão encerrada
 ```
 
-<!-- source: system-architecture.md#L351-L450; ManutencaoSpecification.build complexity 14 -->
+**Observações:** o participante "Blocklist de tokens" representa o **requisito CA-08** (SAD, Seção 9), não uma tecnologia confirmada — o mecanismo de armazenamento efetivo não é verificável no codebase e é o estado compartilhado que condiciona o escalonamento horizontal (NFR-S02) [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA quanto ao mecanismo de armazenamento].
 
-### 2.4 Job Crítico: Verificação de Alertas de Recursos (checkResourceUsageAlerts)
+### 2.4 Consulta de ativos com paginação server-side (RF-14 / RF-15)
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Scheduler as Spring TaskScheduler
-    participant AlertSvc as AlertNotificationService
-    participant DB as Primary Database
-    participant Replica as Read Replica
-    participant WORM as WORM Audit Storage
-    participant Email as Email Service
-    participant Obs as Observability (Metrics/Logs)
+    actor Usuario as Usuário (Admin/User)
+    participant FE as Frontend Web (frontend/)
+    participant API as Backend Java (br.com.aegispatrimonio)
+    participant DB as Banco de Dados (motor a verificar)
 
-    Note over Scheduler,Obs: Executado a cada 30s (NFR-P04: ≤30s para 12k ativos)
-    Scheduler->>AlertSvc: @Scheduled(fixedDelay=30000) checkResourceUsageAlerts()
-    AlertSvc->>Obs: Inicia span OpenTelemetry "checkResourceUsageAlerts"
-    AlertSvc->>Replica: SELECT a.id, a.tag, a.tipo, h.cpu_usage, h.mem_usage, h.disk_usage, h.timestamp\nFROM ativo a\nJOIN health_check h ON h.ativo_id = a.id\nWHERE h.timestamp > NOW() - INTERVAL '5 minutes'\nAND a.ativo = true\nORDER BY a.id [otimizado com índice composto (ativo_id, timestamp)]
-    Replica-->>AlertSvc: List<HealthCheckRecente> (até 12k registros)
-    alt Query > 5s (degradação)
-        AlertSvc->>Obs: Métrica job.query.duration > 5s + log WARN
+    Usuario->>FE: Abre a listagem de ativos (RF-14)
+    FE->>API: Requisição de listagem com página e filtros — rota não confirmada
+    API->>DB: Consulta paginada server-side (NFR-S04) — SQL parametrizado
+    DB-->>API: Página de ativos + total de registros
+    alt Requisição autenticada e válida
+        API-->>FE: 200 OK — página de ativos (DTOs via AtivoMapper)
+        FE-->>Usuario: Exibe listagem paginada
+    else Sessão inválida ou ausente
+        API-->>FE: 401 Unauthorized (CA-06)
+        FE-->>Usuario: Solicita nova autenticação
     end
-    par Processamento em lote (paralelismo controlado)
-        AlertSvc->>AlertSvc: Para cada ativo: avalia thresholds (CPU>80%, MEM>85%, DISK>90%)
-        AlertSvc->>AlertSvc: Agrupa alertas por ativo + severidade (CRITICAL/WARNING/INFO)
-        AlertSvc->>DB: INSERT INTO alerta (ativo_id, tipo, severidade, mensagem, timestamp) ON CONFLICT DO NOTHING
-        AlertSvc->>WORM: AuditoriaService.gravarAsync(ALERTA_GERADO, ALERTA, payload) [batch async]
-        AlertSvc->>Email: Envia notificações CRITICAL (async, circuit breaker Resilience4j)
-    and Métricas de performance
-        AlertSvc->>Obs: Registra métricas: job.duration, job.assets_processed, job.alerts_generated, job.errors
-    end
-    alt Falha no job (exception não tratada)
-        AlertSvc->>Obs: Incrementa counter job.failure + log ERROR com stacktrace
-        AlertSvc->>Obs: Alerta Alertmanager: "checkResourceUsageAlerts falhou"
-    else Sucesso
-        AlertSvc->>Obs: Finaliza span com status OK
-    end
-    Note over AlertSvc: Complexidade ciclomática 17 - REQUER REFACTORING (NFR-M02)\nDividir em: fetchHealthChecks, evaluateThresholds, persistAlerts, notifyCritical
 ```
 
-<!-- source: system-architecture.md#L451-L550; AlertNotificationService.checkResourceUsageAlerts complexity 17, NFR-P04 -->
+**Observações:** o detalhe do ativo (RF-15) segue o mesmo caminho de consulta; ID inexistente retorna **404 Not Found** padronizado (NFR-SEC05). A paginação server-side é **obrigatória em toda listagem** (NFR-S04) — o frontend nunca recebe listagens não paginadas.
 
-### 2.5 Health Check de Ativo e Atualização Periódica
+### 2.5 Solicitação de manutenção (RF-18 / UC-02)
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Scheduler as Spring TaskScheduler
-    participant HealthSvc as HealthCheckService
-    participant DB as Primary Database
-    participant Replica as Read Replica
-    participant WORM as WORM Audit Storage
-    participant Obs as Observability
+    actor Usuario as Usuário (Admin/User)
+    participant FE as Frontend Web (frontend/)
+    participant API as Backend Java (br.com.aegispatrimonio)
+    participant DB as Banco de Dados (motor a verificar)
 
-    Note over Scheduler,Obs: Executado a cada 5min (configurável) - updateHealthCheck
-    Scheduler->>HealthSvc: @Scheduled(fixedDelay=300000) updateHealthCheck()
-    HealthSvc->>Replica: SELECT id, tag, tipo, endpoint_monitoramento FROM ativo WHERE ativo=true AND monitorado=true
-    Replica-->>HealthSvc: List<AtivoMonitorado>
-    par Para cada ativo (paralelo com semáforo max 50 concurrent)
-        HealthSvc->>HealthSvc: Executa check específico por tipo (SNMP, SSH, HTTP, Ping, Agent)
-        alt Check bem-sucedido
-            HealthSvc->>DB: INSERT INTO health_check (ativo_id, cpu, mem, disk, status=UP, timestamp=NOW())
-        else Check falhou / timeout
-            HealthSvc->>DB: INSERT INTO health_check (ativo_id, status=DOWN, erro=?, timestamp=NOW())
-            HealthSvc->>WORM: AuditoriaService.gravarAsync(HEALTH_CHECK_FALHA, HEALTH_CHECK, payload)
-        end
-    and Métricas agregadas
-        HealthSvc->>Obs: Métricas: health_check.duration, health_check.up_count, health_check.down_count
+    Usuario->>FE: Preenche solicitação de manutenção para um ativo (RF-18)
+    FE->>API: Requisição de criação de solicitação — rota não confirmada
+    API->>API: Validação de entrada server-side (NFR-SEC05)
+    alt Payload válido
+        API->>DB: Grava solicitação + registro de auditoria (NFR-SEC07)
+        DB-->>API: Solicitação persistida
+        API-->>FE: Resposta de sucesso (status exato não confirmado no codebase)
+        FE-->>Usuario: Confirmação de solicitação registrada
+    else Payload inválido
+        API-->>FE: 400 Bad Request com mensagens claras (NFR-SEC05)
+        FE-->>Usuario: Exibe erros de validação
     end
-    HealthSvc->>Obs: Log estruturado JSON {timestamp, level=INFO, traceId, message="Health check cycle completed", assetsChecked=X, up=Y, down=Z}
-    Note over HealthSvc: Indicador customizado em /actuator/health inclui:\n- DB connectivity\n- Scheduler last run status\n- Disk space\n- WORM storage accessibility
 ```
 
-<!-- source: system-architecture.md#L551-L650; NFR-O02 -->
+**Observações:** este é o fluxo de **maior prioridade de disponibilidade** (NFR-A04/RNF-08): falhas em componentes não críticos — em especial as notificações de alerta — não devem impedir a criação da solicitação (NFR-A05). A propagação de **request ID** do frontend para o backend (NFR-O02) deve ser implementada neste boundary para correlação.
 
-### 2.6 Consulta Analítica: Custo Total por Ativo (Read Replica Offload)
+### 2.6 Aprovação de manutenção (UC-03)
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Auditor as Auditor (role AUDITOR)
-    participant Frontend as Frontend
-    participant API as Web/API Module
-    participant AtivoSvc as AtivoService
-    participant Cache as Cache L1 (Caffeine - Inferido)
-    participant Replica as Read Replica
-    participant WORM as WORM Audit Storage
+    actor Admin as Administrador
+    participant FE as Frontend Web (frontend/)
+    participant API as Backend Java (br.com.aegispatrimonio)
+    participant DB as Banco de Dados (motor a verificar)
 
-    Auditor->>Frontend: Acessa relatório "Custo Total por Ativo"
-    Frontend->>API: GET /api/relatorios/custo-total-por-ativo?ano=2024
-    API->>AtivoSvc: gerarRelatorioCustoTotal(2024)
-    AtivoSvc->>Cache: Get "custoTotalPorAtivo:2024"
-    alt Cache HIT (TTL 5-15 min)
-        Cache-->>AtivoSvc: Relatório pré-computado
-        AtivoSvc-->>API: RelatórioDTO
-        API-->>Frontend: 200 OK (rápido)
-    else Cache MISS
-        AtivoSvc->>Replica: SELECT a.id, a.tag, a.descricao,\n       COALESCE(SUM(m.custo),0) as custo_manutencoes,\n       COALESCE(SUM(aq.valor),0) as valor_aquisicao,\n       (COALESCE(SUM(m.custo),0) + COALESCE(SUM(aq.valor),0)) as custo_total\nFROM ativo a\nLEFT JOIN manutencao m ON m.ativo_id = a.id AND m.status IN ('CONCLUIDA','APROVADA') AND EXTRACT(YEAR FROM m.data_conclusao) = 2024\nLEFT JOIN aquisicao aq ON aq.ativo_id = a.id AND EXTRACT(YEAR FROM aq.data) = 2024\nGROUP BY a.id, a.tag, a.descricao\nORDER BY custo_total DESC
-        Replica-->>AtivoSvc: ResultSet (pode ser lento - query pesada)
-        AtivoSvc->>AtivoSvc: Constrói RelatórioDTO
-        AtivoSvc->>Cache: Put "custoTotalPorAtivo:2024" (TTL 10 min)
-        AtivoSvc->>WORM: AuditoriaService.gravarAsync(CONSULTA_RELATORIO, RELATORIO_CUSTO, {ano:2024, usuario:auditorId})
-        AtivoSvc-->>API: RelatórioDTO
-        API-->>Frontend: 200 OK
+    Admin->>FE: Abre a fila de solicitações pendentes
+    FE->>API: Requisição de listagem de pendentes — rota não confirmada
+    API->>DB: Consulta filtrada de manutenções (ManutencaoSpecification.build — linha 26)
+    DB-->>API: Solicitações pendentes
+    API-->>FE: 200 OK — lista de pendentes
+    Admin->>FE: Aprova a solicitação (UC-03)
+    FE->>API: Requisição de aprovação — rota não confirmada
+    API->>API: Verifica papel (NFR-SEC04) e registra timestamp da transição (NFR-O04)
+    alt Papel Admin
+        API->>DB: Atualiza status da solicitação + auditoria (NFR-SEC07)
+        DB-->>API: Status atualizado
+        API-->>FE: Resposta de sucesso
+        FE-->>Admin: Confirmação de aprovação
+    else Papel User
+        API-->>FE: 403 Forbidden (RF-26 / RN-01/02 / CA-10)
+        FE-->>Admin: Operação negada
     end
-    Frontend-->>Auditor: Renderiza tabela/gráfico (export CSV/PDF)
-    Note over AtivoSvc,Replica: [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]\nCache L1 Caffeine assumido para custoTotalPorAtivo.\nSe read-replica insuficiente, avaliar Redis L2 distribuído.
 ```
 
-<!-- source: system-architecture.md#L651-L750; NFR-S01, cache strategy inferred -->
+**Observações:** o timestamp registrado na aprovação alimenta o KPI "tempo médio de aprovação abaixo de 4 horas úteis" (NFR-O04). A consulta filtrada (`ManutencaoSpecification.build`, complexidade 14) é superfície prioritária de revisão de índices e parametrização (NFR-P01/NFR-SEC06).
 
-## 3. Diagrama de Componentes (Visão Estática - Módulos Internos do Monolito)
+### 2.7 Relatório de custo total por ativo (RF-17)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Usuario as Usuário (Admin/User)
+    participant FE as Frontend Web (frontend/)
+    participant API as Backend Java (br.com.aegispatrimonio)
+    participant DB as Banco de Dados (motor a verificar)
+
+    Usuario->>FE: Solicita relatório de custo total por ativo (RF-17)
+    FE->>API: Requisição de relatório — rota não confirmada
+    API->>DB: Consulta agregada sobre 10.000+ ativos (SQL parametrizado)
+    DB-->>API: Dados agregados de custo
+    alt Consulta dentro da meta de performance
+        API-->>FE: Resposta de sucesso — relatório em até 3s p95 (NFR-P04)
+        FE-->>Usuario: Exibe relatório
+    else Consulta pesada (risco R-03 do BRD)
+        API-->>FE: Timeout ou degradação de resposta
+        FE-->>Usuario: Erro ou espera prolongada
+    end
+```
+
+**Observações:** nenhuma tecnologia de cache está verificada na stack — as mitigações do risco R-03 (cache externo, materialização de consultas) permanecem decisão pendente (SAD, Seção 7) [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA, caso venham a ser adotadas]. Gargalo relacionado do diagnóstico: `AtivoService.java:119` (TODO de performance — até 1.000 candidatos id+nome com ranking em memória), a reavaliar contra NFR-P01/P04 antes do go-live.
+
+### 2.8 Verificação de alertas — AlertNotificationService (in-process)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant DIS as Disparo interno (agendamento ou evento — modo não detectável)
+    participant ANS as AlertNotificationService (service/)
+    participant DB as Banco de Dados (motor a verificar)
+
+    DIS->>ANS: Executa checkResourceUsageAlerts (linha 96)
+    ANS->>DB: Consulta indicadores de uso de recursos
+    DB-->>ANS: Dados de uso coletados
+    alt Uso acima do limiar configurado
+        ANS->>ANS: Gera alerta de uso de recursos
+        ANS-->>DIS: Alerta registrado para notificação
+    else Uso dentro do limiar
+        ANS-->>DIS: Nenhuma ação necessária
+    end
+```
+
+**Observações:** [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] o modo de disparo (agendamento vs. evento) não é detectável pela varredura (SAD, Seção 4); não há fila/mensageria no codebase — a execução é in-process. `checkResourceUsageAlerts` tem a **maior complexidade ciclomática do codebase (17 — NFR-M02)**. Degradação graciosa (NFR-A05): falhas neste fluxo não devem bloquear autenticação (RF-23), consulta de ativos (RF-14/15) nem criação de solicitações (RF-18).
+
+---
+
+## 3. Diagrama de Componentes (visão estática)
+
+Este diagrama resolve a ambiguidade estrutural que o diagrama de containers não expõe: a **organização interna em camadas do monolito backend** (`config`, `mapper`, `model`, `repository`, `service` — verificadas pela varredura) e o ponto único de integração do frontend.
 
 ```mermaid
 graph TD
-    subgraph "Presentation Layer"
-        REST[REST Controllers\n@Valid + @PreAuthorize]
-        Static[Static Resource Handler\n/frontend/**]
-        Actuator[Actuator Endpoints\n/actuator/health, /actuator/prometheus]
+    subgraph FE["Frontend Web — frontend/ (15 arquivos .js)"]
+        APIJS["services/api.js — função request (linha 54, complexidade 13)"]
     end
 
-    subgraph "Security Layer"
-        FilterChain[SecurityFilterChain\nJWT + RBAC]
-        AuthMgr[AuthenticationManager]
-        JwtUtil[JwtTokenProvider\nRS256/HS256 + jti blocklist]
+    subgraph BE["Backend Java — br.com.aegispatrimonio (335 arquivos .java)"]
+        EP["Camada de endpoints HTTP — NÃO confirmada no codebase"]
+        SVC["service/ — AtivoService (TODO perf, linha 119) / AlertNotificationService (linha 96)"]
+        MAP["mapper/ — AtivoMapper.toDTO (linha 15, complexidade 14)"]
+        REPO["repository/ — ManutencaoSpecification.build (linha 26, complexidade 14)"]
+        MODEL["model/ — Usuario (stub setUsername, linha 86) / Ativo / Manutenção"]
+        CFG["config/ — configuração / RealisticDataSeeder.run (linha 34)"]
     end
 
-    subgraph "Application Services (Domain Layer)"
-        AtivoSvc[AtivoService\nCRUD + validações]
-        ManutSvc[ManutencaoService\nWorkflow: SOLICITADA→APROVADA→EM_ANDAMENTO→CONCLUIDA/CANCELADA]
-        AlertSvc[AlertNotificationService\ncheckResourceUsageAlerts (refatorar)]
-        HealthSvc[HealthCheckService\nupdateHealthCheck + custom indicators]
-        AuditSvc[AuditoriaService\nAsync WORM write + LGPD anonymization]
-        ConfigSvc[ConfiguracaoService\nCacheable lookups]
-    end
+    DB[("Banco de Dados — motor NÃO especificado / SQL cru, sem ORM")]
 
-    subgraph "Data Access Layer"
-        AtivoRepo[AtivoRepository\nJpaRepository + @Query natives]
-        ManutRepo[ManutencaoRepository\n+ ManutencaoSpecification]
-        HealthRepo[HealthCheckRepository]
-        UserRepo[UsuarioRepository\n+ Role/Permission queries]
-        AuditRepo[AuditoriaLogRepository\nWrite-only to WORM]
-        JdbcTpl[JdbcTemplate\nRaw SQL otimizado para relatórios]
-    end
-
-    subgraph "Mappers / Specifications"
-        AtivoMap[AtivoMapper.toDTO\n(complexidade 14 - refatorar)]
-        ManutSpec[ManutencaoSpecification.build\n(complexidade 14 - índices compostos)]
-    end
-
-    subgraph "Scheduler / Async"
-        TaskScheduler[TaskScheduler\nThreadPool: web, scheduler, audit]
-        AsyncExec[@Async Executors\nIsolamento bulkhead]
-    end
-
-    subgraph "External Integrations (Outbound)"
-        IdPClient[IdP Client\nOIDC/SAML/LDAP]
-        EmailClient[Email/Notification Client\nSMTP/REST + CircuitBreaker]
-        WormClient[WORM S3 Client\nObject Lock + Retry/Backoff]
-        ObsClient[OpenTelemetry SDK\nOTLP gRPC Exporter]
-        VaultClient[Vault/Secrets Client\nRotation 90 dias]
-    end
-
-    REST --> FilterChain
-    FilterChain --> AuthMgr
-    AuthMgr --> JwtUtil
-    JwtUtil --> VaultClient
-    REST --> AtivoSvc
-    REST --> ManutSvc
-    REST --> AlertSvc
-    REST --> HealthSvc
-    REST --> AuditSvc
-    Static --> Actuator
-    AtivoSvc --> AtivoRepo
-    AtivoSvc --> AtivoMap
-    ManutSvc --> ManutRepo
-    ManutSvc --> ManutSpec
-    HealthSvc --> HealthRepo
-    AuditSvc --> AuditRepo
-    AuditSvc --> WormClient
-    AtivoSvc --> JdbcTpl
-    ManutSvc --> JdbcTpl
-    AlertSvc --> TaskScheduler
-    HealthSvc --> TaskScheduler
-    TaskScheduler --> AsyncExec
-    AtivoSvc --> ConfigSvc
-    ManutSvc --> EmailClient
-    AlertSvc --> EmailClient
-    FilterChain --> IdPClient
-    REST --> ObsClient
-    AtivoSvc --> ObsClient
-    ManutSvc --> ObsClient
+    APIJS -->|"HTTP síncrono + JWT (NFR-SEC01)"| EP
+    EP --> SVC
+    SVC --> MAP
+    MAP --> MODEL
+    SVC --> REPO
+    REPO -->|"SQL 100% parametrizado (NFR-SEC06)"| DB
+    CFG -->|"Carga de dados realistas (risco R-02 do BRD)"| DB
 ```
 
-<!-- source: system-architecture.md#L751-L850; diagnostic AST classes -->
+**Observações:**
 
-## 4. Diagrama de Casos de Uso / Atividade (Fluxos de Negócio Principais)
+- A **camada de endpoints** é representada por completude do fluxo, mas **não foi detectada** pela varredura — os pontos de entrada HTTP do backend são lacuna de verificação (SAD, Seção 12, item 5).
+- `AtivoMapper.toDTO` (complexidade 14) indica mapeamento condicional extenso a revisar (NFR-M02).
+- `ManutencaoSpecification.build` constrói consultas dinâmicas; **sem ORM, é responsável direta por parametrização e índices** (NFR-SEC06/NFR-P01) — superfície prioritária de revisão de SQL injection.
+- O stub `Usuario.setUsername` com corpo vazio (linha 86) pode indicar bug funcional ou intencionalidade — **investigar com prioridade** (potencialmente relevante para autenticação RF-23/NFR-SEC01; lacuna 7 do NFR).
+- `RealisticDataSeeder` é **carga de dados, não migração de schema** (SAD, Seção 5) — executar em staging com validação (risco R-02 do BRD).
+
+---
+
+## 4. Diagrama de Casos de Uso / Atividade
+
+### 4.1 Fluxo lógico de requisição de escrita — RBAC e validação (RF-26 / NFR-SEC01/04/05/07)
 
 ```mermaid
 flowchart TD
-    Start([Início: Usuário autenticado]) --> Role{Role do Usuário}
-    
-    Role -->|ADMIN| AdminFlow[Gestão Completa\n- Usuários/Roles\n- Configurações sistema\n- Auditoria completa\n- Rotação segredos]
-    Role -->|AUDITOR| AuditorFlow[Acesso Leitura + Relatórios\n- Dashboard executivo\n- Custo total por ativo\n- Trilha auditoria imutável\n- Export SOX/LGPD]
-    Role -->|GESTOR| GestorFlow[Gestão Patrimonial\n- CRUD Ativos\n- Aprovar/Rejeitar Manutenções\n- Dashboards operacionais\n- Alertas críticos]
-    Role -->|OPERADOR| OperadorFlow[Operação Diária\n- Solicitar Manutenção\n- Acompanhar próprias solicitações\n- Visualizar Health Checks\n- Receber Alertas]
-    
-    AdminFlow --> AuditLog[AuditoriaService.gravarAsync\nTodas operações escrita\nWORM Storage]
-    AuditorFlow --> AuditLog
-    GestorFlow --> AuditLog
-    OperadorFlow --> AuditLog
-    
-    GestorFlow --> AtivoCRUD[(Ativo: Create/Read/Update/Delete)]
-    GestorFlow --> ManutAprov[Manutenção: Aprovar/Rejeitar]
-    OperadorFlow --> ManutSolic[Manutenção: Solicitar]
-    OperadorFlow --> ManutAcomp[Manutenção: Acompanhar]
-    
-    AtivoCRUD --> DB[(Primary DB)]
-    ManutAprov --> DB
-    ManutSolic --> DB
-    ManutAcomp --> Replica[(Read Replica)]
-    
-    Scheduler((Scheduler\n@Scheduled)) --> AlertJob[checkResourceUsageAlerts\n≤30s / 12k ativos]
-    Scheduler --> HealthJob[updateHealthCheck\nA cada 5 min]
-    
-    AlertJob --> Replica
-    AlertJob --> DB
-    AlertJob --> WORM[(WORM Audit)]
-    AlertJob --> Email[Email/Notification]
-    
-    HealthJob --> Replica
-    HealthJob --> DB
-    HealthJob --> WORM
-    
-    DB --> Replica[Replicação Nativa]
-    DB --> Backup[Backup Diário + WAL\nRPO ≤ 24h / RTO ≤ 4h]
-    
-    AuditLog --> WORM
-    WORM --> Compliance[SOX 7 anos / LGPD\nImutabilidade verificada]
-    
-    subgraph "Observabilidade Transversal"
-        Obs[OpenTelemetry Java Agent\nLogs JSON + Métricas Prometheus + Traces OTLP]
-        Alerting[Alertmanager\nP0: Latência p95>500ms, Erro>0.1%, Job falha, CPU>80%, Heap>85%, Disco>85%, Replica lag>60s]
-    end
-    
-    REST[REST Controllers] --> Obs
-    AtivoSvc[AtivoService] --> Obs
-    ManutSvc[ManutencaoService] --> Obs
-    AlertSvc[AlertNotificationService] --> Obs
-    HealthSvc[HealthCheckService] --> Obs
-    Scheduler --> Obs
-    
-    Alerting --> Pager[PagerDuty/Slack/Email\nOn-call rotation]
+    Start([Requisição de escrita recebida]) --> Auth{Token JWT válido?}
+    Auth -->|"Não"| R401["401 Unauthorized (CA-06)"]
+    Auth -->|"Sim"| Role{Papel Admin?}
+    Role -->|"Não — papel User"| R403["403 Forbidden (RF-26 / RN-01/02 / CA-10)"]
+    Role -->|"Sim"| Val{Payload válido?}
+    Val -->|"Não"| R400["400 Bad Request com mensagens claras (NFR-SEC05)"]
+    Val -->|"Sim"| Exists{Recurso existente?}
+    Exists -->|"Não"| R404["404 Not Found padronizado (NFR-SEC05)"]
+    Exists -->|"Sim"| Exec["Executa operação + registra trilha de auditoria imutável (NFR-SEC07)"]
+    Exec --> Ok([Operação concluída])
+    R401 --> Rej([Requisição rejeitada])
+    R403 --> Rej
+    R400 --> Rej
+    R404 --> Rej
 ```
 
-<!-- source: system-architecture.md#L851-L950; BRD roles, NFR-O04 -->
+**Cobertura esperada:** 100% dos endpoints de escrita em testes de integração (NFR-SEC04); toda operação de escrita em entidades mestres exige Admin (RF-26, RN-01/02).
 
-## 5. Diagrama de Estado: Ciclo de Vida de Manutenção
+### 4.2 Ciclo de vida da solicitação de manutenção (RF-18 a RF-21) — [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
 
 ```mermaid
 stateDiagram-v2
-    [*] --> SOLICITADA: Operador solicita
-    SOLICITADA --> APROVADA: Gestor aprova
-    SOLICITADA --> CANCELADA: Operador/Gestor cancela
-    SOLICITADA --> REJEITADA: Gestor rejeita
-    
-    APROVADA --> EM_ANDAMENTO: Técnico inicia
-    APROVADA --> CANCELADA: Gestor cancela (antes de iniciar)
-    
-    EM_ANDAMENTO --> CONCLUIDA: Técnico finaliza + relatório
-    EM_ANDAMENTO --> AGUARDANDO_PECAS: Peças necessárias
-    EM_ANDAMENTO --> CANCELADA: Gestor cancela (excepcional)
-    
-    AGUARDANDO_PECAS --> EM_ANDAMENTO: Peças recebidas
-    AGUARDANDO_PECAS --> CANCELADA: Cancelamento por obsolescência
-    
-    CONCLUIDA --> [*]: Fim do ciclo
-    CANCELADA --> [*]: Fim do ciclo
-    REJEITADA --> [*]: Fim do ciclo
-    
-    note right of SOLICITADA
-        Auditoria: CRIAR (payload completo)
-        Notificação: Gestores notificados
-    end note
-    
-    note right of APROVADA
-        Auditoria: APROVAR (antes/depois)
-        Notificação: Solicitante + Equipe técnica
-        Agendamento: Técnico alocado
-    end note
-    
-    note right of EM_ANDAMENTO
-        Auditoria: INICIAR
-        Health Check: Monitoramento ativo
-    end note
-    
-    note right of CONCLUIDA
-        Auditoria: CONCLUIR (relatório + custo + peças)
-        Custo: Atualiza custoTotalPorAtivo (invalida cache)
-        Notificação: Solicitante + Gestor
-    end note
-    
-    note right of CANCELADA
-        Auditoria: CANCELAR (motivo obrigatório)
-        Notificação: Partes envolvidas
-    end note
+    state "Solicitada" as Solicitada
+    state "Aprovada" as Aprovada
+    state "Em execução" as EmExecucao
+    state "Concluída" as Concluida
+    state "Cancelada" as Cancelada
+
+    [*] --> Solicitada: Usuário cria solicitação (RF-18 / UC-02)
+    Solicitada --> Aprovada: Admin aprova (UC-03) — timestamp registrado (NFR-O04)
+    Solicitada --> Cancelada: Cancelamento (taxa-alvo abaixo de 10% — NFR-O04)
+    Aprovada --> EmExecucao: Início da execução (fluxo RF-18 a RF-21)
+    Aprovada --> Cancelada: Cancelamento
+    EmExecucao --> Concluida: Conclusão da manutenção (fluxo RF-18 a RF-21)
+    Concluida --> [*]
+    Cancelada --> [*]
 ```
 
-<!-- source: system-architecture.md#L951-L1050; ManutencaoService workflow -->
+**Premissas adotadas:** os estados foram inferidos a partir das transições referenciadas no SAD ("transições do fluxo de manutenção, RF-18 a RF-21") e dos KPIs de processo do NFR-O04 (tempo médio de aprovação, taxa de solicitações canceladas). **Nenhum artefato de máquina de estados e nenhum enum de status foram varridos no codebase** — os valores reais de status devem ser confirmados no código antes de este diagrama ser considerado definitivo.
 
-## 6. Convenções de Manutenção
+### 4.3 Carga de dados via RealisticDataSeeder (risco R-02 do BRD)
 
-- **Fonte única da verdade:** este arquivo é gerado/atualizado pelo próprio fluxo de documentação — não editar diagramas fora deste artefato.
-- **Sem binários:** nunca anexar `.png`/`.jpg`/`.drawio`; o diagrama é sempre o bloco Mermaid acima.
-- **Atualização obrigatória:** qualquer PR que altere fluxos entre serviços, contratos de API ou topologia de containers deve atualizar a seção correspondente aqui.
-- **Rastreabilidade:** cada diagrama referencia a seção do `system-architecture.md` de onde foi derivado via comentários `<!-- source: ... -->`.
-- **Inferências marcadas:** todo elemento não explicitamente no código ou SAD carrega `[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]` com premissas documentadas.
-- **Versionamento:** diagramas evoluem com o código; breaking changes na arquitetura exigem ADR correspondente.
-- **Validação CI:** pipeline deve validar sintaxe Mermaid (`mermaid-cli` ou similar) em todo PR que toque este arquivo.
+```mermaid
+flowchart TD
+    Start([Execução do seeder em staging]) --> Run["RealisticDataSeeder.run (linha 34, complexidade 15)"]
+    Run --> Val{Dados validados conforme nota do NFR-M02?}
+    Val -->|"Sim"| Ok["Dados realistas carregados no ambiente"]
+    Val -->|"Não"| Fix["Revisar e corrigir carga"]
+    Fix --> Run
+    Ok --> Promote["Promoção a produção — risco R-02 (dados legados) mitigado"]
+```
+
+**Observações:** os passos internos de `run` não são detalhados pela varredura (complexidade 15 — acima do limite proposto de 10, NFR-M02); o requisito de execução em staging com validação vem do SAD/NFR-M02, por ser relevante ao risco R-02 do BRD (migração de dados legados). O passo de promoção a produção é representação do processo recomendado, não de código verificado.
+
+---
+
+## 5. Convenções de Manutenção
+
+- **Fonte única da verdade:** este arquivo é gerado/atualizado pelo próprio fluxo de documentação — não editar diagramas fora deste artefato. As decisões de arquitetura que motivam os diagramas vivem no [[system-architecture]] (SAD v1.0).
+- **Sem binários:** nunca anexar `.png`/`.jpg`/`.drawio`; o diagrama é sempre o bloco Mermaid correspondente.
+- **Atualização obrigatória:** qualquer PR que altere fluxos entre frontend e backend, contratos de API ou topologia de containers deve atualizar a seção correspondente aqui, no mesmo PR.
+- **Rastreabilidade nos rótulos:** manter as referências a RFs/UCs/NFRs nas mensagens e nós dos diagramas, para que cada diagrama permaneça auditável contra o SAD e o NFR.
+- **Pontos de atualização pendentes específicos deste projeto:**
+  - **Rotas de endpoint** — ao confirmar os pontos de entrada HTTP no codebase (incluindo `/health` e `/metrics` — lacuna 5 do NFR), substituir os rótulos "rota não confirmada" nos diagramas da Seção 2 e reavaliar o nó "Camada de endpoints HTTP" da Seção 3.
+  - **Motor de banco de dados** — ao verificar o motor real (lacuna 1 do NFR), atualizar o container `db` (Seção 1), o nó de banco (Seção 3) e os participantes de banco (Seção 2), hoje rotulados "motor NÃO especificado / a verificar".
+  - **Estados da solicitação de manutenção** — ao confirmar os valores reais de status no código, validar o `stateDiagram-v2` da Seção 4.2 (hoje inferido).
+  - **Refatorações de complexidade** (NFR-M02) — quebras de `checkResourceUsageAlerts` (17), `run` (15), `toDTO` (14), `build` (14) e `request` (13) devem ser refletidas na Seção 3.
+  - **Resolução do stub `Usuario.setUsername`** — ao resolver (lacuna 7 do NFR), remover a anotação do nó `model/` na Seção 3.

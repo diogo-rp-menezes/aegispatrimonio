@@ -1,180 +1,122 @@
-# Unified Development Environment Configuration — Aegis Patrimônio
+# Unified Development Environment Configuration — Sistema de Gestão de Patrimônio (A4)
+
+> **Versão:** 1.0 · **Owner:** Engenharia · **Status:** Draft
+> **Fontes:** [[system-architecture]] (SAD v1.0), diagnóstico determinístico do codebase (varredura AST real — 350 arquivos, 1.268 funções, 344 classes, 27.537 LOC), `package.json` do workspace.
+> **Aviso de escopo:** este documento reflete **exclusivamente** o que foi verificado no workspace. O `package.json` da raiz declara **1 dependência de produção** (`@popperjs/core` ^2.11.8), **0 de desenvolvimento** e **nenhum script** — não há toolchain de build/teste/execução verificável pelos artefatos atuais. Onde um passo de setup depende de informação não descobrível (versão do Java, ferramenta de build do backend, motor de banco, portas, variáveis de ambiente), o item é registrado como **pendência de verificação** em vez de presumido.
 
 ## 1. Local Prerequisites & Tooling
 
-* **Runtime (Backend):** Java 17+ (Eclipse Temurin 17 JRE recomendado, alinhado ao NFR-PO02)
-* **Runtime (Frontend):** Node.js 20.x LTS (necessário para build do frontend Vanilla JS com Vite/Webpack — NFR-PO03)
-* **Gerenciador de pacotes (Frontend):** npm 10.x (vem com Node.js 20.x)
-* **Build Tool (Backend):** [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] Maven 3.9+ **ou** Gradle 8.x — *não detectado no diagnóstico (ausência de `pom.xml`/`build.gradle` nos arquivos escaneados); verificar repositório raiz/branches*
+* **Runtime:**
+  * **Java** (backend) — 335 arquivos `.java` em `src/`, pacote `br.com.aegispatrimonio`. **Versão não especificada** no diagnóstico — confirmar no arquivo de build do backend antes de instalar o JDK (o arquivo de build do backend não foi coberto pela varredura de stack, que analisou apenas o `package.json` raiz).
+  * **JavaScript** (frontend) — 15 arquivos `.js` em `frontend/`. A forma de execução/servimento do frontend **não é verificada** (nenhuma dev dependency e nenhum script no `package.json`).
+* **Gerenciador de pacotes:** **npm** — compatível com o `package.json` presente na raiz do workspace **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA — a existência do `package.json` é fato verificado; o gerenciador efetivamente utilizado pelo time não está registrado nos artefatos]**. Nenhuma lockfile foi reportada pela varredura.
 * **Ferramentas obrigatórias:**
-  * Docker 24.x + Docker Compose 2.x (para subir banco de dados, read-replica, WORM storage local, observabilidade stack)
-  * Git 2.40+
-  * CLI do provedor de cloud alvo (AWS CLI / Azure CLI / gcloud) — *pendente definição de infra (Gap #2 do SAD)*
-* **Editores recomendados & extensões:**
-  * **VS Code** + Extension Pack for Java (Microsoft), Spring Boot Extension Pack (VMware), ESLint, Prettier, EditorConfig
-  * **IntelliJ IDEA Ultimate** (suporte nativo Spring Boot, JPA, Database tools)
-* **Versão mínima do SO/Shell:** Linux (Ubuntu 22.04 LTS / RHEL 9), macOS 13+ (Ventura), Windows 10/11 com WSL2 Ubuntu 22.04
+  * **Git** — clonagem e versionamento do repositório.
+  * **Ferramenta de build do backend Java** — obrigatória para compilar e executar os 335 arquivos `.java`, porém **não identificada** pela varredura de stack — **identificar e registrar antes de concluir o setup** (lacuna de verificação do SAD, Seção 2).
+  * **Ferramentas de containerização (Docker/Docker Compose): não verificadas** — nenhuma configuração de container existe no codebase; **não são pré-requisito** deste ambiente.
+* **Editores recomendados & extensões:** **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — recomendação genérica para as duas linguagens presentes (Java e JavaScript): VS Code com extensões de suporte a Java e JavaScript, ou IDE Java dedicada. **Nenhum linter/formatador está configurado no projeto** (0 dev dependencies no `package.json`) — a padronização automatizada de código é pendência (relacionada ao NFR-M02).
+* **Versão mínima do SO/Shell:** **Não descobrível** — nenhuma configuração de SO, shell ou CI foi encontrada no codebase. Qualquer SO com suporte ao JDK e ao npm é adequado; confirmar com o time se existe restrição de ambiente de desenvolvimento.
+
+Observação de higiene: o `package.json` da raiz **não possui campo `name`** — recomenda-se preenchê-lo para facilitar a identificação do workspace em ferramentas.
 
 ## 2. Setup Passo a Passo
 
-1. **Instalar pré-requisitos listados acima** (Java 17, Node.js 20, Docker, Git, build tool backend)
-2. **Clonar o repositório**
-   ```bash
-   git clone <url-do-repositorio>
-   cd aegis-patrimonio
-   ```
-3. **Copiar `.env.example` para `.env`** (criar arquivo se não existir — ver seção 3)
-4. **Instalar dependências do frontend:**
-   ```bash
-   cd frontend
-   npm install --no-audit
-   cd ..
-   ```
-5. **Subir serviços auxiliares (DB, read-replica, WORM storage local, observabilidade):**
-   ```bash
-   docker compose -f docker-compose.dev.yml up -d
-   ```
-   > **Nota:** `docker-compose.dev.yml` deve ser criado na Sprint 0 (Gap #2, #4 do SAD). Incluir: banco relacional (motor TBD), MinIO (S3-compatível com Object Lock para WORM local), Prometheus, Grafana, Loki, Tempo, OpenTelemetry Collector.
-6. **Configurar banco de dados (motor a definir — Gap #1 do SAD):**
-   * Criar schema `aegis_patrimonio`
-   * Rodar migrações (Flyway/Liquibase — a configurar na Sprint 0, Gap #5 do SAD)
-   * Popular dados de exemplo (seed): `./mvnw spring-boot:run -Dspring-boot.run.arguments=--seeder.enabled=true` (Maven) ou `./gradlew bootRun --args='--seeder.enabled=true'` (Gradle) — *comando depende do build tool*
-7. **Build do frontend (assets estáticos para Spring Boot servir):**
-   ```bash
-   cd frontend
-   npm run build
-   cd ..
-   ```
-   > Gera assets em `frontend/dist/` — copiar para `src/main/resources/static/` (Spring Boot) ou configurar `resources.static-locations` no `application-dev.yml`.
-8. **Iniciar aplicação (modo desenvolvimento):**
-   * **Maven:** `./mvnw spring-boot:run -Dspring.profiles.active=dev`
-   * **Gradle:** `./gradlew bootRun --args='--spring.profiles.active=dev'`
-   * **Alternativa (JAR pré-buildado):** `java -jar target/aegis-patrimonio-0.0.1-SNAPSHOT.jar --spring.profiles.active=dev`
+1. **Instalar os pré-requisitos** listados na Seção 1 — JDK (versão a confirmar no arquivo de build do backend), npm e Git.
+2. **Clonar o repositório:** `git clone <URL_DO_REPOSITÓRIO>` — a URL não está registrada nos artefatos verificados; obter com o time. Estrutura esperada: `src/` (backend Java, pacote `br.com.aegispatrimonio`) e `frontend/` (15 arquivos `.js`).
+3. **Variáveis de ambiente:** **nenhum arquivo `.env.example` foi identificado na varredura**. Se o time mantiver um modelo, copiá-lo para `.env`; caso contrário, usar a Seção 3 (variáveis candidatas inferidas — requerem validação).
+4. **Instalar dependências JavaScript:** `npm install` na raiz do workspace (instala `@popperjs/core` ^2.11.8, única dependência de produção declarada). **Dependências do backend Java:** residem no arquivo de build do backend, **não coberto pela varredura** — o comando para resolvê-las é pendência de verificação.
+5. **Subir serviços auxiliares (banco, cache):** **nenhum passo verificável** — não há configuração de containers nem de serviços auxiliares no codebase, e o **motor de banco não está especificado** (lacuna 1 do SAD/NFR — pendência de maior impacto). O passo genérico de subida de containers do template **não se aplica** à stack verificada. O provisionamento local do banco só será possível após a definição do motor.
+6. **Rodar migrações:** **nenhuma ferramenta de migração foi verificada no codebase** (SAD, Seção 5) — estratégia a definir em [[db-migration-spec]]. Não confundir com o seeder (item 7), que é carga de dados, não migração de schema.
+7. **Popular dados de exemplo (seed):** existe a classe `RealisticDataSeeder` (`src/main/java/br/com/aegispatrimonio/config/seeder/RealisticDataSeeder.java:34`), porém **o método de invocação não é verificável** pelos artefatos atuais (nenhum script declarado; forma de disparo — automática na inicialização vs. manual — não detectável pela varredura). Atenção: por ser relevante ao risco R-02 do BRD (migração de dados legados), o SAD recomenda executar o seeder em **staging, com validação**, antes de qualquer carga em produção.
+8. **Iniciar a aplicação:** **comando não descoberto** — o `package.json` não declara scripts e o arquivo de build do backend não foi coberto pela varredura (lacuna 3 do SAD — pipeline/scripts de execução). Este passo será preenchido após a verificação da toolchain de build/execução.
 
 ## 3. Variáveis de Ambiente
 
+**[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — Nenhum arquivo `.env`/`.env.example` e nenhuma variável de ambiente foram identificados na varredura do workspace. A tabela abaixo lista **apenas variáveis candidatas inferidas** dos requisitos arquiteturais (SAD/[[nfr]]) — **nenhuma delas está confirmada no código**. Premissas adotadas: autenticação JWT (NFR-SEC01) exige segredo de assinatura; o acesso a dados via SQL cru exige configuração de conexão; a blocklist de logout (CA-08) pode exigir configuração própria.
+
 | Variável | Obrigatória | Descrição | Valor de exemplo |
 | :--- | :--- | :--- | :--- |
-| `SPRING_PROFILES_ACTIVE` | Sim | Perfil Spring ativo (`dev`, `staging`, `prod`) | `dev` |
-| `SPRING_DATASOURCE_URL` | Sim | JDBC URL do banco primário | `jdbc:postgresql://localhost:5432/aegis_patrimonio` |
-| `SPRING_DATASOURCE_USERNAME` | Sim | Usuário do banco | `aegis_user` |
-| `SPRING_DATASOURCE_PASSWORD` | Sim | Senha do banco (usar secret manager em prod) | `dev_password_only` |
-| `SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE` | Não | Tamanho máximo do pool HikariCP (NFR-S03: 500) | `20` (dev) / `500` (prod) |
-| `SPRING_JPA_HIBERNATE_DDL_AUTO` | Não | Estratégia DDL Hibernate (`validate`, `update`, `none`) | `validate` |
-| `SPRING_FLYWAY_ENABLED` | Não | Habilitar Flyway migrations | `true` |
-| `JWT_SECRET` | Sim | Chave secreta HS256/RS256 para assinar JWT (NFR-SEC02) | `base64_encoded_256bit_key` |
-| `JWT_EXPIRATION_MINUTES` | Não | Expiração access token (NFR-SEC02: ≤ 60 min) | `60` |
-| `WORM_STORAGE_ENDPOINT` | Sim | Endpoint S3-compatível para auditoria (NFR-SEC05) | `http://localhost:9000` (MinIO local) |
-| `WORM_STORAGE_BUCKET` | Sim | Bucket WORM com Object Lock habilitado | `aegis-audit-dev` |
-| `WORM_STORAGE_ACCESS_KEY` | Sim | Access key MinIO/S3 | `minioadmin` |
-| `WORM_STORAGE_SECRET_KEY` | Sim | Secret key MinIO/S3 | `minioadmin` |
-| `OIDC_ISSUER_URI` | Não | Issuer do Identity Provider (Gap #3 do SAD) | `https://keycloak.local/realms/aegis` |
-| `OIDC_CLIENT_ID` | Não | Client ID OIDC | `aegis-patrimonio` |
-| `OIDC_CLIENT_SECRET` | Não | Client secret OIDC (usar secret manager) | `***` |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | Não | Endpoint OpenTelemetry Collector (Gap #4 do SAD) | `http://localhost:4317` |
-| `SPRING_DATASOURCE_READ_REPLICA_URL` | Não | JDBC URL da read-replica (NFR-A04) | `jdbc:postgresql://localhost:5433/aegis_patrimonio` |
-| `LOG_LEVEL_ROOT` | Não | Nível de log raiz | `INFO` |
-| `LOG_LEVEL_BR_COM_AEGISPATRIMONIO` | Não | Nível de log do pacote da aplicação | `DEBUG` |
+| `JWT_SECRET` | Sim (inferido) | Chave de assinatura dos tokens JWT (NFR-SEC01); rotação a cada 90 dias (NFR-SEC10) | `<string-secreta-forte-única-por-ambiente>` |
+| `DB_URL` | Sim (inferido) | URL de conexão do banco — **motor ainda não definido** (lacuna 1 do SAD) | `<url-de-conexão-do-motor-a-definir>` |
+| `DB_USER` | Sim (inferido) | Usuário do banco — usar credencial de menor privilégio | `<usuario-do-banco>` |
+| `DB_PASSWORD` | Sim (inferido) | Senha do banco — nunca commitar; gerenciar via mecanismo de segredos | `<senha-do-banco>` |
+| `SERVER_PORT` | Não (inferido) | Porta de escuta da aplicação — **nenhuma porta verificada no codebase** | `<porta-a-definir>` |
 
-> **Arquivo `.env.example` deve ser versionado; `.env` real deve estar no `.gitignore`.**
+Nota: os nomes exatos das variáveis (incluindo convenção de prefixo) devem ser confirmados no código/arquivo de build do backend quando verificados.
 
 ## 4. Secure Command Sandbox Recipes
 
-> Comandos permitidos para automação/agentes, com limites de segurança explícitos.
+> Comandos permitidos para automação/agentes, com limites de segurança explícitos. Receitas de build/execução do backend **não podem ser definidas** até que a ferramenta de build do backend seja verificada (lacuna 3 do SAD).
 
 | Target Tool | Command Type | Recipe | Timeout | Restrições |
 | :--- | :--- | :--- | :--- | :--- |
-| `npm` | `install` | `npm install --no-audit --prefer-offline` | 120s | Sem acesso à rede externa fora do registry configurado (`npm config get registry`) |
-| `npm` | `run build` | `npm run build --if-present` | 60s | Apenas leitura de `frontend/`, escrita em `frontend/dist/` |
-| `mvn` / `gradle` | `compile` | `./mvnw compile -q` / `./gradlew compileJava --quiet` | 180s | Apenas leitura de `src/main/java/`, `src/main/resources/`; escrita em `target/` ou `build/` |
-| `mvn` / `gradle` | `test` | `./mvnw test -q` / `./gradlew test --quiet` | 300s | Acesso a banco de teste (Testcontainers ou H2 em memória); sem rede externa |
-| `docker compose` | `up` | `docker compose -f docker-compose.dev.yml up -d --wait` | 120s | Apenas imagens definidas no `docker-compose.dev.yml`; volumes locais mapeados |
-| `docker compose` | `down` | `docker compose -f docker-compose.dev.yml down -v` | 60s | Remove volumes anônimos; preserva volumes nomeados se `preserve_volumes=true` |
-| `java` | `run` | `java -jar target/*.jar --spring.profiles.active=dev` | Contínuo | Bind apenas em `localhost:8080`; variáveis de ambiente do `.env` |
-| `flyway` / `liquibase` | `migrate` | `./mvnw flyway:migrate` / `./gradlew liquibaseUpdate` | 60s | Apenas contra `SPRING_DATASOURCE_URL` do perfil ativo; transacional |
+| npm | install | `npm install --no-audit --no-fund` | 120s | Acesso à rede somente ao registry configurado; executar apenas na raiz do workspace |
+| git | consulta (somente leitura) | `git status --porcelain` · `git log --oneline -n 20` | 15s | Sem `commit`, `push` ou alteração de histórico |
+| shell (grep) | busca estática no código | `grep -rn "TODO\|FIXME" src/ frontend/` | 15s | Somente leitura dentro do workspace; sem modificação de arquivos |
+| Build backend | compile | **Não definível** — ferramenta de build do backend não verificada | — | Pendência: definir receita após verificação da ferramenta (lacuna 3) |
+| App runtime | run | **Não definível** — comando de inicialização não descoberto | — | Pendência: definir receita após verificação da toolchain (lacuna 3) |
 
 ## 5. Serviços Locais & Portas
 
+**Nenhuma porta foi verificada no codebase** — não há configuração de servidor, de banco ou de deploy nos artefatos analisados. A tabela abaixo registra os serviços esperados e o estado de verificação de cada um:
+
 | Serviço | Porta | Descrição |
 | :--- | :--- | :--- |
-| Aegis Patrimônio (App) | 8080 | Aplicação principal (Spring Boot + static frontend) |
-| Banco de Dados Primário | 5432 | PostgreSQL (exemplo — **motor a confirmar**, Gap #1) |
-| Read Replica | 5433 | Réplica de leitura (mesmo motor, porta distinta) |
-| MinIO (WORM Storage Local) | 9000 (API), 9001 (Console) | S3-compatível com Object Lock para auditoria local |
-| Prometheus | 9090 | Coleta de métricas (`/actuator/prometheus`) |
-| Grafana | 3000 | Dashboards (login admin/admin, trocar no primeiro acesso) |
-| Loki | 3100 | Agregação de logs JSON |
-| Tempo | 3200 | Traces distribuídos (OTLP/gRPC 4317, HTTP 4318) |
-| OpenTelemetry Collector | 4317 (gRPC), 4318 (HTTP), 8888 (Prometheus metrics) | Recebe telemetria da app |
-| Keycloak (IdP Local) | 8081 | Identity Provider para testes OIDC/MFA (Gap #3) |
+| Backend/API (`src/`, `br.com.aegispatrimonio`) | **A verificar** | Aplicação principal — nenhuma configuração de porta encontrada |
+| Banco de dados | **A verificar** | Motor **não especificado** (lacuna 1 do SAD) — porta indefinida até a escolha do motor |
+| Frontend (`frontend/`) | **A verificar** | Forma de servir/acessar o frontend não verificada (nenhum script nem configuração) |
 
-> **Conflitos de porta:** Se 8080/8081/5432/9000 estiverem em uso, ajustar `docker-compose.dev.yml` e `application-dev.yml` consistentemente.
+Observações:
+- Os endpoints de observabilidade `/health` e `/metrics` (NFR-O01) **não estão confirmados no codebase** (lacuna 5 do SAD) — a verificação de saúde local depende da confirmação deles.
+- A integração frontend↔backend ocorre via `frontend/src/services/api.js` (função `request`, linha 54) — a URL base do backend usada por esse client não é descobrível pelos artefatos atuais.
 
 ## 6. Environment Verification Checklist
 
-- [ ] `npm install` no `frontend/` funciona sem erros (zero vulnerabilidades `high`/`critical` em `npm audit`)
-- [ ] `npm run build` no `frontend/` gera assets em `frontend/dist/` sem erros TypeScript/ESLint (se configurado)
-- [ ] `./mvnw compile` **ou** `./gradlew compileJava` compila backend sem erros (Java 17)
-- [ ] `./mvnw test` **ou** `./gradlew test` executa testes unitários e passa (cobertura ≥ 80% novo código — NFR-M02)
-- [ ] `docker compose -f docker-compose.dev.yml up -d` sobe todos os containers saudáveis (`docker compose ps` mostra `healthy` ou `running`)
-- [ ] Aplicação inicia com `./mvnw spring-boot:run -Dspring.profiles.active=dev` (ou Gradle equivalente) e loga `Started AegisPatrimonioApplication in X seconds`
-- [ ] Health check responde: `curl -f http://localhost:8080/actuator/health/liveness` → `{"status":"UP"}`
-- [ ] Readiness check responde: `curl -f http://localhost:8080/actuator/health/readiness` → `{"status":"UP"}` (inclui DB, scheduler, disco)
-- [ ] Frontend acessível em `http://localhost:8080/` (login carrega, sem erros de console `console.error`/`console.debug` — NFR-M04)
-- [ ] Banco de dados conectado e migrado: `flyway info` ou `liquibase status` mostra migrations aplicadas
-- [ ] Variáveis de ambiente sensíveis não commitadas (`.env` no `.gitignore`; `.env.example` versionado)
-- [ ] OpenAPI spec disponível em `http://localhost:8080/v3/api-docs` (SpringDoc — NFR-M03)
-- [ ] Métricas Prometheus expostas em `http://localhost:8080/actuator/prometheus` (NFR-O01)
-- [ ] Logs JSON estruturados no stdout com `traceId`/`spanId` (NFR-O01)
-- [ ] MinIO console acessível em `http://localhost:9001` (bucket `aegis-audit-dev` com Object Lock habilitado)
+> Itens adaptados à stack verificada. Os itens genéricos do template `npm run dev`, `npm test` e `npm run lint` foram substituídos porque o `package.json` **não declara nenhum script** (lacuna 3 do SAD).
+
+- [ ] `npm install` executa sem erros na raiz do workspace (instala `@popperjs/core` ^2.11.8)
+- [ ] Build do backend Java compila sem erros — **comando a definir** (ferramenta de build não verificada)
+- [ ] Aplicação inicia e responde localmente — **comando a definir** (lacuna 3)
+- [ ] Banco de dados acessível e com schema aplicado — **motor a definir** (lacuna 1)
+- [ ] Seeder `RealisticDataSeeder` executado com sucesso (método de invocação a verificar); quando envolver dados legados, executar em staging com validação (risco R-02)
+- [ ] Endpoints `/health` e `/metrics` respondem (existência não confirmada — lacuna 5)
+- [ ] Variáveis de ambiente sensíveis não commitadas — confirmar que `.env` (se usado) está no `.gitignore`
+- [ ] Dependências do backend resolvidas pelo arquivo de build do backend (não coberto pela varredura de stack)
 
 ## 7. Troubleshooting Comum
 
+**[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — Nenhum registro de problemas de ambiente existe nos artefatos verificados; as entradas abaixo são hipóteses genéricas de troubleshooting, com as pendências de verificação reais do projeto destacadas.
+
 | Sintoma | Causa Provável | Solução |
 | :--- | :--- | :--- |
-| `java: command not found` / versão errada | Java 17 não no PATH ou versão incorreta | `sdk install java 17.0.10-tem` (SDKMAN) ou ajustar `JAVA_HOME`; `java -version` deve mostrar 17.x |
-| `npm install` falha com `EACCES` / permissão | Permissões em `node_modules` ou prefixo npm | `npm config set prefix ~/.npm-global` + adicionar ao PATH; ou `sudo chown -R $USER ~/.npm` |
-| Porta 8080 já em uso | Outro processo (ex: outro Spring Boot, Jenkins) | `lsof -ti:8080 \| xargs kill -9` ou alterar `server.port` no `application-dev.yml` |
-| `Connection refused` ao banco | Container DB não subiu / porta errada / credenciais | `docker compose logs db`; verificar `SPRING_DATASOURCE_URL` porta; `docker compose restart db` |
-| `Flyway migration failed` / `Liquibase lock` | Migration quebrada / lock não liberado | `flyway repair` / `liquibase releaseLocks`; corrigir SQL da migration falha |
-| `JWT signature verification failed` | `JWT_SECRET` diferente entre app e testes / chave curta | Gerar chave Base64 de 256 bits: `openssl rand -base64 32`; usar mesma em `.env` e testes |
-| MinIO `AccessDenied` ao gravar auditoria | Bucket sem Object Lock / policy errada / credenciais | `mc admin bucket lock enable minio/aegis-audit-dev`; policy `PutObject` + `PutObjectLegalHold` |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` connection refused | Collector não subiu / porta errada | `docker compose logs otelcol`; verificar porta 4317/4318 no `docker-compose.dev.yml` |
-| Frontend carrega mas API retorna 401/403 | Token expirado / CORS / `SecurityFilterChain` | Verificar `JWT_EXPIRATION_MINUTES`; CORS configurado em `WebMvcConfigurer`; logs de `SecurityFilterChain` |
-| `HikariPool-1 - Connection is not available` | Pool exaurido (vazamento / pool pequeno) | Aumentar `SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE`; revisar `@Transactional` sem `readOnly=true` em leituras |
-| `console.error` / `console.debug` no browser | Código residual em `frontend/src/services/api.js:36,99` | Remover antes de commit (NFR-M04); `npm run lint` deve falhar se `no-console` configurado |
+| `npm install` falha com erro de rede | Registry inacessível ou proxy corporativo | Verificar conectividade com o registry configurado e configuração de proxy |
+| Erro de compilação no backend Java | Versão do JDK incompatível | Confirmar a versão exigida no arquivo de build do backend — **versão não especificada no diagnóstico** |
+| Porta em uso ao iniciar a aplicação | Outro processo ocupando a porta | Encerrar o processo: `kill -9 $(lsof -ti:PORTA)` (ou equivalente do SO) |
+| Falha de conexão com o banco de dados | Motor/credenciais não configurados | **Motor ainda não definido (lacuna 1)** — definir a conexão conforme Seção 3 após a escolha do motor |
+| Seeder não executa | Método de invocação não documentado | Verificar como `RealisticDataSeeder` (`config/seeder/`) é disparado — nenhum script declarado no `package.json` |
+| Frontend não alcança o backend | URL base incorreta em `frontend/src/services/api.js` | Conferir a URL base do backend na função `request` (linha 54) — valor não descobrível pelos artefatos atuais |
 
 ## 8. Comandos Úteis
 
 | Comando | Descrição |
 | :--- | :--- |
-| `./mvnw spring-boot:run -Dspring.profiles.active=dev` | Inicia backend em modo dev (Maven) |
-| `./gradlew bootRun --args='--spring.profiles.active=dev'` | Inicia backend em modo dev (Gradle) |
-| `cd frontend && npm run dev` | Inicia frontend com Vite (HMR) — **requer proxy para API** (`vite.config.js`: `server.proxy: { '/api': 'http://localhost:8080' }`) |
-| `./mvnw test` / `./gradlew test` | Executa testes unitários + integração |
-| `./mvnw verify` / `./gradlew check` | Build completo + testes + validações (SpotBugs, Checkstyle, OpenAPI breaking changes — NFR-M03) |
-| `cd frontend && npm run lint` | ESLint + Prettier check (configurar `no-console`, `no-debugger`) |
-| `docker compose -f docker-compose.dev.yml logs -f app` | Logs da aplicação em tempo real |
-| `docker compose -f docker-compose.dev.yml exec db psql -U aegis_user -d aegis_patrimonio` | Shell SQL no banco primário |
-| `curl -s http://localhost:8080/actuator/health/readiness \| jq` | Verifica readiness com formatação |
-| `curl -s http://localhost:8080/actuator/prometheus \| grep -E '^jvm_|^http_server_requests_'` | Inspeciona métricas chave |
-| `./mvnw flyway:migrate` / `./gradlew liquibaseUpdate` | Aplica migrations pendentes |
-| `./mvnw spring-boot:run -Dspring-boot.run.arguments=--seeder.enabled=true` | Popula dados realistas (dev/test) — `RealisticDataSeeder` |
-| `docker compose -f docker-compose.dev.yml down -v && docker compose -f docker-compose.dev.yml up -d` | Reset completo do ambiente local (limpa volumes) |
+| `npm install` | Instala as dependências declaradas no `package.json` da raiz (`@popperjs/core` ^2.11.8) |
+| `git status` / `git log --oneline` | Inspeção do estado do repositório |
+| `grep -rn "TODO\|FIXME" src/ frontend/` | Localiza débito técnico registrado (ex.: `AtivoService.java:119`) |
+| `grep -rn "console\." frontend/src` | Localiza chamadas `console.*` residuais (ex.: `frontend/src/services/api.js:44` e `:107`) |
+| Build do backend | **Comando a definir** — ferramenta de build do backend não verificada (lacuna 3) |
+| Execução do seeder | **Comando a definir** — ver Seção 2, item 7 |
 
----
+Observação final: **nenhum script npm de desenvolvimento existe** (`dev`, `build`, `test`, `lint` — todos ausentes do `package.json`); a implementação do pipeline com gate de cobertura > 80% (NFR-M01) e dos scripts de execução é pendência registrada (lacuna 3 do SAD).
 
-## O que falta verificar / Configurar na Sprint 0 (Gaps Bloqueadores)
+## 9. Lacunas de Verificação que Bloqueiam Este Documento
 
-1. **Build Tool Backend:** Confirmar Maven (`pom.xml`) ou Gradle (`build.gradle.kts`) no repositório raiz. Ajustar comandos nas seções 2, 4, 6, 8 conforme ferramenta real.
-2. **Motor de Banco de Dados:** Definir PostgreSQL / Oracle / SQL Server / MySQL (Gap #1 SAD). Ajustar `SPRING_DATASOURCE_URL`, driver JDBC, dialecto Hibernate/Flyway, portas no `docker-compose.dev.yml`.
-3. **`docker-compose.dev.yml`:** Criar arquivo com todos os serviços da seção 5 (DB, read-replica, MinIO, Prometheus, Grafana, Loki, Tempo, OTEL Collector, Keycloak). Definir volumes nomeados para persistência local.
-4. **Migrações de Schema:** Configurar Flyway ou Liquibase (Gap #5 SAD). Criar baseline `V1__init.sql` ou `changelog-master.xml` a partir do schema atual (extrair via `schemacrawler` ou DBA).
-5. **Observabilidade Stack Local:** Definir stack (Prometheus/Grafana/Loki/Tempo vs Datadog vs New Relic — Gap #4 SAD). Configurar `docker-compose.dev.yml` e `application-dev.yml` (OTel Java Agent, `management.otlp.tracing.endpoint`).
-6. **Identity Provider Local:** Subir Keycloak no `docker-compose.dev.yml` (Gap #3 SAD). Criar realm `aegis`, client `aegis-patrimonio`, roles `ADMIN`/`AUDITOR`/`GESTOR`/`OPERADOR`, fluxo MFA para ADMIN.
-7. **OpenAPI / SpringDoc:** Adicionar dependência `springdoc-openapi-starter-webmvc-ui` no build tool. Configurar `springdoc.api-docs.path=/v3/api-docs`, `springdoc.swagger-ui.path=/swagger-ui.html`.
-8. **CI/CD Pipeline:** Implementar pipeline (GitHub Actions / GitLab CI / Jenkins) com validações NFR-M03/M04/M05 (quebra de build em: OpenAPI breaking changes, `console.*` no frontend, stubs vazios no backend).
-9. **Secret Management Local:** Usar `.env` + `docker-compose.dev.yml` `env_file` para dev; planejar Vault / AWS Secrets Manager para staging/prod (NFR-SEC04).
-10. **Frontend Build Integration:** Decidir se assets vão em `src/main/resources/static/` (Spring Boot serve) ou CDN/Nginx separado (NFR-PO03). Configurar `vite.config.js` `build.outDir` e `base` accordingly.
-
-> **Todas as seções marcadas com [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] dependem das decisões acima e devem ser revisadas pelo Tech Lead / Arquiteto / DevOps na Sprint 0.**
+| # | Lacuna | Impacto neste documento | Fonte |
+| :--- | :--- | :--- | :--- |
+| 1 | Motor de banco de dados não especificado | Bloqueia os passos 5–6 do setup, variáveis `DB_*`, portas e troubleshooting de conexão | SAD, Seções 2, 5 e 12 |
+| — | Versão do Java não especificada | Bloqueia a instalação do JDK (passo 1 do setup) | SAD, Seção 2 |
+| — | Ferramenta de build do backend não identificada | Bloqueia passos 4 e 8 do setup, receitas de sandbox e comandos úteis | SAD, Seção 2 |
+| 3 | Pipeline CI/CD e scripts de execução ausentes | `package.json` sem scripts — bloqueia comandos de dev/build/test/lint e itens do checklist | SAD, Seções 2 e 11 |
+| 4 | Ferramentas de APM/load testing/uptime/acessibilidade não definidas | Impede incluir comandos de verificação de performance no checklist | SAD, Seção 12 |
+| 5 | Endpoints `/health` e `/metrics` não confirmados | Bloqueia o item de health check do checklist e a Seção 5 | SAD, Seções 10 e 12 |
+| 6 | Configuração de deploy/infraestrutura de produção ausente | Impede documentar paridade entre ambiente local e produção | SAD, Seções 9 e 11 |

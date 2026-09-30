@@ -1,360 +1,329 @@
-# User Flows & Interaction Diagrams — Aegis Patrimônio
+# User Flows & Interaction Diagrams — Sistema de Gestão de Patrimônio A4 (AegisPatrimônio)
+
+> **Nota de rastreabilidade e escopo:** A varredura determinística do workspace **não detectou nenhuma rota, handler de IPC ou definição explícita de endpoints** ("Nenhuma rota/IPC detectada no código"). O frontend consiste em 15 arquivos `.js` em `frontend/` (com `@popperjs/core` como única dependência de produção declarada) e o backend em 335 arquivos `.java` em `src/` — nenhuma definição de tela/rota foi extraída pela varredura. Por isso, os fluxos abaixo são ancorados em três fontes verificáveis: (1) os casos de uso e requisitos do BRD (UC-01 a UC-04, RF-01 a RF-29, RN-01 a RN-08, CA-01 a CA-10); (2) os arquivos reais existentes na base citados pela varredura AST (ex.: `frontend/src/services/api.js`, `src/main/java/br/com/aegispatrimonio/service/AtivoService.java`, `src/main/java/br/com/aegispatrimonio/repository/ManutencaoSpecification.java`); e (3) os comportamentos de API citados no BRD como cenários de teste (ex.: `criar_comAdmin_deveRetornarCreated`, `buscarPorId_comIdInexistente_deveRetornarNotFound`). Transições de rota exatas e nomes literais de telas devem ser confirmados contra o código antes do uso operacional.
+
+---
 
 ## 1. User Personas & Actors
+
+**[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — Atores derivados da tabela de Stakeholders (BRD §2) e do modelo de RBAC do BRD (RF-26: duas roles — **Admin** e **User**). O mapeamento de "Equipe de Manutenção" e "Aprovador" para roles concretas do sistema não está explícito no BRD nem detectado no código e precisa de validação.
+
 | Ator | Papel | Objetivos Principais | Permissões |
 | :--- | :--- | :--- | :--- |
-| **Gestor de Patrimônio** | Responsável pelo ciclo de vida dos ativos (aquisição, alocação, depreciação, baixa) across filiais | Visibilidade centralizada, relatórios de TCO, trilha de auditoria, conformidade | CRUD completo em Ativos, Tipos de Ativo, Localizações; leitura em Departamentos, Filiais, Fornecedores, Funcionários; relatórios `custoTotalPorAtivo`; exportação de dados |
-| **Analista de Manutenção** | Planeja e executa manutenções preventivas/corretivas; aprova solicitações | Fluxo de aprovação rastreável, alertas preditivos (disco, memória, rede), histórico de saúde | CRUD em Manutenções (iniciar, aprovar, cancelar, concluir); leitura em Ativos, Alertas, Health Checks; `listarAlertas`, `getRecentAlerts`, `markAsRead`, `checkResourceUsageAlerts` |
-| **Administrador de Sistema (Admin)** | Configura RBAC, cadastra tipos de ativo, departamentos, filiais, fornecedores, usuários | Controle granular de permissões, provisionamento de usuários | CRUD completo em Departamentos, Filiais, Fornecedores, Funcionários, Tipos de Ativo, Permissões, Roles, Usuários; `createUserAndToken`, `mockLogin`, `authInterceptor`, `clearSession`, `logout`, `hasPermission`, `isAdmin` |
-| **Usuário Final (Funcionário)** | Solicita manutenção, reporta problemas, visualiza ativos sob sua responsabilidade | Portal simples para abrir chamados, acompanhar status, receber notificações | Leitura em Ativos (próprios), criação de solicitações de manutenção (`iniciar`), acompanhamento de status; `listarAlertas` (próprios) |
-| **Auditor / Compliance** | Valida trilha de custódia, depreciação, baixas, acessos a dados sensíveis | Logs imutáveis de operações sensíveis com usuário/timestamp | Leitura em todos os relatórios e logs de auditoria (entidade futura `audit_log`); exportação de trilhas |
-
-> **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — Personas e permissões inferidas a partir do glossário do BRD (30+ operações de domínio) e regras de negócio BR-01 a BR-10. Não há rotas/IPC detectadas no código para confirmar endpoints reais.
+| **Administrador do Sistema** | Admin (role) | Manter cadastros mestres, gerenciar usuários/roles/permissões, garantir integridade do acervo | CRUD total em Departamento, Filial, Fornecedor, Funcionário, Localização, Tipo de Ativo, Role e Permission (RF-01 a RF-10, RF-27); gestão completa de ativos (RF-11 a RF-17); aprovar/cancelar manutenções (RF-19, RF-20) |
+| **Funcionário / Colaborador** | User (role) | Solicitar manutenção de ativos alocados; consultar ativos e histórico | Leitura de ativos e cadastros (RF-14, RF-15); criação de solicitações de manutenção (RF-18); **403 Forbidden** em qualquer escrita em entidades mestres (RN-02) |
+| **Aprovador** | Admin ou role específica (a confirmar) | Validar solicitações, garantir conformidade e custo razoável | Visualizar fila de pendentes, aprovar (RF-19) e cancelar (RF-20); consultar histórico e custo total por ativo (`custoTotalPorAtivo`) |
+| **Equipe de Manutenção** | Operador (role a confirmar) | Executar ordens de serviço e registrar custos com precisão | Concluir manutenções aprovadas (RF-21); registro de data, descrição, peças, custo e tempo |
+| **Gestor de Patrimônio** | Product Owner (consumidor de informação) | Visibilidade do acervo, custos e auditoria | Leitura de relatórios e histórico; trilha de auditoria de operações de escrita (RNF-07) |
 
 ---
 
 ## 2. Core User Flows
 
-### Flow 1: Cadastro e Gestão de Ativo (CRUD Completo)
-* **Gatilho:** Gestor de Patrimônio acessa "Novo Ativo" ou edita ativo existente na listagem
-* **Ator:** Gestor de Patrimônio (Admin para criar/atualizar/deletar; User apenas leitura)
-* **Pré-condições:** Usuário autenticado com token válido (`authInterceptor`); papel `ADMIN` para escrita (BR-01)
-* **Resultado esperado:** Ativo persistido com metadados completos (tipo, localização, departamento, filial, fornecedor, depreciação) e trilha de auditoria registrada
+**[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — Salvo indicação em contrário, os comportamentos de estado de UI (loading, disabled, empty) descritos nos fluxos abaixo são inferidos a partir dos casos de uso do BRD, pois a varredura não detectou telas/rotas reais. Os estados de **erro** e seus códigos HTTP seguem o BRD (RN-02, RN-03, RN-04, CA-01, CA-06). Da mesma forma, **nenhum mecanismo de instrumentação (analytics/eventos) foi detectado na varredura** — as métricas listadas por fluxo são metas de KPI do BRD §8 e requerem implementação de instrumentação.
+
+### Flow 1: Autenticação, Sessão e Logout
+
+* **Gatilho:** Usuário não autenticado tenta acessar o sistema, ou a sessão expira (token expira em 1h; refresh token 7 dias — RNF-01 do BRD).
+* **Ator:** Todos os atores (Admin e User).
+* **Pré-condições:** Credenciais cadastradas; funcionário pode estar vinculado a usuário do sistema para autenticação (RN-06, cenário `createFuncionarioAndUsuario` do BRD).
+* **Resultado esperado:** Sessão autenticada com token JWT emitido (RF-23 — conforme BRD; biblioteca de implementação não verificada na varredura de dependências) e injeção automática do token em requisições subsequentes via `authInterceptor` (RF-24, CA-07). No logout: sessão local limpa e token invalidado server-side em blocklist (CA-08).
 
 * **Passos:**
-  1. Usuário acessa tela de listagem de ativos (`listarTodos`)
-  2. Sistema exibe tabela paginada com filtros (filial, departamento, tipo, status) — **estado: loading → success/empty**
-  3. Usuário clica "Novo Ativo" ou seleciona linha para editar (`buscarPorId`)
-  4. Sistema abre formulário com campos: identificação, tipo (`createTipoAtivo`), localização (`createLocalizacao`), departamento, filial, fornecedor, data aquisição, valor, vida útil — **estado: loading → success**
-  5. Usuário preenche dados obrigatórios e submete
-  6. Sistema valida entrada (BR-03: 400 se inválido) e verifica permissão (BR-01: 403 se USER)
-  7. Sistema persiste ativo, registra log de auditoria (BR-02: usuário, timestamp, entidade, ação, valores)
-  8. Sistema retorna sucesso (201 Created / 200 OK) e atualiza listagem — **estado: success**
-  9. Para exclusão: usuário confirma modal → sistema valida permissão (BR-01) → deleta em cascata (BR-10 se hardware) → registra auditoria → **estado: success**
+  1. Usuário acessa a tela de login do frontend (`frontend/`).
+  2. Sistema exibe o formulário de credenciais.
+  3. Usuário preenche e submete; a requisição é processada pela função `request` do serviço central `frontend/src/services/api.js` — função de maior complexidade ciclomática do frontend (13), conforme varredura AST.
+  4. Sistema valida as credenciais: sucesso retorna o token (CA-06); credenciais ausentes/inválidas ou requisição sem token resultam em **401** nos endpoints protegidos.
+  5. Frontend armazena as credenciais e o `authInterceptor` passa a injetar o token automaticamente em todas as requisições.
+  6. **Logout:** usuário aciona a saída; `clearSession` limpa a sessão local e o token é invalidado server-side (blocklist — CA-08).
 
 ```mermaid
 graph TD
-    A[Início: Listar Ativos] --> B{Autenticado?}
-    B -- Não --> C[Redirecionar Login]
-    B -- Sim --> D[Exibir Listagem<br/>loading → success/empty]
-    D --> E{Ação do Usuário}
-    E -- Novo --> F[Abrir Formulário Criação<br/>loading → success]
-    E -- Editar --> G[Buscar Por ID<br/>loading → success/404]
-    E -- Excluir --> H[Confirmar Exclusão]
-    F --> I[Preencher Dados<br/>Validação Cliente]
-    G --> I
-    I --> J{Submeter}
-    J -- Inválido --> K[Exibir Erros 400<br/>estado: error]
-    J -- Válido --> L{Permissão ADMIN?}
-    L -- Não --> M[403 Forbidden<br/>estado: error]
-    L -- Sim --> N[Persistir + Auditoria]
-    N --> O{Sucesso?}
-    O -- Sim --> P[Toast Sucesso<br/>Atualizar Listagem]
-    O -- Não --> Q[Toast Erro 5xx<br/>estado: error]
-    H --> L
-    P --> D
-    Q --> I
-    M --> D
-    K --> I
-    C --> A
+    A["Início: usuário não autenticado"] --> B["Tela de Login exibida"]
+    B --> C["Usuário preenche credenciais"]
+    C --> D["Envio em andamento - botão em loading"]
+    D --> E{"Credenciais válidas?"}
+    E -- "Sim" --> F["Token emitido e armazenado"]
+    F --> G["authInterceptor injeta token nas requisições"]
+    G --> H["Sucesso: acesso à área autenticada"]
+    E -- "Não" --> I["Erro 401: mensagem de credenciais inválidas"]
+    I --> B
+    H --> J["Logout acionado"]
+    J --> K["clearSession limpa sessão local"]
+    K --> L["Token invalidado server-side - blocklist"]
+    L --> B
 ```
 
-* **Estados de UI cobertos:** loading (listagem, formulário, busca), empty (nenhum ativo cadastrado), error (400 validação, 403 permissão, 404 não encontrado, 5xx servidor), success (toast + atualização), disabled (botões durante submit)
-* **Métricas instrumentadas neste fluxo:** taxa de conclusão de cadastro, tempo médio preenchimento, taxa de erro 400/403/5xx, latência P95 `listarTodos`/`buscarPorId`/`createAtivo`/`atualizar`/`deletar`
+* **Estados de UI cobertos:**
 
----
+| Estado | Cobertura neste fluxo |
+| :--- | :--- |
+| **loading** | Durante o envio das credenciais (botão em processamento) |
+| **empty** | Não aplicável — o formulário de login renderiza campos vazios por padrão |
+| **error** | Credenciais inválidas ou requisição sem token — **401** (CA-06) |
+| **success** | Redirecionamento para a área autenticada após emissão do token |
+| **disabled** | Botão de submit desabilitado durante o envio |
 
-### Flow 2: Solicitação e Aprovação de Manutenção (Workflow de Estados)
-* **Gatilho:** Usuário Final ou Analista identifica necessidade de manutenção e clica "Nova Solicitação"
-* **Ator:** Usuário Final (inicia), Analista de Manutenção (aprova/cancela/conclui), Gestor de Patrimônio (visualiza)
-* **Pré-condições:** Ativo existe (`buscarPorId` retorna 200); usuário autenticado
-* **Resultado esperado:** Solicitação criada no estado `PENDENTE`, transicionada para `APROVADA` → `EM_ANDAMENTO` → `CONCLUIDA` ou `CANCELADA`, com trilha de auditoria em cada transição
+* **Métricas instrumentadas neste fluxo:** Tempo de resposta da autenticação (meta RNF-04: p95 < 200ms); taxa de sucesso de login.
+* **Observação de código:** erros de requisição são hoje logados via `console.error` (`frontend/src/services/api.js:44`) e `console.debug` (`frontend/src/services/api.js:107`) — impacta a observabilidade do estado de erro em produção.
 
-* **Passos:**
-  1. Usuário acessa detalhe do ativo (`buscarPorId`) ou listagem de manutenções
-  2. Sistema exibe botão "Nova Manutenção" — **estado: disabled se usuário sem permissão**
-  3. Usuário preenche: tipo (preventiva/corretiva), prioridade, descrição, data desejada, ativo vinculado
-  4. Sistema valida (BR-03) e cria solicitação com status `PENDENTE` — **estado: loading → success**
-  5. Analista recebe notificação/alerta (`listarAlertas`/`getRecentAlerts`) e acessa fila de aprovação
-  6. Analista revisa: pode `aprovar` (→ `APROVADA`), `cancelar` (→ `CANCELADA` com justificativa) ou solicitar mais info
-  7. Se aprovada: técnico executa → Analista `conclui` (→ `CONCLUIDA` com custo, peças, mão de obra) — alimenta `custoTotalPorAtivo`
-  8. Cada transição registra auditoria (BR-02: usuário, timestamp, estado anterior/novo)
-  9. Usuário Final acompanha status em "Minhas Solicitações" — **estados: loading, empty, success**
+### Flow 2: Cadastro de Filial — padrão CRUD de entidades mestres (Admin)
+
+* **Gatilho:** Admin acessa "Cadastro de Filiais" (UC-01, passo 1 do BRD).
+* **Ator:** Admin (User recebe **403 Forbidden** — RN-02).
+* **Pré-condições:** Usuário autenticado com role Admin.
+* **Resultado esperado:** Filial persistida e retornada como **201 Created** (RN-01); disponível para associação a ativos/departamentos.
+
+* **Passos (ancorados em UC-01):**
+  1. Admin acessa "Cadastro de Filiais".
+  2. Sistema exibe o formulário (nome, código, endereço, responsável).
+  3. Admin preenche e submete.
+  4. Sistema valida os dados (RN-03): inválido → **400 Bad Request** com mensagens claras (CA-02, cenário `criar_comDadosInvalidos_deveRetornarBadRequest`).
+  5. Válido → persiste e retorna **201 Created** (cenário `criar_comAdmin_deveRetornarCreated`).
+  6. Variante de bloqueio: a mesma operação submetida por User retorna **403 Forbidden** (`criar_comUser_deveRetornarForbidden`).
+
+* **Nota de abrangência:** este padrão de fluxo se repete para Departamento (RF-01 a RF-05), Fornecedor (RF-07), Funcionário (RF-08, incluindo a variante com criação simultânea de usuário — `createFuncionarioAndUsuario`), Localização (RF-09), Tipo de Ativo (RF-10) e Role/Permission (RF-27).
 
 ```mermaid
 graph TD
-    A[Início: Nova Solicitação] --> B{Autenticado?}
-    B -- Não --> C[Login]
-    B -- Sim --> D[Formulário Manutenção<br/>loading → success]
-    D --> E[Preencher Dados]
-    E --> F{Validar 400?}
-    F -- Sim --> G[Erros Campo<br/>estado: error]
-    F -- Não --> H[Criar PENDENTE<br/>Auditoria]
-    H --> I{Sucesso?}
-    I -- Não --> J[Toast Erro<br/>estado: error]
-    I -- Sim --> K[Notificar Analista<br/>Alerta]
-    K --> L[Fila Aprovação Analista]
-    L --> M{Ação Analista}
-    M -- Aprovar --> N[Status APROVADA<br/>Auditoria]
-    M -- Cancelar --> O[Modal Justificativa<br/>Status CANCELADA<br/>Auditoria]
-    M -- Mais Info --> P[Notificar Solicitante]
-    N --> Q[Técnico Executa]
-    Q --> R[Analista Conclui<br/>Custo/Peças/MãoObra]
-    R --> S[Status CONCLUIDA<br/>Auditoria + custoTotalPorAtivo]
-    S --> T[Notificar Solicitante]
-    O --> T
-    P --> L
+    A["Início: Admin acessa Cadastro de Filiais"] --> B{"Role Admin?"}
+    B -- "Não" --> C["Erro 403: escrita bloqueada para User"]
+    B -- "Sim" --> D["Formulário de filial exibido"]
+    D --> E["Preencher nome, código, endereço e responsável"]
+    E --> F["Submissão em andamento - botão em loading"]
+    F --> G{"Dados válidos?"}
+    G -- "Não" --> H["Erro 400: mensagens de validação"]
+    H --> D
+    G -- "Sim" --> I["Persistência da filial"]
+    I --> J["Sucesso: 201 Created"]
+    J --> K["Filial disponível para associação a ativos e departamentos"]
+```
+
+* **Estados de UI cobertos:**
+
+| Estado | Cobertura neste fluxo |
+| :--- | :--- |
+| **loading** | Durante a submissão e o carregamento da lista de filiais |
+| **empty** | Lista de filiais vazia antes do primeiro cadastro — atenção: `RealisticDataSeeder.java` popula dados realistas em ambientes de demonstração, o que pode mascarar este estado em dev/staging |
+| **error** | **400** (validação — RN-03) e **403** (User tentando escrever — RN-02) |
+| **success** | **201 Created** com confirmação visual da filial criada |
+| **disabled** | Botão de submit desabilitado durante o envio e enquanto campos obrigatórios estão vazios |
+
+* **Métricas instrumentadas neste fluxo:** Taxa de erros de validação (400); tempo de resposta da operação (meta RNF-04: p95 < 200ms).
+
+### Flow 3: Abertura de Solicitação de Manutenção
+
+* **Gatilho:** Funcionário identifica um problema em ativo e acessa "Nova Solicitação" (UC-02, passo 1 do BRD).
+* **Ator:** User (Funcionário).
+* **Pré-condições:** Usuário autenticado; ativo existe e está ativo.
+* **Resultado esperado:** Solicitação criada com status **Pendente** (RF-18), visível para aprovadores (entrada no Flow 4).
+
+* **Passos:**
+  1. Funcionário acessa "Nova Solicitação".
+  2. Sistema exibe a busca de ativos por filial/departamento/localização (RF-15). *Ancoragem de código:* a listagem/ranking de candidatos de ativo é implementada em `src/main/java/br/com/aegispatrimonio/service/AtivoService.java` — o TODO na linha 119 registra que este caminho carrega até 1000 candidatos (id+nome) e faz ranking; a serialização para exibição usa `AtivoMapper.toDTO` (`src/main/java/br/com/aegispatrimonio/mapper/AtivoMapper.java`).
+  3. Funcionário seleciona o ativo, descreve o problema, define a prioridade e anexa fotos (opcional).
+  4. Sistema valida os dados (RN-03) e cria a solicitação com status **Pendente**.
+  5. Confirmação de sucesso; a solicitação entra na fila de aprovadores.
+
+```mermaid
+graph TD
+    A["Início: Funcionário acessa Nova Solicitação"] --> B["Busca de ativos em loading"]
+    B --> C{"Ativos encontrados?"}
+    C -- "Não" --> D["Empty state: nenhum ativo encontrado"]
+    D --> E["Ajustar filtros de busca"]
+    E --> B
+    C -- "Sim" --> F["Selecionar ativo"]
+    F --> G["Descrever problema, prioridade e anexos opcionais"]
+    G --> H{"Ativo selecionado e campos obrigatórios preenchidos?"}
+    H -- "Não" --> I["Botão de envio desabilitado"]
+    I --> G
+    H -- "Sim" --> J["Submeter solicitação"]
+    J --> K{"Validação do servidor"}
+    K -- "Erro 400" --> L["Mensagem de erro de validação"]
+    L --> G
+    K -- "OK" --> M["Sucesso: solicitação criada com status Pendente"]
+    M --> N["Solicitação visível na fila de aprovadores"]
+```
+
+* **Estados de UI cobertos:**
+
+| Estado | Cobertura neste fluxo |
+| :--- | :--- |
+| **loading** | Durante a busca de ativos e a submissão |
+| **empty** | Nenhum ativo encontrado para os filtros aplicados |
+| **error** | **400** (validação — RN-03) |
+| **success** | Solicitação criada com status **Pendente** |
+| **disabled** | Botão de envio desabilitado sem ativo selecionado ou com campos obrigatórios vazios |
+
+* **Métricas instrumentadas neste fluxo:** Taxa de solicitações canceladas (meta BRD §8: < 10%); tempo médio de aprovação (medido a partir da criação).
+* **Risco de performance:** o TODO em `AtivoService.java:119` (carregamento de até 1000 candidatos + ranking) pode degradar a etapa de seleção de ativos deste fluxo.
+
+### Flow 4: Aprovação ou Cancelamento de Solicitação
+
+* **Gatilho:** Solicitação em status **Pendente**; aprovador acessa a fila de pendentes (UC-03, passo 1 do BRD).
+* **Ator:** Aprovador (Admin ou role específica — a confirmar; ver Seção 1).
+* **Pré-condições:** Solicitação em status **Pendente** (RN-05).
+* **Resultado esperado:** Status **Aprovada** (com equipe de manutenção notificada — UC-03) ou **Cancelada** (recursos liberados — CA-05).
+
+* **Passos:**
+  1. Aprovador visualiza a fila de pendentes. *Ancoragem de código:* a construção dinâmica de critérios de filtragem de manutenções existe em `src/main/java/br/com/aegispatrimonio/repository/ManutencaoSpecification.java` (método `build`, complexidade ciclomática 14).
+  2. Analisa detalhes e histórico do ativo, incluindo o custo total acumulado (`custoTotalPorAtivo` — RF-17, RN-08).
+  3. Clica "Aprovar" → sistema atualiza o status para **Aprovada** (RN-05).
+  4. Alternativa: clica "Cancelar" em qualquer estado do fluxo → **Cancelada** (RF-20, CA-05).
+  5. Pós-aprovação: equipe de manutenção notificada. **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — o BRD afirma "Equipe de manutenção notificada" (UC-03); a base contém `src/main/java/br/com/aegispatrimonio/service/AlertNotificationService.java` (método `checkResourceUsageAlerts`, focado em alertas de uso de recursos), mas o wiring de notificação específico para aprovações de manutenção não foi verificado na varredura.
+
+```mermaid
+graph TD
+    A["Início: Aprovador acessa fila de pendentes"] --> B["Carregamento da fila em loading"]
+    B --> C{"Há solicitações pendentes?"}
+    C -- "Não" --> D["Empty state: fila sem pendências"]
+    C -- "Sim" --> E["Analisar detalhes e histórico do ativo"]
+    E --> F{"Decisão do aprovador"}
+    F -- "Aprovar" --> G["Status atualizado para Aprovada"]
+    G --> H["Sucesso: equipe de manutenção notificada"]
+    F -- "Cancelar" --> I["Status atualizado para Cancelada"]
+    I --> J["Sucesso: recursos liberados"]
+```
+
+* **Estados de UI cobertos:**
+
+| Estado | Cobertura neste fluxo |
+| :--- | :--- |
+| **loading** | Durante o carregamento da fila e o processamento da decisão |
+| **empty** | Fila sem solicitações pendentes |
+| **error** | Falha ao atualizar status; tentativa de aprovar solicitação não pendente |
+| **success** | Status **Aprovada** ou **Cancelada** confirmado |
+| **disabled** | Botão "Aprovar" indisponível quando o status da solicitação não é **Pendente** |
+
+* **Métricas instrumentadas neste fluxo:** Tempo médio de aprovação (meta BRD §8: < 4 horas úteis); taxa de solicitações canceladas (meta: < 10%).
+
+### Flow 5: Execução e Conclusão da Ordem de Serviço
+
+* **Gatilho:** Solicitação **Aprovada** e técnico designado (UC-04, pré-condição do BRD).
+* **Ator:** Equipe de Manutenção.
+* **Pré-condições:** Status **Aprovada** ou **Em Andamento** (RF-21, RN-05).
+* **Resultado esperado:** Status **Concluída**; histórico do ativo atualizado; `custoTotalPorAtivo` recalculado (RN-08, CA-09).
+
+* **Passos:**
+  1. Técnico executa o serviço.
+  2. Registra: data, descrição, peças usadas, custo e tempo.
+  3. Clica "Concluir" → sistema atualiza o status para **Concluída** (RN-05).
+  4. Sistema atualiza o `custoTotalPorAtivo` do ativo (CA-09: relatório bate com a soma das ordens concluídas).
+  5. **Nota sobre estado intermediário:** a transição para **Em Andamento** existe na máquina de estados (RN-05), mas seu gatilho não está especificado no BRD nem detectado no código. **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — premissa adotada: a transição ocorre quando o técnico inicia a execução da ordem aprovada.
+
+```mermaid
+graph TD
+    A["Início: técnico designado à ordem"] --> B{"Status Aprovada ou Em Andamento?"}
+    B -- "Não" --> C["Botão Concluir desabilitado"]
+    B -- "Sim" --> D["Execução do serviço"]
+    D --> E["Registrar data, descrição, peças, custo e tempo"]
+    E --> F{"Campos obrigatórios preenchidos?"}
+    F -- "Não" --> G["Botão Concluir desabilitado"]
     G --> E
+    F -- "Sim" --> H["Submeter conclusão"]
+    H --> I{"Validação do servidor"}
+    I -- "Erro 400" --> J["Mensagem de erro de validação"]
     J --> E
-    T --> U[Fim: Histórico Atualizado]
+    I -- "OK" --> K["Sucesso: status Concluída"]
+    K --> L["Histórico e custo total do ativo atualizados"]
 ```
 
-* **Estados de UI cobertos:** loading (criação, transições), empty (nenhuma solicitação), error (400, 403, 404 ativo, 5xx), success (toast por transição), disabled (botões de ação conforme papel/estado — ex: só Admin/Analista vê "Aprovar")
-* **Métricas instrumentadas neste fluxo:** lead time PENDENTE→APROVADA, taxa de aprovação, tempo médio conclusão, custo médio por manutenção, % preventiva vs corretiva
+* **Estados de UI cobertos:**
 
----
+| Estado | Cobertura neste fluxo |
+| :--- | :--- |
+| **loading** | Durante a submissão da conclusão |
+| **empty** | Campos de registro obrigatórios (data, descrição, custo) vazios |
+| **error** | **400** (validação — RN-03) |
+| **success** | Status **Concluída** com confirmação |
+| **disabled** | Botão "Concluir" desabilitado se o status não for **Aprovada**/**Em Andamento** ou se campos obrigatórios estiverem vazios |
 
-### Flow 3: Health Check de Hardware e Alertas Preditivos
-* **Gatilho:** Agendador externo (cron/Spring `@Scheduled`) chama `updateHealthCheck` periodicamente OU Analista dispara manualmente
-* **Ator:** Sistema (agendador) / Analista de Manutenção (manual)
-* **Pré-condições:** Ativo é do tipo hardware; endpoint `updateHealthCheck` idempotente (BR-10: limpa adaptadores/discos/memórias anteriores via `deleteByAtivoDetalheHardwareId`)
-* **Resultado esperado:** Métricas de disco, memória, rede persistidas; alertas gerados se thresholds excedidos (disco >85%, memória >90%, latência rede >100ms — BR-05)
+* **Métricas instrumentadas neste fluxo:** Custo médio de manutenção por ativo/ano (meta BRD §8: redução de 15% YoY).
+
+### Flow 6: Consulta de Ativos, Histórico e Custos
+
+* **Gatilho:** Usuário acessa a listagem de ativos ou busca um ativo específico.
+* **Ator:** Admin e User (leitura permitida para ambas as roles — RF-14, RF-15).
+* **Pré-condições:** Usuário autenticado (Flow 1).
+* **Resultado esperado:** Detalhes completos do ativo, incluindo histórico de manutenção (RF-22) e custo total por período (RF-17).
 
 * **Passos:**
-  1. Agendador executa `updateHealthCheck(ativoId, payload)` com dados coletados (adaptadores, discos, memórias)
-  2. Sistema valida ativo existe (BR-04: 404 se não) e é hardware
-  3. Sistema remove dados antigos do hardware (`deleteByAtivoDetalheHardwareId` — BR-10)
-  4. Sistema persiste novos dados (`findByAtivoDetalheHardwareId` para verificação)
-  5. Sistema executa `checkResourceUsageAlerts` (complexidade 17 — refatorar) avaliando thresholds configuráveis
-  6. Se excedido: cria alerta com severidade, tipo (DISCO/MEMORIA/REDE), valor atual, threshold
-  7. Analista visualiza alertas em dashboard (`listarAlertas`, `getRecentAlerts`) — **estados: loading, empty, success**
-  8. Analista `markAsRead` ou converte em manutenção preventiva (Flow 2)
-  9. Histórico de saúde disponível via `getHealthHistory` para tendências — **estado: loading → success/empty**
+  1. Usuário acessa a listagem de ativos.
+  2. Sistema carrega a listagem com filtros por tipo, filial, departamento, status e localização (RF-15).
+  3. Usuário aplica filtros e/ou seleciona um ativo por ID (RF-14).
+  4. ID inexistente → **404 Not Found** com mensagem padronizada (RN-04, `buscarPorId_comIdInexistente_deveRetornarNotFound`, CA-03).
+  5. Sucesso → detalhes, histórico e custo total exibidos.
 
 ```mermaid
 graph TD
-    A[Início: Agendador/Manual] --> B{Ativo Existe?}
-    B -- Não --> C[404 Not Found<br/>Log Erro]
-    B -- Sim --> D{Tipo Hardware?}
-    D -- Não --> E[Ignorar/Log Warn]
-    D -- Sim --> F[Limpar Dados Antigos<br/>deleteByAtivoDetalheHardwareId]
-    F --> G[Persistir Novos Dados<br/>Adaptadores/Discos/Memórias]
-    G --> H{Sucesso Persistência?}
-    H -- Não --> I[Log Erro 5xx<br/>Retry/Alertar DevOps]
-    H -- Sim --> J[Executar checkResourceUsageAlerts]
-    J --> K{Threshold Excedido?}
-    K -- Não --> L[Fim: Health Check OK]
-    K -- Sim --> M[Criar Alerta<br/>Severidade/Tipo/Valor]
-    M --> N[Notificar Analista<br/>Push/Email/In-App]
-    N --> O[Dashboard Alertas<br/>loading → success/empty]
-    O --> P{Analista Ação}
-    P -- Mark Read --> Q[markAsRead]
-    P -- Converter Manutenção --> R[Flow 2: Nova Preventiva]
-    Q --> O
-    R --> S[Fim: Preventiva Criada]
-    L --> S
-    C --> S
-    E --> S
-    I --> S
+    A["Início: usuário acessa lista de ativos"] --> B["Carregamento da listagem em loading"]
+    B --> C{"Há ativos cadastrados?"}
+    C -- "Não" --> D["Empty state: nenhum ativo cadastrado"]
+    C -- "Sim" --> E["Aplicar filtros de tipo, filial, departamento, status e localização"]
+    E --> F{"Resultados para o filtro?"}
+    F -- "Não" --> G["Empty state: nenhum resultado para o filtro"]
+    G --> E
+    F -- "Sim" --> H["Selecionar ativo por ID"]
+    H --> I{"Ativo existe?"}
+    I -- "Não" --> J["Erro 404: mensagem padronizada de não encontrado"]
+    I -- "Sim" --> K["Sucesso: detalhes, histórico e custo total exibidos"]
 ```
 
-* **Estados de UI cobertos:** loading (dashboard alertas, histórico saúde), empty (nenhum alerta, sem histórico), error (falha coleta, 5xx em `checkResourceUsageAlerts`), success (health check OK, alerta lido), disabled (botão "Converter em Manutenção" se já existe aberta)
-* **Métricas instrumentadas neste fluxo:** frequência health checks executados, % alertas convertidos em preventiva (meta ≥70% — BRD), taxa de erro `checkResourceUsageAlerts` (<0,1% — BRD), latência P95 `updateHealthCheck`/`getHealthHistory`
+* **Estados de UI cobertos:**
 
----
+| Estado | Cobertura neste fluxo |
+| :--- | :--- |
+| **loading** | Durante o carregamento da listagem e do detalhe |
+| **empty** | Nenhum ativo cadastrado; nenhum resultado para o filtro aplicado |
+| **error** | **404** para ID inexistente (RN-04, CA-03) |
+| **success** | Detalhes, histórico e custo total exibidos |
+| **disabled** | Não aplicável — fluxo somente leitura |
 
-### Flow 4: Gestão de RBAC e Provisionamento de Usuários (Admin)
-* **Gatilho:** Admin acessa "Administração > Usuários/Permissões/Roles"
-* **Ator:** Administrador de Sistema (papel `ADMIN` obrigatório — BR-01)
-* **Pré-condições:** Usuário autenticado com `isAdmin=true`; token válido (`authInterceptor`)
-* **Resultado esperado:** Entidades mestras gerenciadas (Departamento, Filial, Fornecedor, Funcionário, TipoAtivo, Permissão, Role, Usuário) com auditoria completa
-
-* **Passos:**
-  1. Admin acessa painel de administração — **estado: loading → success**
-  2. Aba "Usuários": lista (`listarTodos` — BR-01: USER pode ler), botão "Novo Usuário" — **estado: disabled se não ADMIN**
-  3. Admin preenche: nome, email, papel (Role), departamento, filial, senha temporária
-  4. Sistema valida (BR-03) e executa `createUserAndToken` (retorna token inicial) ou `createUsuario` + `createFuncionarioAndUsuario`
-  5. Sistema registra auditoria (BR-02)
-  6. Aba "Roles/Permissões": CRUD em `createRole`, `createPermission`, associação role↔permission
-  7. Aba "Mestras": CRUD em Departamento, Filial, Fornecedor, Funcionário, TipoAtivo — **todos 403 para USER (BR-01)**
-  8. Admin pode `logout` ou `clearSession` (invalida token cliente/servidor — BR-08)
-  9. `mockLogin` disponível apenas em ambiente de teste — **estado: hidden em prod**
-
-```mermaid
-graph TD
-    A[Início: Painel Admin] --> B{isAdmin?}
-    B -- Não --> C[403 Forbidden<br/>Redirecionar Dashboard]
-    B -- Sim --> D[Carregar Abas<br/>loading → success]
-    D --> E{Aba Selecionada}
-    E -- Usuários --> F[Listar Usuários<br/>loading → success/empty]
-    E -- Roles/Permissões --> G[Listar Roles/Perms<br/>loading → success/empty]
-    E -- Mestras --> H[Listar Entidades<br/>loading → success/empty]
-    F --> I{Ação}
-    I -- Novo --> J[Formulário Usuário<br/>createUserAndToken]
-    I -- Editar --> K[Buscar Usuário<br/>atualizar]
-    I -- Excluir --> L[Confirmar + Auditoria]
-    J --> M{Validar 400?}
-    M -- Sim --> N[Erros Campo]
-    M -- Não --> O[Persistir + Token + Auditoria]
-    O --> P{Sucesso?}
-    P -- Sim --> Q[Toast + Atualizar Lista]
-    P -- Não --> R[Toast Erro]
-    G --> S[CRUD Roles/Perms<br/>Mesmo Padrão]
-    H --> T[CRUD Mestras<br/>Mesmo Padrão<br/>403 se USER]
-    Q --> F
-    R --> J
-    N --> J
-    L --> F
-    S --> D
-    T --> D
-    C --> A
-```
-
-* **Estados de UI cobertos:** loading (listagens, formulários), empty (nenhum usuário/role), error (400, 403, 404, 5xx), success (toast + atualização), disabled (todas as ações de escrita se não ADMIN; `mockLogin` hidden em prod)
-* **Métricas instrumentadas neste fluxo:** tempo de provisionamento usuário (<5min — BRD), taxa de erro 403 (deve ser 0% para ADMIN), auditoria 100% operações escrita
-
----
-
-### Flow 5: Relatórios Financeiros e Auditoria (Gestor/Auditor)
-* **Gatilho:** Gestor de Patrimônio ou Auditor acessa "Relatórios > Custo Total por Ativo" ou "Auditoria > Trilha de Logs"
-* **Ator:** Gestor de Patrimônio, Auditor / Compliance
-* **Pré-condições:** Usuário autenticado; permissão de leitura em relatórios/logs
-* **Resultado esperado:** Relatório `custoTotalPorAtivo` (soma manutenções por ativo — BR-06) exportável; logs de auditoria imutáveis filtráveis
-
-* **Passos:**
-  1. Usuário acessa tela de relatórios — **estado: loading → success**
-  2. Filtros: período, filial, departamento, tipo ativo, status manutenção
-  3. Sistema executa `custoTotalPorAtivo` agregando custos (peças, mão de obra, terceiros) por `ativo_id`
-  4. Exibe tabela: Ativo, Tag, Descrição, Total Manutenções, Qtd Manutenções, Última Manutenção — **estado: success/empty**
-  5. Botão "Exportar CSV/Excel" — gera arquivo para contabilidade (BRD Seção 7)
-  6. Aba "Auditoria": filtros por entidade, ação, usuário, período
-  7. Sistema consulta `audit_log` (entidade futura — BR-02 gap) — **estado: loading → success/empty**
-  8. Exibe: timestamp, usuário, entidade, entidade_id, ação, valores_anteriores, valores_novos
-  9. Exportação para evidência SOX/LGPD
-
-```mermaid
-graph TD
-    A[Início: Tela Relatórios] --> B{Autenticado?}
-    B -- Não --> C[Login]
-    B -- Sim --> D[Carregar Filtros<br/>loading → success]
-    D --> E{Aba}
-    E -- Custo Total --> F[Aplicar Filtros]
-    F --> G[Executar custoTotalPorAtivo]
-    G --> H{Resultado}
-    H -- Vazio --> I[Estado Empty<br/>Mensagem Orientativa]
-    H -- Dados --> J[Tabela + Totais<br/>estado: success]
-    J --> K[Exportar CSV/Excel]
-    K --> L[Download Arquivo]
-    E -- Auditoria --> M[Aplicar Filtros Log]
-    M --> N[Consultar audit_log]
-    N --> O{Resultado}
-    O -- Vazio --> P[Estado Empty]
-    O -- Dados --> Q[Tabela Logs<br/>Imutável/Ordenado]
-    Q --> R[Exportar Evidência]
-    R --> S[Download/Compartilhar]
-    L --> T[Fim]
-    S --> T
-    I --> T
-    P --> T
-    C --> A
-```
-
-* **Estados de UI cobertos:** loading (consulta agregada, logs), empty (sem dados no período), error (timeout agregação, 5xx), success (tabela renderizada), disabled (exportar se empty)
-* **Métricas instrumentadas neste fluxo:** tempo geração relatório (meta <5s), taxa de exportação, completude logs auditoria (meta 100% — BRD)
-
----
-
-### Flow 6: Autenticação e Gestão de Sessão
-* **Gatilho:** Usuário acessa aplicação não autenticado OU sessão expira durante uso
-* **Ator:** Qualquer usuário (Admin, Gestor, Analista, Funcionário)
-* **Pré-condições:** Nenhuma (tela pública de login)
-* **Resultado esperado:** Usuário autenticado com JWT válido; `authInterceptor` injeta token em requisições subsequentes; `logout`/`clearSession` invalidam corretamente
-
-* **Passos:**
-  1. Usuário acessa URL base → redirecionado para `/login` se sem token válido
-  2. Tela de login: campos email/username, senha, botão "Entrar" — **estado: loading (submit) → success/error**
-  3. Sistema valida credenciais (backend: `mockLogin` apenas testes; produção: integração LDAP/AD futura — BRD Seção 7)
-  4. Se válido: retorna JWT + dados usuário (roles, permissions) → armazena em memory/storage
-  5. `authInterceptor` injeta `Authorization: Bearer <token>` em todas as chamadas `request` (frontend `api.js:46`)
-  6. Usuário navega → se 401/token expirado: `clearSession` → redireciona login preservando `returnUrl`
-  7. Usuário clica "Sair" → `logout` (invalida server-side) + `clearSession` (limpa client) → redireciona login
-  8. `mockLogin` disponível apenas em `NODE_ENV=development` — **estado: hidden em prod**
-
-```mermaid
-graph TD
-    A[Início: Acesso App] --> B{Token Válido?}
-    B -- Sim --> C[Permitir Acesso<br/>authInterceptor Injeta Token]
-    B -- Não --> D[Tela Login<br/>estado: ready]
-    D --> E[Preencher Credenciais]
-    E --> F{Submeter}
-    F --> G[Validar Backend]
-    G -- Inválido --> H[Erro 401<br/>estado: error<br/>Mensagem Genérica]
-    G -- Válido --> I[Receber JWT + User Data]
-    I --> J[Armazenar Token<br/>Redirecionar returnUrl]
-    J --> C
-    C --> K{Navegação}
-    K -- Requisição --> L[request + Token]
-    L --> M{Resposta}
-    M -- 2xx --> N[handleResponse<br/>Sucesso]
-    M -- 401 --> O[clearSession<br/>Redirecionar Login]
-    M -- 403 --> P[handleApiError<br/>Toast Permissão]
-    M -- 5xx --> Q[handleApiError<br/>Toast Erro Servidor]
-    N --> K
-    O --> D
-    P --> K
-    Q --> K
-    K -- Logout --> R[logout + clearSession]
-    R --> D
-    H --> E
-```
-
-* **Estados de UI cobertos:** loading (submit login, requisições autenticadas), error (401 credenciais, 403 permissão, 5xx servidor, network error), success (login ok, requisições ok), disabled (botão login durante submit, botões app durante 401 redirect)
-* **Métricas instrumentadas neste fluxo:** taxa de sucesso login, tempo médio autenticação, taxa de 401 (expiração), latência P95 `request` (meta ≤500ms — BRD), console.error/debug residuais em `api.js:36,99` (remover prod)
+* **Métricas instrumentadas neste fluxo:** Tempo de resposta das consultas (meta RNF-04: p95 < 200ms, excluindo relatórios pesados).
 
 ---
 
 ## 3. Edge Cases & Error Flows
-| Cenário | Tratamento na UI | Mensagem Exibida |
-| :--- | :--- | :--- |
-| Sessão expira durante preenchimento de formulário longo (ex: novo ativo) | `authInterceptor` detecta 401 → `clearSession` → salva estado formulário em `sessionStorage` → redireciona login com `returnUrl` → após login restaura dados | "Sua sessão expirou. Os dados preenchidos foram salvos temporariamente. Faça login para continuar." |
-| Usuário USER tenta acessar rota de escrita (ex: `/ativos/novo`) | Roteamento client-side verifica `isAdmin` (do token/user data) → oculta link/botão; se acessa URL direta, backend retorna 403 → frontend exibe toast + redireciona listagem | "Acesso negado. Apenas administradores podem realizar esta ação." |
-| `buscarPorId` retorna 404 (ativo removido por outro usuário) | Tela de detalhe exibe estado **error** com botão "Voltar à Listagem"; listagem atualizada automaticamente via polling ou refresh manual | "Ativo não encontrado. Pode ter sido removido por outro usuário." |
-| `checkResourceUsageAlerts` falha (5xx / timeout) — complexidade 17 | Backend: circuit breaker / retry com backoff; Frontend: dashboard alertas exibe **error** com botão "Tentar Novamente"; alerta crítico enviado para DevOps (log estruturado) | "Falha ao verificar alertas de hardware. Tentando novamente em 30s. Equipe técnica notificada." |
-| Health check payload inválido (ex: disco sem `totalBytes`) | `updateHealthCheck` valida schema (BR-03: 400) → retorna detalhes campo a campo → agendador loga erro + alerta DevOps; não gera alerta falso positivo | "Dados de health check inválidos: campo 'disco.totalBytes' é obrigatório." |
-| Concorrência: dois admins editam mesmo ativo simultaneamente | Backend: optimistic locking (`@Version`) → segundo `atualizar` recebe 409 Conflict → frontend exibe modal "Dados alterados por outro usuário. Recarregar?" | "Este registro foi modificado por outro usuário. Deseja recarregar os dados atuais?" |
-| Exportação `custoTotalPorAtivo` com dataset grande (>10k linhas) | Backend: streaming CSV / chunked response; Frontend: botão "Exportar" → **loading** com progress bar → download automático ao concluir | "Gerando relatório... 45% concluído. Não feche esta aba." |
-| `setUsername` stub vazio em `Usuario.java:86` afeta `createFuncionarioAndUsuario` | Backend: correção urgente + teste regressão; Frontend: validação cliente impede envio username vazio; monitoramento de 5xx em criação usuário | "Erro interno ao criar usuário. Contate suporte. (Ref: USR-001)" |
 
-> **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — Cenários de exceção inferidos a partir das regras de negócio (BR-01 a BR-10), achados do diagnóstico (complexidade ciclomática, stubs, console.*) e padrões comuns de UX. Não há código de frontend real para confirmar implementação atual.
+| Cenário | Tratamento na UI | Mensagem exibida | Fonte |
+| :--- | :--- | :--- | :--- |
+| Sessão expirada durante o fluxo (token expira em 1h; refresh 7 dias) | **401** e redirecionamento para login preservando contexto | Mensagem de sessão expirada (texto exato a confirmar) | **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — expiração conforme BRD RNF-01; comportamento de redirecionamento inferido |
+| Requisição sem token em endpoint protegido | Rejeição da operação | Mensagem de não autenticado | BRD CA-06 |
+| Payload inválido em formulário (campos obrigatórios, formatos, tipos) | Bloqueio da submissão; destaque dos campos inválidos | Mensagens claras de validação | BRD RN-03 / CA-02 (`criar_comDadosInvalidos_deveRetornarBadRequest`) |
+| ID inexistente em consulta de ativo/entidade | Estado de erro na tela de detalhe | Mensagem padronizada de não encontrado | BRD RN-04 / CA-03 (`buscarPorId_comIdInexistente_deveRetornarNotFound`) |
+| User tenta criar/atualizar/excluir entidade mestre | Ação bloqueada; recomenda-se ocultar/desabilitar controles de escrita para a role User | Mensagem de acesso negado | BRD RN-02 / CA-01 (`criar_comUser_deveRetornarForbidden`); ocultação de controles é **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** |
+| Busca de ativos retorna grande volume de candidatos | Loading prolongado na etapa de seleção de ativos (Flow 3) | Indicador de carregamento | Código: TODO em `AtivoService.java:119` (carrega até 1000 candidatos id+nome e faz ranking); comportamento de UI **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** |
+| Cancelamento de solicitação em qualquer estado do fluxo de manutenção | Fluxo anulado e recursos liberados | Confirmação de cancelamento | BRD RN-05 / CA-05 |
+| Empty states mascarados em ambientes de demonstração | Listas populadas automaticamente pelo seeder | — | Código: `RealisticDataSeeder.java` (método `run`, complexidade 15) — validar empty states em ambiente sem seed **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** |
+| Edição de username do usuário | Alteração sem efeito no servidor | — | Código: `Usuario.setUsername` com corpo vazio (stub) em `Usuario.java:86` — fluxo de edição de perfil não consta no BRD **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** |
+| Falha de rede/servidor durante submissão | Erro registrado via `console.error` no serviço central de API | Mensagem de erro genérica (texto exato a confirmar) | Código: `frontend/src/services/api.js:44`; texto da mensagem **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** |
 
 ---
 
 ## 4. Cross-Flow Dependencies
-* **Flow 2 (Manutenção) depende de Flow 1 (Ativo):** `buscarPorId` do ativo deve retornar 200 antes de permitir `iniciar` manutenção; ativo deve existir e estar ativo.
-* **Flow 3 (Health Check) alimenta Flow 2 (Manutenção Preventiva):** Alertas gerados em `checkResourceUsageAlerts` → botão "Converter em Manutenção Preventiva" inicia Flow 2 com tipo=preventiva, prioridade=alta, descrição pré-preenchida.
-* **Flow 4 (RBAC) controla todos os demais:** Permissões definidas aqui (roles, permissions, `isAdmin`) determinam quais botões/rotas/ações estão **disabled** ou **hidden** nos Flows 1, 2, 3, 5, 6.
-* **Flow 5 (Relatórios) consome dados dos Flows 1, 2, 3:** `custoTotalPorAtivo` agrega manutenções (Flow 2); auditoria loga operações dos Flows 1, 2, 3, 4.
-* **Flow 6 (Auth) é pré-condição de todos:** Token válido + `authInterceptor` funcionando (sem `console.error/debug` residuais) é requisito para qualquer fluxo autenticado.
+
+* **Flow 1 (Autenticação) precede todos os demais:** sem sessão válida, os endpoints protegidos retornam **401** (CA-06); o `authInterceptor` (RF-24) é pré-requisito de qualquer requisição autenticada.
+* **Flow 2 (cadastros mestres) precede Flow 3:** a solicitação exige ativo existente e ativo (UC-02), e cada ativo pertence a **um** Tipo de Ativo, **uma** Filial, **um** Departamento e **uma** Localização (RN-07) — entidades criadas no Flow 2.
+* **Flow 3 precede Flow 4:** apenas solicitações em status **Pendente** podem ser aprovadas (RN-05).
+* **Flow 4 precede Flow 5:** apenas solicitações **Aprovada** (ou **Em Andamento**) podem ser concluídas (RF-21, RN-05).
+* **Flow 5 alimenta Flow 4 e Flow 6:** o `custoTotalPorAtivo` (RN-08, CA-09), atualizado na conclusão, é consumido na análise de aprovação (UC-03, passo 2) e na consulta de custos (RF-17).
+* **Flow 6 depende de Flow 2, Flow 3 e Flow 5** para exibir dados completos: histórico de manutenção (RF-22) só existe após solicitações criadas e concluídas.
+* **Cancelamento (Flow 4 — RF-20) é transversal** à máquina de estados de manutenção: pode ocorrer em qualquer estado (CA-05), interrompendo os Flows 3→4→5 em qualquer ponto.
 
 ---
 
 ## 5. Acessibilidade nos Fluxos
-* **Navegação por teclado:** Ordem de tab lógica em todos os formulários (Flow 1, 2, 4, 6); `Tab` navega campos, `Enter` submete, `Esc` fecha modais/cancela; `Shift+Tab` reverso. Foco visível (`:focus-visible`) em todos os elementos interativos.
-* **Leitores de tela:** 
-  - Labels associados via `<label for>` ou `aria-label` em todos os inputs (Flow 1, 2, 4, 6)
-  - Tabelas com `<caption>`, `<th scope="col">`, `aria-sort` para ordenação (Flow 1, 5)
-  - Estados dinâmicos anunciados via `aria-live="polite"`: loading ("Carregando ativos..."), success ("Ativo salvo com sucesso"), error ("Erro ao salvar: campo valor é obrigatório"), empty ("Nenhum ativo cadastrado")
-  - Modais (confirmação exclusão, justificativa cancelamento) com `role="dialog"`, `aria-modal="true"`, `aria-labelledby` no título, foco trapado
-  - Alertas de health check (Flow 3) com `role="alert"` para anúncio imediato
-  - Indicadores de estado (spinner loading, ícones success/error) com `aria-hidden="true"` + texto alternativo em `sr-only`
-* **Contraste e zoom:** Cores de status (sucesso=verde, erro=vermelho, aviso=amarelo) com contraste ≥4.5:1; layout responsivo até 400% zoom sem perda de funcionalidade.
+
+* **Responsividade:** o BRD (RNF-08) exige interface responsiva (desktop/tablet) com abordagem **mobile-first para solicitações de manutenção** — impacto direto no Flow 3 (abertura de solicitação), que deve ser plenamente operável em telas menores.
+* **Navegação por teclado:** **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — ordem de tab e atalhos não são verificáveis na varredura (nenhuma tela/rota detectada e nenhum teste de acessibilidade citado no BRD). Recomendação: ordem de tab coerente com a sequência dos formulários descrita nos casos de uso (login → campos → submit; solicitação → busca de ativo → descrição → anexos → submit), com foco visível nos botões de ação crítica (Aprovar/Cancelar/Concluir). Premissa adotada: os formulários seguem a ordem dos passos de UC-01 a UC-04.
+* **Leitores de tela:** **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — textos alternativos e anúncios de estado não são verificáveis na base. Recomendação: anunciar programaticamente as transições de estado (loading → sucesso/erro) nos fluxos de manutenção e as mensagens de validação (400/403/404), que o BRD exige claras (CA-02) e padronizadas (CA-03). Premissa adotada: mensagens seguem os critérios de aceitação do BRD.
 
 ---
 
 ## 6. Referências
-* **Wireframes/Protótipos:** [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — Não há arquivos de design no repositório. Recomenda-se criar no Figma com base nestes flows.
-* **Use Cases relacionados:** UC-01 (Cadastrar Ativo), UC-02 (Solicitar Manutenção), UC-03 (Aprovar Manutenção), UC-04 (Monitorar Health Check), UC-05 (Gerenciar Usuários/RBAC), UC-06 (Visualizar Relatórios/Auditoria) — mapeados 1:1 dos Flows 1–6.
-* **Glossário Ubiquitous Language (BRD Seção 12):** 30+ termos de domínio usados como base para nomenclatura de ações/estados.
-* **Regras de Negócio (BRD Seção 6):** BR-01 a BR-10 referenciadas em cada fluxo.
-* **Diagnóstico Determinístico:** 348 arquivos Java, 15 JS; complexidade ciclomática alta em `api.js:46` (13), `AlertNotificationService:96` (17), `ManutencaoSpecification:26` (14), `AtivoMapper:15` (14), `RealisticDataSeeder:34` (15); stub `Usuario.setUsername:86`; console.* residual `api.js:36,99`.
-* **Stack Tecnológica Verificada:** Java backend (Spring Boot implícito), JavaScript frontend (15 arquivos), `@popperjs/core` para tooltips/dropdowns; sem ORM/banco identificado — SQL cru assumido.
+
+* **BRD:** Business Requirements Document — Sistema de Gestão de Patrimônio (A4) — fonte primária dos fluxos (UC-01 a UC-04, RF-01 a RF-29, RN-01 a RN-08, CA-01 a CA-10, KPIs §8, Riscos §9).
+* **Glossário:** `glossario.md` (referenciado pelo BRD como fonte da linguagem ubíqua e das regras de negócio).
+* **Código (varredura determinística do workspace):** `frontend/src/services/api.js`; `src/main/java/br/com/aegispatrimonio/service/AtivoService.java`; `src/main/java/br/com/aegispatrimonio/mapper/AtivoMapper.java`; `src/main/java/br/com/aegispatrimonio/repository/ManutencaoSpecification.java`; `src/main/java/br/com/aegispatrimonio/service/AlertNotificationService.java`; `src/main/java/br/com/aegispatrimonio/config/seeder/RealisticDataSeeder.java`; `src/main/java/br/com/aegispatrimonio/model/Usuario.java`.
+* **Rotas/Endpoints:** nenhuma rota/IPC detectada na varredura — mapeamento de endpoints reais pendente de extração.
+* **Wireframes/Protótipos:** não localizados no workspace — a definir.

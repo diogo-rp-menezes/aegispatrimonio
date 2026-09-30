@@ -1,164 +1,145 @@
-# Test Strategy — Aegis Patrimônio
+# Test Strategy — Sistema de Gestão de Patrimônio (AegisPatrimônio)
 
-> **Versão:** 1.0 · **Owner:** QA Lead / Eng Lead · **Status:** Draft
-
-## 1. Objectives & Quality Goals
-* Garantir zero regressões críticas (P0) em produção — cobertura de fluxos de auditoria, RBAC e health checks
-* Reduzir MTTD (Mean Time To Detect) para < 2 horas via testes automatizados em CI/CD e monitoramento de métricas de qualidade
-* Validar conformidade com BR-02 (auditoria WORM imutável), BR-01 (RBAC estrito) e NFRs de latência (P95) antes de cada release
-* Eliminar bugs bloqueantes conhecidos (RISK-03: `setUsername` stub, RISK-02: `AuditLog` ausente, RISK-16: `AlertNotificationService` complexidade 17) antes de homologação
-
-## 2. Test Pyramid
-| Camada | Cobertura Mínima | Ferramenta | Frequência de Execução | Responsável |
-| :--- | :--- | :--- | :--- | :--- |
-| **Unit Tests** | 80% global; 95% em regras de negócio (services, mappers, specifications, evaluators) | JUnit 5 + Mockito (backend), Vitest (frontend) | A cada commit (CI) | Dev |
-| **Integration Tests** | 100% dos fluxos críticos listados nas US (cadastro ativo, manutenção, health check, auth, auditoria) | Testcontainers (PostgreSQL assumido para testes), SpringBootTest, MockMvc | A cada PR (pipeline obrigatório) | Dev |
-| **E2E Tests** | Jornadas principais: onboarding funcionário+usuário, solicitação→aprovação→conclusão manutenção, health check→alerta→manutenção, dashboard executivo | Playwright (JavaScript) | A cada deploy para staging; nightly em staging | QA |
-| **Contract Tests** | Todos os endpoints públicos OpenAPI (30+ endpoints mapeados nas US) | Pact (provider: Spring, consumer: frontend) | A cada release candidate | Dev |
-| **Performance Tests** | Cenários NFR: login P95 ≤ 800ms, listagem ativos P95 ≤ 300ms, health check throughput 11 req/s, job alertas 10k ativos < 2 min | k6 (scripts versionados) | Semanal em staging; obrigatório antes de release major | QA/Dev |
-| **Security Tests** | SAST no pipeline (Semgrep rules Java/JS), DAST em staging (OWASP ZAP), validação RBAC (403/401), tokens JWT RS256 | Semgrep, OWASP ZAP, testes de integração RBAC | SAST: a cada commit; DAST: semanal; RBAC: a cada PR | Sec/Dev |
-
-## 3. Test Environments
-| Ambiente | Propósito | Dados | Acesso |
-| :--- | :--- | :--- | :--- |
-| **Local** | Desenvolvimento e debug | Seed `RealisticDataSeeder` (refatorado US-TECH-007) + mocks | Dev |
-| **CI (GitHub Actions/GitLab CI)** | Validação automatizada unit/integration/contract | Banco efêmero Testcontainers (PostgreSQL 15), schema Flyway/Liquibase | Pipeline |
-| **Staging** | Homologação pré-produção, E2E, performance, security | Dados anonimizados (LGPD) — dump produção sanitizado + seed controlado | QA, PO, Dev |
-| **Produção** | Smoke tests pós-deploy, canary metrics | Real (somente leitura para testes) | Automação monitorada |
-
-> **Nota:** O diagnóstico não identificou motor de banco nas dependências (`package.json` sem driver JDBC). Assume-se PostgreSQL para testes via Testcontainers por ser padrão em projetos Spring Boot — **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**. Confirmar com arquitetura o banco alvo (PostgreSQL, Oracle, SQL Server) e ajustar Testcontainers module conforme.
-
-## 4. Coverage Targets
-* **Mínimo global:** 80% (linhas, branches, métodos) — gate no SonarQube/JaCoCo
-* **Crítico (regras de negócio):** 95% em:
-  - `AtivoService`, `AtivoMapper` (US-ATIVO-001 a 005, US-TECH-001)
-  - `ManutencaoService`, `ManutencaoSpecification` (US-MAN-001 a 005, US-TECH-002)
-  - `AlertNotificationService` + evaluators (US-MON-001, 004, US-TECH-003)
-  - `AuthService`, `JwtProvider`, `RefreshTokenRepository` (US-ATIVO-014)
-  - `AuditLogService`, `AuditInterceptor`, `AuditAspect` (US-AUD-001)
-  - `UsuarioService`, `Usuario.setUsername` (US-ATIVO-011, 013, US-TECH-004)
-* **Exclusões justificadas:** DTOs/records anêmicos, configurações (YAML/Properties), código gerado (OpenAPI), `RealisticDataSeeder` (apenas testes), `mockLogin` (profile `test`)
-
-## 5. Non-Functional Testing
-### Performance
-| Cenário | Ferramenta | Critério de Aceite | Origem |
-| :--- | :--- | :--- | :--- |
-| Login (`POST /api/auth/login`) | k6 | P95 ≤ 800ms, 100 VUs simultâneos | US-ATIVO-014, NFR-20 |
-| Listagem ativos (`GET /api/ativos`) | k6 | P95 ≤ 300ms (página 1, cache quente), 10k ativos | US-ATIVO-002, NFR-04 |
-| Detalhe ativo (`GET /api/ativos/{id}`) | k6 | P95 ≤ 200ms | US-ATIVO-003, NFR-06 |
-| Health check ingest (`POST /api/ativos/{id}/health-check`) | k6 | Throughput 11 req/s sustentado, P95 ≤ 1s | US-MON-001, NFR-32, NFR-33 |
-| Job verificação alertas (10k ativos) | k6 | Execução completa < 2 min, taxa erro 5xx < 0.1% | US-MON-004, NFR-39, NFR-40 |
-| Exportação CSV 50k registros | k6 | < 10s streaming | US-ATIVO-002, NFR-05 |
-| Dashboard executivo | k6 | P95 ≤ 1s | US-REL-002, NFR-44 |
-
-### Segurança
-* **SAST:** Semgrep com ruleset Java (Spring Security, SQLi, XSS, path traversal) + JavaScript (prototype pollution, unsafe eval) — executado no pipeline a cada commit
-* **DAST:** OWASP ZAP scan autenticado em staging (credenciais de teste) — varredura semanal + antes de release
-* **RBAC Validation:** Testes de integração cobrindo matriz de permissões (ADMIN, GESTOR_PATRIMONIO, ANALISTA_MANUTENCAO, USER, AUDITOR, HEALTH_COLLECTOR) — 403/401 esperados por endpoint
-* **JWT:** Validação RS256, expiração access token (8h), refresh rotation sem race condition, invalidação no logout/desativação
-* **AuditLog Imutabilidade:** Teste de tentativa `UPDATE/DELETE` em `audit_log` deve falhar (grants restritos) — US-AUD-001
-
-### Acessibilidade
-* **Ferramenta:** axe-core integrado nos testes E2E (Playwright) + Storybook a11y addon
-* **Critério:** WCAG 2.1 AA em todas as telas de formulário (cadastro ativo, manutenção, login, usuários) e tabelas (listagens, auditoria, alertas)
-* **Validação:** Automatizada no pipeline E2E; revisão manual em staging para fluxos complexos (wizard conclusão manutenção, modal baixa ativo 2 etapas)
-
-### Resiliência / Chaos
-* **Cenários validados em staging (mensal):**
-  - Falha de conexão DB durante `AtivoRepository.save` → 500 + rollback + alerta infra (US-ATIVO-001 EX-5)
-  - Storage WORM indisponível ao auditar → transação principal commitada, alerta CRITICAL disparado (US-ATIVO-001 EX-6, US-ATIVO-004 EX-5)
-  - `AlertNotificationService` falha parcial → health check persistido, erro logado, job reprocessamento (US-MON-001 EX-5)
-  - SMTP down ao notificar → `NotificationOutbox` enfileira, retry exponencial worker (US-MON-004 EX-4)
-  - Refresh token race condition → 10 requests paralelos com token expirado → 1 refresh, 9 reutilizam (US-ATIVO-014 EX-4)
-
-## 6. Test Data Management
-* **Estratégia de geração:**
-  - **Unit/Integration:** Builders/Factories (pattern Builder) para `Ativo`, `Manutencao`, `Usuario`, `Filial`, `TipoAtivo`, `HealthCheck`, `Alerta` — refatorar `RealisticDataSeeder` (US-TECH-007) para servir como factory library
-  - **E2E/Staging:** Dump anonimizado de produção (scripts de sanitização: CPF/CNPJ/email/username mascarados, valores financeiros perturbados ±10%, IPs anonimizados) + seed controlado para cenários específicos (ex: ativo com health check crítico, manutenção em cada status)
-* **Dados sensíveis:** **Obrigatório** anonimização/mascaramento fora de produção. Nenhum dado real de CPF, CNPJ, email corporativo, token JWT, senha (mesmo hash) em CI/staging. Scripts de sanitização versionados e auditados.
-
-## 7. Regression Strategy
-* **Suite de regressão automatizada:**
-  - **Nível 1 (CI - obrigatório a cada PR):** Unit + Integration + Contract tests (~15 min)
-  - **Nível 2 (Staging deploy - obrigatório):** E2E jornadas críticas + Performance smoke (subset k6) + Acessibilidade (~30 min)
-  - **Nível 3 (Semanal/Release):** Performance suite completa + DAST + Chaos scenarios (~2h)
-* **Critérios de entrada para release (Definition of Release Ready):**
-  - 0 bugs P0/P1 abertos
-  - Pipeline Nível 1 e 2 verdes
-  - Cobertura ≥ targets (Seção 4)
-  - Performance benchmarks dentro do NFR (Seção 5)
-  - `AuditLog` implementado e testado (RISK-02 resolvido) — **bloqueante**
-  - `setUsername` corrigido e testado (RISK-03 resolvido) — **bloqueante**
-  - `AlertNotificationService` refatorado (RISK-016 resolvido) — **bloqueante para Q2**
-* **Critérios de saída (pós-deploy produção):**
-  - Smoke tests: health endpoint, login, listagem ativos, health check ingest, dashboard — todos verdes em < 10 min
-  - Métricas de erro 5xx < 0.1% nos primeiros 30 min (guardrail BRD)
-
-## 8. Bug Triage & Severity
-| Severidade | Definição | SLA de Correção | Exemplos no Projeto |
-| :--- | :--- | :--- | :--- |
-| **Crítica (P0)** | Sistema fora do ar, perda de dados, vazamento segurança, não conformidade legal (LGPD/SOX), bug bloqueante conhecido | Imediato (hotfix ou rollback < 1h) | `AuditLog` ausente (RISK-02), `setUsername` stub (RISK-03), taxa erro 5xx > 0.1% (RISK-16), token JWT não invalida no logout (RISK-09) |
-| **Alta (P1)** | Funcionalidade principal quebrada (CRUD ativos, manutenção, auth, health check, alertas), performance fora do NFR, RBAC bypass | 24h (sprint atual) | Mapper complexidade causa bug mapeamento (RISK-01), Specification gera query ineficiente (RISK-04), lazy loading exception (RISK-05), soft/hard delete inconsistente (RISK-06) |
-| **Média (P2)** | Funcionalidade secundária afetada (relatórios, dashboard, export, filtros salvos), UX degradada, tech debt não bloqueante | Próxima sprint | Console.* em produção (RISK-11), request complexidade (RISK-10), seeder quality gate (RISK-30), depreciação linear não validada (RISK-14/23) |
-| **Baixa (P3)** | Cosmético, melhorias, documentação, refatoração não urgente | Backlog (priorizado por ROI) | Popper.js tooltips styling, cache TTL ajustes, logs estruturados frontend |
-
-## 9. Reporting & Metrics
-* **Dashboards (Grafana/Datadog):**
-  - Cobertura por módulo (JaCoCo + Vitest) — meta 80%/95%
-  - Taxa de falha de build (CI) — target < 5%
-  - Flakiness rate (testes instáveis) — target < 1%
-  - Performance trends (P95, throughput) por endpoint crítico
-  - Bug escape rate (produção vs staging) — target < 2%
-  - MTTR (Mean Time To Resolve) por severidade
-  - Defect density por componente (mapper, specification, alert service, auth)
-* **Métricas de qualidade acompanhadas semanalmente:**
-  - **Escape Rate:** Bugs encontrados em produção / Total bugs (meta < 5%)
-  - **MTTR:** P0 < 4h, P1 < 24h, P2 < 5 dias
-  - **Defect Density:** Bugs/KLOC por módulo (foco: `AtivoMapper`, `ManutencaoSpecification`, `AlertNotificationService`)
-  - **Technical Debt Ratio:** SonarQube (meta < 5%)
-  - **NFR Compliance:** % endpoints dentro do P95 alvo
-
-## 10. Roles & Responsibilities
-| Papel | Responsabilidade |
-| :--- | :--- |
-| **Dev (Backend)** | Testes unitários (services, mappers, specifications, evaluators), integração (MockMvc + Testcontainers), contract tests (Pact provider), correção bugs P0/P1, refatoração tech debt (US-TECH-001 a 007) |
-| **Dev (Frontend)** | Testes unitários (Vitest: hooks, utils, components), integração (MSW mocks), E2E (Playwright: jornadas), acessibilidade (axe-core), remoção console.* (US-TECH-005), refatoração `request` (US-TECH-006) |
-| **QA Lead** | Estratégia de teste, planejamento E2E, gestão dados de teste staging, triagem bugs, validação performance/security, relatórios qualidade, gate release |
-| **Eng Lead** | Quality gate em releases (aprovação Definition of Release Ready), priorização tech debt, alinhamento NFR com arquitetura, decisões bloqueantes (RISK-02, 03, 09, 16) |
-| **Sec/DevSecOps** | SAST/DAST pipeline, regras Semgrep, ZAP scans, validação RBAC/JWT, auditoria grants `audit_log`, rotação chaves RSA (90 dias) |
-| **DBA/Infra** | Índices compostos validação (CI `EXPLAIN ANALYZE`), particionamento `audit_log`/`ativo_detalhe_hardware`, tiering cold storage, Testcontainers config, staging data refresh |
-
-## 11. Traceability Matrix (Resumo)
-| User Story / Tech Debt | Test Types | Critical Path | Blocking Risks |
-| :--- | :--- | :--- | :--- |
-| US-ATIVO-001 a 005 (CRUD Ativos) | Unit, Integration, E2E, Contract | Sim | RISK-01, RISK-02, RISK-05, RISK-06 |
-| US-ATIVO-011, 013 (Funcionário/Usuário) | Unit, Integration, E2E | Sim | **RISK-03 (BLOQUEANTE)**, RISK-02, RISK-09 |
-| US-ATIVO-014 (Auth) | Unit, Integration, E2E, Contract, Performance, Security | Sim | RISK-09, RISK-10, RISK-11 |
-| US-MAN-001 a 005 (Manutenção) | Unit, Integration, E2E, Contract | Sim | RISK-02, RISK-04, RISK-12, RISK-13 |
-| US-MON-001, 004 (Health Check + Job Alertas) | Unit, Integration, Performance, Chaos | Sim | **RISK-16 (CRÍTICO)**, RISK-17, RISK-18, RISK-20, RISK-21, RISK-22 |
-| US-MON-002, 003 (Histórico + Alertas UI) | Unit, Integration, E2E, Acessibilidade | Não | RISK-15, RISK-19 |
-| US-REL-001, 002 (Relatórios + Dashboard) | Unit, Integration, E2E, Performance | Não | RISK-14, RISK-23, RISK-24, RISK-25, RISK-26 |
-| US-AUD-001 (Auditoria) | Unit, Integration, E2E, Security, Performance | Sim | **RISK-02 (BLOQUEANTE)**, RISK-27, RISK-28, RISK-29 |
-| US-TECH-001 a 007 (Tech Debt) | Unit, Integration (regressão) | Sim (001, 002, 003, 004) | RISK-01, RISK-04, RISK-16, RISK-03, RISK-11, RISK-10, RISK-30 |
-
-## 12. Open Issues Requerendo Decisão Humana (Impactam Testes)
-| Item | Descrição | Impacto no Teste | Decisão Necessária |
-| :--- | :--- | :--- | :--- |
-| Banco de dados alvo | Diagnóstico não encontrou driver JDBC | Testcontainers module, CI schema, performance baselines | Confirmar: PostgreSQL, Oracle, SQL Server? |
-| Soft vs Hard delete ativo | LGPD vs auditoria (RISK-06) | Cenários de teste US-ATIVO-005, US-AUD-001 | Definir com Compliance/Arquitetura |
-| Filtro implícito por escopo (filial/departamento) | USER vê apenas sua filial? (RISK-15) | Testes RBAC US-ATIVO-002, US-MAN-005, US-MON-003 | Definir com PO |
-| Matriz de permissões por role | Roles/permissões não definidas (RISK-08) | Testes RBAC todos os endpoints | Workshop stakeholders |
-| Estratégia invalidação token | Blacklist Redis vs versioning (RISK-09) | Testes logout, desativação, segurança | Definir com Arquitetura/Segurança |
-| Alçadas aprovação manutenção | Valores por filial/valor/tipo (RISK-12) | Testes US-MAN-001, 002 | Workshop Gestão/Financeiro |
-| Método depreciação | Linear vs fiscal (RISK-14, 23) | Testes US-REL-001 (TCO) | Validar com Financeiro |
-| Permissão `relatorio:custo-total` | Roles exatas (RISK-24) | Testes RBAC US-REL-001 | Definir roles |
-| Hash encadeado vs assinatura digital | Integridade `audit_log` (RISK-27) | Testes segurança US-AUD-001 | Avaliar com Segurança |
-| Sampling health checks auditoria | Volume alto (RISK-29) | Testes US-AUD-001, US-MON-001 | Definir política |
-| Role `HEALTH_COLLECTOR` | RBAC granular endpoint health check (RISK-18) | Testes auth US-MON-001 | Definir role + permissões |
-| Particionamento `ativo_detalhe_hardware` | Por data? por ativo? (RISK-17) | Testes performance US-MON-001, 002 | Decidir com DBA |
-| Retenção health checks | 13 meses — job purge? (RISK-19) | Testes US-MON-002, US-AUD-001 | Definir política + job |
-| Canais notificação por severidade | Email CRITICA, push ALTA, log BAIXA (RISK-21) | Testes US-MON-001, 003, 004 | Definir com PO |
-| Permissão dashboard por filial | Gestor vê apenas sua filial? (RISK-26) | Testes US-REL-002 | Definir com PO |
+> **Versão:** 1.0 · **Owner:** A designar (QA Lead/Eng Lead) **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** · **Status:** Draft
+>
+> *Nota de Transparência:* Este documento é ancorado na varredura determinística do codebase (**A5** — 350 arquivos, 27.537 LOC, 1268 funções, 344 classes), nas dependências reais capturadas (`@popperjs/core` em produção; **0 dependências de desenvolvimento**) e no artefato **User Stories (BDD)** (A3, com seus requisitos de NFRs, riscos e critérios de aceite do BRD). **Estado verificado da base de testes:** nenhuma biblioteca de teste/runner detectada nas dependências, nenhum script de teste em `package.json`, engine de banco de dados não especificada, nenhum ORM/query builder. Stack verificada: backend Java (335 arquivos `.java` em `src/`), frontend JavaScript (15 arquivos `.js` em `frontend/`), topologia **Aplicação Web / Server-side**, sem empacotamento Tauri. Toda ferramenta, comando ou parâmetro não detectado diretamente nos fontes contém o marcador `[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]`.
 
 ---
-*Documento gerado a partir de diagnóstico determinístico do codebase (348 arquivos, 1257 funções, 342 classes) e 30 User Stories BDD com critérios de aceite, rastreabilidade NFR/UC/Risk. Tecnologias restritas ao stack verificado: Java (backend), JavaScript (frontend), @popperjs/core. Nenhuma tecnologia externa assumida sem validação.*
+
+## 1. Objectives & Quality Goals
+
+* **Garantir cobertura de testes > 80%** (RNF-10 do BRD), incluindo obrigatoriamente os cenários de permissão **Admin vs User** (CA-10) e a conciliação de custos (CA-09) — meta declarada no BRD e referenciada no DoD de todas as stories (US-001..US-007). Hoje a meta **não é mensurável**: não há runner de testes nem ferramenta de cobertura no codebase (A5).
+* **Zero regressões nos contratos comportamentais verificados:** `criar_comAdmin_deveRetornarCreated`, `criar_comUser_deveRetornarForbidden`, `criar_comDadosInvalidos_deveRetornarBadRequest`, `buscarPorId_comIdInexistente_deveRetornarNotFound`, `aprovar`, `cancelar`, `concluir` e `custoTotalPorAtivo` — base dos critérios de aceite BDD (US-001..US-004) e das regras RN-03 (400 Bad Request), RN-04 (404 padronizado), RN-05 (ciclo Pendente → Aprovada → Em Andamento → Concluída) e RN-08 (custo total = somatório das ordens concluídas).
+* **Verificar as metas não-funcionais do BRD pendentes de instrumentação:** RNF-04 (< 200ms p95, excluindo relatórios pesados — risco R-03), RNF-01 (token JWT com expiração de 1h — meta pendente de verificação no codebase), RNF-07 (audit trail imutável em toda escrita, incluindo tentativas rejeitadas — US-006) e RNF-08 (UX mobile-first — risco R-04). Nenhuma instrumentação de métricas foi detectada na varredura A5 — a verificação requer instrumentação nova.
+* **Reduzir o tempo de detecção de bugs (MTTD) para < 24h** via execução automatizada a cada commit/PR **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — premissa: não há pipeline de CI detectado no codebase; o valor de 24h é hipótese de governança, não requisito dos fontes.
+* **Fechar os achados de qualidade da varredura A5** como objetivo contínuo: stub `setUsername` (`Usuario.java:86`), logs residuais `console.error`/`console.debug` (`api.js:44`/`:107`) e funções com complexidade ciclomática alta (`request` 13, `toDTO` 14, `build` 14, `checkResourceUsageAlerts` 17, `run` 15) — tratados pelas stories US-005 e US-007 e por gate de revisão de código.
+
+---
+
+## 2. Test Pyramid
+
+| Camada | Cobertura Mínima | Ferramenta | Frequência de Execução | Responsável |
+| :--- | :--- | :--- | :--- | :--- |
+| **Unit Tests** | 80% (RNF-10) | Backend Java: JUnit 5 **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** · Frontend JS: Jest **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** (script `test` a criar no `package.json`) | A cada commit (CI) — pipeline inexistente hoje, a criar **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** | Dev |
+| **Integration Tests** | Fluxos críticos UC-01..UC-04 + contratos nomeados (ver notas) | JUnit 5 (testes de integração) **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — estratégia de banco de dados de teste pendente da confirmação do mecanismo de persistência (não discoverable nas fontes) | A cada PR | Dev |
+| **E2E Tests** | Jornadas principais: US-001 (cadastro de filial), US-002 (solicitação de manutenção), US-003 (aprovação), US-004 (conclusão da ordem) | Playwright **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — recomendado por suportar emulação de viewport mobile (RNF-08 / risco R-04) | A cada deploy para staging | QA |
+| **Contract Tests** | Todos os endpoints públicos — lista de endpoints **pendente** (`api-specification.md` não gerado; nenhuma rota detectada na varredura A5) | Pact **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** | A cada release | Dev |
+
+**Notas da pirâmide (ancoragem na base real):**
+
+* **Nenhum runner/framework de testes está instalado.** As dependências reais capturadas limitam-se a `@popperjs/core` (produção), sem dev-dependencies e sem scripts de teste em `package.json`. Todas as ferramentas da tabela são sugestões para a stack verificada (Java + JavaScript, aplicação web/server-side) e exigem decisão explícita de adoção antes de qualquer uso.
+* **Contratos de integração nomeados** derivados das User Stories (BDD): `criar_comAdmin_deveRetornarCreated`, `criar_comUser_deveRetornarForbidden`, `criar_comDadosInvalidos_deveRetornarBadRequest` (US-001); `criar_comDadosInvalidos_deveRetornarBadRequest`, `buscarPorId_comIdInexistente_deveRetornarNotFound` (US-002); `aprovar`, `cancelar`, `custoTotalPorAtivo` (US-003); `concluir` + conciliação do `custoTotalPorAtivo` (CA-09) (US-004). Como a varredura não identificou rotas/endpoints, os testes de integração devem ser ancorados a esses contratos comportamentais até a publicação do `api-specification.md`.
+* **BDD:** as stories estão escritas em Gherkin; um framework BDD (ex.: Cucumber para o backend Java) pode automatizar os cenários diretamente **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**.
+* **Camada de integração e persistência:** nenhum motor de banco ou ORM/query builder foi encontrado nas dependências — a escolha da estratégia de dados de teste de integração (banco em memória, container, etc.) **não pode ser presumida** e depende da confirmação do mecanismo real de persistência no codebase.
+* **Prioridade de cobertura por risco** (caminhos apontados pela varredura A5, a cobrir primeiro): `AtivoService.java:119` (TODO de performance — busca com até 1000 candidatos, US-005), `AtivoMapper.toDTO` (complexidade 14 — RF-14), `ManutencaoSpecification.build` (complexidade 14 — filtros da fila, US-003), `AlertNotificationService.checkResourceUsageAlerts` (complexidade 17) e a função `request` de `frontend/src/services/api.js` (complexidade 13, comum a todos os fluxos UC-01..US-004).
+
+---
+
+## 3. Test Environments
+
+| Ambiente | Propósito | Dados | Acesso |
+| :--- | :--- | :--- | :--- |
+| **Local** | Desenvolvimento e execução de testes unitários/integração | Seed via `RealisticDataSeeder` (detectado: `src/main/java/br/com/aegispatrimonio/config/seeder/RealisticDataSeeder.java`, método `run`, complexidade 15) | Dev |
+| **CI** | Validação automatizada (unit + integração + higiene estática) | Efêmero (criado e destruído por execução) | Pipeline — **pipeline de CI não detectado no codebase, a criar [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** |
+| **Staging** | Homologação pré-produção — DoD das stories exige "Feature testada em staging (com dados do `RealisticDataSeeder`)" e medição de tempo de resposta (US-005) | Seed realista (`RealisticDataSeeder`) / anonimizado **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** | QA/PO |
+| **Produção** | Smoke tests pós-deploy | Real | Automação **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** |
+
+**Notas de ambientes:**
+
+* **Provisionamento de banco:** engine de banco de dados não especificada nas dependências — o provisionamento de local/CI/staging depende da confirmação do mecanismo de persistência real.
+* **Mobile-first (RNF-08):** o staging e a suíte E2E devem incluir validação em viewport mobile, dado que a adoção do módulo de manutenção depende de UX mobile-first (risco R-04 do BRD).
+* **Massa de dados para performance:** a validação da meta RNF-06 (10k+ ativos / 1k+ usuários simultâneos) exige ambiente com volume compatível — a criar **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**; aplicação backend única, sem mecanismos de scaling horizontal detectados no codebase, logo os testes de carga validam os limites do caminho de aplicação existente.
+
+---
+
+## 4. Coverage Targets
+
+* **Mínimo global:** **80%** — RNF-10 do BRD ("cobertura > 80%"), referenciado no DoD de US-001..US-004. Ferramenta de medição inexistente hoje; sugerido: JaCoCo (Java) e cobertura nativa do runner JS **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**.
+* **Crítico (regras de negócio):** **95%** para RN-03 (validação/400), RN-04 (404 padronizado), RN-05 (ciclo de manutenção e transições de estado), RN-08/CA-09 (conciliação do custo total) e CA-10 (permissões Admin vs User) **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — premissa: o BRD fixa apenas o piso global de 80% (RNF-10); o piso de 95% para caminhos críticos é hipótese de governança alinhada à criticidade das stories Must (US-002..US-004).
+* **Exclusões justificadas:**
+  * `src/main/java/br/com/aegispatrimonio/config/seeder/RealisticDataSeeder.java` — código de carga de dados de teste (método `run`, complexidade 15), não é caminho de negócio; sua qualidade é tratada por revisão e pela verificação de integridade dos dados gerados (seção 6).
+  * Classes de configuração e código puramente declarativo **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — premissa: exclusão padrão de código de configuração; a lista concreta de classes excluídas deve ser definida na adoção do runner.
+  * `frontend/src/services/api.js` **não** é excluído — a função `request` (complexidade 13) é comum a todos os fluxos (US-001..US-004) e deve ser coberta, incluindo injeção de token (RF-24/CA-07) e `clearSession` (RF-25/CA-08).
+
+---
+
+## 5. Non-Functional Testing
+
+* **Performance:**
+  * **Critério de aceite (RNF-04 do BRD):** resposta < 200ms (p95) nas operações de escrita e busca, **excluindo operações de relatório pesado** — a consulta `custoTotalPorAtivo` (RF-17/RN-08) está explicitamente fora dessa garantia (risco R-03: timeout em consultas pesadas).
+  * **Foco obrigatório:** caminho de busca de ativos (`AtivoService.java:119` — TODO: carrega até 1000 candidatos e faz ranking; US-005) e detalhes do ativo (`AtivoMapper.toDTO`, complexidade 14 — RF-14).
+  * **Carga alvo (RNF-06):** 10k+ ativos / 1k+ usuários simultâneos — meta do BRD pendente de verificação no codebase; sem mecanismos de scaling detectados, os testes devem medir os limites reais do caminho de aplicação.
+  * **Ferramenta:** Gatling (JVM, aderente à stack Java) ou k6 **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**; nenhuma instrumentação de métricas detectada na varredura — a medição do p95 requer instrumentação nova (DoD de US-005).
+* **Segurança:**
+  * **Requisitos dos fontes:** RNF-01 — token JWT com expiração de 1h (meta do BRD pendente de verificação no codebase); RN-02 — 403 Forbidden para escrita sem permissão; CA-06 — 401 Unauthorized com sessão expirada; CA-07 — injeção automática de token no cliente (`api.js`, função `request`); CA-08 — `clearSession`; CA-10 — cobertura de permissões Admin vs User em todas as escritas.
+  * **SAST:** nenhuma ferramenta detectada; sugerido Semgrep a cada PR **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**. A varredura A5 já cobre verificação estática de higiene (logs residuais `api.js:44`/`:107` — exposição potencial de dados em console, US-007).
+  * **DAST:** sugerido OWASP ZAP em staging, a cada release **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**.
+* **Acessibilidade:**
+  * **Requisitos dos fontes:** RNF-08 — UX mobile-first (risco R-04); DoD de todas as stories exige "Sem regressões de acessibilidade".
+  * **Ferramenta:** axe-core integrada à suíte E2E, com execução em viewport mobile **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**; critérios WCAG — nível não especificado nos fontes; premissa: WCAG 2.1 nível AA **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**.
+* **Resiliência/Chaos:**
+  * **Não aplicável no nível de infraestrutura:** aplicação web/server-side única, sem mecanismos de scaling, réplicas ou infraestrutura distribuída detectados no codebase — chaos engineering de infraestrutura não se aplica ao estado atual **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**.
+  * **Aplicável no nível de aplicação** (falha induzida, ancorada aos cenários BDD): falha no upload de anexos sem bloquear a solicitação (US-002, Scenario 3); falha na gravação do audit trail sem corromper a operação de negócio (US-006, Scenario 3); timeout na consulta de custo (R-03 — US-003); sessão expirada durante submissão (CA-06 — US-001/US-002/US-004); **condição de corrida** na transição Pendente → Aprovada com dois aprovadores simultâneos (US-003, Scenario 4) — requer teste de concorrência dedicado.
+
+---
+
+## 6. Test Data Management
+
+* **Estratégia de geração:**
+  * **Seed verificado:** `RealisticDataSeeder` (`src/main/java/br/com/aegispatrimonio/config/seeder/RealisticDataSeeder.java`, método `run`, complexidade 15) — gerador de dados realistas usado no DoD das stories para staging (US-001..US-007). Deve garantir as pré-condições dos fluxos: filiais cadastradas (RN-01/RN-07), ativos vinculados a filial/departamento/localização (RN-07) e usuários com roles Admin/User (RN-02/CA-10).
+  * **Fixtures/factories** para testes unitários e de integração, cobrindo os cenários de erro: dados inválidos (RN-03), IDs inexistentes (RN-04), transições inválidas (RN-05) **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**.
+  * **Massa de volume** para testes de performance: 10k+ ativos (RNF-06) e cenário de busca com ~1000 candidatos (TODO em `AtivoService.java:119`) **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**.
+  * **Integridade do seed:** o método `run` (complexidade 15) deve ser acompanhado de verificação de integridade dos dados gerados (contagens e vínculos RN-07) **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**.
+* **Dados sensíveis:**
+  * O domínio envolve dados de pessoas (vínculo Funcionário↔Usuário — RN-06; RF-08: `createFuncionario` / `createFuncionarioAndUsuario`), portanto **anonimização/mascaramento é obrigatório fora de produção** **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — o BRD não define política de anonimização nem de retenção de dados de teste; premissa adotada: nenhum dado pessoal real em local/CI/staging.
+  * O seeder gera "dados realistas" — validar na adoção que não incorpora dados pessoais reais.
+  * Logs residuais no cliente API (`console.error` em `api.js:44`, `console.debug` em `api.js:107`) podem expor payloads em console — remoção tratada pela US-007; a verificação estática da varredura A5 opera como controle complementar.
+
+---
+
+## 7. Regression Strategy
+
+* **Suite de regressão:**
+  * **Escopo:** todos os contratos comportamentais dos UC-01..UC-04 (criar filial, solicitar manutenção, aprovar/cancelar, concluir ordem), as regras RN-03/RN-04/RN-05/RN-08, as permissões Admin vs User (CA-10) e a conciliação do `custoTotalPorAtivo` (CA-09); inclui a suíte E2E das jornadas principais (US-001..US-004).
+  * **Frequência:** integração a cada PR; E2E a cada deploy em staging **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — premissa: não há pipeline detectado; cadência a formalizar na criação do CI.
+  * **Gatilho obrigatório para refatorações:** US-005 (otimização da busca — `AtivoService.java:119`, `AtivoMapper.toDTO`) e US-007 (higiene — `Usuario.java:86`, `api.js:44`/`:107`) exigem regressão completa dos contratos existentes antes do merge, pois alteram caminhos comuns aos fluxos Must.
+* **Critérios de entrada/saída de release:**
+  * **Entrada:** código revisado (PR aprovado) e suíte de integração verde em CI.
+  * **Saída:** 0 bugs críticos (P0) e altos (P1) abertos; suíte de regressão verde; cobertura ≥ 80% (RNF-10) incluindo CA-10; verificação da conciliação de custos (CA-09); smoke tests em produção executados **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — premissa: critérios de governança não explícitos nos fontes, alinhados ao DoD das stories.
+
+---
+
+## 8. Bug Triage & Severity
+
+> Os SLAs de correção **não estão definidos nos artefatos-fonte** — a coluna de SLA é hipótese de governança **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**, a validar com o time. As definições de severidade são ancoradas aos fluxos e regras do BRD.
+
+| Severidade | Definição | SLA de correção |
+| :--- | :--- | :--- |
+| Crítica (P0) | Sistema fora do ar / perda de dados — ex.: perda de registros de audit trail (RNF-07), corrupção do custo total por ativo (RN-08/CA-09), escrita persistida sem permissão (RN-02) | Imediato **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** |
+| Alta (P1) | Funcionalidade principal quebrada — ex.: ciclo de manutenção bloqueado (RN-05 — US-002..US-004), 403 indevido para Admin (RN-02/CA-01), 401 em sessão válida (CA-06) | 24h **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** |
+| Média (P2) | Funcionalidade secundária afetada — ex.: filtros dinâmicos da fila (`ManutencaoSpecification.build`), busca fora da meta RNF-04 sem bloquear o fluxo, mensagens de erro não padronizadas (RN-04) | Próxima sprint **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** |
+| Baixa (P3) | Cosmético/menor — ex.: logs residuais em console (`api.js:44`/`:107` — US-007), stub `setUsername` sem fluxo dependente ativo | Backlog **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** |
+
+---
+
+## 9. Reporting & Metrics
+
+* **Dashboards:**
+  * Cobertura de testes (global ≥ 80% — RNF-10; crítico ≥ 95% — seção 4) — requer instrumentação nova (JaCoCo/runner JS **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**).
+  * Taxa de falha de build e flakiness da suíte E2E — requer pipeline de CI, inexistente hoje **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**.
+  * Nenhuma instrumentação de observabilidade foi detectada na varredura A5 — todos os dashboards dependem de instrumentação a criar (DoD das stories: "Métricas/observabilidade instrumentadas (se aplicável)").
+* **Métricas de qualidade acompanhadas:**
+  * Escape rate (bugs em produção vs staging), MTTR e defect density **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — não definidos nos fontes.
+  * **KPIs do BRD que a estratégia de testes deve sustentar (medidos em produção):** tempo médio de aprovação < 4 horas úteis (US-003) e taxa de solicitações canceladas < 10% (US-004) — fora do escopo da suíte automatizada, mas os testes de integração/E2E devem garantir os comportamentos que os habilitam (fila de pendentes visível, transições RN-05, conciliação CA-09).
+  * **Achados da varredura A5 como métrica de dívida:** funções com complexidade ciclomática alta apontadas pela varredura (12; detalhadas: `request` 13, `toDTO` 14, `build` 14, `checkResourceUsageAlerts` 17, `run` 15) e achados de higiene (stub + logs residuais: 3) — meta: redução a zero via US-005/US-007.
+
+---
+
+## 10. Roles & Responsibilities
+
+| Papel | Responsabilidade |
+| :--- | :--- |
+| **Dev** | Testes unitários e de integração cobrindo os contratos nomeados (`criar_*`, `buscarPorId_*`, `aprovar`, `cancelar`, `concluir`, `custoTotalPorAtivo`) e os cenários BDD (incl. permissões CA-10 e condição de corrida US-003); correção dos achados A5 (US-005/US-007); manutenção de fixtures/factories |
+| **QA** | E2E das jornadas principais (US-001..US-004), testes exploratórios, regressão em staging; validação mobile-first (RNF-08/risco R-04) e acessibilidade; execução com dados do `RealisticDataSeeder` |
+| **Eng Lead** | Gate de qualidade em releases (critérios da seção 7); aprovação da adoção das ferramentas de teste inferidas; priorização da dívida de complexidade |
+| **PO** | Validação dos critérios de aceite BDD e das lacunas abertas que afetam os testes: unicidade de código de filial (US-001, Scenario 2), role de aprovação (US-003), código HTTP de transição inválida (US-003/US-004, Scenario 4), comportamento de falha do audit trail (US-006, Scenario 3) **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** |

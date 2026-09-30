@@ -1,138 +1,145 @@
 # Database Performance, Recovery & Observability — aegis_patrimonio
 
-> **Versão:** 1.0 · **Owner:** Aegis Patrimônio — Engenharia de Dados · **Status:** Draft
+> **Versão:** 1.0 · **Owner:** backend-team · **Status:** Draft
 
 ## 1. Performance Targets
 ```yaml
 performance:
-  workload: "mixed"
+  workload: "OLTP"
   targets:
-    reads: { p50_ms: "100", p95_ms: "500", p99_ms: "1000" }
-    writes: { p95_ms: "200" }
+    reads: { p50_ms: "200", p95_ms: "2000", p99_ms: "5000" }
+    writes: { p95_ms: "500" }
   throughput:
-    reads_per_second: "200"
+    reads_per_second: "100"
     writes_per_second: "50"
   capacity:
-    expected_rows: "ativo: 100k; manutencao: 1M; alerta: 500k; auditoria: 10M (ano 1)"
-    growth_per_month: "ativo: +2k; manutencao: +15k; alerta: +10k; auditoria: +500k"
+    expected_rows: "ativos: 5000, manutencoes: 50000/ano, health_check_disco: 1M+/ano, auditoria: 500k+/ano"
+    growth_per_month: "ativos: +100, health_check_disco: +80k, auditoria: +40k"
 ```
 
 ### Queries Críticas
 | ID | Propósito | Latência Máx. | Índices Esperados |
 | :--- | :--- | :--- | :--- |
-| QUERY-001 | Busca ativo por tag_patrimonial (etiqueta física, importação) | ≤ 50ms p95 | INDEX-001 (btree unique tag_patrimonial) |
-| QUERY-002 | Listagem ativos por filial + status (dashboard, relatórios) | ≤ 100ms p95 | INDEX-003 (btree filial_id, status) |
-| QUERY-003 | Filtros dinâmicos ManutencaoSpecification.build (ativo, tipo, status, datas, fornecedor, técnico, faixa custo) | ≤ 50ms p95 | INDEX-010 (btree ativo_id, status, tipo, data_abertura DESC) |
-| QUERY-004 | Agregação custoTotalPorAtivo offload read-replica | ≤ 2s p95 | INDEX-009 (btree ativo_id, data_conclusao DESC, custo_total) + vw_custo_manutencao_por_ativo (materialized) |
-| QUERY-005 | listarAlertas/getRecentAlerts: alertas ativos por ativo ordenados severidade/data | ≤ 100ms p95 | INDEX-014 (btree ativo_id, status, severidade, data_criacao DESC) |
-| QUERY-006 | Histórico auditoria por entidade (todas alterações de um ativo) | ≤ 200ms p95 | INDEX-031 (btree entidade, entidade_id, data_hora DESC) |
-| QUERY-007 | Ações por usuário (compliance SOX/LGPD) | ≤ 200ms p95 | INDEX-032 (btree usuario_id, data_hora DESC) |
-| QUERY-008 | checkResourceUsageAlerts job (12k ativos) | ≤ 30s total | INDEX-007 (btree tipo_ativo_id, status) + INDEX-014 + INDEX-015 |
-| QUERY-009 | AtivoMapper.toDTO join ativo_detalhe_hardware (evita N+1) | ≤ 100ms p95 | INDEX-026 (btree unique ativo_id on ativo_detalhe_hardware) |
-| QUERY-010 | Particionamento lógico/arquivamento auditoria por data_hora (mensal) | N/A (DDL) | INDEX-033 (btree data_hora ASC) |
+| QUERY-001 | Listagem paginada de ativos por filial/status (dashboard) | 2000 ms (p95) | INDEX-002 (filial_id, status) |
+| QUERY-002 | Busca exata de ativo por tag_patrimonio | 50 ms (p95) | INDEX-001 (tag_patrimonio UNIQUE) |
+| QUERY-003 | Histórico de manutenções de um ativo (mais recente primeiro) | 500 ms (p95) | INDEX-009 (ativo_id, data_solicitacao DESC) |
+| QUERY-004 | Fila de manutenções por status ordenadas por antiguidade | 500 ms (p95) | INDEX-010 (status, data_solicitacao) |
+| QUERY-005 | Alertas não lidos de um ativo (painel de saúde) | 200 ms (p95) | INDEX-013 (ativo_id, lido, created_at DESC) |
+| QUERY-006 | Caixa de entrada de alertas do usuário (não lidos primeiro) | 200 ms (p95) | INDEX-014 (usuario_id, lido, created_at DESC) |
+| QUERY-007 | Alertas críticos/altos recentes (monitoramento operacional) | 500 ms (p95) | INDEX-015 (severidade, created_at DESC) |
+| QUERY-008 | Último health check de cada disco (vw_disco_saude_atual) | 1000 ms (p95) | INDEX-029 (disco_id, coletado_em DESC) + INDEX-026 (saude_smart, usado_gb DESC) |
+| QUERY-009 | Histórico de auditoria de uma entidade específica | 1000 ms (p95) | INDEX-031 (entidade, entidade_id, created_at DESC) |
+| QUERY-010 | Ações realizadas por um usuário (investigação, LGPD) | 1000 ms (p95) | INDEX-032 (usuario_id, created_at DESC) |
+| QUERY-011 | Depreciação acumulada e valor residual por ativo (vw_depreciacao_ativo) | 2000 ms (p95) | INDEX-006 (tipo_ativo_id) + INDEX-008 (data_aquisicao DESC) |
+| QUERY-012 | Busca de ativo por MAC address (inventário de rede) | 100 ms (p95) | INDEX-028 (mac_address UNIQUE) |
 
-<!-- source: db-schema-spec#4 (Indexes) -->
-<!-- source: nfr#NFR-P01, NFR-P04, NFR-S01, NFR-S02 -->
-<!-- source: db-schema-spec#5 (Views: vw_custo_manutencao_por_ativo materialized) -->
-<!-- source: db-schema-spec#9 (PART-001, IDX-001) -->
+<!-- source: db-schema-spec#4-indexes -->
+<!-- source: nfr#NFR-P01 -->
+<!-- source: nfr#NFR-P05 -->
 
 ## 2. Backup & Recovery
 ```yaml
 recovery:
   backup:
-    frequency: "diário (full) + WAL/log shipping contínuo se suportado pelo SGBD"
-    retention: "7 anos (SOX) para auditoria; 5 anos para demais tabelas transacionais; 90 dias para logs operacionais"
-    types: ["full", "incremental/WAL"]
-  rpo_target: "24h (backup diário) — alvo NFR-A03; pode reduzir para < 1h com WAL shipping se SGBD suportar"
-  rto_target: "4h (restauração completa banco + aplicação) — alvo NFR-A02"
+    frequency: "full: daily 02:00 UTC; incremental: every 15 minutes (WAL archiving)"
+    retention: "full: 30 days; incremental/WAL: 7 days; archived: 5 years (compliance LGPD/SOX)"
+    types: ["full", "incremental", "wal_archiving"]
+  rpo_target: "15 minutes"
+  rto_target: "1 hour"
   disaster_recovery:
-    regions: "[PENDENTE: definir região primária e DR — depende de provedor cloud/on-prem]"
-    failover_strategy: "read-replica promovida a primária + restore point-in-time a partir de backup + WAL; runbook documentado e testado trimestralmente"
-  restore_test_frequency: "trimestral (simulação restore point-in-time + validação hash_encadeado auditoria)"
+    regions: ["primary: us-east-1 (or on-prem DC), standby: us-west-2 (or secondary DC)"]
+    failover_strategy: "synchronous streaming replication with automatic failover (Patroni/repmgr) or managed service HA (RDS Multi-AZ, Cloud SQL HA)"
+  restore_test_frequency: "monthly (automated restore to staging + checksum validation)"
 ```
 
-### Detalhamento por Tabela (Política de Retenção e Recuperabilidade)
+### Políticas de Retenção por Tabela (Particionamento)
+| Tabela | Estratégia | Intervalo | Retenção | Ação de Purge |
+| :--- | :--- | :--- | :--- | :--- |
+| `health_check_disco` | RANGE (coletado_em) | 1 month | 13 months | `DROP PARTITION` automático via pg_partman/job |
+| `auditoria` | RANGE (created_at) | 1 year | 5 years | `DROP PARTITION` automático + arquivamento WORM para storage frio |
 
-| Tabela | Classificação | Retenção Mínima | Estratégia Backup | Criticidade Recuperação | Observações |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| `auditoria` | audit | 7 anos (SOX) | Full diário + WAL contínuo + cópia assíncrona WORM (audit-worm-storage) | **Crítica** — imutável, hash_encadeado, append-only | Particionamento mensal (data_hora); tiering hot 30d SSD / cold 7a archive |
-| `ativo` | core | 5 anos | Full diário + WAL | **Alta** — núcleo patrimonial | Particionamento lógico data_aquisicao; PK UUID |
-| `manutencao` | transactional | 5 anos | Full diário + WAL | **Alta** — custos, SLA, compliance | Particionamento lógico data_abertura; MV vw_custo_manutencao_por_ativo refresh diário |
-| `alerta` | transactional | 3 anos | Full diário + WAL | **Média** — operacional | Arquiva lidos > 90 dias (lifecycle); particionamento data_criacao |
-| `usuario`, `funcionario`, `role`, `permissao`, `usuario_role`, `role_permissao` | core/reference | 5 anos (LGPD: anonimização sob demanda) | Full diário + WAL | **Alta** — RBAC, acesso | LGPD: anonymize_user function para direito ao esquecimento |
-| `filial`, `departamento`, `localizacao`, `fornecedor`, `tipo_ativo` | reference | Indefinida (dados mestres) | Full diário + WAL | **Média** — catálogos | Baixa volatilidade |
-| `ativo_detalhe_hardware`, `adaptador_rede`, `disco`, `memoria` | supporting | 5 anos (vinculado ao ativo pai) | Full diário + WAL | **Média** — inventário técnico | Cascade delete com ativo; coletado_em para versionamento |
-
-<!-- source: db-schema-spec#1 (Tables classification) -->
-<!-- source: db-schema-spec#9 (WORM-001, PART-001, SEC-001) -->
-<!-- source: nfr#NFR-A02, NFR-A03, NFR-A04, NFR-C01, NFR-C02, NFR-CO03 -->
-<!-- source: db-schema-spec#6 (Functions: anonymize_user, calcular_hash_encadeado_auditoria) -->
-<!-- source: db-schema-spec#7 (Triggers: trg_auditoria_insert_hash_chain, trg_auditoria_prevent_update_delete) -->
+<!-- source: db-schema-spec#1.15-health_check_disco-partitioning -->
+<!-- source: db-schema-spec#1.16-auditoria-partitioning -->
+<!-- source: nfr#NFR-A02 -->
+<!-- source: nfr#NFR-A03 -->
+<!-- source: nfr#NFR-C02 -->
 
 ## 3. Observability
 ```yaml
 observability:
   metrics:
     - name: "db_connections_active"
-      warning_threshold: "400 (80% pool 500)"
-      critical_threshold: "475 (95% pool)"
-    - name: "db_query_latency_p95_ms"
-      warning_threshold: "400"
-      critical_threshold: "800"
-    - name: "db_query_error_rate"
-      warning_threshold: "0.05%"
-      critical_threshold: "0.1%"
-    - name: "db_replication_lag_seconds"
-      warning_threshold: "30"
-      critical_threshold: "120"
-    - name: "db_disk_usage_percent"
-      warning_threshold: "70%"
-      critical_threshold: "85%"
-    - name: "auditoria_hash_chain_integrity"
-      warning_threshold: "1 falha verificação"
-      critical_threshold: "qualquer falha"
-    - name: "checkResourceUsageAlerts_duration_seconds"
-      warning_threshold: "20"
-      critical_threshold: "30"
-    - name: "materialized_view_refresh_duration_seconds"
-      warning_threshold: "60"
-      critical_threshold: "120"
-    - name: "backup_duration_seconds"
-      warning_threshold: "1800 (30min)"
-      critical_threshold: "3600 (1h)"
-    - name: "backup_size_bytes"
-      warning_threshold: "crescimento > 20% mês a mês"
-      critical_threshold: "espaço disco < 20% livre"
+      warning_threshold: "70% of max_connections"
+      critical_threshold: "90% of max_connections"
+    - name: "db_connections_idle_in_transaction"
+      warning_threshold: "> 10 for > 5 min"
+      critical_threshold: "> 20 for > 2 min"
+    - name: "db_replication_lag_bytes"
+      warning_threshold: "> 100 MB"
+      critical_threshold: "> 1 GB"
+    - name: "db_table_bloat_ratio"
+      warning_threshold: "> 20%"
+      critical_threshold: "> 50%"
+    - name: "db_index_usage_ratio"
+      warning_threshold: "< 80%"
+      critical_threshold: "< 50%"
+    - name: "db_sequential_scan_ratio"
+      warning_threshold: "> 30% on tables > 10k rows"
+      critical_threshold: "> 50% on tables > 10k rows"
+    - name: "db_checkpoint_write_latency_ms"
+      warning_threshold: "> 50 ms"
+      critical_threshold: "> 200 ms"
+    - name: "db_wal_growth_rate_mb_min"
+      warning_threshold: "> 500 MB/min sustained"
+      critical_threshold: "> 1 GB/min sustained"
+    - name: "health_check_disco_partition_count"
+      warning_threshold: "> 14 partitions (retention breach)"
+      critical_threshold: "> 15 partitions"
+    - name: "auditoria_partition_count"
+      warning_threshold: "> 6 partitions (retention breach)"
+      critical_threshold: "> 7 partitions"
+    - name: "query_latency_p95_ms_by_endpoint"
+      warning_threshold: "> 1500 ms (listagem ativos), > 400 ms (CRUD unitário)"
+      critical_threshold: "> 3000 ms (listagem), > 1000 ms (CRUD)"
+    - name: "deadlock_count_per_minute"
+      warning_threshold: "> 0"
+      critical_threshold: "> 5"
   alerts:
-    - name: "AltaLatenciaLeitura"
-      condition: "db_query_latency_p95_ms > 400 por 5min"
-      severity: "high"
-    - name: "AltaLatenciaEscrita"
-      condition: "db_write_latency_p95_ms > 200 por 5min"
-      severity: "high"
-    - name: "TaxaErroElevada"
-      condition: "db_query_error_rate > 0.1% por 2min"
+    - name: "DB_High_Connection_Usage"
+      condition: "db_connections_active > 90% for 2 min"
       severity: "critical"
-    - name: "PoolConexoesEsgotando"
-      condition: "db_connections_active > 475 por 5min"
+    - name: "DB_Replication_Lag_High"
+      condition: "db_replication_lag_bytes > 1 GB for 5 min"
       severity: "critical"
-    - name: "ReplicationLagAlto"
-      condition: "db_replication_lag_seconds > 120 por 5min"
+    - name: "DB_Table_Bloat_Critical"
+      condition: "db_table_bloat_ratio > 50% on any core table (ativo, manutencao, auditoria)"
       severity: "high"
-    - name: "DiscoQuaseCheio"
-      condition: "db_disk_usage_percent > 85%"
+    - name: "DB_Sequential_Scan_High"
+      condition: "db_sequential_scan_ratio > 50% on tables > 10k rows for 10 min"
+      severity: "high"
+    - name: "DB_Checkpoint_Latency_High"
+      condition: "db_checkpoint_write_latency_ms > 200 ms for 5 min"
+      severity: "high"
+    - name: "DB_WAL_Growth_Abnormal"
+      condition: "db_wal_growth_rate_mb_min > 1 GB/min for 10 min"
+      severity: "high"
+    - name: "Partition_Retention_Breach_HealthCheck"
+      condition: "health_check_disco_partition_count > 14"
+      severity: "high"
+    - name: "Partition_Retention_Breach_Auditoria"
+      condition: "auditoria_partition_count > 6"
       severity: "critical"
-    - name: "FalhaIntegridadeAuditoria"
-      condition: "auditoria_hash_chain_integrity falha verificação"
+    - name: "Query_Latency_SLA_Breach"
+      condition: "query_latency_p95_ms_by_endpoint exceeds thresholds for 5 min"
+      severity: "high"
+    - name: "Deadlock_Storm"
+      condition: "deadlock_count_per_minute > 5 for 2 min"
       severity: "critical"
-    - name: "JobAlertasLento"
-      condition: "checkResourceUsageAlerts_duration_seconds > 30"
-      severity: "high"
-    - name: "MVRefreshFalhou"
-      condition: "materialized_view_refresh_duration_seconds > 120 OU erro"
-      severity: "high"
-    - name: "BackupLentoOuFalhou"
-      condition: "backup_duration_seconds > 3600 OU erro"
+    - name: "Disk_Space_Critical"
+      condition: "data directory > 80% full"
+      severity: "critical"
+    - name: "Backup_Failure"
+      condition: "pg_basebackup or WAL archiving fails"
       severity: "critical"
   migration_monitoring:
     lock_duration: true
@@ -141,64 +148,192 @@ observability:
     errors: true
 ```
 
-### Instrumentação Necessária (Gaps a Implementar)
+### Dashboards Obrigatórios (Grafana)
+| Dashboard | Painéis Principais | Fonte de Dados |
+| :--- | :--- | :--- |
+| **DB Overview** | Conexões ativas/ociosas, TPS, latência p50/p95/p99, cache hit ratio, replication lag | Prometheus (postgres_exporter) |
+| **Table & Index Health** | Bloat ratio por tabela, index usage %, sequential scan %, dead tuples, autovacuum activity | Prometheus (postgres_exporter) |
+| **Partition Management** | Contagem de partições por tabela, tamanho por partição, próxima partição a expirar, status do pg_partman | Prometheus (custom queries) |
+| **Query Performance** | Latência por query tag (endpoint), top 10 queries por tempo total, top 10 por chamadas, planos de execução recentes | Prometheus (pg_stat_statements) + pgBadger |
+| **Backup & Recovery** | Status do último backup (sucesso/falha), tamanho, duração, WAL arquivado, RPO atual, último restore test | Prometheus (backup_exporter) + logs |
+| **Audit & Compliance** | Volume de auditoria por dia/entidade/usuário, latência de insert na tabela auditoria, contagem de partições | Prometheus (custom queries) |
 
-| Componente | Métrica/Log/Trace | Status Atual | Ação Requerida |
-| :--- | :--- | :--- | :--- |
-| **Spring Boot Actuator** | `/actuator/metrics/http.server.requests`, `/actuator/metrics/hikaricp.connections.*`, `/actuator/metrics/jvm.*` | Não confirmado no código | Adicionar `spring-boot-starter-actuator`, `micrometer-registry-prometheus`; expor `/actuator/prometheus` |
-| **Health Checks** | `/actuator/health` (liveness/readiness) verificando DB, disco, scheduler health checks ativos | Não confirmado | Implementar `HealthIndicator` custom para conectividade DB, espaço disco, job `checkResourceUsageAlerts` |
-| **Distributed Tracing** | OpenTelemetry Java agent propagando `traceparent` em 100% requisições HTTP + chamadas JDBC | Não configurado | Adicionar agent OTel; configurar exportador (OTLP/Jaeger/Zipkin); instrumentar JDBC via `otel.instrumentation.jdbc.enabled=true` |
-| **Structured Logging** | JSON logs: `timestamp`, `level`, `traceId`, `spanId`, `service`, `message`, `context` | `console.error/debug` residuais em `api.js` (frontend) | Remover `console.*`; configurar Logback/Log4j2 com `LogstashEncoder`; correlacionar `traceId` via MDC |
-| **Audit Integrity Verification** | Job periódico validando `hash_encadeado` monotônico por `correlation_id` (INDEX-030) | Função `calcular_hash_encadeado_auditoria` + trigger definidos no schema | Implementar job batch (Spring Batch/Quartz) rodando diário; alertar em falha |
-| **Partition Maintenance** | Monitorar criação de partições mensais (auditoria), verificação de arquivamento alertas lidos > 90d | Particionamento lógico definido, não implementado | Implementar procedure/trigger para rotação partições; job de arquivamento alertas |
-| **Materialized View Refresh** | `REFRESH MATERIALIZED VIEW CONCURRENTLY vw_custo_manutencao_por_ativo` diário | View definida, refresh não agendado | Agendar via `pg_cron` (PG) / `DBMS_SCHEDULER` (Oracle) / Agent Job (SQL Server); monitorar duração |
-| **Backup Verification** | `pg_basebackup`/`RMAN`/`sqlcmd` + restore test automatizado trimestral | Runbook < 4h definido (NFR-A02), não automatizado | Automatizar restore em staging; validar contagem linhas + checksums + hash_encadeado auditoria |
+### Logs Estruturados (PostgreSQL)
+```yaml
+log_config:
+  log_destination: "stderr,csvlog"
+  logging_collector: "on"
+  log_directory: "pg_log"
+  log_filename: "postgresql-%Y-%m-%d_%H%M%S.log"
+  log_rotation_age: "1d"
+  log_rotation_size: "100MB"
+  log_min_duration_statement: "1000"  # log queries > 1s
+  log_checkpoints: "on"
+  log_connections: "on"
+  log_disconnections: "on"
+  log_lock_waits: "on"
+  log_temp_files: "10MB"
+  log_autovacuum_min_duration: "5000"
+  log_statement: "ddl,mod"
+  log_line_prefix: "%m [%p] %q%u@%d %r %a "
+  log_timezone: "UTC"
+```
 
-<!-- source: nfr#NFR-O01, NFR-O02, NFR-O03, NFR-O04 -->
-<!-- source: db-schema-spec#6 (Functions), #7 (Triggers), #4 (INDEX-030, INDEX-033) -->
-<!-- source: db-schema-spec#5 (vw_custo_manutencao_por_ativo materialized) -->
-<!-- source: db-schema-spec#9 (PART-001, WORM-001, IDX-001) -->
-<!-- source: Diagnóstico#Chamadas console.* residuais (frontend\src\services\api.js:36,99) -->
+### Tracing Distribuído (OpenTelemetry)
+- **Instrumentação:** `oteljavaagent` com auto-instrumentação JDBC, Spring MVC
+- **Propagação:** `traceparent` / `b3` headers
+- **Amostragem:** 100% para transações de escrita (INSERT/UPDATE/DELETE em tabelas core), 10% para reads
+- **Atributos DB:** `db.system=postgresql`, `db.operation`, `db.sql.table`, `db.statement` (sanitizado), `db.rows_affected`
+
+<!-- source: nfr#NFR-O01 -->
+<!-- source: nfr#NFR-O02 -->
+<!-- source: nfr#NFR-O03 -->
+<!-- source: nfr#NFR-O04 -->
+<!-- source: nfr#NFR-O05 -->
+<!-- source: db-schema-spec#1.15-health_check_disco -->
+<!-- source: db-schema-spec#1.16-auditoria -->
 
 ---
 
-## 4. Decisões Pendentes e Riscos (Bloqueadores para Implementação)
+## 4. Índices de Performance Críticos (Validação Contínua)
+> Estes índices devem ser monitorados para uso (`pg_stat_user_indexes.idx_scan = 0` por > 7 dias = candidato a remoção) e bloat (`pgstattuple`).
 
-| ID | Decisão | Impacto em Performance/Recovery/Observability | Responsável | Prazo |
+| Índice | Tabela | Colunas | Tipo | Justificativa de Performance |
 | :--- | :--- | :--- | :--- | :--- |
-| **MOTOR-001** | Definir SGBD (PostgreSQL, Oracle, SQL Server, MySQL) | **Crítico**: Tipos físicos (UUID, JSONB, ENUM, INET, MACADDR), particionamento nativo, WAL shipping, WORM storage, índices parciais, MV refresh concorrente, RLS, funções/trigger syntax | Arquiteto de Dados / Tech Lead | Imediato |
-| **PART-001** | Particionamento nativo vs lógico (views+triggers) | **Alto**: Performance queries históricas, manutenção, backup granular, purge dados antigos | DBA / Arquiteto | Antes geração DDL |
-| **WORM-001** | Storage WORM auditoria (S3 Object Lock, Azure Immutable Blob, tabela append-only cluster separado) | **Crítico**: Compliance SOX 7 anos, integridade hash_encadeado | SecOps / DBA | Antes produção |
-| **ENUM-001** | Implementação ENUMs (tipo nativo, CHECK constraint, tabela referência) | **Médio**: Performance CHECK vs join, manutenção valores, portabilidade | Arquiteto de Dados | Antes geração DDL |
-| **JSON-001** | Suporte JSONB/JSON no SGBD alvo | **Médio**: `tipo_ativo.campos_tecnicos_obrigatorios`, `alerta.metadados`, `auditoria.valores_*` | Arquiteto de Dados | Antes geração DDL |
-| **SEC-001** | RLS / views segurança para segregação `filial_id` (multi-tenancy lógico) | **Alto**: Isolamento dados por unidade, performance queries com predicate pushdown | SecOps / Arquiteto | Antes produção |
-| **IDX-001** | Validar 35 índices propostos com `EXPLAIN ANALYZE` carga realista (100k+ ativos, 1M+ manutenções, 500k+ alertas, 10M+ auditoria) | **Alto**: Evitar over-indexing, confirmar planos de execução queries críticas | DBA / Eng. Performance | Pós-carga teste |
-| **OBS-001** | Stack observabilidade (Prometheus/Grafana, Datadog, New Relic, ELK, Loki, Tempo) | **Médio**: Implementação métricas, alertas, tracing, logs centralizados | DevOps / Platform | Sprint 0 |
+| INDEX-001 | ativo | tag_patrimonio | btree UNIQUE | PK de negócio, busca exata O(log n) |
+| INDEX-002 | ativo | filial_id, status | btree | Dashboard principal: listagem por filial + filtro status |
+| INDEX-003 | ativo | departamento_id, status | btree | Gestão departamental |
+| INDEX-009 | manutencao | ativo_id, data_solicitacao DESC | btree | Histórico por ativo (mais recente primeiro) |
+| INDEX-010 | manutencao | status, data_solicitacao | btree | Fila de trabalho por status |
+| INDEX-013 | alerta | ativo_id, lido, created_at DESC | btree | Painel saúde do ativo |
+| INDEX-014 | alerta | usuario_id, lido, created_at DESC | btree | Caixa de entrada usuário |
+| INDEX-015 | alerta | severidade, created_at DESC | btree | Monitoramento operacional (CRITICA/ALTA) |
+| INDEX-026 | disco | saude_smart, usado_gb DESC | btree | Job de alerta DISCO_CRITICO |
+| INDEX-029 | health_check_disco | disco_id, coletado_em DESC | btree | Histórico saúde por disco (LATERAL join em view) |
+| INDEX-030 | health_check_disco | coletado_em | BRIN | Purge particionado + scans temporais em tabela grande |
+| INDEX-031 | auditoria | entidade, entidade_id, created_at DESC | btree | Auditoria por entidade (mais recente) |
+| INDEX-032 | auditoria | usuario_id, created_at DESC | btree | Investigação LGPD por usuário |
+| INDEX-033 | auditoria | created_at | BRIN | Purge particionado + scans temporais append-only |
 
-<!-- source: db-schema-spec#9 (Pendências e Decisões Necessárias) -->
-<!-- source: nfr#O que falta verificar (Gaps de Informação) -->
+<!-- source: db-schema-spec#4-indexes -->
+
+## 5. Configurações de Performance (PostgreSQL 15+)
+```yaml
+postgresql_conf_tuning:
+  # Memória
+  shared_buffers: "25% RAM (ex: 4GB em 16GB)"
+  effective_cache_size: "75% RAM (ex: 12GB em 16GB)"
+  work_mem: "64MB (ajustar p/ sorts/hashes complexos)"
+  maintenance_work_mem: "1GB"
+  max_parallel_workers_per_gather: "4"
+  max_parallel_workers: "8"
+  max_parallel_maintenance_workers: "4"
+
+  # WAL / Checkpoint
+  wal_level: "replica"
+  max_wal_size: "4GB"
+  min_wal_size: "1GB"
+  checkpoint_completion_target: "0.9"
+  wal_buffers: "64MB"
+  wal_writer_delay: "200ms"
+  synchronous_commit: "on"  # "remote_apply" se synchronous_standby_names configurado
+
+  # Planner
+  random_page_cost: "1.1"  # SSD/NVMe
+  effective_io_concurrency: "200"  # NVMe
+  default_statistics_target: "500"
+  constraint_exclusion: "partition"
+  enable_partitionwise_join: "on"
+  enable_partitionwise_aggregate: "on"
+  jit: "on"
+  jit_above_cost: "100000"
+
+  # Autovacuum (crítico para tabelas de alta rotatividade)
+  autovacuum: "on"
+  autovacuum_max_workers: "4"
+  autovacuum_naptime: "30s"
+  autovacuum_vacuum_threshold: "50"
+  autovacuum_vacuum_scale_factor: "0.05"
+  autovacuum_analyze_threshold: "50"
+  autovacuum_analyze_scale_factor: "0.02"
+  autovacuum_vacuum_cost_limit: "2000"
+  autovacuum_vacuum_cost_delay: "2ms"
+  # Overrides por tabela (via ALTER TABLE ... SET (autovacuum_vacuum_scale_factor = 0.01)):
+  # health_check_disco, auditoria, alerta, manutencao
+
+  # Conexões
+  max_connections: "200"  # via PgBouncer pool_mode=transaction para 200 usuários concorrentes
+  superuser_reserved_connections: "3"
+
+  # Logging (ver seção Observability)
+  # ...
+```
+
+### PgBouncer (Connection Pooling)
+```yaml
+pgbouncer:
+  pool_mode: "transaction"
+  max_client_conn: "1000"
+  default_pool_size: "50"
+  min_pool_size: "10"
+  reserve_pool_size: "10"
+  reserve_pool_timeout: "5s"
+  max_db_connections: "150"
+  max_user_connections: "150"
+  server_reset_query: "DISCARD ALL"
+  server_check_query: "SELECT 1"
+  server_check_delay: "30s"
+  query_timeout: "30s"
+  query_wait_timeout: "10s"
+```
+
+<!-- source: nfr#NFR-S01 -->
+<!-- source: nfr#NFR-S04 -->
+
+## 6. Capacidade de Crescimento & Planejamento
+| Métrica | Atual (Estimado) | 12 Meses | 36 Meses | Ação de Escala |
+| :--- | :--- | :--- | :--- | :--- |
+| `ativo` rows | 5.000 | 6.200 | 8.600 | Vertical (RAM/CPU) suficiente |
+| `manutencao` rows/ano | 50.000 | 60.000 | 80.000 | Índices compostos mantêm performance |
+| `health_check_disco` rows/ano | 1.000.000 | 1.200.000 | 1.500.000 | Particionamento mensal + BRIN + purge 13m |
+| `auditoria` rows/ano | 500.000 | 600.000 | 800.000 | Particionamento anual + BRIN + purge 5a |
+| `disco` rows | 15.000 | 18.000 | 25.000 | Índice saude_smart + usado_gb |
+| Tamanho DB (dados + índices) | ~15 GB | ~25 GB | ~50 GB | Storage auto-expand (managed) ou +disk |
+| WAL/dia | ~5 GB | ~8 GB | ~15 GB | WAL archiving para S3/GCS |
+
+<!-- source: nfr#NFR-S03 -->
+<!-- source: db-schema-spec#1.15 -->
+<!-- source: db-schema-spec#1.16 -->
+
+## 7. Checklist de Validação Operacional
+| Item | Frequência | Responsável | Ferramenta/Query |
+| :--- | :--- | :--- | :--- |
+| Verificar `idx_scan = 0` em índices > 7 dias | Semanal | DBA | `pg_stat_user_indexes` |
+| Verificar bloat > 20% em tabelas core | Semanal | DBA | `pgstattuple` / `pg_freespacemap` |
+| Confirmar autovacuum rodando nas tabelas particionadas | Diário | DBA | `pg_stat_progress_vacuum` + logs |
+| Validar contagem de partições vs retenção | Diário | Automação | Query custom + alerta Prometheus |
+| Testar restore de backup (staging) | Mensal | DevOps | `pg_restore` + checksum |
+| Verificar replication lag < 100 MB | Contínuo | Monitoramento | `pg_stat_replication` |
+| Analisar top 10 queries por `total_exec_time` | Semanal | DBA | `pg_stat_statements` |
+| Revisar `work_mem` / `maintenance_work_mem` p/ queries complexas | Quinzenal | DBA | `EXPLAIN (ANALYZE, BUFFERS)` |
+| Validar RPO/RTO em drill de disaster recovery | Trimestral | DevOps + DBA | Runbook documentado |
 
 ---
 
-## 5. Checklist de Prontidão Operacional (Go-Live)
+## 8. Pendências & Riscos Conhecidos
+| ID | Descrição | Impacto | Mitigação | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| DB-001 | Motor de banco não confirmado no diagnóstico (package.json só mostra frontend). Schema spec assume PostgreSQL 15+ (UUID, JSONB, TIMESTAMPTZ, BRIN, particionamento nativo). | Alto — DDL incompatível se for MySQL/SQL Server | Confirmar com Tech Lead/DBA: stack backend Java/Spring Boot usa PostgreSQL? | `[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]` |
+| DB-002 | Ferramenta de migração não confirmada (Flyway vs Liquibase). DDL gerado deve ser versionado. | Médio | Definir ferramenta e criar baseline migration V1__init.sql | `[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]` |
+| DB-003 | Sequence `seq_numero_os` referenciada em `fn_gerar_numero_os` não declarada no schema. | Médio | Criar sequence global ou por ano com reset anual via job | `[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]` |
+| DB-004 | Validação completa CPF/CNPJ (dígitos verificadores) apenas via regex no CHECK constraint. | Baixo | Implementar function PL/pgSQL `fn_validar_cpf/cnpj` + trigger ou mover para camada app | `[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]` |
+| DB-005 | Middleware para popular `app.current_user_id` e `app.client_ip` (auditoria) não implementado. | Alto — Auditoria incompleta | Implementar filter/interceptor Spring Boot | `[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]` |
+| DB-006 | Criptografia em repouso para colunas `sensitivity: restricted/confidential` não implementada. | Alto — LGPD | JPA AttributeConverter + AES-256-GCM ou TDE (volume criptografado) | `[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]` |
+| DB-007 | Índices BRIN em `health_check_disco.coletado_em` e `auditoria.created_at` assumem inserts ordenados. Backfill/out-of-order inserts degradam BRIN. | Médio | Monitorar `pg_stat_user_indexes` + `pg_brin_summarize`; fallback para B-tree se necessário | `[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]` |
+| DB-008 | TODO em `AtivoService.java:119`: carrega até 1000 candidatos (id+nome) e faz ranking em memória. | Alto — Performance listagem | Implementar query otimizada com window function ou buscar paginado no DB | `[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]` |
 
-| Item | Critério | Evidência Esperada | Status |
-| :--- | :--- | :--- | :--- |
-| **PERF-01** | Queries críticas (QUERY-001 a QUERY-010) validadas com `EXPLAIN ANALYZE` em carga ≥ 50% produção | Relatórios de plano execução + latência p95/p99 | ⬜ Pendente |
-| **PERF-02** | Job `checkResourceUsageAlerts` processa 12k ativos em ≤ 30s | Logs execução + métrica `checkResourceUsageAlerts_duration_seconds` | ⬜ Pendente |
-| **PERF-03** | Read-replica suporta `custoTotalPorAtivo` ≤ 2s p95 via MV + INDEX-009 | Teste carga read-replica isolada | ⬜ Pendente |
-| **RECV-01** | Restore point-in-time testado trimestralmente com sucesso (RTO ≤ 4h, RPO ≤ 24h) | Relatório teste restore + validação hash_encadeado auditoria | ⬜ Pendente |
-| **RECV-02** | Backup full diário + WAL shipping (se suportado) completos sem erro ≥ 30 dias consecutivos | Logs backup + alertas `BackupLentoOuFalhou` zerados | ⬜ Pendente |
-| **RECV-03** | WORM storage auditoria provisionado, replicado cross-region, imutabilidade verificada | Auditoria bucket/política + teste tentativa delete/overwrite falha | ⬜ Pendente |
-| **OBS-01** | Métricas Prometheus expostas em `/actuator/prometheus` (JVM, HTTP, DB pool, cache, custom) | Scrape Prometheus bem-sucedido + dashboards Grafana operacionais | ⬜ Pendente |
-| **OBS-02** | Health checks `/actuator/health` (liveness/readiness) verificam DB, disco, scheduler | Kubernetes/Orquestrador usa probes; falha induzida derruba pod | ⬜ Pendente |
-| **OBS-03** | Tracing distribuído 100% requisições HTTP + JDBC com `traceparent` propagado | Amostra traces Jaeger/Tempo mostrando spans DB | ⬜ Pendente |
-| **OBS-04** | Alertas críticos (TaxaErroElevada, PoolConexoesEsgotando, DiscoQuaseCheio, FalhaIntegridadeAuditoria, BackupLentoOuFalhou) disparando no Alertmanager/Grafana | Testes de injeção falha + recebimento notificação | ⬜ Pendente |
-| **OBS-05** | Logs estruturados JSON com `traceId`/`spanId` correlacionados em toda stack (frontend → backend → DB) | Busca log por `traceId` retorna cadeia completa | ⬜ Pendente |
-| **SEC-01** | RLS / views segurança `filial_id` implementadas e testadas para todos roles | Query plano mostra predicate `filial_id = current_setting('app.current_filial')::uuid` | ⬜ Pendente |
-| **SEC-02** | Rotação segredos (JWT, DB, criptografia) a cada 90 dias via cofre (Vault/Secrets Manager) | Pipeline rotação automatizado + auditoria rotação | ⬜ Pendente |
-| **COMP-01** | LGPD `anonymize_user` function testada e auditada (registro em `auditoria` com `acao='UPDATE'`) | Teste anonimização + verificação hash_encadeado | ⬜ Pendente |
-| **COMP-02** | Matriz retenção dados aprovada por Compliance/Legal (7a SOX, LGPD por tipo dado) | Documento assinado + implementado em jobs purge/arquivamento | ⬜ Pendente |
-
-<!-- source: nfr#NFR-P01, NFR-P04, NFR-A02, NFR-A03, NFR-A04, NFR-O01..O04, NFR-SEC01..SEC05, NFR-C01, NFR-C02, NFR-CO03 -->
-<!-- source: db-schema-spec#6, #7, #9 -->
+<!-- source: diagnostico#TODO-perf-AtivoService -->
+<!-- source: db-schema-spec#9.7 -->
+<!-- source: db-schema-spec#9.12 -->
+<!-- source: nfr#NFR-SEC02 -->
+<!-- source: nfr#NFR-C01 -->
