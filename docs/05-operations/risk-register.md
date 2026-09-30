@@ -24,41 +24,42 @@
 | RISK-016 | Negócio | Integração AD/LDAP para sincronia de `Usuario`/`Funcionario` não confirmada — cadastro manual propenso a erros | Média | Médio | 4 | Definir contrato SCIM/LDAP com Identity Team; sincronismo agendado + webhook de mudanças | Processo manual com checklist de validação; script de reconciliação semanal | Identity Team / Tech Lead Backend | Aberto | 15/01/2025 |
 | RISK-017 | Operacional | Certificado TLS + domínio corporativo não provisionados — impede homologação/produção | Baixa | Alto | 3 | Solicitar com 30 dias de antecedência; usar Let's Encrypt staging para homologação | Homologação em HTTP com aviso de segurança; deploy em subdomínio temporário | SecOps / NetOps | Aberto | 15/01/2025 |
 | RISK-018 | Técnico | Autenticação JWT stateless sem refresh token observado — expiração curta causa UX ruim; longa aumenta risco de token roubado | Média | Médio | 4 | Definir política: access token 15 min + refresh token 7 dias com rotação; armazenamento httpOnly cookie | Fallback para sessão server-side (Redis) se refresh token falhar; logout forçado em mudança de senha | Tech Lead Backend / Security | Aberto | 15/01/2025 |
-| RISK-019 | Negócio | Mudança de prioridade estratégica no meio do projeto (ex: diretoria solicita módulo financeiro completo) | Média | Médio | 4 | Backlog priorizado com MoSCoW; change control board quinzenal; escopo fixo por sprint (Sprint Goal) | Congelar escopo do MVP (fases F1-F3 do GTM); novas demandas vão para backlog v2 | PM / Sponsor | Aberto | 15/01/2025 |
-| RISK-020 | Técnico | Frontend vanilla JS + Popper.js sem framework reativo — dificulta manutenção de estado complexo (alertas, formulários multi-step) | Baixa | Médio | 2 | Avaliar migração incremental para React/Vue/Svelte no próximo ciclo; por enquanto, modularizar em ESModules + Custom Elements | Manter arquitetura atual; investir em testes E2E (Cypress) para regressão | Tech Lead Frontend | Aberto | 15/01/2025 |
+| RISK-019 | Negócio | Mudança de prioridade estratégica no meio do projeto (ex: diretoria solicita módulo f... | Média | Alto | 6 | Alinhamento quinzenal com PO; backlog priorizado com MoSCoW; buffer de 20% capacidade para mudanças não planejadas | Replanejamento de sprint com trade-offs explícitos; comunicação proativa a stakeholders | Product Owner / Tech Lead | Aberto | 15/01/2025 |
 
-<!-- source: diagnostic-cyclomatic-complexity -->
-<!-- source: diagnostic-console-calls -->
-<!-- source: diagnostic-empty-stub -->
-<!-- source: diagnostic-todo-comments -->
-<!-- source: brd-section-8-risks -->
-<!-- source: brd-section-7-assumptions -->
-<!-- source: stack-verification -->
+## 2. Resumo por Categoria
 
-## 2. Critérios de Priorização
-* **Probabilidade:** Alta (>60%) · Média (30-60%) · Baixa (<30%)
-* **Impacto:** Alto (bloqueia release/dado sensível/perda financeira relevante) · Médio (degrada experiência) · Baixo (cosmético)
-* **Score:** Probabilidade × Impacto (1-3 cada eixo) — riscos com score ≥ 6 exigem plano de mitigação ativo
+| Categoria | Qtd Riscos | Score Médio | Riscos Críticos (Score ≥ 9) |
+| :--- | :---: | :---: | :---: |
+| Técnico | 7 | 5.9 | RISK-001, RISK-008 |
+| Segurança | 3 | 4.7 | — |
+| Operacional | 3 | 5.0 | — |
+| Negócio | 4 | 5.8 | RISK-012 |
+| Regulatório | 1 | 6.0 | — |
+| Segurança & Compliance | 1 | 6.0 | — |
 
-## 3. Riscos por Categoria
-### Técnicos
-* RISK-001, RISK-002, RISK-003, RISK-004, RISK-005, RISK-008, RISK-009, RISK-010, RISK-014, RISK-018, RISK-020
+## 3. Top 5 Riscos por Score
 
-### Negócio
-* RISK-012, RISK-016, RISK-019
+1. **RISK-001** (9) — Complexidade `AlertNotificationService` — Refatoração urgente + testes
+2. **RISK-008** (9) — Ausência Flyway/Liquibase — Adoção imediata + CI gate
+3. **RISK-012** (9) — Dependência DB externo não versionado — Confirmação DBA/Infra urgente
+4. **RISK-002** (6) — Complexidade `ManutencaoSpecification` — Extrair builders + PBT
+5. **RISK-003** (6) — Complexidade `AtivoMapper` — Migrar para MapStruct + testes contrato
 
-### Segurança & Compliance
-* RISK-006, RISK-007, RISK-011, RISK-015
+## 4. Ações Imediatas (Próximas 2 Semanas)
 
-### Operacionais
-* RISK-009, RISK-013, RISK-017
-
-## 4. Riscos Aceitos (Accepted Risks)
-| ID | Risco | Justificativa da Aceitação | Aprovado por |
+| Ação | Risco Relacionado | Responsável | Prazo |
 | :--- | :--- | :--- | :--- |
-| — | Nenhum risco aceito até a presente data | Todos os riscos identificados possuem score ≥ 2 e requerem mitigação ou contingência ativa | — |
+| Adotar Flyway/Liquibase + baseline schema | RISK-008 | Tech Lead Backend / DBA | 29/01/2025 |
+| Refatorar `AlertNotificationService.checkResourceUsageAlerts` | RISK-001 | Tech Lead Backend | 29/01/2025 |
+| Confirmar engine/versão/pool DB com DBA/Infra | RISK-012 | DBA / Infra | 22/01/2025 |
+| Implementar validação `hasPermission` contextual | RISK-011 | Tech Lead Backend / Compliance | 29/01/2025 |
+| Remover `console.error`/`console.debug` residuais | RISK-007 | Tech Lead Frontend | 22/01/2025 |
 
-## 5. Histórico de Materialização
-| ID | Data | O que aconteceu | Ação tomada | Lição aprendida |
-| :--- | :--- | :--- | :--- | :--- |
-| — | — | Nenhum risco materializado até a presente data (projeto em fase inicial) | — | — |
+## 5. Métricas de Acompanhamento
+
+- **Total de riscos abertos:** 19
+- **Riscos com Score ≥ 9:** 3 (16%)
+- **Riscos com Score 6-8:** 9 (47%)
+- **Riscos com Score ≤ 5:** 7 (37%)
+- **Média de idade dos riscos abertos:** 0 dias (todos identificados em 15/01/2025)
+- **Próxima revisão:** 29/01/2025 (quinzenal)

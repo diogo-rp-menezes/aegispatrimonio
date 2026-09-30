@@ -95,7 +95,10 @@ public class SecurityConfig {
                         .successHandler(oAuth2AuthenticationSuccessHandler))
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(new TenantFilter(), JwtAuthFilter.class)
+                // H2 (audit): TenantFilter deve rodar DEPOIS do JwtAuthFilter, para
+                // que o TenantAccessFilter (que valida filial contra o usuário
+                // autenticado) veja a autenticação já estabelecida no contexto.
+                .addFilterAfter(new TenantFilter(), JwtAuthFilter.class)
                 .addFilterAfter(new br.com.aegispatrimonio.security.TenantAccessFilter(), JwtAuthFilter.class);
 
         return http.build();

@@ -3,7 +3,6 @@ package br.com.aegispatrimonio.service;
 import br.com.aegispatrimonio.dto.AtivoCreateDTO;
 import br.com.aegispatrimonio.dto.AtivoHealthHistoryDTO;
 import br.com.aegispatrimonio.dto.AtivoDTO;
-import br.com.aegispatrimonio.dto.AtivoNameDTO;
 import br.com.aegispatrimonio.dto.AtivoDetalheHardwareDTO;
 import br.com.aegispatrimonio.dto.AtivoUpdateDTO;
 import br.com.aegispatrimonio.dto.query.AtivoQueryParams;
@@ -20,11 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -48,7 +45,6 @@ public class AtivoService implements IAtivoService {
     private final MovimentacaoRepository movimentacaoRepository;
     private final DepreciacaoService depreciacaoService;
     private final AtivoHealthHistoryRepository healthHistoryRepository;
-    private final SearchOptimizationService searchOptimizationService;
     private final UserContextService userContextService;
 
     public AtivoService(AtivoRepository ativoRepository, AtivoMapper ativoMapper,
@@ -56,7 +52,7 @@ public class AtivoService implements IAtivoService {
             FornecedorRepository fornecedorRepository, FuncionarioRepository funcionarioRepository,
             FilialRepository filialRepository, ManutencaoRepository manutencaoRepository,
             MovimentacaoRepository movimentacaoRepository, DepreciacaoService depreciacaoService,
-            AtivoHealthHistoryRepository healthHistoryRepository, SearchOptimizationService searchOptimizationService,
+            AtivoHealthHistoryRepository healthHistoryRepository,
             UserContextService userContextService) {
         this.ativoRepository = ativoRepository;
         this.ativoMapper = ativoMapper;
@@ -69,7 +65,6 @@ public class AtivoService implements IAtivoService {
         this.movimentacaoRepository = movimentacaoRepository;
         this.depreciacaoService = depreciacaoService;
         this.healthHistoryRepository = healthHistoryRepository;
-        this.searchOptimizationService = searchOptimizationService;
         this.userContextService = userContextService;
     }
 
@@ -115,51 +110,22 @@ public class AtivoService implements IAtivoService {
             userFiliais = userContextService.getUserFiliais();
         }
 
-        // 2. Fuzzy Search Path (Shift Left Optimization)
-        // TODO(perf): Este caminho carrega até 1000 candidatos (id+nome) e faz ranking
-        // Levenshtein em memória — aceitável para MVP. Revisar quando o parque de ativos
-        // superar ~5k registros ou quando o p95 de latência da busca ultrapassar o SLO
-        // (medição antes de otimizar; candidatos: ranking no banco via pg_trgm/ILIKE).
-        if (isFuzzySearch) {
-            List<AtivoNameDTO> candidates;
-            // Fetch candidates matching other filters, ignoring name (limited to 1000 for
-            // safety)
-            org.springframework.data.domain.Pageable limit = org.springframework.data.domain.PageRequest.of(0, 1000);
-
-            if (isAdmin) {
-                candidates = ativoRepository.findSimpleByFilters(filialId, tipoAtivoId, status, minDate, maxDate,
-                        hasPrediction, limit);
-            } else {
-                candidates = ativoRepository.findSimpleByFilialIdsAndFilters(userFiliais, filialId, tipoAtivoId, status,
-                        minDate, maxDate, hasPrediction, limit);
+        // 2. Busca por nome (M4): usa índice FULLTEXT do MySQL (ranking por relevância no
+        // banco). Fallback para LIKE quando o termo tem menos de 3 caracteres ou quando
+        // o banco não suporta MATCH...AGAINST (ex.: H2 em dev/e2e/testes).
+        if (isFuzzySearch && nome.trim().length() >= 3) {
+            try {
+                String statusName = (status != null) ? status.name() : null;
+                Page<Ativo> page = isAdmin
+                        ? ativoRepository.searchByNomeFullText(nome, filialId, tipoAtivoId, statusName, minDate,
+                                maxDate, hasPrediction, effectivePageable)
+                        : ativoRepository.searchByNomeFullTextByFilialIds(nome, userFiliais, filialId, tipoAtivoId,
+                                statusName, minDate, maxDate, hasPrediction, effectivePageable);
+                return page.map(ativoMapper::toDTO);
+            } catch (org.springframework.dao.InvalidDataAccessResourceUsageException
+                    | org.springframework.orm.jpa.JpaSystemException e) {
+                // Banco sem suporte a FULLTEXT (ex.: H2) — cai para o caminho LIKE abaixo.
             }
-
-            // Rank in memory using Levenshtein distance
-            List<AtivoNameDTO> ranked = searchOptimizationService.rankResults(nome, candidates, AtivoNameDTO::nome);
-
-            // Manual Pagination
-            int start = (int) effectivePageable.getOffset();
-            int end = Math.min((start + effectivePageable.getPageSize()), ranked.size());
-
-            if (start > ranked.size()) {
-                return new PageImpl<>(List.of(), effectivePageable, ranked.size());
-            }
-
-            List<AtivoNameDTO> pageContentDTOs = ranked.subList(start, end);
-            List<Long> ids = pageContentDTOs.stream().map(AtivoNameDTO::id).collect(Collectors.toList());
-
-            List<Ativo> fullEntities = ativoRepository.findAllByIdInWithDetails(ids);
-
-            // Sort entities to match ranking order
-            Map<Long, Ativo> entityMap = fullEntities.stream()
-                    .collect(Collectors.toMap(Ativo::getId, Function.identity()));
-            List<AtivoDTO> pageContent = ids.stream()
-                    .map(entityMap::get)
-                    .filter(Objects::nonNull)
-                    .map(ativoMapper::toDTO)
-                    .collect(Collectors.toList());
-
-            return new PageImpl<>(pageContent, effectivePageable, ranked.size());
         }
 
         // 3. Original Path (Strict / DB Paged)
@@ -190,11 +156,13 @@ public class AtivoService implements IAtivoService {
             return new PageImpl<>(allContent, effectivePageable, total);
         }
 
+        // Fallback LIKE (termo curto ou banco sem FULLTEXT): passa o nome como filtro.
+        String nomeLike = isFuzzySearch ? nome : null;
         if (isAdmin) {
-            return ativoRepository.findByFilters(filialId, tipoAtivoId, status, null, minDate, maxDate, hasPrediction,
-                    effectivePageable).map(ativoMapper::toDTO);
+            return ativoRepository.findByFilters(filialId, tipoAtivoId, status, nomeLike, minDate, maxDate,
+                    hasPrediction, effectivePageable).map(ativoMapper::toDTO);
         }
-        return ativoRepository.findByFilialIdsAndFilters(userFiliais, filialId, tipoAtivoId, status, null, minDate,
+        return ativoRepository.findByFilialIdsAndFilters(userFiliais, filialId, tipoAtivoId, status, nomeLike, minDate,
                 maxDate, hasPrediction, effectivePageable).map(ativoMapper::toDTO);
     }
 

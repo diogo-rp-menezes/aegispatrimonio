@@ -1,257 +1,185 @@
-# API & Integration Contract Specification — API Interna do Backend · Sistema de Gestão de Patrimônio (A4)
+# API & Integration Contract Specification — AegisPatrimônio (API HTTP interna do backend)
 
-> **Versão da API:** v1 (proposta — nenhum mecanismo de versionamento verificado no código) [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] · **Protocolo:** HTTP síncrono (verificado — SAD Seção 3); estilo REST presumido [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]; sem IPC — o projeto não possui `src-tauri/Cargo.toml` (verificado na stack) · **Base URL:** **a definir** — nenhuma configuração de deploy, provedor, TLS ou domínio verificada no codebase (NFR-PO03)
-> **Autenticação:** JWT — access token 1h, refresh token 7d, blocklist server-side no logout (NFR-SEC01); transporte via header `Authorization` presumido [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
-> **Status:** Draft · **Owner:** Arquitetura/Engenharia · **Fontes:** [[nfr]] (Non-Functional Requirements v1.0), System Architecture Document (SAD v1.0), diagnóstico determinístico do codebase (varredura AST — 350 arquivos, 1.268 funções, 344 classes, 27.537 LOC), `package.json` do workspace
+> **Versão da API:** não formalizada — a definir (NFR-M03) · **Protocolo:** HTTP síncrono sobre TLS 1.2+ (NFR-SEC01) · **Base URL:** não descobrível a partir dos fontes — a definir pela engenharia
+> **Autenticação:** token de acesso emitido no login (`createUserAndToken`) e validado a cada requisição (`doFilterInternal` — NFR-SEC02)
+> **Owner:** Engenharia/Arquitetura · **Status:** Draft — catálogo de endpoints pendente de instrumentação
 
-> ⚠️ **AVISO DE EXTRAÇÃO:** **as rotas reais não puderam ser localizadas automaticamente no workspace.** Nenhum arquivo de rotas foi encontrado e a varredura AST determinística **não detectou nenhum handler/rota declarado no código**. Consequentemente, **nenhum endpoint de negócio foi extraído do código**: este documento não propõe caminhos, métodos ou contratos por endpoint de negócio. As Seções 4.1–4.4 documentam honestamente essa lacuna, a superfície funcional referenciada pelas fontes e o único par de caminhos citado nelas (`/health`, `/metrics` — existência não confirmada).
+> ⚠️ **Aviso central — rotas não localizadas automaticamente.** As rotas da API **não puderam ser localizadas automaticamente**: o arquivo de rotas referenciado pelo processo de extração (`server/express-app.ts`) não foi encontrado no workspace, e a varredura determinística do codebase reportou **"Nenhuma rota/IPC detectada no código"**. **Nenhum método HTTP, caminho ou schema de payload foi confirmado.** Em conformidade com isso, este documento **não inventa endpoints**: ele registra (i) as convenções de contrato, (ii) as capacidades de API evidenciadas por comportamento no código e nos NFRs (SAD §3/§6), e (iii) o plano de completude do catálogo (Seção 8).
+
+---
 
 ## 1. Overview
 
-**Propósito.** Formalizar o contrato de integração entre o frontend web (`frontend/`) e o backend Java (`src/`, pacote `br.com.aegispatrimonio`) do Sistema de Gestão de Patrimônio (A4), estabelecendo convenções de autenticação, autorização, paginação, tratamento de erros e observabilidade. Este documento materializa a pendência **NFR-M03** (documentação formal da API via OpenAPI/Swagger — ferramenta não verificada no codebase).
+**Propósito.** Expor as operações do sistema interno corporativo de gestão patrimonial multi-filial — **fonte única de verdade do patrimônio** (BRD §1) — ao frontend da aplicação. A API é a única fronteira de comunicação externa do backend monolítico Java (`src/`, 338 arquivos `.java`, pacotes `br.com.aegispatrimonio.*`): toda interação é **síncrona via HTTP com TLS 1.2+** (NFR-SEC01), com correlation ID propagado (NFR-O02). Não há filas, eventos assíncronos, cache identificável nem integrações externas no codebase (SAD §2/§4/§6).
 
-**Consumidores esperados:**
+**Consumidores esperados.** **Consumidor único verificado:** o frontend JavaScript (`frontend/`, 15 arquivos `.js`), desktop-first (1280–1920px — NFR-U03), construído sobre `@popperjs/core ^2.11.8` (única dependência de produção declarada em `package.json`; nenhuma devDependency). O acesso à API é centralizado na camada de serviços `api.js`: função `request` (complexidade ciclomática 13 — ponto de atenção, NFR-M02), `authInterceptor` (injeção do token) e `handleApiError` (tratamento uniforme de erros — NFR-U02). **Nenhuma integração externa** (pagamento, e-mail, ERPs etc.) e **nenhum consumidor machine-to-machine** foram detectados no código (SAD §6). O sistema é de **instância única**, sem empacotamento desktop (não há `src-tauri/Cargo.toml`).
 
-| Consumidor | Evidência | Status |
-| :--- | :--- | :--- |
-| Frontend web (`frontend/`) | Função `request` em `frontend/src/services/api.js:54` — ponto único de integração client-side (verificado) | Confirmado |
-| Monitor externo de uptime/APM | `/health` e `/metrics` (NFR-O01) | **Existência não confirmada no codebase** (lacuna de verificação 5 do SAD) |
-| Integrações externas (ERP, pagamento, e-mail etc.) | Nenhuma detectada no codebase | Não aplicável |
+**Princípios de design** (ancorados no SAD e nos NFRs):
 
-**Princípios de design:**
+1. Comunicação **síncrona HTTP** — nenhum mecanismo de mensageria/eventos assíncronos existe no codebase nem é requisito nesta fase (SAD §4);
+2. **TLS 1.2+ (preferencialmente 1.3) em 100% do tráfego** frontend↔backend (NFR-SEC01);
+3. **Autenticação por token validada a cada requisição** (NFR-SEC02); **logout invalida imediatamente o token** (BR-07 / NFR-SEC04);
+4. **RBAC com contexto** (perfil + filial/departamento) cobrindo **100% das operações de escrita** (BR-01, BR-04) e a leitura do histórico de saúde por filial (BR-03);
+5. **Correlation ID propagado** entre frontend e backend, presente em **100% dos logs de requisições que falharem** (NFR-O02; guardrail BRD §4);
+6. **Tratamento uniforme de erros** sem exposição de detalhes internos (NFR-U02);
+7. No backend, **100% das consultas SQL parametrizadas** — SQL cru, sem ORM/query builder; concatenação de strings em SQL é proibida (NFR-SEC03).
 
-- Comunicação **síncrona via HTTP** (verificado — não há comunicação assíncrona, filas, eventos ou webhooks detectados no codebase); estilo **REST presumido** [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA].
-- **Paginação server-side obrigatória em toda listagem** (NFR-S04 — requisito verificado).
-- **Erros via status HTTP padronizados**: 400/401/403/404 (NFR-SEC01, NFR-SEC04, NFR-SEC05 — requisitos verificados).
-- **Propagação de request ID** do frontend para o backend nos fluxos críticos — autenticação, solicitação, aprovação (NFR-O02 — requisito verificado).
-- **SQL 100% parametrizado** no backend (NFR-SEC06 — requisito crítico dado o acesso a dados via SQL cru sem ORM, verificado na stack).
-- **Escopo de transporte:** API HTTP web — **não há superfície de IPC** a documentar: o projeto não possui `src-tauri/Cargo.toml` (verificado na stack), sem empacotamento desktop Tauri.
+**Estilo de exposição.** A classificação formal do estilo HTTP (registro em ADR) **não existe** — SAD §12. Os comportamentos evidenciados (CRUD de ativos via DTO, filtros combinados de consulta, emissão/validação de token) definem o perfil da API, mas a confirmação do padrão de exposição integra o levantamento técnico pendente (C-01 do BRD).
 
-**Metas de performance aplicáveis aos endpoints** (do [[nfr]]):
+**Estado do catálogo (gap NFR-M03).** O inventário de endpoints é um **gap de documentação confirmado** (NFR-M03 — não instrumentada no repositório; SAD §6). Este documento estabelece as convenções e os elementos de contrato conhecidos; o catálogo completo deve ser gerado na primeira onda de instrumentação de rotas, em conjunto com este documento (Seção 8). Ferramenta/formato da documentação de API: **a definir** — nada foi presumido neste documento.
 
-| Meta | Valor | Requisito |
-| :--- | :--- | :--- |
-| Latência | p95 < 200ms; p99 < 500ms | NFR-P01 |
-| TTFB | < 100ms em leituras simples | NFR-P02 |
-| Relatórios de custo total por ativo | < 3s p95 para 10.000+ ativos | NFR-P04 |
-| Capacidade | ≥ 100 req/s por instância (cenário misto 80/20) | NFR-S03 |
-| Carga | 10.000+ ativos e 1.000+ usuários simultâneos com degradação < 10% sobre o baseline | NFR-S01 |
+### 1.1 Fronteiras de integração
+
+| Integração | Tipo | Direção | Contrato | Criticidade |
+| :--- | :--- | :--- | :--- | :--- |
+| Frontend ↔ Backend | HTTP síncrono (TLS 1.2+ — NFR-SEC01) | Frontend → Backend, via `request`/`authInterceptor` | Este documento — catálogo de endpoints **pendente de instrumentação** (NFR-M03) | Alta |
+| Backend ↔ Persistência | SQL cru, 100% parametrizado (NFR-SEC03) | Backend → Banco | Contrato físico em [[db-schema-spec]] — **nenhuma tabela detectada na varredura**; motor não especificado (C-01) | Alta |
+| Integrações externas (pagamento, e-mail, ERPs etc.) | — | — | **Nenhuma integração externa detectada no código** | — |
+
+> **Nota:** o mecanismo real de exposição do backend e de servir o frontend **não é descobrível a partir dos fontes** (SAD §11) — a Base URL e o modo de publicação devem ser confirmados pela engenharia.
+
+---
 
 ## 2. Conventions
 
-* **Formato:** JSON (`application/json`) — a serialização efetiva não foi verificada no código (nenhum contrato de serialização localizado); JSON é a convenção adotada por este documento.
-* **Versionamento:** via path `/v1/` — **proposto** [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]; nenhum mecanismo de versionamento (header `Accept-Version` ou path) verificado no código.
-* **Convenção de nomes:** `camelCase` — **proposto** [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]; premissa: alinhamento com a convenção de nomenclatura do backend Java (verificado no codebase) e dos DTOs (`AtivoMapper.toDTO`).
-* **Paginação:** server-side e **obrigatória em toda listagem** (NFR-S04 — verificado). Estilo concreto (`?page=&size=` vs. cursor) **não especificado nas fontes** — proposta: `?page=&size=` com envelope paginado (Seção 5) [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA].
-* **Rate Limiting:** **nenhum requisito de rate limiting verificado** nos NFRs ou no código — nenhum limite por chave ou header (`X-RateLimit-*`) está definido, e este documento não propõe valores. A meta de capacidade verificada é **≥ 100 req/s por instância** em cenário misto 80/20 (NFR-S03). Caso rate limiting seja adotado no futuro, será decisão de arquitetura própria a formalizar em ADR.
-* **Correlação (request ID):** propagação de request ID do frontend para o backend nos fluxos críticos (NFR-O02 — verificado). Header proposto: `X-Request-Id` [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA].
-* **HTTPS:** obrigatório em produção com TLS 1.2+ (NFR-SEC03 — requisito verificado do BRD).
-* **Auditoria:** toda operação de escrita é registrada em trilha de auditoria imutável (NFR-SEC07 — requisito verificado; tensão com a LGPD a resolver — SAD Seção 13).
-* **Idempotência:** **nenhum mecanismo de idempotência verificado** no código ou nos requisitos — não garantido pelo contrato atual.
+* **Formato:** JSON (`application/json`) — premissa de trabalho deste contrato [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]: o formato real dos payloads não está explicitado nos fontes verificados e deve ser confirmado na instrumentação das rotas (NFR-M03).
+* **Versionamento:** **nenhum mecanismo identificado** (nem path `/v1/`, nem header de versão) — a definir na formalização do catálogo (NFR-M03). Trata-se de API interna, de consumidor único e instância única; a decisão de versionamento deve ser registrada quando da primeira versão formalizada.
+* **Convenção de nomes:** **não descobrível para os campos de payload** — a confirmar na instrumentação. Observação verificada: os identificadores evidenciados no código (`createUserAndToken`, `getHealthHistory`, `checkResourceUsageAlerts`, `doFilterInternal`) seguem o padrão camelCase; nada indica a convenção dos corpos de requisição/resposta.
+* **Correlation ID:** propagado entre frontend (`request`) e backend e presente em **100% dos logs de requisições que falharem** (NFR-O02; guardrail BRD §4). O nome do header/campo de propagação **não está definido** — a definir na instrumentação.
+* **Paginação:** **nenhum padrão de paginação identificado** no código ou nos NFRs. Ponto de atenção: o ranking de ativos carrega até 1000 candidatos em memória (`AtivoService.java:119` — meta p95 < 1,5s, NFR-P04); a evolução prevista (SAD §13) é migrar o ranking para a camada de consulta **com paginação** caso a meta não seja atendida — a paginação pode entrar no contrato nessa refatoração.
+* **Rate Limiting:** **nenhum mecanismo identificado** nos fontes ou NFRs — não é requisito nesta fase. As metas de carga conhecidas são capacidade, não limitação por cliente: **150 usuários concorrentes** com degradação < 10% (NFR-S01) e **50 req/s sustentados em leitura** (NFR-S03). Headers `X-RateLimit-*`: não aplicáveis hoje.
+* **Idempotência:** **nenhum mecanismo identificado** — a definir na instrumentação, em especial para as operações de escrita (CRUD de ativos, fluxo de manutenção com aprovação).
+* **Webhooks/eventos:** **não aplicável** — comunicação estritamente síncrona; nenhum mecanismo de mensageria/eventos existe no codebase nem é requisito nesta fase (SAD §4).
+
+---
 
 ## 3. Authentication & Authorization
 
-* **Mecanismo:** **JWT** (NFR-SEC01 — requisito verificado):
-  * access token com expiração em **1 hora**; refresh token em **7 dias** (RF-24);
-  * endpoints protegidos rejeitam requisições sem token com **401** (CA-06);
-  * logout limpa a sessão local no frontend (RF-25 — `clearSession` em `frontend/src/services/api.js`) e **invalida o token server-side via blocklist** (CA-08);
-  * transporte via header `Authorization: Bearer <token>` — **presumido** [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA].
-* **Hash de senhas:** o mecanismo efetivamente implementado no backend **não pôde ser verificado** na varredura de dependências — verificação obrigatória antes de aprovar o requisito (lacuna de verificação 2 do SAD/NFR). O BRD (RNF-02) especifica bcrypt/argon2 como requisito. (NFR-SEC02)
-* **Escopos/Permissões:** modelo de autorização por **roles internas — `Admin` e `User`** (NFR-SEC04 — requisito verificado). **Não há escopos granulares** (tipo `read:orders` / `write:orders`):
-  * toda operação de escrita em **entidades mestres** exige role `Admin`; tentativas de `User` retornam **403 Forbidden** (RF-26, RN-01/02, CA-01/CA-10);
-  * cobertura de **100% dos endpoints de escrita** em testes de integração (NFR-SEC04);
-  * o mapeamento role-por-endpoint não foi extraído do código e não é proposto neste documento (Seção 4.1).
-* **MFA para acesso Admin:** requisito **Should** (NFR-SEC09) — evolução futura, não implementado no contrato atual.
-* **Rotação de segredos:** chave de assinatura do JWT e credenciais de banco a cada 90 dias (NFR-SEC10) — item inferido no NFR, sem mecanismo verificado no código.
-* **Achado de segurança funcional relevante:** o stub `Usuario.setUsername` com corpo vazio (`src/main/java/br/com/aegispatrimonio/model/Usuario.java:86`) pode indicar bug funcional ou intencionalidade — **investigar com prioridade**, pois é potencialmente relevante para a autenticação (RF-23/NFR-SEC01) (SAD Seção 12, item 7).
+**Mecanismo.** Autenticação por **token de acesso**, com estado no servidor:
 
-## 4. Endpoints
+* **Emissão no login** — `createUserAndToken`;
+* **Validação em cada requisição** — filtro do backend (`doFilterInternal`), com injeção do token no frontend via `authInterceptor` (NFR-SEC02);
+* **Logout invalida imediatamente o token** (BR-07 / NFR-SEC04) — implica estado de sessão/token no servidor; consequência arquitetural: o escalonamento horizontal foi conscientemente adiado até que o armazenamento compartilhado de tokens seja resolvido (SAD §7/§13);
+* **Encerramento de sessão** (`clearSession`) exige nova autenticação;
+* **TLS 1.2+ (preferencialmente 1.3) obrigatório** em 100% do tráfego (NFR-SEC01);
+* **MFA:** não evidenciado no código — evolução futura, não requisito desta fase (NFR-SEC02).
 
-### 4.1 Status da extração de rotas — rotas não localizadas automaticamente
+**Elementos de contrato pendentes** (não descobríveis a partir dos fontes — extrair na instrumentação, sem inventar): endpoint de login (método/caminho), endpoint de logout, nome e esquema do header de autorização, formato/opacidade e TTL do token, mecanismo de renovação (se existir).
 
-> **Nenhum arquivo de rotas foi localizado no workspace** (o arquivo de rotas esperado pela rotina de extração — `server/express-app.ts` — não existe) e a **varredura AST determinística (350 arquivos, 1.268 funções, 344 classes, 27.537 LOC) não detectou nenhum handler/rota declarado no código**.
+**Escopos/Permissões.** RBAC **com contexto** — perfil + filial/departamento — verificado via `hasPermission` (NFR-SEC02):
 
-Consequências para este documento:
+* cobertura obrigatória de **100% das operações de escrita** (BR-01, BR-04);
+* leitura do **histórico de saúde restrita por filial** (BR-03);
+* nomenclatura dos perfis e das strings de permissão: **não descobrível a partir dos fontes** — a extrair do código; este documento não inventa catálogo de escopos.
 
-1. **Nenhum endpoint de negócio foi extraído do código** — não existe catálogo verificado de caminhos, métodos HTTP, payloads, schemas ou códigos de erro por endpoint.
-2. Este documento **não propõe caminhos nem contratos por endpoint de negócio**, para não inventar contratos não verificáveis. A especificação detalhada por endpoint será produzida quando as rotas reais forem localizadas ou confirmadas pelo time (Seção 4.4).
-3. A existência de uma superfície HTTP no backend é **de facto** — o frontend consome o backend via HTTP síncrono através do ponto de integração verificado (`frontend/src/services/api.js`, função `request`) — porém o contrato dessa superfície não foi extraído. A partir das fontes disponíveis **não é possível determinar** se as rotas existem e não foram cobertas pela varredura, ou se ainda não foram implementadas.
-4. A superfície **funcional** que a API deve expor é derivável dos requisitos referenciados no SAD e está descrita na Seção 4.2 — em nível funcional, sem correspondência com rotas específicas.
-5. Os únicos caminhos citados nas fontes são `/health` e `/metrics` (NFR-O01) — detalhados na Seção 4.3 com existência **não confirmada no codebase** (lacuna de verificação 5 do SAD).
+**Boundary de rede** (premissa carregada do SAD §9): [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] sistema interno corporativo, acessível apenas pela rede corporativa por usuários autenticados; sem exposição pública de endpoints administrativos. Segmentação de rede e firewall: a documentar pela infraestrutura antes do go-live.
 
-### 4.2 Superfície funcional referenciada pelas fontes (não confirmada no código)
+---
 
-A tabela abaixo descreve, em nível funcional, as operações que os requisitos (referenciados no SAD) esperam da API. **Nenhum caminho, método HTTP ou payload foi extraído do código**; a correspondência com rotas específicas permanece em aberto.
+## 4. Catálogo de Endpoints — status: **não extraído**
 
-| Área funcional | Requisitos de origem | Operações previstas (nível funcional) | Semântica contratual verificada |
+> **Por que não há contratos de endpoint abaixo:** a varredura determinística não extraiu inventário de rotas/handlers ("Nenhuma rota/IPC detectada no código") e `server/express-app.ts` não foi encontrado no workspace. Os sub-capítulos registram as **capacidades de API evidenciadas por comportamento no código e nos NFRs** (SAD §3/§6) — **sem inventar caminhos, métodos ou payloads**. O contrato HTTP completo de cada capacidade deve ser extraído na instrumentação (Seção 8).
+
+| # | Capacidade | Evidência no código/NFR | Contrato HTTP |
 | :--- | :--- | :--- | :--- |
-| Autenticação | RF-23, RF-24, RF-25; NFR-SEC01 | Autenticar usuário; renovar access token a partir do refresh token (7d); logout com limpeza de sessão local (`clearSession`) e invalidação server-side do token via blocklist (CA-08) | Sem token em endpoint protegido → 401 (CA-06) |
-| Ativos — consulta | RF-14, RF-15; NFR-S04 | Listagem de ativos com filtros e **paginação server-side obrigatória**; consulta de detalhe por identificador | ID inexistente → 404 padronizado (NFR-SEC05) |
-| Ativos — escrita | RF-14, RF-26; NFR-SEC04, NFR-SEC07 | Criação/edição de ativos (entidades mestres) | Exige role Admin; tentativa de User → 403 (RF-26, RN-01/02, CA-01/CA-10); escrita auditada (NFR-SEC07) |
-| Relatório de custo total por ativo | RF-17; NFR-P04 | Consulta analítica pesada (< 3s p95 para 10.000+ ativos) | Risco R-03 do BRD (timeout em consultas pesadas); estratégia de cache/materialização pendente (NFR-CO02) |
-| Manutenção — solicitação e aprovação | RF-18, RF-19, RF-20, RF-21; UC-02, UC-03; NFR-O04 | Criação de solicitação de manutenção; listagem/filtragem (via `ManutencaoSpecification`); transições de status; aprovação | Timestamps nas transições para KPIs de processo: tempo médio de aprovação < 4h úteis e taxa de cancelamento < 10% (NFR-O04); fluxo de maior prioridade de disponibilidade (SAD Seção 8, RNF-08) |
-| Observabilidade | NFR-O01, NFR-O03 | Health check (`/health`) e exposição de métricas (`/metrics`) | Únicos caminhos citados nas fontes; existência não confirmada (Seção 4.3) |
+| 4.1 | Autenticação (emissão, validação, invalidação de token) | `createUserAndToken`, `doFilterInternal`, `clearSession` | Não extraído |
+| 4.2 | Ativos — CRUD, busca e ranking | `AtivoService`, `AtivoMapper` | Não extraído |
+| 4.3 | Manutenção — fluxo com aprovação e filtros combinados | `ManutencaoSpecification` | Não extraído |
+| 4.4 | Histórico de saúde por filial | `getHealthHistory` | Não extraído |
+| 4.5 | Alertas operacionais | `AlertNotificationService` | Não extraído (exposição HTTP a confirmar) |
+| 4.6 | Trilha de auditoria | `onUpdate`/`preUpdate` (BR-08) | Não extraído (meio de consulta a confirmar) |
+| 4.7 | Health check da aplicação | SAD §10 (arquitetura-alvo) | Não confirmado no código |
 
-**Nota de filtragem dinâmica:** a construção dinâmica de consultas de manutenção (`ManutencaoSpecification.build`, `src/main/java/br/com/aegispatrimonio/repository/ManutencaoSpecification.java:26`, complexidade 14) é **superfície de risco prioritária** para SQL parametrizado e índices (NFR-SEC06, NFR-P01) — os parâmetros de filtro aceitos por esse mecanismo não foram extraídos do código e devem ser documentados quando as rotas forem confirmadas.
+### 4.1 Autenticação — emissão, validação e invalidação de token
+* **Capacidade evidenciada:** login com emissão de token (`createUserAndToken`); validação do token a cada requisição (`doFilterInternal`); logout com invalidação imediata (BR-07 / NFR-SEC04); encerramento de sessão (`clearSession`).
+* **Contrato HTTP:** **não extraído** — método, caminho, payload de credenciais e formato de resposta não descobríveis.
+* **Restrições conhecidas:** TLS 1.2+ obrigatório (NFR-SEC01); token validado a cada requisição (NFR-SEC02); invalidação imediata no logout (NFR-SEC04); RBAC com contexto aplica-se a todas as operações subsequentes.
+* **Elementos a extrair:** endpoint de login, endpoint de logout, header de autorização, TTL/renovação do token, formato das credenciais, códigos de erro de autenticação.
 
-### 4.3 Endpoint referenciado nas fontes: `/health` e `/metrics`
+### 4.2 Ativos — CRUD, busca e ranking
+* **Capacidade evidenciada:** operações CRUD de ativos, busca e ranking (`AtivoService`, `AtivoMapper`).
+* **Contrato HTTP:** **não extraído**.
+* **Restrições conhecidas:**
+  * RBAC com contexto cobre as operações de escrita (BR-01, BR-04);
+  * latência: metas p95/p99 para CRUD e listagens (NFR-P01); ranking em memória de até 1000 candidatos (`AtivoService.java:119`) com meta p95 < 1,5s (NFR-P04) — débito técnico trackado com TODO; se a meta não for atendida, migrar o ranking para a camada de consulta com paginação (SAD §13);
+  * mapeamento DTO via `AtivoMapper.toDTO` (complexidade ciclomática 14 — refatoração obrigatória antes de novas evoluções, NFR-M02);
+  * auditoria de modificações via `onUpdate`/`preUpdate` (BR-08).
 
-Único par de caminhos citado nas fontes (NFR-O01). **Existência não confirmada no codebase** (SAD Seção 12, item 5 — lacuna de verificação).
+### 4.3 Manutenção — fluxo com aprovação e filtros combinados
+* **Capacidade evidenciada:** fluxo de manutenção com aprovação (BRD §2/§4); consultas com filtros combinados (`ManutencaoSpecification.build`).
+* **Contrato HTTP:** **não extraído**.
+* **Restrições conhecidas:** latência p95 < 1s / p99 < 2s para consultas com filtros (NFR-P02); sem ORM/query builder, índices e plano de consulta são responsabilidade direta do código — definição de índices a revisar em conjunto com a refatoração de `ManutencaoSpecification.build` (complexidade 14) (SAD §7); RBAC com contexto nas operações de escrita, incluindo a aprovação (BR-01, BR-04).
 
-#### `GET /health` e `GET /metrics` *(método GET presumido — não especificado nas fontes)* [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
-* **Purpose:** health check para monitor de uptime e exposição de métricas da instância (NFR-O01). Alertas previstos: p95 de latência acima de 200ms sustentado, taxa de erro > 1% e saturação de recursos da instância (NFR-O03) [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA].
-* **Auth requerida:** não especificada nas fontes — proposta: `/health` público; `/metrics` a definir (público vs. restrito) [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA].
+### 4.4 Histórico de saúde por filial
+* **Capacidade evidenciada:** `getHealthHistory` — leitura restrita por filial (BR-03).
+* **Contrato HTTP:** **não extraído**.
+* **Restrições conhecidas:** autorização por filial obrigatória (BR-03); backup diário deve incluir obrigatoriamente o histórico de saúde (NFR-A03); política de retenção compatível com a análise preditiva de falhas futura (BRD §5; NFR-C02).
 
-#### Request
-##### Path Parameters
-Nenhum (os identificadores são fixos: `/health`, `/metrics`).
+### 4.5 Alertas operacionais
+* **Capacidade evidenciada:** `AlertNotificationService` / `checkResourceUsageAlerts` (complexidade 17) — verificação de uso de recursos e alertas operacionais, incluindo saturação de recursos (NFR-O03).
+* **Contrato HTTP:** **não extraído** — não há evidência de exposição HTTP destes alertas; podem ser mecanismos internos ao backend. A confirmar na instrumentação.
 
-##### Query Parameters
-Nenhum especificado nas fontes.
+### 4.6 Trilha de auditoria
+* **Capacidade evidenciada:** callbacks `onUpdate`/`preUpdate` (BR-08) — mecanismo **já implementado no código**; consultável por registro com data/hora da última modificação (NFR-O04).
+* **Contrato HTTP:** **não extraído** — o meio de consulta (endpoint dedicado ou outro mecanismo) não é descobrível. A confirmar na instrumentação.
 
-##### Headers
-| Nome | Obrigatório | Descrição |
-| :--- | :--- | :--- |
-| `Authorization` | Depende da decisão de restrição de `/metrics` | `Bearer <token>` (NFR-SEC01) — se o endpoint for protegido |
+### 4.7 Health check da aplicação
+* **Status:** previsto na **arquitetura-alvo** de observabilidade (SAD §10) — **não confirmado no código**. A implementar/confirmar na instrumentação de rotas.
 
-#### Response
+### 4.8 Modelo de contrato por endpoint (a aplicar na instrumentação)
+Para cada endpoint extraído, documentar: método HTTP e caminho; parâmetros de path/query; headers (autorização, correlation ID); schema de request/response; códigos de erro; idempotência; autorização requerida (perfil + contexto filial/departamento); metas de latência aplicáveis (NFR-P01/P02/P04); eventos de auditoria relacionados (BR-08).
 
-##### 200 OK — Schema
-```typescript
-// [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] Nenhum schema de resposta foi extraído
-// do código ou especificado nas fontes; proposta mínima a validar.
-interface HealthResponse {
-  status: string; // ex.: "ok" — valores e formato a definir
-}
-```
-
-##### Exemplo de Response
-```json
-{ "status": "ok" }
-```
-
-##### Códigos de Erro
-| Código HTTP | Código de Erro Interno (proposto) | Descrição | Ação Recomendada |
-| :--- | :--- | :--- | :--- |
-| 500 | `INTERNAL_ERROR` | Instância indisponível/degradada | Acionar runbook de disponibilidade (RTO ≤ 1h — NFR-A02) |
-
-#### Idempotency
-Não aplicável (leitura).
-
-#### Webhooks/Eventos Relacionados
-**Não aplicável** — não há comunicação assíncrona (filas/eventos/webhooks) detectada no codebase (SAD Seção 4); o processamento de alertas (`AlertNotificationService.checkResourceUsageAlerts`, linha 96) aparenta execução in-process.
-
-### 4.4 Contratos detalhados por endpoint — pendência
-
-Os contratos detalhados por endpoint de negócio (parâmetros de path/query, headers, body schema, exemplos de request/response, códigos de erro específicos, idempotência) **não puderam ser gerados a partir do código** e serão produzidos quando as rotas reais forem localizadas/confirmadas. Ao produzi-los, cada especificação deve cobrir:
-
-- [ ] Mecanismo de autenticação e role exigida (Admin/User — NFR-SEC04), com teste de integração para 100% dos endpoints de escrita (NFR-SEC04);
-- [ ] Paginação server-side obrigatória em listagens (NFR-S04) e o estilo escolhido;
-- [ ] Códigos de erro 400/401/403/404 conforme o padrão da Seção 6 (NFR-SEC01, SEC04, SEC05);
-- [ ] Propagação de request ID (NFR-O02) nos fluxos críticos (autenticação, solicitação, aprovação);
-- [ ] Parâmetros de filtro aceitos pela construção dinâmica de consultas (`ManutencaoSpecification.build`) — com revisão de parametrização SQL (NFR-SEC06);
-- [ ] Instrumentação de timestamps para KPIs de processo (NFR-O04) nos endpoints do fluxo de manutenção (RF-18 a RF-21);
-- [ ] Definição de idempotência para operações de escrita (nenhum mecanismo verificado até o momento).
+---
 
 ## 5. Data Models
 
-**Status da modelagem (honesto):** a varredura determinística **não detectou nenhuma tabela no schema** — o contrato físico (tabelas, colunas, constraints, DDL) deve viver em [[db-schema-spec]] e o modelo conceitual em [[db-domain-model]] (ambos a produzir/validar). O acesso a dados é via **SQL cru, sem ORM** (verificado na stack — nenhum ORM/query builder nas dependências) e o **motor de banco não está especificado** (nenhum motor identificado nas dependências verificadas) — o que impede calibrar metas de escrita concorrente (NFR-S01), backup/RPO (NFR-A03) e comportamento de lock até a verificação do motor.
+> **Estado:** **nenhuma tabela foi detectada no schema** pela varredura determinística (SAD §5). O contrato físico (tabelas, colunas, constraints, DDL) vive em [[db-schema-spec]] e ainda não foi extraído; o modelo conceitual vive em [[db-domain-model]]. **Nenhum schema de payload (DTO) foi extraído** — as entidades abaixo são evidenciadas por nomes de classes/funções e **não constituem DDL nem contrato de payload confirmado**.
 
-Entidades verificadas via nomes de classes no codebase: **Usuario** (autenticação/RBAC), **Ativo** (núcleo do domínio — `AtivoService`, `AtivoMapper`) e **Manutenção** (`ManutencaoSpecification`, fluxo RF-18–21). Os DTOs existem no backend (`AtivoMapper.toDTO` — complexidade 14), mas **seus campos não foram extraídos pela varredura**. Os modelos abaixo são **propostas mínimas**, derivadas de evidências pontuais do SAD, e requerem validação contra a implementação [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA].
+| Entidade | Evidência no código | Observações de contrato |
+| :--- | :--- | :--- |
+| Ativo | `AtivoService`, `AtivoMapper` | CRUD, busca e ranking; DTO via `AtivoMapper.toDTO` (schema não extraído) |
+| Usuario | `Usuario.java` | atenção ao stub `setUsername` (corpo vazio, linha 86 — NFR-M05 / C-04 do BRD) |
+| Funcionario | `createFuncionarioAndUsuario` | vínculo funcionário↔credenciais — relevante para LGPD (NFR-C01) |
+| Manutenção | `ManutencaoSpecification` | filtros combinados de consulta |
+| Histórico de saúde por filial | `getHealthHistory` | leitura restrita por filial (BR-03) |
+| Alertas | `AlertNotificationService` / `checkResourceUsageAlerts` | alertas operacionais |
+| Trilha de auditoria | `onUpdate`/`preUpdate` (BR-08) | data/hora da última modificação (NFR-O04) |
 
-```typescript
-// [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] Campos derivados de evidências mínimas:
-// "id+nome" (AtivoService:119), stub setUsername (Usuario.java:86), transições de status
-// (RF-19/RF-20) e timestamps de KPI (NFR-O04). Tipos primitivos propostos — os tipos
-// reais não foram verificados.
+**Relacionamentos indicados pelos requisitos** (não constitui DDL confirmado): ativo ↔ unidade organizacional (filial/departamento — contexto do RBAC, NFR-SEC02); funcionário ↔ usuário/credenciais (`createFuncionarioAndUsuario`); ativo ↔ manutenção e ativo ↔ histórico de saúde (fluxo de monitoramento — BRD §4/§5).
 
-interface UsuarioDTO {
-  id: string;             // tipo real não verificado
-  username: string;       // evidenciado pelo stub Usuario.setUsername (Usuario.java:86)
-  role: "ADMIN" | "USER"; // RBAC Admin/User (NFR-SEC04) — valores literais presumidos
-}
+**Camada de acesso a dados (fronteira do contrato):** SQL cru, **100% parametrizado** — concatenação de strings em SQL é proibida (NFR-SEC03); **sem ORM/query builder**; motor de persistência **não especificado** (C-01 do BRD) — o modelo de concorrência/lock é desconhecido até a confirmação, o que condiciona as metas de escrita concorrente. Estratégia de migração de schema: ver [[db-migration-spec]] — nenhum mecanismo de migração identificado no repositório.
 
-interface AtivoDTO {
-  id: string;   // evidenciado por AtivoService:119 (candidatos "id+nome")
-  nome: string; // idem
-  // demais campos não verificados — AtivoMapper.toDTO (complexidade 14) indica
-  // mapeamento condicional extenso a revisar (NFR-M02)
-}
-
-interface SolicitacaoManutencaoDTO {
-  id: string;           // tipo real não verificado
-  ativoId: string;      // relacionamento com Ativo presumido
-  status: string;       // máquina de estados RF-19/RF-20 — valores não verificados
-  criadoEm: string;     // timestamp exigido para KPIs de processo (NFR-O04)
-  aprovadoEm?: string;  // tempo médio de aprovação < 4h úteis (NFR-O04)
-  canceladoEm?: string; // taxa de solicitações canceladas < 10% (NFR-O04)
-}
-
-// Envelope de paginação server-side (NFR-S04) — formato proposto [INFERIDO]
-interface PaginatedResponse<T> {
-  data: T[];
-  page: number;
-  size: number;
-  totalElements: number;
-}
-```
+---
 
 ## 6. Error Handling Standard
 
-**Requisitos verificados que ancoram o padrão:**
+* **Evidência verificada:** tratamento centralizado no frontend via `handleApiError` — cobre **100% dos erros de API apresentados ao usuário**, sem exposição de detalhes internos (NFR-U02).
+* **Formato do corpo de erro:** **não descobrível a partir dos fontes** — nenhum handler de erro do backend foi extraído pela varredura. O envelope de erro, os códigos internos e a estrutura de detalhes **não estão definidos**; este documento **não inventa códigos de erro**. O padrão deve ser formalizado em conjunto com o catálogo de endpoints (NFR-M03).
+* **Requisitos que o padrão deverá satisfazer** (dos NFRs/guardrails):
+  1. **Não expor detalhes internos** ao usuário (NFR-U02);
+  2. Viabilizar **correlation ID em 100% dos logs de requisições que falharem**, para investigação de incidentes de acesso indevido (NFR-O02; guardrail BRD §4);
+  3. Expressar os desfechos do **RBAC com contexto** (requisição sem permissão — perfil ou filial/departamento) de forma distinguível de falhas de autenticação (NFR-SEC02);
+  4. Permitir **classificação consistente de erros** para o alerta de **taxa de erro > 1%** previsto na arquitetura-alvo de observabilidade (NFR-O03).
+* **Mapeamento para códigos HTTP:** a definir na instrumentação — nenhum mapeamento foi confirmado no código.
 
-- Payloads inválidos → **400 Bad Request** com mensagens claras (NFR-SEC05);
-- IDs inexistentes → **404 Not Found** padronizado (NFR-SEC05);
-- Requisições sem token em endpoints protegidos → **401** (CA-06, NFR-SEC01);
-- Operações de escrita sem role Admin → **403 Forbidden** (RF-26, NFR-SEC04).
+---
 
-**Envelope de erro proposto** [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA — o formato exato do corpo de erro não foi verificado no código; a proposta alinha-se ao requisito de mensagens claras (NFR-SEC05) e deve ser validada contra a implementação]:
+## 7. Changelog da API
 
-```json
-{
-  "error": {
-    "code": "STRING_CODE",
-    "message": "Mensagem legível para humanos",
-    "details": []
-  }
-}
-```
-
-**Mapa status HTTP → código interno (proposto):**
-
-| Código HTTP | Código de Erro Interno (proposto) | Requisito de origem | Status do requisito |
-| :--- | :--- | :--- | :--- |
-| 400 | `VALIDATION_ERROR` | NFR-SEC05 | Verificado |
-| 401 | `UNAUTHENTICATED` | CA-06 / NFR-SEC01 | Verificado |
-| 403 | `FORBIDDEN` | RF-26 / NFR-SEC04 | Verificado |
-| 404 | `NOT_FOUND` | NFR-SEC05 | Verificado |
-| 500 | `INTERNAL_ERROR` | — | Sem requisito específico verificado |
-
-**Códigos 409 (Conflict) e 429 (Rate Limited):** **sem requisito verificado** nos NFRs ou no código — não são garantidos pelo contrato atual e não devem ser tratados como comportamento prometido até que exista requisito/implementação que os suporte.
-
-**Dívida de observabilidade no client (achado real do diagnóstico):** chamadas residuais `console.error` (`frontend/src/services/api.js:44`) e `console.debug` (`frontend/src/services/api.js:107`) devem ser removidas ou substituídas por tratamento de erro estruturado antes de produção.
-
-## 7. Contrato de Integração Client-Side (verificado)
-
-O único ponto de integração client-side verificado no codebase é o serviço de API do frontend:
-
-| Aspecto | Conteúdo verificado |
-| :--- | :--- |
-| Arquivo | `frontend/src/services/api.js` |
-| Função central | `request` (linha 54, complexidade ciclomática 13) — centraliza todas as chamadas HTTP ao backend |
-| Protocolo | HTTP síncrono (SAD Seção 3 — comunicação frontend↔backend síncrona) |
-| Sessão | Logout limpa a sessão local (RF-25 — `clearSession`); o backend invalida o token via blocklist (CA-08) |
-| Erros | Tratamento via status HTTP padronizados (401/403/400/404 — NFR-SEC01/SEC04/SEC05) |
-| Dependências | `@popperjs/core` ^2.11.8 — única dependência de produção declarada no `package.json`; 0 dependências de desenvolvimento e nenhum script (sem toolchain de build/teste verificável) |
-
-**Implicações contratuais:**
-
-- Qualquer degradação na função `request` afeta **todos os fluxos** (gargalo 3 do SAD Seção 7) — mudanças no contrato de autenticação ou de erro devem ser coordenadas com este arquivo.
-- A propagação de **request ID** (NFR-O02) deve ser implementada neste boundary para correlação nos fluxos críticos (autenticação, solicitação, aprovação).
-- As chamadas residuais `console.*` (linhas 44 e 107) devem ser removidas ou substituídas por tratamento estruturado antes de produção (Seção 6).
-
-## 8. Changelog da API
+Nenhuma versão formalizada da API foi identificada — não há changelog anterior. A primeira versão formalizada deve ser registrada nesta seção quando o catálogo de endpoints for extraído e o esquema de versionamento definido (NFR-M03).
 
 | Versão | Data | Mudança | Breaking? |
 | :--- | :--- | :--- | :--- |
-| 1.0 (draft) | — | Criação inicial da especificação do contrato de integração (materializa a pendência NFR-M03 — documentação formal via OpenAPI/Swagger, ferramenta não verificada). Nenhuma API publicada; **rotas reais não localizadas automaticamente** — nenhum endpoint de negócio foi extraído do código; contratos detalhados por endpoint pendentes (Seção 4.4). | — (não aplicável — nenhuma versão publicada) |
+| — | — | Nenhuma versão formalizada registrada; catálogo de endpoints pendente de instrumentação (NFR-M03) | — |
+
+---
+
+## 8. Plano de Completude do Catálogo (NFR-M03)
+
+1. **Reextrair o inventário de rotas sobre os artefatos corretos** — a referência `server/express-app.ts` não corresponde à composição verificada do codebase (backend Java em `src/`, 338 arquivos `.java`); a varredura determinística sobre o codebase reportou "Nenhuma rota/IPC detectada no código".
+2. **Definir ferramenta/formato da documentação de API** (NFR-M03 — a definir; nada presumido neste documento).
+3. **Extrair os schemas de payload** (DTOs — ex.: `AtivoMapper.toDTO`) e o mapeamento de códigos de erro, preenchendo as seções 4–6 deste documento.
+4. **Confirmar os elementos de autenticação e exposição** — header/esquema/TTL do token, base URL, mecanismo de servir o frontend (SAD §11).
+5. **Nomear o pacote e criar scripts de build/verificação no `package.json`** (NFR-M06) — hoje sem nome e sem scripts, o que limita a verificação automatizada do frontend.
+6. **Registrar a primeira versão formalizada no changelog** (Seção 7).
+7. **Pré-condição transversal:** confirmação do motor de persistência (C-01 do BRD) e da versão do runtime Java (NFR-PO03) — não bloqueia a extração das rotas, mas bloqueia o fechamento do contrato físico ([[db-schema-spec]]), do backup (NFR-A03) e da criptografia em repouso (NFR-SEC01).

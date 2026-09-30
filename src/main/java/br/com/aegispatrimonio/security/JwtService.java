@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
 import java.util.Date;
+import java.util.UUID;
 import java.util.function.Function;
 
 @Service
@@ -31,26 +32,53 @@ public class JwtService {
         return extractClaim(token, Claims::getSubject);
     }
 
+    /** Extrai o claim jti (id único do token), usado como chave da denylist. */
+    public String extractJti(String token) {
+        return extractClaim(token, Claims::getId);
+    }
+
+    /** Extrai o claim uid (id do usuário dono do token). */
+    public Long extractUid(String token) {
+        Object uid = extractClaim(token, claims -> claims.get("uid"));
+        return uid instanceof Number n ? n.longValue() : null;
+    }
+
     public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
         final Claims claims = extractAllClaims(token);
         return claimsResolver.apply(claims);
     }
 
     public String generateToken(UserDetails userDetails) {
-        return Jwts.builder()
+        Long uid = resolveUsuarioId(userDetails);
+        var builder = Jwts.builder()
+                .id(UUID.randomUUID().toString()) // jti: chave da denylist
                 .subject(userDetails.getUsername())
                 .issuedAt(new Date(System.currentTimeMillis()))
-                .expiration(new Date(System.currentTimeMillis() + jwtExpiration))
+                .expiration(new Date(System.currentTimeMillis() + jwtExpiration));
+        if (uid != null) {
+            builder.claim("uid", uid);
+        }
+        return builder
                 .signWith(getSignInKey())
                 .compact();
     }
 
     public boolean isTokenValid(String token, UserDetails userDetails) {
-        if (tokenDenylistService.isRevoked(token)) {
+        // Denylist indexada por jti (C2): nunca pela string completa do token
+        if (tokenDenylistService.isRevoked(extractJti(token))) {
             return false;
         }
         final String username = extractUsername(token);
         return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
+    }
+
+    /**
+     * Revoga todos os tokens de um usuário (por uid) até o horizonte de
+     * expiração padrão. Usado, por exemplo, em troca de senha/roles.
+     */
+    public void revokeAllTokensForUser(Long usuarioId) {
+        tokenDenylistService.revokeAllForUser(usuarioId,
+                System.currentTimeMillis() + jwtExpiration);
     }
 
     /**
@@ -59,6 +87,14 @@ public class JwtService {
      */
     public long extractExpirationEpochMillis(String token) {
         return extractExpiration(token).getTime();
+    }
+
+    private Long resolveUsuarioId(UserDetails userDetails) {
+        if (userDetails instanceof CustomUserDetails custom
+                && custom.getUsuario() != null) {
+            return custom.getUsuario().getId();
+        }
+        return null;
     }
 
     private boolean isTokenExpired(String token) {

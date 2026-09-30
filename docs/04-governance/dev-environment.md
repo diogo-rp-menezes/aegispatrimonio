@@ -1,122 +1,147 @@
-# Unified Development Environment Configuration — Sistema de Gestão de Patrimônio (A4)
+# Unified Development Environment Configuration — AegisPatrimônio (a6)
 
 > **Versão:** 1.0 · **Owner:** Engenharia · **Status:** Draft
-> **Fontes:** [[system-architecture]] (SAD v1.0), diagnóstico determinístico do codebase (varredura AST real — 350 arquivos, 1.268 funções, 344 classes, 27.537 LOC), `package.json` do workspace.
-> **Aviso de escopo:** este documento reflete **exclusivamente** o que foi verificado no workspace. O `package.json` da raiz declara **1 dependência de produção** (`@popperjs/core` ^2.11.8), **0 de desenvolvimento** e **nenhum script** — não há toolchain de build/teste/execução verificável pelos artefatos atuais. Onde um passo de setup depende de informação não descobrível (versão do Java, ferramenta de build do backend, motor de banco, portas, variáveis de ambiente), o item é registrado como **pendência de verificação** em vez de presumido.
+> **Método:** conteúdo derivado da varredura determinística do workspace + AST (`server/analyze-pipeline.ts`) e do System Architecture Document (SAD) v1.0. Itens não descobríveis nos fontes estão marcados como **[PENDENTE]** ou **[NÃO APLICÁVEL HOJE]** — nenhum dado de stack foi presumido além do verificado: `@popperjs/core ^2.11.8` (única dependência de produção), 0 devDependencies, nenhum motor de banco, nenhum ORM/query builder, sem empacotamento desktop.
+> **Identificação:** o `package.json` do projeto está **sem nome** (gap confirmado — NFR-M06); o nome do produto segue o SAD v1.0.
+
+---
 
 ## 1. Local Prerequisites & Tooling
 
-* **Runtime:**
-  * **Java** (backend) — 335 arquivos `.java` em `src/`, pacote `br.com.aegispatrimonio`. **Versão não especificada** no diagnóstico — confirmar no arquivo de build do backend antes de instalar o JDK (o arquivo de build do backend não foi coberto pela varredura de stack, que analisou apenas o `package.json` raiz).
-  * **JavaScript** (frontend) — 15 arquivos `.js` em `frontend/`. A forma de execução/servimento do frontend **não é verificada** (nenhuma dev dependency e nenhum script no `package.json`).
-* **Gerenciador de pacotes:** **npm** — compatível com o `package.json` presente na raiz do workspace **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA — a existência do `package.json` é fato verificado; o gerenciador efetivamente utilizado pelo time não está registrado nos artefatos]**. Nenhuma lockfile foi reportada pela varredura.
-* **Ferramentas obrigatórias:**
-  * **Git** — clonagem e versionamento do repositório.
-  * **Ferramenta de build do backend Java** — obrigatória para compilar e executar os 335 arquivos `.java`, porém **não identificada** pela varredura de stack — **identificar e registrar antes de concluir o setup** (lacuna de verificação do SAD, Seção 2).
-  * **Ferramentas de containerização (Docker/Docker Compose): não verificadas** — nenhuma configuração de container existe no codebase; **não são pré-requisito** deste ambiente.
-* **Editores recomendados & extensões:** **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — recomendação genérica para as duas linguagens presentes (Java e JavaScript): VS Code com extensões de suporte a Java e JavaScript, ou IDE Java dedicada. **Nenhum linter/formatador está configurado no projeto** (0 dev dependencies no `package.json`) — a padronização automatizada de código é pendência (relacionada ao NFR-M02).
-* **Versão mínima do SO/Shell:** **Não descobrível** — nenhuma configuração de SO, shell ou CI foi encontrada no codebase. Qualquer SO com suporte ao JDK e ao npm é adequado; confirmar com o time se existe restrição de ambiente de desenvolvimento.
+* **Runtime (backend):** **Java** — 338 arquivos `.java` em `src/`, pacotes `br.com.aegispatrimonio.{model, repository, mapper, service, config.seeder}`. **Versão do JDK/runtime: não confirmada** — pendência registrada no SAD §2 ("a confirmar e documentar antes do go-live" — NFR-PO03).
+* **Runtime (frontend):** **JavaScript** — 15 arquivos `.js` em `frontend/`, com camada de serviços centralizada em `frontend/src/services/api.js` (`request`, `authInterceptor`, `handleApiError`). Nenhum runtime de build/execução do frontend é descobrível a partir dos fontes (`package.json` sem scripts; sem lockfile verificado) — **[PENDENTE]**.
+* **Gerenciador de pacotes (frontend):** `npm` — gerenciador canônico do manifesto `package.json` verificado. **Caveat:** nenhum lockfile foi registrado na varredura; o gerenciador efetivamente usado pela equipe requer confirmação. [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
+* **Gerenciador de dependências / ferramenta de build (backend):** **não documentada em nenhum artefato-fonte** (SAD §2/§12 não registram ferramenta). A árvore `src/main/java/br/com/aegispatrimonio/...` segue o layout de diretórios convencional de projetos Java, mas nenhum arquivo de build foi registrado na varredura — confirmação urgente com a engenharia. **[PENDENTE]**
+* **Ferramentas obrigatórias (estado verificado):**
+  * JDK Java — versão a confirmar (NFR-PO03) — para compilar e executar o backend;
+  * `npm` (ou gerenciador compatível com `package.json`) — para instalar `@popperjs/core ^2.11.8`;
+  * Pipeline de análise estática (`server/analyze-pipeline.ts`) — reproduz o baseline determinístico deste documento (353 arquivos · 1.287 funções · 347 classes · 27.912 LOC).
+* **Ferramentas NÃO detectadas nos fontes (não presumir):** containerização/orquestração (nenhum arquivo verificado no workspace), banco de dados local (nenhum motor nas dependências — C-01 do BRD), ferramenta de build do backend, ferramentas de lint/formatação e suíte de testes (0 devDependencies; `package.json` sem scripts — NFR-M06).
+* **Editores recomendados & extensões:** nenhuma configuração de editor foi registrada na varredura — recomendações ficam pendentes de definição pela equipe; nada foi presumido.
+* **Versão mínima do SO/Shell:** não especificada em nenhum artefato-fonte; o sistema é uma aplicação web server-side de instância única (SAD §11), sem requisitos de SO detectáveis no código — **[PENDENTE]**.
 
-Observação de higiene: o `package.json` da raiz **não possui campo `name`** — recomenda-se preenchê-lo para facilitar a identificação do workspace em ferramentas.
+---
 
 ## 2. Setup Passo a Passo
 
-1. **Instalar os pré-requisitos** listados na Seção 1 — JDK (versão a confirmar no arquivo de build do backend), npm e Git.
-2. **Clonar o repositório:** `git clone <URL_DO_REPOSITÓRIO>` — a URL não está registrada nos artefatos verificados; obter com o time. Estrutura esperada: `src/` (backend Java, pacote `br.com.aegispatrimonio`) e `frontend/` (15 arquivos `.js`).
-3. **Variáveis de ambiente:** **nenhum arquivo `.env.example` foi identificado na varredura**. Se o time mantiver um modelo, copiá-lo para `.env`; caso contrário, usar a Seção 3 (variáveis candidatas inferidas — requerem validação).
-4. **Instalar dependências JavaScript:** `npm install` na raiz do workspace (instala `@popperjs/core` ^2.11.8, única dependência de produção declarada). **Dependências do backend Java:** residem no arquivo de build do backend, **não coberto pela varredura** — o comando para resolvê-las é pendência de verificação.
-5. **Subir serviços auxiliares (banco, cache):** **nenhum passo verificável** — não há configuração de containers nem de serviços auxiliares no codebase, e o **motor de banco não está especificado** (lacuna 1 do SAD/NFR — pendência de maior impacto). O passo genérico de subida de containers do template **não se aplica** à stack verificada. O provisionamento local do banco só será possível após a definição do motor.
-6. **Rodar migrações:** **nenhuma ferramenta de migração foi verificada no codebase** (SAD, Seção 5) — estratégia a definir em [[db-migration-spec]]. Não confundir com o seeder (item 7), que é carga de dados, não migração de schema.
-7. **Popular dados de exemplo (seed):** existe a classe `RealisticDataSeeder` (`src/main/java/br/com/aegispatrimonio/config/seeder/RealisticDataSeeder.java:34`), porém **o método de invocação não é verificável** pelos artefatos atuais (nenhum script declarado; forma de disparo — automática na inicialização vs. manual — não detectável pela varredura). Atenção: por ser relevante ao risco R-02 do BRD (migração de dados legados), o SAD recomenda executar o seeder em **staging, com validação**, antes de qualquer carga em produção.
-8. **Iniciar a aplicação:** **comando não descoberto** — o `package.json` não declara scripts e o arquivo de build do backend não foi coberto pela varredura (lacuna 3 do SAD — pipeline/scripts de execução). Este passo será preenchido após a verificação da toolchain de build/execução.
+> Legenda de status: **[VERIFICADO]** = derivado dos fontes; **[PENDENTE]** = não descobrível, requer confirmação; **[NÃO APLICÁVEL HOJE]** = condição inexistente no estado atual do codebase.
+
+1. **Instalar pré-requisitos** **[PENDENTE — parcialmente bloqueado]** — JDK Java (versão a confirmar, NFR-PO03) e `npm`/gerenciador compatível. Sem a versão do JDK confirmada, a compilação do backend não pode ser validada.
+2. **Clonar o repositório** **[PENDENTE]** — a URL remota e o cliente de versionamento não estão documentados nos artefatos-fonte.
+3. **Copiar `.env.example` para `.env`** **[NÃO APLICÁVEL HOJE]** — nenhum arquivo `.env`/`.env.example` foi detectado na varredura. Ao introduzir configuração externa, criar o `.env.example` documentado e manter o `.env` fora do versionamento (SAD §9 — nenhum segredo versionado no repositório).
+4. **Instalar dependências:**
+   * **Frontend** **[VERIFICADO]** — `npm install` no diretório que contém o `package.json` (instala `@popperjs/core ^2.11.8`, única dependência de produção; 0 devDependencies). Sem lockfile verificado — revisar artefatos de lock gerados antes de versionar.
+   * **Backend** **[PENDENTE]** — comando não definível: nenhuma ferramenta de build/gerenciador de dependências documentada nos artefatos-fonte.
+5. **Subir serviços auxiliares (DB, cache)** **[NÃO APLICÁVEL HOJE]** — nenhum motor de banco nas dependências (C-01), nenhuma camada de cache nos fontes (SAD §7), nenhum arquivo de composição de serviços/containers detectado.
+6. **Rodar migrações** **[NÃO APLICÁVEL HOJE]** — nenhum mecanismo de migração identificado no repositório; a definir junto com a confirmação do motor de persistência (C-01). Ver [[db-migration-spec]].
+7. **Popular dados de exemplo (seed)** **[PENDENTE]** — o seeder existe: `src/main/java/br/com/aegispatrimonio/config/seeder/RealisticDataSeeder.java` (método `run`), destinado à população de dados realistas para homologação e primeira onda de medição de performance (SAD §3/§11). O comando de invocação **não é descobrível** (sem scripts; sem ferramenta de build verificada) — confirmar com a engenharia. Uso restrito a homologação.
+8. **Iniciar aplicação** **[PENDENTE]** — comando não definível: `package.json` sem scripts (frontend — NFR-M06) e sem mecanismo de execução/build verificado (backend). O mecanismo de servir o frontend não é descobrível a partir dos fontes (SAD §11) e a varredura não extraiu inventário de rotas para smoke-test.
+
+---
 
 ## 3. Variáveis de Ambiente
 
-**[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — Nenhum arquivo `.env`/`.env.example` e nenhuma variável de ambiente foram identificados na varredura do workspace. A tabela abaixo lista **apenas variáveis candidatas inferidas** dos requisitos arquiteturais (SAD/[[nfr]]) — **nenhuma delas está confirmada no código**. Premissas adotadas: autenticação JWT (NFR-SEC01) exige segredo de assinatura; o acesso a dados via SQL cru exige configuração de conexão; a blocklist de logout (CA-08) pode exigir configuração própria.
+> **Status:** nenhum arquivo `.env`/`.env.example` ou mecanismo externo de configuração foi detectado na varredura determinística. Nenhuma variável é, portanto, discoverável no estado atual — a tabela registra o gap; os nomes de variáveis **não foram inventados**.
 
 | Variável | Obrigatória | Descrição | Valor de exemplo |
 | :--- | :--- | :--- | :--- |
-| `JWT_SECRET` | Sim (inferido) | Chave de assinatura dos tokens JWT (NFR-SEC01); rotação a cada 90 dias (NFR-SEC10) | `<string-secreta-forte-única-por-ambiente>` |
-| `DB_URL` | Sim (inferido) | URL de conexão do banco — **motor ainda não definido** (lacuna 1 do SAD) | `<url-de-conexão-do-motor-a-definir>` |
-| `DB_USER` | Sim (inferido) | Usuário do banco — usar credencial de menor privilégio | `<usuario-do-banco>` |
-| `DB_PASSWORD` | Sim (inferido) | Senha do banco — nunca commitar; gerenciar via mecanismo de segredos | `<senha-do-banco>` |
-| `SERVER_PORT` | Não (inferido) | Porta de escuta da aplicação — **nenhuma porta verificada no codebase** | `<porta-a-definir>` |
+| *(nenhuma variável discoverável)* | — | Nenhum `.env`/`.env.example` detectado; mecanismo de configuração não identificável nos fontes | — |
 
-Nota: os nomes exatos das variáveis (incluindo convenção de prefixo) devem ser confirmados no código/arquivo de build do backend quando verificados.
+**Áreas que demandarão variáveis de ambiente após as confirmações pendentes (nomes a definir):**
+* Conexão com a camada de persistência — condicionada à confirmação do motor (C-01 do BRD);
+* Configuração de TLS 1.2+ do tráfego frontend↔backend (NFR-SEC01);
+* Armazenamento de tokens de sessão — o logout invalida o token imediatamente (NFR-SEC04), implicando estado no servidor;
+* Segredos de configuração da aplicação — nenhum segredo versionado no repositório (SAD §9); rotação a cada 90 dias [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA — premissa herdada do SAD §9; não há segredos identificados nos fontes].
+
+Ao introduzir o `.env`: garantir entrada correspondente no `.gitignore` (arquivo não verificado na varredura — confirmar).
+
+---
 
 ## 4. Secure Command Sandbox Recipes
 
-> Comandos permitidos para automação/agentes, com limites de segurança explícitos. Receitas de build/execução do backend **não podem ser definidas** até que a ferramenta de build do backend seja verificada (lacuna 3 do SAD).
+> Comandos permitidos para automação/agentes, com limites de segurança explícitos. Timeouts são sugestões operacionais. Onde o comando não é definível no estado atual, a linha registra a pendência.
 
 | Target Tool | Command Type | Recipe | Timeout | Restrições |
 | :--- | :--- | :--- | :--- | :--- |
-| npm | install | `npm install --no-audit --no-fund` | 120s | Acesso à rede somente ao registry configurado; executar apenas na raiz do workspace |
-| git | consulta (somente leitura) | `git status --porcelain` · `git log --oneline -n 20` | 15s | Sem `commit`, `push` ou alteração de histórico |
-| shell (grep) | busca estática no código | `grep -rn "TODO\|FIXME" src/ frontend/` | 15s | Somente leitura dentro do workspace; sem modificação de arquivos |
-| Build backend | compile | **Não definível** — ferramenta de build do backend não verificada | — | Pendência: definir receita após verificação da ferramenta (lacuna 3) |
-| App runtime | run | **Não definível** — comando de inicialização não descoberto | — | Pendência: definir receita após verificação da toolchain (lacuna 3) |
+| `npm` (diretório do `package.json`) | install | `npm install --no-audit --ignore-scripts` | 120s | Acesso à rede externa apenas ao registry configurado, para resolver `@popperjs/core ^2.11.8`; sem lockfile verificado — revisar artefatos de lock gerados antes de versionar |
+| Pipeline de análise (`server/analyze-pipeline.ts`) | scan (somente leitura) | Executar a varredura determinística do workspace + AST e comparar a saída com o baseline (353 arquivos · 27.912 LOC · 1.287 funções · 347 classes) — comando de invocação não documentado nos fontes **[PENDENTE]** | — | Somente leitura; proibido modificar fontes durante o scan |
+| Backend Java | build / run | **Não definível** — nenhuma ferramenta de build ou mecanismo de execução documentado nos artefatos-fonte | — | Pendente de levantamento técnico; versão do JDK também a confirmar (NFR-PO03) |
+| Qualidade de código | check (somente leitura) | Verificar as 2 chamadas `console.*` residuais em `frontend/src/services/api.js` (linhas 44 e 107) e o stub `setUsername` em `src/main/java/br/com/aegispatrimonio/model/Usuario.java:86` | — | Somente leitura; reportar sem alterar código |
+
+---
 
 ## 5. Serviços Locais & Portas
 
-**Nenhuma porta foi verificada no codebase** — não há configuração de servidor, de banco ou de deploy nos artefatos analisados. A tabela abaixo registra os serviços esperados e o estado de verificação de cada um:
+> Nenhuma porta ou configuração de rede foi detectada na varredura; o mecanismo de servir o frontend não é descobrível (SAD §11). A tabela registra o estado atual, não uma configuração funcional.
 
 | Serviço | Porta | Descrição |
 | :--- | :--- | :--- |
-| Backend/API (`src/`, `br.com.aegispatrimonio`) | **A verificar** | Aplicação principal — nenhuma configuração de porta encontrada |
-| Banco de dados | **A verificar** | Motor **não especificado** (lacuna 1 do SAD) — porta indefinida até a escolha do motor |
-| Frontend (`frontend/`) | **A verificar** | Forma de servir/acessar o frontend não verificada (nenhum script nem configuração) |
+| Backend Java (instância única) | não detectada | Endpoints HTTP, filtro de autenticação (`doFilterInternal`), regras de negócio e seeder de homologação — porta pendente de documentação |
+| Frontend JavaScript | não detectada | Interface desktop-first (1280–1920px — NFR-U03) — mecanismo de servir não descobrível (SAD §11) |
+| Persistência | não aplicável | Nenhum motor de banco nas dependências (C-01) — sem serviço local de banco |
+| Cache | não aplicável | Nenhuma camada de cache identificada (SAD §7) |
 
-Observações:
-- Os endpoints de observabilidade `/health` e `/metrics` (NFR-O01) **não estão confirmados no codebase** (lacuna 5 do SAD) — a verificação de saúde local depende da confirmação deles.
-- A integração frontend↔backend ocorre via `frontend/src/services/api.js` (função `request`, linha 54) — a URL base do backend usada por esse client não é descobrível pelos artefatos atuais.
+---
 
 ## 6. Environment Verification Checklist
 
-> Itens adaptados à stack verificada. Os itens genéricos do template `npm run dev`, `npm test` e `npm run lint` foram substituídos porque o `package.json` **não declara nenhum script** (lacuna 3 do SAD).
+- [ ] `npm install` executa sem erros no diretório do `package.json` e instala `@popperjs/core ^2.11.8` *(verificável hoje)*
+- [ ] A varredura determinística (`server/analyze-pipeline.ts`) reproduz o baseline: 353 arquivos · 1.287 funções · 347 classes · 27.912 LOC *(verificável hoje)*
+- [ ] Zero chamadas `console.*` no frontend de produção — **falha confirmada hoje**: 2 residuais em `frontend/src/services/api.js` (linhas 44 — `console.error`; 107 — `console.debug`; NFR-M04)
+- [ ] Zero métodos stub — **falha confirmada hoje**: `Usuario.setUsername` (linha 86, corpo vazio — NFR-M05 / C-04 do BRD)
+- [ ] `npm run dev` sobe o servidor local — **inexistente**: `package.json` sem scripts (NFR-M06)
+- [ ] `npm test` executa e passa — **inexistente**: nenhuma suíte/scripts declarados (0 devDependencies); meta de cobertura ≥ 80% em service/mapper pendente de instrumentação (NFR-M01–M06)
+- [ ] `npm run lint` sem erros — **inexistente**: nenhuma ferramenta de lint declarada nos fontes
+- [ ] Compilação do backend executada com sucesso — **comando pendente** (ferramenta de build não documentada; versão do JDK a confirmar — NFR-PO03)
+- [ ] Aplicação acessível em `http://localhost:[porta]` — **porta não detectada** nos fontes (SAD §11)
+- [ ] Banco de dados conectado e migrado — **não aplicável hoje** (motor não especificado — C-01 do BRD)
+- [ ] Seeder executado em homologação — **comando de invocação pendente**
+- [ ] Variáveis de ambiente sensíveis não commitadas — `.env` inexistente hoje; ao criar, incluir no `.gitignore` (arquivo não verificado na varredura)
 
-- [ ] `npm install` executa sem erros na raiz do workspace (instala `@popperjs/core` ^2.11.8)
-- [ ] Build do backend Java compila sem erros — **comando a definir** (ferramenta de build não verificada)
-- [ ] Aplicação inicia e responde localmente — **comando a definir** (lacuna 3)
-- [ ] Banco de dados acessível e com schema aplicado — **motor a definir** (lacuna 1)
-- [ ] Seeder `RealisticDataSeeder` executado com sucesso (método de invocação a verificar); quando envolver dados legados, executar em staging com validação (risco R-02)
-- [ ] Endpoints `/health` e `/metrics` respondem (existência não confirmada — lacuna 5)
-- [ ] Variáveis de ambiente sensíveis não commitadas — confirmar que `.env` (se usado) está no `.gitignore`
-- [ ] Dependências do backend resolvidas pelo arquivo de build do backend (não coberto pela varredura de stack)
+---
 
 ## 7. Troubleshooting Comum
 
-**[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — Nenhum registro de problemas de ambiente existe nos artefatos verificados; as entradas abaixo são hipóteses genéricas de troubleshooting, com as pendências de verificação reais do projeto destacadas.
+> Entradas ancoradas em fatos verificados (diagnóstico AST + SAD v1.0). Causas prováveis são hipóteses de trabalho, não diagnósticos fechados.
 
 | Sintoma | Causa Provável | Solução |
 | :--- | :--- | :--- |
-| `npm install` falha com erro de rede | Registry inacessível ou proxy corporativo | Verificar conectividade com o registry configurado e configuração de proxy |
-| Erro de compilação no backend Java | Versão do JDK incompatível | Confirmar a versão exigida no arquivo de build do backend — **versão não especificada no diagnóstico** |
-| Porta em uso ao iniciar a aplicação | Outro processo ocupando a porta | Encerrar o processo: `kill -9 $(lsof -ti:PORTA)` (ou equivalente do SO) |
-| Falha de conexão com o banco de dados | Motor/credenciais não configurados | **Motor ainda não definido (lacuna 1)** — definir a conexão conforme Seção 3 após a escolha do motor |
-| Seeder não executa | Método de invocação não documentado | Verificar como `RealisticDataSeeder` (`config/seeder/`) é disparado — nenhum script declarado no `package.json` |
-| Frontend não alcança o backend | URL base incorreta em `frontend/src/services/api.js` | Conferir a URL base do backend na função `request` (linha 54) — valor não descobrível pelos artefatos atuais |
+| `npm install` falha ao resolver `@popperjs/core` | Registry inacessível ou `package.json` sem lockfile de referência (arquivo sem nome — gap NFR-M06) | Verificar conectividade ao registry configurado; validar integridade do `package.json`; reinstalar |
+| Não existe comando de build/execução do backend | Nenhuma ferramenta de build documentada nos artefatos-fonte; versão do JDK não confirmada (NFR-PO03) | Levantamento técnico urgente: confirmar ferramenta de build e versão do runtime; atualizar as Seções 1, 2 e 8 deste documento |
+| Seeder não popula dados de homologação | `RealisticDataSeeder` restrito a homologação; mecanismo de invocação não documentado (método `run`, complexidade ciclomática 15) | Confirmar o comando de execução com a engenharia; validar os dados gerados antes da primeira onda de medição de performance (SAD §3/§11) |
+| Frontend não carrega no navegador | Mecanismo de servir os assets não é descobrível a partir dos fontes (SAD §11) | Confirmar com a engenharia como o frontend é servido; documentar porta e comando de inicialização |
+| Erros de API exibidos sem tratamento uniforme | Fluxo não passando pelo tratamento centralizado `handleApiError` (NFR-U02); chamadas `console.*` residuais (linhas 44/107) | Verificar o fluxo de erro em `frontend/src/services/api.js`; remover as chamadas residuais com verificação automatizada no pipeline (NFR-M04) |
+| Listagens com filtros combinados lentas em desenvolvimento | `ManutencaoSpecification.build` (complexidade ciclomática 14); sem ORM, índices e plano de consulta são responsabilidade direta do código (NFR-P02) | Revisar índices em conjunto com a refatoração do método (SAD §7); monitorar as metas p95 < 1s / p99 < 2s (NFR-P02) |
+
+---
 
 ## 8. Comandos Úteis
 
 | Comando | Descrição |
 | :--- | :--- |
-| `npm install` | Instala as dependências declaradas no `package.json` da raiz (`@popperjs/core` ^2.11.8) |
-| `git status` / `git log --oneline` | Inspeção do estado do repositório |
-| `grep -rn "TODO\|FIXME" src/ frontend/` | Localiza débito técnico registrado (ex.: `AtivoService.java:119`) |
-| `grep -rn "console\." frontend/src` | Localiza chamadas `console.*` residuais (ex.: `frontend/src/services/api.js:44` e `:107`) |
-| Build do backend | **Comando a definir** — ferramenta de build do backend não verificada (lacuna 3) |
-| Execução do seeder | **Comando a definir** — ver Seção 2, item 7 |
+| `npm install` (diretório do `package.json`) | Instala a única dependência de produção declarada (`@popperjs/core ^2.11.8`) |
+| `npm run <script>` | **Indisponível** — `package.json` sem scripts (gap NFR-M06); criação de scripts de dev/build/verificação é ação recomendada |
+| Build/execução do backend | **Comando não definido** — nenhuma ferramenta de build documentada; pendente de levantamento técnico |
+| Varredura determinística (`server/analyze-pipeline.ts`) | Reproduz o diagnóstico baseline do workspace (353 arquivos, 27.912 LOC) — comando de invocação a documentar |
+| Seed de homologação | **Não documentado** — `RealisticDataSeeder` (restrito a homologação; SAD §3/§11) |
 
-Observação final: **nenhum script npm de desenvolvimento existe** (`dev`, `build`, `test`, `lint` — todos ausentes do `package.json`); a implementação do pipeline com gate de cobertura > 80% (NFR-M01) e dos scripts de execução é pendência registrada (lacuna 3 do SAD).
+---
 
-## 9. Lacunas de Verificação que Bloqueiam Este Documento
+## 9. Pendências de Verificação Consolidadas
 
-| # | Lacuna | Impacto neste documento | Fonte |
+> Consolidado dos gaps que impedem um ambiente de desenvolvimento plenamente reproduzível. Nenhum item abaixo foi inventado — todos derivam da varredura determinística e do SAD v1.0. Este documento deve ser revisado imediatamente após o levantamento técnico urgente (C-01 do BRD) e a confirmação da ferramenta de build/versão do runtime.
+
+| # | Pendência | Impacto no ambiente de desenvolvimento | Referência |
 | :--- | :--- | :--- | :--- |
-| 1 | Motor de banco de dados não especificado | Bloqueia os passos 5–6 do setup, variáveis `DB_*`, portas e troubleshooting de conexão | SAD, Seções 2, 5 e 12 |
-| — | Versão do Java não especificada | Bloqueia a instalação do JDK (passo 1 do setup) | SAD, Seção 2 |
-| — | Ferramenta de build do backend não identificada | Bloqueia passos 4 e 8 do setup, receitas de sandbox e comandos úteis | SAD, Seção 2 |
-| 3 | Pipeline CI/CD e scripts de execução ausentes | `package.json` sem scripts — bloqueia comandos de dev/build/test/lint e itens do checklist | SAD, Seções 2 e 11 |
-| 4 | Ferramentas de APM/load testing/uptime/acessibilidade não definidas | Impede incluir comandos de verificação de performance no checklist | SAD, Seção 12 |
-| 5 | Endpoints `/health` e `/metrics` não confirmados | Bloqueia o item de health check do checklist e a Seção 5 | SAD, Seções 10 e 12 |
-| 6 | Configuração de deploy/infraestrutura de produção ausente | Impede documentar paridade entre ambiente local e produção | SAD, Seções 9 e 11 |
+| 1 | Confirmar a versão do runtime Java (JDK) | Bloqueia validação de compilação/execução do backend | NFR-PO03; SAD §2 |
+| 2 | Identificar a ferramenta de build/gerenciador de dependências do backend | Bloqueia instalação de dependências, build, execução e seed | SAD §2/§12 |
+| 3 | Confirmar o motor de persistência | Bloqueia serviço local de banco, migrações e variáveis de conexão | C-01 do BRD; SAD §5 |
+| 4 | Nomear o pacote e criar scripts no `package.json` | Bloqueia `npm run dev/build/test/lint`; limita a reprodutibilidade do build do frontend | NFR-M06; SAD §12 |
+| 5 | Documentar o mecanismo de servir o frontend e as portas locais | Bloqueia o checklist de acesso local (`http://localhost:[porta]`) | SAD §11 |
+| 6 | Documentar o comando de invocação do `RealisticDataSeeder` | Bloqueia população de dados de homologação e medição de performance | SAD §3/§11 |
+| 7 | Confirmar lockfile/gerenciador de pacotes do frontend | Define o comando canônico de instalação | Seção 1 [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] |
+| 8 | Remover `console.*` residuais e resolver o stub `setUsername` | Higiene de código verificável no ambiente local | NFR-M04/NFR-M05; C-04 do BRD |
+
+---
+
+**Documentos relacionados:** [[db-migration-spec]] · [[db-schema-spec]] · [[api-specification]] · [[uml-diagrams]] · security-policies.md · NFR v1.0

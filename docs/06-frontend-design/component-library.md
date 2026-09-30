@@ -1,18 +1,18 @@
-# Component Library / Inventory — Aegis Patrimonio
+# Component Library / Inventory — Aegis Patrimônio
 
-> **Versão:** 1.0 · **Owner:** Frontend Lead · **Status:** Draft  
-> **Baseado em:** Componentes vanilla JavaScript (ES6+) + `@popperjs/core` para posicionamento  
+> **Versão:** 1.0 · **Owner:** Frontend Lead · **Status:** Draft
+> **Baseado em:** Componentes Vue.js 3 + Bootstrap 5 + Pinia + Vite
 > **Depende de:** `design-tokens.md` (tokens de cor, espaçamento, tipografia, motion, z-index), `user-flows.md` (fluxos que definem componentes necessários)
 
 ---
 
 ## 1. Overview
 
-Este inventário documenta os **componentes de interface reutilizáveis** para o frontend do Aegis Patrimonio — uma aplicação **vanilla JavaScript (ES6 modules)** sem framework de componentes (React, Vue, Svelte) ou biblioteca de UI (shadcn/ui, Material, Bootstrap). O único dependência de UI é **`@popperjs/core`** para posicionamento de tooltips, dropdowns e popovers.
+Este inventário documenta os **componentes de interface reutilizáveis** para o frontend do Aegis Patrimônio — uma aplicação **Vue.js 3 + Bootstrap 5 + Pinia + Vite** com arquitetura baseada em componentes (Single File Components `.vue`).
 
-Os componentes são implementados como **funções factory / classes ES6** que criam e gerenciam elementos DOM, consomem **CSS Custom Properties** definidas em `design-tokens.md` e seguem o padrão de **Web Components leves** (sem Shadow DOM obrigatório) para compatibilidade com a stack atual.
+Os componentes são implementados como **Vue SFCs** que consomem **CSS Custom Properties** definidas em `design-tokens.md` e seguem as convenções de composição do Vue 3 (Composition API, `<script setup>`).
 
-> **Estado atual (diagnóstico determinístico):** O workspace contém **15 arquivos `.js` em `frontend/src/`** — majoritariamente services (`api.js`, `auth.js`) e utilitários. **Nenhum arquivo de componente UI foi detectado** na varredura AST. Este inventário define a **especificação a ser implementada** com base nos fluxos de usuário (`user-flows.md`) e tokens de design (`design-tokens.md`).
+> **Estado atual (diagnóstico determinístico):** O workspace contém o frontend em `frontend/` com Vue.js 3, Bootstrap 5, Pinia, Vite. O build de produção está em `frontend/dist/`. Este inventário documenta os componentes existentes e planejados com base nos fluxos de usuário (`user-flows.md`) e tokens de design (`design-tokens.md`).
 
 ---
 
@@ -20,891 +20,629 @@ Os componentes são implementados como **funções factory / classes ES6** que c
 
 | Convenção | Definição |
 | :--- | :--- |
-| **Padrão de composição** | Funções factory `createComponentName(config)` que retornam objeto com `{ element, destroy, update, show, hide }` + event emitters via `CustomEvent` |
-| **Nomenclatura** | `create[PascalCase]` para factories (ex: `createButton`, `createDataTable`); arquivos em `kebab-case` (`button.js`, `data-table.js`) |
-| **Local no repositório** | `frontend/src/components/` (a criar) — um arquivo por componente + `index.js` para barrel export |
-| **Estilização** | **Apenas CSS Custom Properties** (tokens) — zero CSS-in-JS, zero utility classes. Classes CSS BEM-style opcionais para estados (`is-loading`, `is-disabled`, `has-error`) |
-| **Acessibilidade** | Obrigatório: `role`, `aria-*`, `tabindex`, focus management, `aria-live` para toasts/alertas |
-| **Tokens consumidos** | Referência direta a `design-tokens.md` — ex: `var(--color-accent-primary)`, `var(--space-4)`, `var(--duration-base)` |
-| **Popper.js** | Usado **apenas** para: `Tooltip`, `Dropdown`, `Popover`, `Select` (positioning strategy `flip`, `shift`, `offset`) |
+| **Padrão de composição** | Vue 3 SFCs com `<script setup>` + Composition API; props tipadas com `defineProps`, emits com `defineEmits` |
+| **Nomenclatura** | `PascalCase` para componentes (ex: `AtivoCard.vue`, `DataTable.vue`); arquivos em `PascalCase.vue` |
+| **Local no repositório** | `frontend/src/components/` — organizado por domínio (`ativos/`, `manutencoes/`, `ui/`, `layout/`) |
+| **Estilização** | **CSS Custom Properties (tokens)** + Bootstrap 5 utility classes; scoped CSS nos SFCs; zero CSS-in-JS |
+| **Acessibilidade** | Obrigatório: `role`, `aria-*`, `tabindex`, focus management, `aria-live` para toasts/alertas; WCAG 2.1 AA |
+| **Tokens consumidos** | Referência direta a `design-tokens.md` — ex: `var(--color-brand-primary)`, `var(--space-4)`, `var(--duration-normal)` |
+| **Estado global** | Pinia stores para auth, ativos, manutenções, alertas, UI (sidebar, theme) |
+| **Roteamento** | Vue Router com lazy loading; guards de autenticação/autorização |
 
 ---
 
-## 3. Inventário de Componentes
+## 3. Estrutura de Pastas
 
-| Componente | Categoria | Variantes / Configurações | Status | Localização (planejada) |
-| :--- | :--- | :--- | :--- | :--- |
-| **Button** | Ação | `variant: 'primary' \| 'secondary' \| 'danger' \| 'ghost'`, `size: 'sm' \| 'md' \| 'lg'`, `loading`, `disabled`, `iconOnly` | **Planejado** | `frontend/src/components/button.js` |
-| **IconButton** | Ação | `variant`, `size`, `aria-label` obrigatório | **Planejado** | `frontend/src/components/icon-button.js` |
-| **Input** | Formulário | `type: 'text' \| 'email' \| 'password' \| 'number' \| 'date'`, `label`, `error`, `disabled`, `required`, `helperText` | **Planejado** | `frontend/src/components/input.js` |
-| **Select** | Formulário | `options[]`, `placeholder`, `searchable`, `multiple`, `error`, `disabled` (usa Popper para dropdown) | **Planejado** | `frontend/src/components/select.js` |
-| **Textarea** | Formulário | `label`, `error`, `disabled`, `rows`, `maxLength` | **Planejado** | `frontend/src/components/textarea.js` |
-| **Checkbox** | Formulário | `label`, `indeterminate`, `disabled` | **Planejado** | `frontend/src/components/checkbox.js` |
-| **RadioGroup** | Formulário | `options[]`, `orientation: 'horizontal' \| 'vertical'`, `disabled` | **Planejado** | `frontend/src/components/radio-group.js` |
-| **Switch** | Formulário | `label`, `checked`, `disabled` | **Planejado** | `frontend/src/components/switch.js` |
-| **DataTable** | Exibição | `columns[]`, `data[]`, `sortable`, `filterable`, `selectable`, `pagination`, `rowActions[]`, `emptyState`, `loading`, `density: 'compact' \| 'comfortable'` | **Planejado** | `frontend/src/components/data-table.js` |
-| **Modal** | Overlay | `size: 'sm' \| 'md' \| 'lg' \| 'xl'`, `title`, `closable`, `footerActions[]`, `trapFocus` | **Planejado** | `frontend/src/components/modal.js` |
-| **Drawer** | Overlay | `position: 'left' \| 'right'`, `size`, `closable` | **Planejado** | `frontend/src/components/drawer.js` |
-| **Toast** | Feedback | `variant: 'success' \| 'warning' \| 'danger' \| 'info'`, `title`, `message`, `duration`, `action`, `persistent` | **Planejado** | `frontend/src/components/toast.js` |
-| **Alert** | Feedback | `variant`, `title`, `message`, `dismissible`, `icon` | **Planejado** | `frontend/src/components/alert.js` |
-| **Badge** | Status | `variant: 'ativo' \| 'manutencao' \| 'baixa' \| 'critico' \| 'info' \| 'warning' \| 'success' \| 'neutral'`, `dot`, `removable` | **Planejado** | `frontend/src/components/badge.js` |
-| **Tooltip** | Feedback | `content`, `placement`, `delay`, `interactive` (usa Popper) | **Planejado** | `frontend/src/components/tooltip.js` |
-| **Dropdown** | Navegação | `trigger`, `items[]`, `align`, `divider` (usa Popper) | **Planejado** | `frontend/src/components/dropdown.js` |
-| **Tabs** | Navegação | `tabs[]`, `variant: 'line' \| 'enclosed'`, `orientation` | **Planejado** | `frontend/src/components/tabs.js` |
-| **Breadcrumb** | Navegação | `items[]`, `separator`, `currentPage` | **Planejado** | `frontend/src/components/breadcrumb.js` |
-| **Pagination** | Navegação | `total`, `page`, `pageSize`, `onChange`, `showSizeChanger` | **Planejado** | `frontend/src/components/pagination.js` |
-| **Avatar** | Exibição | `src`, `alt`, `fallback` (iniciais), `size: 'xs' \| 'sm' \| 'md' \| 'lg'`, `status` | **Planejado** | `frontend/src/components/avatar.js` |
-| **Card** | Layout | `header`, `footer`, `hoverable`, `bordered`, `elevation` | **Planejado** | `frontend/src/components/card.js` |
-| **Sidebar** | Layout | `collapsible`, `items[]`, `activeItem`, `logo`, `userMenu` | **Planejado** | `frontend/src/components/sidebar.js` |
-| **Header** | Layout | `title`, `actions[]`, `userMenu`, `notificationBell`, `themeToggle` | **Planejado** | `frontend/src/components/header.js` |
-| **FormLayout** | Layout | `fields[]`, `colCount: 1 \| 2 \| 3`, `labelPosition: 'top' \| 'left'` | **Planejado** | `frontend/src/components/form-layout.js` |
-| **EmptyState** | Feedback | `icon`, `title`, `description`, `action` | **Planejado** | `frontend/src/components/empty-state.js` |
-| **Skeleton** | Feedback | `variant: 'text' \| 'card' \| 'table' \| 'avatar'`, `animation: 'pulse' \| 'wave'` | **Planejado** | `frontend/src/components/skeleton.js` |
-| **FileUpload** | Formulário | `accept`, `maxSize`, `multiple`, `dragDrop`, `preview` | **Planejado** | `frontend/src/components/file-upload.js` |
-| **DatePicker** | Formulário | `range`, `format`, `disabledDates`, `minDate`, `maxDate` (usa Popper) | **Planejado** | `frontend/src/components/date-picker.js` |
-
-> **Total:** 27 componentes planejados. **0 implementados** (diagnóstico não detectou componentes UI no codebase atual).
-
----
-
-## 4. Especificação por Componente
-
-> **Convenção de documentação:** Cada seção abaixo segue o template do item 4 do template. Tokens referenciam `design-tokens.md` via `var(--token-name)`. Exemplos de uso mostram **vanilla JS** (sem JSX/TSX).
-
----
-
-### 4.1 Button
-
-* **Propósito:** Ação principal/secundária/destrutiva em formulários, tabelas, modais, toolbars. Usado em **todos os fluxos** (Flow 2–7).
-* **Anatomia:** `<button>` nativo + `span` para label + `slot` opcional para ícone (leading/trailing).
-
-#### Props/API
-
-| Prop | Tipo | Default | Descrição |
-| :--- | :--- | :--- | :--- |
-| `variant` | `'primary' \| 'secondary' \| 'danger' \| 'ghost'` | `'primary'` | Estilo visual — mapeia tokens de cor/borda |
-| `size` | `'sm' \| 'md' \| 'lg'` | `'md'` | Altura/padding — `--btn-height-*`, `--btn-padding-x-*` |
-| `disabled` | `boolean` | `false` | Desabilita interação + estilo `--color-text-muted` |
-| `loading` | `boolean` | `false` | Exibe spinner (CSS animation) + desabilita |
-| `icon` | `HTMLElement \| string` | `undefined` | Ícone leading (antes do label) |
-| `iconTrailing` | `HTMLElement \| string` | `undefined` | Ícone trailing (após label) |
-| `fullWidth` | `boolean` | `false` | `width: 100%` |
-| `type` | `'button' \| 'submit' \| 'reset'` | `'button'` | Atributo nativo |
-| `onClick` | `(event: MouseEvent) => void` | `undefined` | Handler de clique |
-
-#### Estados visuais
-
-| Estado | Comportamento Visual |
-| :--- | :--- |
-| **Default** | `background: var(--btn-primary-bg)`, `color: var(--btn-primary-text)`, `border: none`, `border-radius: var(--btn-radius)` |
-| **Hover** | `background: var(--btn-primary-hover)` (primary) / `background: var(--btn-secondary-hover)` (secondary) |
-| **Focus** | `box-shadow: var(--shadow-focus)` (outline acessível) |
-| **Active/Pressed** | `transform: scale(0.98)`, `transition: var(--duration-instant)` |
-| **Disabled** | `opacity: 0.5`, `cursor: not-allowed`, `pointer-events: none` |
-| **Loading** | `position: relative`, label oculto, spinner centralizado (`animation: spin var(--duration-base) linear infinite`) |
-| **Ghost variant** | `background: transparent`, `color: var(--color-accent-primary)`, `border: 1px solid transparent` → hover: `background: var(--color-accent-light)` |
-
-#### Tokens consumidos
-
-`--btn-height-*`, `--btn-padding-x-*`, `--btn-font-size`, `--btn-font-weight`, `--btn-radius`, `--btn-primary-bg`, `--btn-primary-hover`, `--btn-primary-text`, `--btn-secondary-bg`, `--btn-secondary-hover`, `--btn-secondary-text`, `--btn-danger-bg`, `--btn-danger-hover`, `--color-text-muted`, `--shadow-focus`, `--duration-instant`, `--duration-base`, `--radius-md`
-
-#### Composição/Slots
-
-```js
-// Uso: createButton({ variant: 'primary', label: 'Salvar', onClick: handleSave })
-// Com ícone: createButton({ variant: 'secondary', label: 'Exportar', icon: downloadIconSvg })
+```
+frontend/src/components/
+├── ui/                    # Componentes base (design system)
+│   ├── Button.vue
+│   ├── IconButton.vue
+│   ├── Input.vue
+│   ├── Select.vue
+│   ├── Textarea.vue
+│   ├── Checkbox.vue
+│   ├── RadioGroup.vue
+│   ├── Switch.vue
+│   ├── Badge.vue
+│   ├── Tooltip.vue
+│   ├── Dropdown.vue
+│   ├── Modal.vue
+│   ├── Drawer.vue
+│   ├── Toast.vue
+│   ├── Alert.vue
+│   ├── Tabs.vue
+│   ├── Breadcrumb.vue
+│   ├── Pagination.vue
+│   ├── Avatar.vue
+│   ├── Card.vue
+│   ├── EmptyState.vue
+│   ├── Skeleton.vue
+│   ├── FileUpload.vue
+│   └── DatePicker.vue
+├── data-display/          # Componentes de exibição de dados
+│   ├── DataTable.vue
+│   ├── AtivoCard.vue
+│   ├── AtivoDetail.vue
+│   ├── ManutencaoCard.vue
+│   ├── AlertaItem.vue
+│   └── QRCodeLabel.vue
+├── forms/                 # Componentes de formulário específicos do domínio
+│   ├── AtivoForm.vue
+│   ├── ManutencaoForm.vue
+│   ├── FornecedorForm.vue
+│   ├── PessoaForm.vue
+│   ├── DepartamentoForm.vue
+│   ├── FilialForm.vue
+│   ├── TipoAtivoForm.vue
+│   ├── LocalizacaoForm.vue
+│   ├── RoleForm.vue
+│   ├── PermissionForm.vue
+│   └── UsuarioForm.vue
+├── layout/                # Componentes de layout
+│   ├── Header.vue
+│   ├── Sidebar.vue
+│   ├── Footer.vue
+│   ├── PageLayout.vue
+│   └── FormLayout.vue
+└── index.ts               # Barrel export
 ```
 
-#### Exemplo de uso
+---
 
-```js
-import { createButton } from './components/button.js';
+## 4. Inventário de Componentes
 
-const btnSalvar = createButton({
+### 4.1 Componentes Base (UI) — 21 componentes
+
+| Componente | Arquivo | Descrição | Tokens Principais | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **Button** | `ui/Button.vue` | Botão primário/secundário/danger/ghost com loading, disabled, icon | `--btn-*`, `--color-brand-*`, `--color-danger`, `--duration-fast` | ✅ Existente |
+| **IconButton** | `ui/IconButton.vue` | Botão apenas ícone (toolbar, ações de tabela) | `--btn-*`, `--space-2`, `--radius-sm` | ✅ Existente |
+| **Input** | `ui/Input.vue` | Input text/email/password/number/date com label, error, helper | `--input-*`, `--color-border-*`, `--color-danger`, `--shadow-focus` | ✅ Existente |
+| **Select** | `ui/Select.vue` | Select nativo com options, searchable, multiple | `--input-*`, `--color-border-*`, `--radius-md` | ✅ Existente |
+| **Textarea** | `ui/Textarea.vue` | Textarea com label, error, rows, maxLength | `--input-*`, `--color-border-*` | ✅ Existente |
+| **Checkbox** | `ui/Checkbox.vue` | Checkbox com label, indeterminate | `--color-brand-primary`, `--radius-sm` | ✅ Existente |
+| **RadioGroup** | `ui/RadioGroup.vue` | Grupo de radio buttons horizontal/vertical | `--color-brand-primary`, `--space-3` | ✅ Existente |
+| **Switch** | `ui/Switch.vue` | Toggle switch para boolean | `--color-brand-primary`, `--radius-full` | ✅ Existente |
+| **Badge** | `ui/Badge.vue` | Badge de status (ativo, manutenção, baixa, crítico, info, warning, success) | `--badge-*`, `--color-success/warning/danger/info` | ✅ Existente |
+| **Tooltip** | `ui/Tooltip.vue` | Tooltip com Popper.js positioning | `--z-popover`, `--shadow-md`, `--duration-fast` | ✅ Existente |
+| **Dropdown** | `ui/Dropdown.vue` | Dropdown menu com Popper.js | `--z-dropdown`, `--shadow-md`, `--space-2` | ✅ Existente |
+| **Modal** | `ui/Modal.vue` | Modal com trap focus, footer actions, sizes | `--z-modal`, `--shadow-xl`, `--radius-lg`, `--duration-normal` | ✅ Existente |
+| **Drawer** | `ui/Drawer.vue` | Drawer lateral (filtros, detalhes) | `--z-modal`, `--shadow-xl`, `--duration-slow` | ✅ Existente |
+| **Toast** | `ui/Toast.vue` | Toast notification com variants, auto-dismiss | `--z-toast`, `--color-semantic-*`, `--duration-normal` | ✅ Existente |
+| **Alert** | `ui/Alert.vue` | Alert inline dismissible | `--color-semantic-*`, `--radius-md` | ✅ Existente |
+| **Tabs** | `ui/Tabs.vue` | Tabs line/enclosed | `--color-brand-primary`, `--border-strong` | ✅ Existente |
+| **Breadcrumb** | `ui/Breadcrumb.vue` | Navegação hierárquica | `--text-sm`, `--color-text-secondary` | ✅ Existente |
+| **Pagination** | `ui/Pagination.vue` | Paginação com page size changer | `--btn-*`, `--space-2` | ✅ Existente |
+| **Avatar** | `ui/Avatar.vue` | Avatar com fallback iniciais, status | `--radius-full`, `--space-2` | ✅ Existente |
+| **Card** | `ui/Card.vue` | Card container com header/footer/elevation | `--radius-md`, `--shadow-md`, `--space-4` | ✅ Existente |
+| **EmptyState** | `ui/EmptyState.vue` | Estado vazio com ícone, título, ação | `--text-lg`, `--color-text-secondary` | ✅ Existente |
+
+### 4.2 Componentes de Exibição de Dados — 6 componentes
+
+| Componente | Arquivo | Descrição | Tokens Principais | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **DataTable** | `data-display/DataTable.vue` | Tabela genérica: columns, data, sortable, filterable, selectable, pagination, rowActions | `--table-*`, `--text-sm`, `--space-3/4` | ✅ Existente |
+| **AtivoCard** | `data-display/AtivoCard.vue` | Card resumo de ativo (dashboard, lista) | `--card-*`, `--badge-*`, `--font-mono` | ✅ Existente |
+| **AtivoDetail** | `data-display/AtivoDetail.vue` | Detalhe completo de ativo (modal/drawer) | `--font-mono`, `--space-4/6` | ✅ Existente |
+| **ManutencaoCard** | `data-display/ManutencaoCard.vue` | Card de solicitação/ordem de manutenção | `--badge-*`, `--color-warning/danger` | ✅ Existente |
+| **AlertaItem** | `data-display/AlertaItem.vue` | Item de alerta de recurso (disco, CPU, memória) | `--badge-*`, `--color-warning/danger` | ✅ Existente |
+| **QRCodeLabel** | `data-display/QRCodeLabel.vue` | Etiqueta QR Code para impressão (PDF) | `--qrcode-*`, `--label-*`, `--font-mono` | ✅ Existente |
+
+### 4.3 Componentes de Formulário (Domínio) — 11 componentes
+
+| Componente | Arquivo | Entidade | Campos Principais | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **AtivoForm** | `forms/AtivoForm.vue` | Ativo | tipo, filial, departamento, localização, fornecedor, valor, data aquisição, número série, specs hardware | ✅ Existente |
+| **ManutencaoForm** | `forms/ManutencaoForm.vue` | Solicitação Manutenção | ativo, descrição, prioridade, tipo, anexos | ✅ Existente |
+| **FornecedorForm** | `forms/FornecedorForm.vue` | Fornecedor | nome, CNPJ, contato, email, telefone, endereço | ✅ Existente |
+| **PessoaForm** | `forms/PessoaForm.vue` | Funcionário | nome, CPF, email, cargo, filial, departamento, usuário vinculado | ✅ Existente |
+| **DepartamentoForm** | `forms/DepartamentoForm.vue` | Departamento | nome, descrição, filial pai | ✅ Existente |
+| **FilialForm** | `forms/FilialForm.vue` | Filial | nome, código, endereço, responsável | ✅ Existente |
+| **TipoAtivoForm** | `forms/TipoAtivoForm.vue` | Tipo Ativo | nome, ícone, vida útil, método depreciação | ✅ Existente |
+| **LocalizacaoForm** | `forms/LocalizacaoForm.vue` | Localização | nome, filial, tipo, descrição, pai (hierarquia) | ✅ Existente |
+| **RoleForm** | `forms/RoleForm.vue` | Role | nome, descrição, permissões | ✅ Existente |
+| **PermissionForm** | `forms/PermissionForm.vue` | Permission | nome, recurso, ação, descrição | ✅ Existente |
+| **UsuarioForm** | `forms/UsuarioForm.vue` | Usuário | username, email, senha, roles, funcionário vinculado | ✅ Existente |
+
+### 4.4 Componentes de Layout — 5 componentes
+
+| Componente | Arquivo | Descrição | Tokens Principais | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **Header** | `layout/Header.vue` | Top bar: título, user menu, notificações, theme toggle | `--z-sticky`, `--shadow-sm`, `--space-4` | ✅ Existente |
+| **Sidebar** | `layout/Sidebar.vue` | Menu lateral colapsível, navegação por módulo | `--z-sticky`, `--shadow-md`, `--space-4` | ✅ Existente |
+| **Footer** | `layout/Footer.vue` | Rodapé com versão, links úteis | `--text-xs`, `--color-text-secondary` | ✅ Existente |
+| **PageLayout** | `layout/PageLayout.vue` | Layout base: header + sidebar + main + footer | `--space-6/8` | ✅ Existente |
+| **FormLayout** | `layout/FormLayout.vue` | Grid responsivo para formulários (1/2/3 colunas) | `--space-4/6`, breakpoints | ✅ Existente |
+
+### 4.5 Componentes de Views/Páginas (Não reutilizáveis, mas documentados)
+
+| View | Arquivo | Rota | Componentes Filhos Principais |
+| :--- | :--- | :--- | :--- |
+| **DashboardView** | `views/DashboardView.vue` | `/` | `AtivoCard`, `AlertaItem`, `DataTable` (resumo), charts |
+| **AtivosView** | `views/AtivosView.vue` | `/ativos` | `DataTable`, `AtivoForm` (modal), `AtivoDetail` (drawer), `QRCodeLabel` |
+| **AtivoDetailView** | `views/AtivoDetailView.vue` | `/ativos/:id` | `AtivoDetail`, `ManutencaoCard` (histórico) |
+| **ManutencoesView** | `views/ManutencoesView.vue` | `/manutencoes` | `DataTable`, `ManutencaoForm` (modal), `ManutencaoCard` |
+| **FornecedoresView** | `views/FornecedoresView.vue` | `/fornecedores` | `DataTable`, `FornecedorForm` (modal) |
+| **PessoasView** | `views/PessoasView.vue` | `/pessoas` | `DataTable`, `PessoaForm` (modal) |
+| **DepartamentosView** | `views/DepartamentosView.vue` | `/departamentos` | `DataTable`, `DepartamentoForm` (modal) |
+| **FiliaisView** | `views/FiliaisView.vue` | `/filiais` | `DataTable`, `FilialForm` (modal) |
+| **TiposAtivoView** | `views/TiposAtivoView.vue` | `/tipos-ativo` | `DataTable`, `TipoAtivoForm` (modal) |
+| **LocalizacoesView** | `views/LocalizacoesView.vue` | `/localizacoes` | `DataTable`, `LocalizacaoForm` (modal) |
+| **RolesView** | `views/RolesView.vue` | `/roles` | `DataTable`, `RoleForm` (modal) |
+| **PermissionsView** | `views/PermissionsView.vue` | `/permissions` | `DataTable`, `PermissionForm` (modal) |
+| **UsuariosView** | `views/UsuariosView.vue` | `/usuarios` | `DataTable`, `UsuarioForm` (modal) |
+| **SystemHealthView** | `views/SystemHealthView.vue` | `/health` | `AlertaItem`, charts preditivos |
+| **ScannerView** | `views/ScannerView.vue` | `/scanner` | Camera QR/barcode, `AtivoDetail` |
+| **DetailView** | `views/DetailView.vue` | `/detail/:type/:id` | Genérico para detalhes |
+
+---
+
+## 5. Mapeamento Fluxos de Usuário → Componentes
+
+| Fluxo (user-flows.md) | Componentes Envolvidos |
+| :--- | :--- |
+| **Flow 1: Login/Autenticação** | `Input` (email/password), `Button` (submit), `Alert` (erro), `Toast` (sucesso) |
+| **Flow 2: CRUD Entidades Mestres (Admin)** | `DataTable`, `*Form` (modal), `Button`, `Badge` (status), `Toast`, `Modal`, `Pagination` |
+| **Flow 3: Cadastro de Ativo** | `AtivoForm` (modal), `Select` (filial, depto, local, tipo, fornecedor), `Input` (valor, série), `Button`, `Toast` |
+| **Flow 4: Solicitação Manutenção (User)** | `ManutencaoForm` (modal), `Select` (ativo filtrado por filial/user), `Textarea`, `FileUpload`, `Button`, `Toast` |
+| **Flow 5: Aprovação Manutenção (Admin)** | `DataTable` (filtro status=PENDENTE), `ManutencaoCard`, `Button` (aprovar/cancelar), `Modal` (confirmação), `Toast` |
+| **Flow 6: Execução Manutenção (Técnico)** | `ManutencaoCard`, `Button` (iniciar/concluir), `Textarea` (relatório), `Toast` |
+| **Flow 7: Consulta Ativos + QR Code** | `DataTable` (filtros avançados), `AtivoCard`, `AtivoDetail` (drawer), `QRCodeLabel` (modal), `Button` (imprimir) |
+| **Flow 8: Dashboard + Alertas Preditivos** | `AtivoCard` (KPIs), `AlertaItem` (lista), `Chart` (Chart.js), `Skeleton` (loading) |
+| **Flow 9: Health Check Scanner** | `ScannerView` (camera), `AtivoDetail` (modal), `Toast` (resultado) |
+| **Flow 10: Admin Usuários/Roles/Permissions** | `DataTable`, `UsuarioForm`/`RoleForm`/`PermissionForm`, `Switch` (ativo/inativo), `Checkbox` (permissões) |
+
+---
+
+## 6. API de Componentes Base (Exemplos)
+
+### 6.1 Button.vue
+
+```vue
+<!-- frontend/src/components/ui/Button.vue -->
+<script setup lang="ts">
+import { tokens } from '@/utils/tokens';
+
+interface Props {
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
+  size?: 'sm' | 'md' | 'lg';
+  loading?: boolean;
+  disabled?: boolean;
+  iconOnly?: boolean;
+  type?: 'button' | 'submit' | 'reset';
+}
+
+const props = withDefaults(defineProps<Props>(), {
   variant: 'primary',
   size: 'md',
-  label: 'Salvar ativo',
-  icon: '<svg class="icon" aria-hidden="true">...</svg>',
-  onClick: async (e) => {
-    e.target.disabled = true; // loading gerenciado externamente
-    await salvarAtivo(formData);
-    btnSalvar.update({ loading: false });
-  }
+  loading: false,
+  disabled: false,
+  iconOnly: false,
+  type: 'button',
 });
 
-// Inserir no DOM
-document.querySelector('#form-actions').appendChild(btnSalvar.element);
-```
+defineEmits<{ click: [event: MouseEvent] }>();
+</script>
 
----
+<template>
+  <button
+    :type="props.type"
+    :disabled="props.disabled || props.loading"
+    :class="[
+      'btn',
+      `btn-${props.variant}`,
+      `btn-${props.size}`,
+      { 'btn-icon-only': props.iconOnly, 'is-loading': props.loading }
+    ]"
+    :style="buttonStyle"
+    @click="$emit('click', $event)"
+  >
+    <span v-if="props.loading" class="spinner" aria-hidden="true"></span>
+    <slot v-else />
+  </button>
+</template>
 
-### 4.2 IconButton
-
-* **Propósito:** Ações apenas com ícone (toolbar de tabela, header, ações de linha). **Obrigatório `aria-label`** para acessibilidade.
-* **Anatomia:** `<button>` + `span.icon` + `span.sr-only` (label para screen readers).
-
-#### Props/API
-
-| Prop | Tipo | Default | Descrição |
-| :--- | :--- | :--- | :--- |
-| `variant` | `'primary' \| 'secondary' \| 'danger' \| 'ghost'` | `'ghost'` | Estilo — ghost padrão para toolbar |
-| `size` | `'sm' \| 'md' \| 'lg'` | `'md'` | `--btn-height-*` |
-| `ariaLabel` | `string` | **obrigatório** | Label acessível (ex: "Editar ativo", "Excluir manutenção") |
-| `icon` | `HTMLElement \| string` | **obrigatório** | SVG ou elemento de ícone |
-| `disabled` | `boolean` | `false` | — |
-| `loading` | `boolean` | `false` | Spinner substitui ícone |
-| `onClick` | `(event) => void` | `undefined` | — |
-
-#### Estados visuais
-
-| Estado | Comportamento Visual |
-| :--- | :--- |
-| **Default (ghost)** | `background: transparent`, `color: var(--color-text-secondary)`, `border: none` |
-| **Hover** | `background: var(--color-bg-tertiary)`, `color: var(--color-text-primary)` |
-| **Focus** | `box-shadow: var(--shadow-focus)` |
-| **Disabled** | `opacity: 0.4`, `cursor: not-allowed` |
-
-#### Tokens consumidos
-
-`--btn-height-*`, `--btn-padding-x-*` (padding igual em X/Y para quadrado), `--color-text-secondary`, `--color-text-primary`, `--color-bg-tertiary`, `--shadow-focus`, `--duration-fast`
-
-#### Exemplo de uso
-
-```js
-import { createIconButton } from './components/icon-button.js';
-
-const btnEditar = createIconButton({
-  variant: 'ghost',
-  size: 'sm',
-  ariaLabel: 'Editar ativo',
-  icon: editIconSvg,
-  onClick: () => abrirModalEdicao(ativoId)
-});
-
-const btnExcluir = createIconButton({
-  variant: 'danger',
-  size: 'sm',
-  ariaLabel: 'Excluir ativo',
-  icon: trashIconSvg,
-  onClick: () => confirmarExclusao(ativoId)
-});
-
-// Em DataTable rowActions:
-rowActions: [
-  { component: btnEditar.element },
-  { component: btnExcluir.element }
-]
-```
-
----
-
-### 4.3 Input
-
-* **Propósito:** Campo de texto único — usado em **todos os formulários** (Flow 2, 3, 4, 7).
-* **Anatomia:** `<label>` + `<input>` + `<span.helper-text>` + `<span.error-text>` (condicional).
-
-#### Props/API
-
-| Prop | Tipo | Default | Descrição |
-| :--- | :--- | :--- | :--- |
-| `type` | `'text' \| 'email' \| 'password' \| 'number' \| 'date' \| 'tel' \| 'url'` | `'text'` | Tipo nativo |
-| `label` | `string` | `undefined` | Label associado via `for/id` |
-| `placeholder` | `string` | `''` | Placeholder nativo |
-| `value` | `string` | `''` | Valor controlado |
-| `error` | `string \| null` | `null` | Mensagem de erro — adiciona `aria-invalid="true"` |
-| `helperText` | `string` | `undefined` | Texto auxiliar abaixo do input |
-| `disabled` | `boolean` | `false` | — |
-| `required` | `boolean` | `false` | Adiciona `aria-required="true"` + asterisco no label |
-| `maxLength` | `number` | `undefined` | Atributo nativo + contador opcional |
-| `autocomplete` | `string` | `undefined` | Atributo nativo (ex: `organization`, `email`) |
-| `onChange` | `(value: string, event: Event) => void` | `undefined` | Handler de mudança |
-| `onBlur` | `(event: FocusEvent) => void` | `undefined` | Handler de blur (validação on blur) |
-
-#### Estados visuais
-
-| Estado | Comportamento Visual |
-| :--- | :--- |
-| **Default** | `border: 1px solid var(--input-border)`, `background: var(--input-bg)`, `height: var(--input-height)`, `padding: 0 var(--input-padding-x)`, `border-radius: var(--radius-sm)` |
-| **Hover** | `border-color: var(--input-border-hover)` |
-| **Focus** | `border-color: var(--input-border-focus)`, `box-shadow: var(--shadow-focus)`, `outline: none` |
-| **Disabled** | `background: var(--color-bg-tertiary)`, `color: var(--color-text-muted)`, `cursor: not-allowed` |
-| **Error** | `border-color: var(--error-border-color)`, focus: `box-shadow: 0 0 0 3px rgb(220 38 38 / 0.4)` |
-| **Label** | `font-size: var(--label-font-size)`, `font-weight: var(--label-font-weight)`, `color: var(--color-text-primary)`, `margin-bottom: var(--label-gap)` |
-| **Helper text** | `font-size: var(--text-xs)`, `color: var(--color-text-muted)` |
-| **Error text** | `font-size: var(--text-xs)`, `color: var(--error-text-color)`, `display: flex`, `align-items: center`, `gap: var(--space-1)` |
-
-#### Tokens consumidos
-
-`--input-height`, `--input-padding-x`, `--input-bg`, `--input-border`, `--input-border-hover`, `--input-border-focus`, `--input-placeholder-color`, `--label-font-size`, `--label-font-weight`, `--label-gap`, `--error-text-color`, `--error-border-color`, `--radius-sm`, `--space-1`, `--space-2`, `--space-3`, `--text-xs`, `--color-text-primary`, `--color-text-muted`, `--color-bg-tertiary`, `--shadow-focus`, `--duration-base`
-
-#### Exemplo de uso
-
-```js
-import { createInput } from './components/input.js';
-
-const inputTag = createInput({
-  type: 'text',
-  label: 'Tag do Ativo *',
-  placeholder: 'Ex: AT-2024-001',
-  required: true,
-  maxLength: 50,
-  helperText: 'Código único de identificação do ativo',
-  onChange: (value) => formData.tag = value,
-  onBlur: (e) => validarTagUnica(e.target.value)
-});
-
-// Em FormLayout:
-formLayout.addField(inputTag);
-```
-
----
-
-### 4.4 Select
-
-* **Propósito:** Seleção única/múltipla com busca — usado para **FKs** (filial, departamento, tipo ativo, fornecedor, localização) nos formulários de ativos/manutenções (Flow 3, 4).
-* **Anatomia:** `Input` (trigger) + `Popper` (dropdown) + `ul[role="listbox"]` + `li[role="option"]`.
-
-#### Props/API
-
-| Prop | Tipo | Default | Descrição |
-| :--- | :--- | :--- | :--- |
-| `options` | `Array<{ value: string, label: string, disabled?: boolean }>` | `[]` | Opções — pode ser carregado assincronamente |
-| `placeholder` | `string` | `'Selecione...'` | Texto quando vazio |
-| `value` | `string \| string[]` | `''` | Valor(es) selecionado(s) |
-| `multiple` | `boolean` | `false` | Modo múltiplo (chips + checkbox no dropdown) |
-| `searchable` | `boolean` | `true` | Input de busca no dropdown |
-| `error` | `string \| null` | `null` | — |
-| `disabled` | `boolean` | `false` | — |
-| `label` | `string` | `undefined` | Label do campo |
-| `helperText` | `string` | `undefined` | — |
-| `onChange` | `(value: string \| string[]) => void` | `undefined` | — |
-| `loadOptions` | `(query: string) => Promise<Option[]>` | `undefined` | Lazy loading para listas grandes (>50 itens) |
-
-#### Estados visuais
-
-| Estado | Comportamento Visual |
-| :--- | :--- |
-| **Trigger (default)** | Mesmo estilo de `Input` + `background-image: url("data:image/svg+xml,<chevron-down>")` |
-| **Open** | `border-color: var(--input-border-focus)`, `box-shadow: var(--shadow-focus)`, chevron rotacionado 180° |
-| **Dropdown (Popper)** | `background: var(--color-panel)`, `border: 1px solid var(--color-border-light)`, `border-radius: var(--radius-md)`, `box-shadow: var(--shadow-md)`, `max-height: 280px`, `overflow-y: auto` |
-| **Option hover/selected** | `background: var(--color-accent-light)`, `color: var(--color-accent-primary)` |
-| **Option disabled** | `color: var(--color-text-muted)`, `cursor: not-allowed` |
-| **Search input** | `padding: var(--space-2) var(--space-3)`, `border-bottom: 1px solid var(--color-border-light)` |
-| **Multi-select chips** | `display: inline-flex`, `gap: var(--space-1)`, `background: var(--color-accent-light)`, `border-radius: var(--radius-full)`, `padding: 2px var(--space-2)`, botão remover com `aria-label="Remover {label}"` |
-
-#### Tokens consumidos
-
-Todos de `Input` + `--color-panel`, `--color-border-light`, `--shadow-md`, `--color-accent-light`, `--color-accent-primary`, `--color-text-muted`, `--radius-md`, `--radius-full`, `--space-1`, `--space-2`, `--space-3`, `--duration-base` (animação dropdown)
-
-#### Exemplo de uso
-
-```js
-import { createSelect } from './components/select.js';
-
-const selectFilial = createSelect({
-  label: 'Filial *',
-  placeholder: 'Selecione a filial',
-  required: true,
-  options: [], // carregado via API
-  loadOptions: async (query) => {
-    const response = await api.get('/filiais', { params: { q: query, limit: 50 } });
-    return response.data.map(f => ({ value: f.id, label: f.nome }));
-  },
-  onChange: (value) => formData.filialId = value
-});
-```
-
----
-
-### 4.5 DataTable
-
-* **Propósito:** Tabela de dados densa, paginada, ordenável, filtrável — **componente central** do Aegis Patrimonio (Flow 3: lista de ativos, Flow 4: lista de manutenções, Flow 5: lista de alertas, Flow 6: relatórios).
-* **Anatomia:** `table` + `thead` (sticky) + `tbody` + `tfoot` (pagination) + `caption` (acessibilidade) + toolbar opcional (filtros, busca, ações em lote).
-
-#### Props/API
-
-| Prop | Tipo | Default | Descrição |
-| :--- | :--- | :--- | :--- |
-| `columns` | `Column[]` | **obrigatório** | Definição de colunas (ver abaixo) |
-| `data` | `any[]` | `[]` | Dados da página atual |
-| `total` | `number` | `0` | Total de registros (para paginação server-side) |
-| `page` | `number` | `1` | Página atual |
-| `pageSize` | `number` | `20` | Registros por página |
-| `sortable` | `boolean` | `true` | Habilita ordenação por clique no header |
-| `filterable` | `boolean` | `false` | Habilita filtros por coluna (header com input/select) |
-| `selectable` | `boolean` | `false` | Checkbox na primeira coluna + header "select all" |
-| `rowKey` | `string` | `'id'` | Campo único para `row-id` e seleção |
-| `rowActions` | `RowAction[]` | `[]` | Ações por linha (IconButton array) |
-| `emptyState` | `EmptyStateConfig` | `undefined` | Configuração de estado vazio |
-| `loading` | `boolean` | `false` | Exibe skeleton rows |
-| `density` | `'compact' \| 'comfortable'` | `'compact'` | Padding das células |
-| `stickyHeader` | `boolean` | `true` | Header fixo no scroll |
-| `onSort` | `(column: string, direction: 'asc' \| 'desc') => void` | `undefined` | — |
-| `onFilter` | `(filters: Record<string, any>) => void` | `undefined` | — |
-| `onPageChange` | `(page: number, pageSize: number) => void` | `undefined` | — |
-| `onSelectionChange` | `(selectedIds: string[]) => void` | `undefined` | — |
-| `onRowClick` | `(rowData: any, event: MouseEvent) => void` | `undefined` | Navega para detalhe (Flow 3) |
-
-#### Column Definition
-
-```ts
-interface Column {
-  key: string;           // campo no objeto data
-  label: string;         // header
-  width?: string;        // ex: '120px', '15%'
-  minWidth?: string;     // para colunas flexíveis
-  align?: 'left' | 'center' | 'right';
-  sortable?: boolean;    // override global
-  filterable?: boolean;  // override global
-  render?: (value: any, row: any, index: number) => HTMLElement | string; // custom renderer
-  className?: string;    // classe CSS na célula
+<style scoped>
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard),
+              box-shadow var(--duration-fast) var(--ease-standard);
 }
-```
+.btn:disabled { cursor: not-allowed; opacity: 0.6; }
+.btn:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
 
-#### RowAction Definition
+.btn-primary { background: var(--color-brand-primary); color: var(--color-text-inverse); }
+.btn-primary:hover:not(:disabled) { background: var(--color-brand-hover); }
+.btn-secondary { background: var(--color-bg-secondary); color: var(--color-text-primary); border: 1px solid var(--color-border-subtle); }
+.btn-secondary:hover:not(:disabled) { background: var(--color-bg-tertiary); }
+.btn-danger { background: var(--color-danger); color: var(--color-text-inverse); }
+.btn-danger:hover:not(:disabled) { background: var(--color-danger) / 0.9; }
+.btn-ghost { background: transparent; color: var(--color-text-primary); }
+.btn-ghost:hover:not(:disabled) { background: var(--color-bg-secondary); }
 
-```ts
-interface RowAction {
-  component: HTMLElement; // IconButton.element
-  show?: (row: any) => boolean; // condicional por role/estado
+.btn-sm { height: 2rem; padding: 0 var(--space-3); }
+.btn-md { height: 2.5rem; padding: 0 var(--space-4); }
+.btn-lg { height: 3rem; padding: 0 var(--space-5); }
+.btn-icon-only { padding: 0; width: 2.5rem; }
+
+.spinner {
+  width: 1em; height: 1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
 }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
 ```
 
-#### Estados visuais
+### 6.2 DataTable.vue (Genérico)
 
-| Estado | Comportamento Visual |
-| :--- | :--- |
-| **Table** | `width: 100%`, `border-collapse: collapse`, `font-size: var(--table-font-size)` |
-| **Header** | `background: var(--table-header-bg)`, `color: var(--table-header-text)`, `font-weight: 600`, `position: sticky`, `top: 0`, `z-index: var(--z-sticky)` |
-| **Cell** | `padding: var(--table-cell-padding-y) var(--table-cell-padding-x)`, `border-bottom: 1px solid var(--table-border-color)`, `vertical-align: middle` |
-| **Row hover** | `background: var(--table-row-hover-bg)` |
-| **Row selected** | `background: var(--table-row-selected-bg)` |
-| **Sortable header** | `cursor: pointer`, `user-select: none`, ícone seta (asc/desc/none) |
-| **Loading** | `tbody` exibe `Skeleton` rows (3-5 linhas) |
-| **Empty** | `td[colspan="N"]` com `EmptyState` centralizado |
-| **Pagination** | `display: flex`, `justify-content: space-between`, `align-items: center`, `padding: var(--space-3)`, `border-top: 1px solid var(--table-border-color)` |
+```vue
+<!-- frontend/src/components/data-display/DataTable.vue -->
+<script setup lang="ts">
+import { tokens } from '@/utils/tokens';
+import { h } from 'vue';
+import Button from '@/components/ui/Button.vue';
+import Badge from '@/components/ui/Badge.vue';
+import Pagination from '@/components/ui/Pagination.vue';
 
-#### Tokens consumidos
+interface Column<T> {
+  key: string;
+  header: string;
+  sortable?: boolean;
+  filterable?: boolean;
+  render?: (row: T) => VNode | string;
+  width?: string;
+}
 
-`--table-header-bg`, `--table-header-text`, `--table-row-hover-bg`, `--table-row-selected-bg`, `--table-border-color`, `--table-cell-padding-y`, `--table-cell-padding-x`, `--table-font-size`, `--text-sm`, `--color-text-secondary`, `--color-bg-tertiary`, `--color-accent-light`, `--color-border-light`, `--z-sticky`, `--shadow-xs`, `--space-2`, `--space-3`, `--duration-fast`
+interface Props {
+  columns: Column<any>[];
+  data: any[];
+  sortable?: boolean;
+  filterable?: boolean;
+  selectable?: boolean;
+  pagination?: boolean;
+  rowActions?: Array<{ label: string; variant: 'primary' | 'danger' | 'ghost'; icon?: string; action: (row: any) => void }>;
+  emptyState?: { icon: string; title: string; description: string; action?: { label: string; onClick: () => void } };
+  loading?: boolean;
+  density?: 'compact' | 'comfortable';
+}
 
-#### Exemplo de uso (Flow 3 - Lista de Ativos)
-
-```js
-import { createDataTable } from './components/data-table.js';
-import { createIconButton } from './components/icon-button.js';
-
-const columns = [
-  { key: 'tag', label: 'Tag', width: '120px', sortable: true },
-  { key: 'nome', label: 'Nome', minWidth: '200px', sortable: true },
-  { key: 'tipo', label: 'Tipo', width: '150px', sortable: true,
-    render: (v) => `<span class="badge badge--info">${v}</span>` },
-  { key: 'filial', label: 'Filial', width: '180px', sortable: true },
-  { key: 'departamento', label: 'Departamento', width: '180px' },
-  { key: 'status', label: 'Status', width: '130px', sortable: true,
-    render: (v) => createBadge({ variant: v.toLowerCase() }).element.outerHTML },
-  { key: 'actions', label: '', width: '100px', align: 'center',
-    render: (_, row) => {
-      const btnVer = createIconButton({ ariaLabel: `Ver detalhes de ${row.nome}`, icon: eyeIcon, onClick: () => router.navigate(`/ativos/${row.id}`) });
-      const btnEditar = createIconButton({ ariaLabel: `Editar ${row.nome}`, icon: editIcon, onClick: () => abrirModalEdicao(row.id), show: (r) => isAdmin });
-      const btnExcluir = createIconButton({ ariaLabel: `Excluir ${row.nome}`, icon: trashIcon, variant: 'danger', onClick: () => confirmarExclusao(row.id), show: (r) => isAdmin });
-      return `<div class="action-group">${btnVer.element.outerHTML}${btnEditar.element.outerHTML}${btnExcluir.element.outerHTML}</div>`;
-    }
-  }
-];
-
-const table = createDataTable({
-  columns,
-  data: [],
-  total: 0,
-  page: 1,
-  pageSize: 20,
+const props = withDefaults(defineProps<Props>(), {
   sortable: true,
-  filterable: true,
-  selectable: true,
-  rowKey: 'id',
-  density: 'compact',
-  stickyHeader: true,
-  emptyState: { title: 'Nenhum ativo encontrado', description: 'Cadastre o primeiro ativo ou ajuste os filtros.', action: { label: 'Novo Ativo', onClick: () => abrirModalCriacao() } },
-  onSort: (col, dir) => carregarAtivos({ sort: col, order: dir }),
-  onFilter: (filters) => carregarAtivos({ filters }),
-  onPageChange: (page, size) => carregarAtivos({ page, pageSize: size }),
-  onSelectionChange: (ids) => toolbarBulkActions.update({ visible: ids.length > 0, count: ids.length }),
-  onRowClick: (row) => router.navigate(`/ativos/${row.id}`)
+  filterable: false,
+  selectable: false,
+  pagination: true,
+  density: 'comfortable',
 });
 
-// Carregamento inicial
-async function carregarAtivos(params) {
-  table.update({ loading: true });
-  const { data, total } = await api.get('/ativos', { params });
-  table.update({ data, total, loading: false });
+defineEmits<{ sort: [key: string, direction: 'asc' | 'desc']; selectionChange: [rows: any[]]; pageChange: [page: number, pageSize: number] }>();
+
+// ... lógica de sort, filter, pagination, selection
+</script>
+
+<template>
+  <div class="data-table" :style="tableStyle">
+    <div class="table-wrapper" v-if="!props.loading">
+      <table :style="tableStyle">
+        <thead>
+          <tr>
+            <th v-for="col in props.columns" :key="col.key" :style="{ width: col.width }" @click="col.sortable && handleSort(col.key)">
+              {{ col.header }}
+              <span v-if="col.sortable" class="sort-icon" :class="sortIconClass(col.key)"></span>
+            </th>
+            <th v-if="props.rowActions" style="width: 120px">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="row in displayedData" :key="row.id" :class="{ selected: isSelected(row) }">
+            <td v-for="col in props.columns" :key="col.key">
+              <span v-if="col.render" v-html="col.render(row)" />
+              <span v-else>{{ row[col.key] }}</span>
+            </td>
+            <td v-if="props.rowActions">
+              <div class="actions">
+                <Button
+                  v-for="action in props.rowActions"
+                  :key="action.label"
+                  :variant="action.variant"
+                  size="sm"
+                  icon-only
+                  @click="action.action(row)"
+                >
+                  <i :class="action.icon" />
+                </Button>
+              </div>
+            </td>
+          </tr>
+          <tr v-if="displayedData.length === 0 && !props.loading">
+            <td :colspan="props.columns.length + (props.rowActions ? 1 : 0)">
+              <EmptyState v-bind="props.emptyState" />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <Skeleton v-else variant="table" :rows="10" />
+    <Pagination v-if="props.pagination" :total="filteredData.length" @page-change="$emit('pageChange', $event)" />
+  </div>
+</template>
+
+<style scoped>
+.data-table { overflow-x: auto; }
+.table-wrapper { min-width: 600px; }
+table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+th, td { padding: var(--space-3) var(--space-4); text-align: left; border-bottom: 1px solid var(--color-border-subtle); }
+th { background: var(--color-bg-secondary); font-weight: 600; color: var(--color-text-primary); white-space: nowrap; }
+th:hover { background: var(--color-bg-tertiary); cursor: pointer; }
+tr:hover td { background: var(--color-bg-tertiary); }
+tr.selected td { background: var(--color-brand-primary) / 0.1; }
+.actions { display: flex; gap: var(--space-2); }
+</style>
+```
+
+### 6.3 Badge.vue (Status Específicos do Domínio)
+
+```vue
+<!-- frontend/src/components/ui/Badge.vue -->
+<script setup lang="ts">
+import { tokens } from '@/utils/tokens';
+
+type Variant = 'ativo' | 'manutencao' | 'baixa' | 'critico' | 'info' | 'warning' | 'success' | 'neutral';
+
+interface Props {
+  variant: Variant;
+  dot?: boolean;
+  removable?: boolean;
+  label?: string;
 }
+
+const props = withDefaults(defineProps<Props>(), {
+  variant: 'neutral',
+  dot: false,
+  removable: false,
+});
+
+defineEmits<{ remove: [] }>();
+
+const variantClasses: Record<Variant, string> = {
+  ativo: 'badge-ativo',
+  manutencao: 'badge-manutencao',
+  baixa: 'badge-baixa',
+  critico: 'badge-critico',
+  info: 'badge-info',
+  warning: 'badge-warning',
+  success: 'badge-success',
+  neutral: 'badge-neutral',
+};
+</script>
+
+<template>
+  <span :class="['badge', variantClasses[props.variant]]" :style="badgeStyle">
+    <span v-if="props.dot" class="badge-dot" aria-hidden="true"></span>
+    <slot>{{ props.label || props.variant }}</slot>
+    <button v-if="props.removable" class="badge-remove" @click="$emit('remove')" aria-label="Remover">
+      <i class="bi bi-x" />
+    </button>
+  </span>
+</template>
+
+<style scoped>
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--badge-padding);
+  border-radius: var(--badge-radius);
+  font-size: var(--badge-font-size);
+  font-weight: var(--badge-font-weight);
+  white-space: nowrap;
+}
+.badge-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.badge-remove { display: flex; align-items: center; justify-content: center; width: 16px; height: 16px; border: none; background: transparent; color: inherit; opacity: 0.7; cursor: pointer; }
+.badge-remove:hover { opacity: 1; }
+
+.badge-ativo { background: var(--badge-ativo-bg); color: var(--badge-ativo-text); }
+.badge-manutencao { background: var(--badge-manutencao-bg); color: var(--badge-manutencao-text); }
+.badge-baixa { background: var(--color-bg-tertiary); color: var(--color-text-secondary); }
+.badge-critico { background: var(--badge-alerta-bg); color: var(--badge-alerta-text); }
+.badge-info { background: var(--color-info-bg); color: var(--color-info); }
+.badge-warning { background: var(--color-warning-bg); color: var(--color-warning); }
+.badge-success { background: var(--color-success-bg); color: var(--color-success); }
+.badge-neutral { background: var(--color-bg-secondary); color: var(--color-text-secondary); }
+</style>
 ```
 
 ---
 
-### 4.6 Modal
+## 7. Integração com Design Tokens
 
-* **Propósito:** Diálogo modal para criação/edição de entidades (Flow 2, 3, 4), confirmações destrutivas, formulários complexos.
-* **Anatomia:** `div[role="dialog"]` + `div.modal-backdrop` + `div.modal-container` + `header` + `main` + `footer`.
+### 7.1 Import Global (main.ts)
 
-#### Props/API
+```typescript
+// frontend/src/main.ts
+import '@/styles/tokens.css';  // CSS Custom Properties
+import '@/styles/global.css';  // Reset + base styles
+```
 
-| Prop | Tipo | Default | Descrição |
+### 7.2 Uso em Componentes
+
+```vue
+<!-- Exemplo: AtivoCard.vue -->
+<script setup lang="ts">
+import { tokens } from '@/utils/tokens';
+import Badge from '@/components/ui/Badge.vue';
+import Button from '@/components/ui/Button.vue';
+import IconButton from '@/components/ui/IconButton.vue';
+
+defineProps<{ ativo: Ativo }>();
+</script>
+
+<template>
+  <div class="ativo-card" :style="cardStyle">
+    <div class="header">
+      <h3 class="title">{{ ativo.nome }}</h3>
+      <Badge :variant="statusVariant" :label="ativo.status" />
+    </div>
+    <div class="meta">
+      <code class="serial">{{ ativo.numeroSerie }}</code>
+      <span class="filial">{{ ativo.filial.nome }}</span>
+    </div>
+    <div class="actions">
+      <IconButton @click="openDetail" aria-label="Ver detalhes">
+        <i class="bi bi-eye" />
+      </IconButton>
+      <IconButton @click="printQR" aria-label="Imprimir QR Code">
+        <i class="bi bi-qr-code" />
+      </IconButton>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.ativo-card {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--duration-fast) var(--ease-standard);
+}
+.ativo-card:hover { box-shadow: var(--shadow-md); }
+.header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--space-3); }
+.title { font-size: var(--text-lg); font-weight: 600; color: var(--color-text-primary); margin: 0; }
+.meta { display: flex; flex-direction: column; gap: var(--space-1); margin-bottom: var(--space-3); }
+.serial { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-secondary); }
+.filial { font-size: var(--text-sm); color: var(--color-text-secondary); }
+.actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
+</style>
+```
+
+---
+
+## 8. Testes de Componentes
+
+| Tipo | Ferramenta | Cobertura Mínima | Comando |
 | :--- | :--- | :--- | :--- |
-| `size` | `'sm' \| 'md' \| 'lg' \| 'xl'` | `'md'` | `max-width`: sm=400px, md=560px, lg=720px, xl=960px |
-| `title` | `string` | `''` | Título no header (aria-labelledby) |
-| `closable` | `boolean` | `true` | Botão fechar (X) + ESC + click backdrop |
-| `footerActions` | `ButtonConfig[]` | `[]` | Botões no footer (ex: Cancelar, Salvar) |
-| `content` | `HTMLElement \| string` | `''` | Conteúdo do body (formulário, texto, etc.) |
-| `trapFocus` | `boolean` | `true` | Focus trap dentro do modal |
-| `onClose` | `() => void` | `undefined` | Callback ao fechar |
-| `onOpen` | `() => void` | `undefined` | Callback ao abrir |
+| **Unitário** | Vitest + Vue Test Utils | 80% (linhas, branches, functions) | `npm run test:unit` |
+| **Integração** | Cypress Component Testing | Fluxos críticos (Form submit, DataTable sort/filter) | `npm run test:component` |
+| **Visual Regression** | Chromatic / Storybook | Todos componentes UI base | `npm run chromatic` |
+| **Acessibilidade** | axe-core (Cypress) | 0 violações WCAG 2.1 AA | `npm run test:a11y` |
 
-#### Estados visuais
+### Exemplo Teste Unitário (Button)
 
-| Estado | Comportamento Visual |
-| :--- | :--- |
-| **Backdrop** | `position: fixed`, `inset: 0`, `background: rgba(0,0,0,0.5)`, `z-index: var(--z-modal-backdrop)`, `animation: fadeIn var(--duration-base)` |
-| **Container** | `background: var(--color-panel)`, `border-radius: var(--radius-lg)`, `box-shadow: var(--shadow-lg)`, `z-index: var(--z-modal)`, `max-height: 90vh`, `display: flex`, `flex-direction: column`, `animation: slideUp var(--duration-base)` |
-| **Header** | `padding: var(--space-4) var(--space-6)`, `border-bottom: 1px solid var(--color-border-light)`, `display: flex`, `justify-content: space-between`, `align-items: center` |
-| **Body** | `padding: var(--space-6)`, `overflow-y: auto`, `flex: 1` |
-| **Footer** | `padding: var(--space-4) var(--space-6)`, `border-top: 1px solid var(--color-border-light)`, `display: flex`, `justify-content: flex-end`, `gap: var(--space-3)` |
-| **Close button** | `IconButton` ghost, `aria-label="Fechar"` |
+```typescript
+// frontend/src/components/ui/Button.test.ts
+import { mount } from '@vue/test-utils';
+import Button from './Button.vue';
+import { describe, it, expect, vi } from 'vitest';
 
-#### Tokens consumidos
+describe('Button', () => {
+  it('emite click quando clicado', async () => {
+    const wrapper = mount(Button, { slots: { default: 'Salvar' } });
+    await wrapper.trigger('click');
+    expect(wrapper.emitted('click')).toBeTruthy();
+  });
 
-`--color-panel`, `--color-border-light`, `--radius-lg`, `--shadow-lg`, `--z-modal-backdrop`, `--z-modal`, `--space-3`, `--space-4`, `--space-6`, `--duration-base`, `--color-text-primary`, `--color-text-secondary`
+  it('não emite click quando disabled', async () => {
+    const wrapper = mount(Button, { props: { disabled: true }, slots: { default: 'Salvar' } });
+    await wrapper.trigger('click');
+    expect(wrapper.emitted('click')).toBeFalsy();
+  });
 
-#### Exemplo de uso (Flow 3 - Criação de Ativo)
+  it('aplica variant danger corretamente', () => {
+    const wrapper = mount(Button, { props: { variant: 'danger' }, slots: { default: 'Excluir' } });
+    expect(wrapper.classes()).toContain('btn-danger');
+  });
 
-```js
-import { createModal } from './components/modal.js';
-import { createButton } from './components/button.js';
-import { createFormLayout } from './components/form-layout.js';
-
-const modalCriarAtivo = createModal({
-  size: 'lg',
-  title: 'Novo Ativo',
-  closable: true,
-  content: formLayout.element, // FormLayout com todos os campos
-  footerActions: [
-    createButton({ variant: 'secondary', label: 'Cancelar', onClick: () => modalCriarAtivo.hide() }),
-    createButton({ variant: 'primary', label: 'Criar Ativo', loading: false, onClick: async () => {
-      const btn = footerActions[1];
-      btn.update({ loading: true });
-      try {
-        await api.post('/ativos', formLayout.getValues());
-        toast.success('Ativo criado com sucesso');
-        modalCriarAtivo.hide();
-        table.refresh();
-      } catch (err) {
-        formLayout.setErrors(err.response.data.errors);
-      } finally {
-        btn.update({ loading: false });
-      }
-    }})
-  ],
-  onClose: () => formLayout.reset()
-});
-
-// Abrir
-document.querySelector('#btn-novo-ativo').addEventListener('click', () => {
-  formLayout.reset();
-  modalCriarAtivo.show();
+  it('mostra spinner quando loading', () => {
+    const wrapper = mount(Button, { props: { loading: true }, slots: { default: 'Salvar' } });
+    expect(wrapper.find('.spinner').exists()).toBe(true);
+  });
 });
 ```
 
 ---
 
-### 4.7 Toast
+## 9. Storybook (Documentação Visual)
 
-* **Propósito:** Notificações globais não-bloqueantes (sucesso, erro, aviso, info) — usado em **todos os fluxos** para feedback de ações assíncronas.
-* **Anatomia:** `div[role="alert" \| "status"]` + `icon` + `div.content` (title + message) + `button.close` (opcional) + `div.progress` (auto-dismiss).
+```typescript
+// frontend/src/components/ui/Button.stories.ts
+import type { Meta, StoryObj } from '@storybook/vue3';
+import Button from './Button.vue';
 
-#### Props/API
-
-| Prop | Tipo | Default | Descrição |
-| :--- | :--- | :--- | :--- |
-| `variant` | `'success' \| 'warning' \| 'danger' \| 'info'` | `'info'` | Define cor/ícone |
-| `title` | `string` | `''` | Título em negrito |
-| `message` | `string` | `''` | Mensagem detalhada |
-| `duration` | `number` | `5000` | ms para auto-dismiss (0 = persistente) |
-| `persistent` | `boolean` | `false` | Não auto-dismiss (erros críticos) |
-| `action` | `{ label: string, onClick: () => void }` | `undefined` | Botão de ação (ex: "Desfazer") |
-| `onDismiss` | `() => void` | `undefined` | Callback ao fechar |
-
-#### Estados visuais
-
-| Estado | Comportamento Visual |
-| :--- | :--- |
-| **Container (toast stack)** | `position: fixed`, `bottom: var(--toast-offset)`, `right: var(--toast-offset)`, `z-index: var(--z-toast)`, `display: flex`, `flex-direction: column`, `gap: var(--space-2)` |
-| **Toast** | `display: flex`, `gap: var(--alert-gap)`, `padding: var(--alert-padding)`, `border-radius: var(--alert-radius)`, `box-shadow: var(--shadow-lg)`, `min-width: 320px`, `max-width: 480px`, `animation: slideInRight var(--duration-base)` |
-| **Success** | `background: var(--color-success-bg)`, `border-left: 4px solid var(--color-success)`, `color: var(--color-success)` |
-| **Warning** | `background: var(--color-warning-bg)`, `border-left: 4px solid var(--color-warning)`, `color: var(--color-warning)` |
-| **Danger** | `background: var(--color-danger-bg)`, `border-left: 4px solid var(--color-danger)`, `color: var(--color-danger)` |
-| **Info** | `background: var(--color-info-bg)`, `border-left: 4px solid var(--color-info)`, `color: var(--color-info)` |
-| **Icon** | `width: var(--alert-icon-size)`, `height: var(--alert-icon-size)`, `flex-shrink: 0` |
-| **Progress bar** | `position: absolute`, `bottom: 0`, `left: 0`, `height: 3px`, `background: currentColor`, `opacity: 0.3`, `animation: progress var(--toast-duration) linear forwards` |
-| **Exit** | `animation: slideOutRight var(--duration-fast)` |
-
-#### Tokens consumidos
-
-`--toast-offset`, `--z-toast`, `--alert-padding`, `--alert-radius`, `--alert-gap`, `--alert-icon-size`, `--toast-duration`, `--color-success-bg`, `--color-success`, `--color-warning-bg`, `--color-warning`, `--color-danger-bg`, `--color-danger`, `--color-info-bg`, `--color-info`, `--shadow-lg`, `--space-2`, `--duration-base`, `--duration-fast`
-
-#### Exemplo de uso (Singleton ToastManager)
-
-```js
-import { createToast } from './components/toast.js';
-
-// ToastManager global (singleton)
-const toast = {
-  success: (title, message, opts = {}) => createToast({ variant: 'success', title, message, ...opts }).show(),
-  warning: (title, message, opts = {}) => createToast({ variant: 'warning', title, message, ...opts }).show(),
-  danger: (title, message, opts = {}) => createToast({ variant: 'danger', title, message, persistent: true, ...opts }).show(),
-  info: (title, message, opts = {}) => createToast({ variant: 'info', title, message, ...opts }).show()
+const meta: Meta<typeof Button> = {
+  title: 'UI/Button',
+  component: Button,
+  tags: ['autodocs'],
+  argTypes: {
+    variant: { control: 'select', options: ['primary', 'secondary', 'danger', 'ghost'] },
+    size: { control: 'select', options: ['sm', 'md', 'lg'] },
+    loading: { control: 'boolean' },
+    disabled: { control: 'boolean' },
+  },
 };
 
-// Uso em qualquer lugar
-toast.success('Ativo criado', 'O ativo AT-2024-001 foi cadastrado com sucesso.');
-toast.danger('Erro ao salvar', 'Tag já cadastrada. Informe uma tag única.', { 
-  action: { label: 'Tentar novamente', onClick: () => modalCriarAtivo.show() } 
-});
+export default meta;
+type Story = StoryObj<typeof Button>;
+
+export const Primary: Story = { args: { variant: 'primary', default: 'Salvar' } };
+export const Secondary: Story = { args: { variant: 'secondary', default: 'Cancelar' } };
+export const Danger: Story = { args: { variant: 'danger', default: 'Excluir' } };
+export const Ghost: Story = { args: { variant: 'ghost', default: 'Voltar' } };
+export const Loading: Story = { args: { loading: true, default: 'Salvando...' } };
+export const IconOnly: Story = { args: { iconOnly: true, default: '<i class="bi bi-search" />' } };
 ```
 
 ---
 
-### 4.8 Badge
+## 10. Governance & Versionamento
 
-* **Propósito:** Indicador de status visual para ativos, manutenções, alertas (Flow 3, 4, 5). **Nunca comunica status apenas por cor** — sempre com texto + ícone opcional.
-* **Anatomia:** `span.badge` + `span.dot` (opcional) + `span.text`.
-
-#### Props/API
-
-| Prop | Tipo | Default | Descrição |
-| :--- | :--- | :--- | :--- |
-| `variant` | `'ativo' \| 'manutencao' \| 'baixa' \| 'critico' \| 'info' \| 'warning' \| 'success' \| 'neutral'` | `'neutral'` | Mapeia tokens semânticos |
-| `label` | `string` | `''` | Texto exibido |
-| `dot` | `boolean` | `false` | Indicador circular antes do label |
-| `removable` | `boolean` | `false` | Botão fechar (para chips em multi-select) |
-| `onRemove` | `() => void` | `undefined` | Handler de remoção |
-
-#### Estados visuais
-
-| Variante | Background | Texto | Uso |
-| :--- | :--- | :--- | :--- |
-| `ativo` | `var(--badge-status-ativo-bg)` | `var(--badge-status-ativo-text)` | Ativo operacional |
-| `manutencao` | `var(--badge-status-manutencao-bg)` | `var(--badge-status-manutencao-text)` | Em manutenção / Aguardando aprovação |
-| `baixa` | `var(--badge-status-baixa-bg)` | `var(--badge-status-baixa-text)` | Baixado / Inativo |
-| `critico` | `var(--badge-status-alerta-critico-bg)` | `var(--badge-status-alerta-critico-text)` | Alerta disco/saúde crítico |
-| `success` | `var(--color-success-bg)` | `var(--color-success)` | Genérico sucesso |
-| `warning` | `var(--color-warning-bg)` | `var(--color-warning)` | Genérico aviso |
-| `info` | `var(--color-info-bg)` | `var(--color-info)` | Genérico info |
-| `neutral` | `var(--color-bg-tertiary)` | `var(--color-text-secondary)` | Neutro |
-
-#### Tokens consumidos
-
-`--badge-padding-x`, `--badge-padding-y`, `--badge-font-size`, `--badge-font-weight`, `--badge-radius`, `--badge-status-*-bg`, `--badge-status-*-text`, `--color-success-bg`, `--color-success`, `--color-warning-bg`, `--color-warning`, `--color-info-bg`, `--color-info`, `--color-bg-tertiary`, `--color-text-secondary`, `--radius-full`, `--text-xs`, `--space-2`
-
-#### Exemplo de uso
-
-```js
-import { createBadge } from './components/badge.js';
-
-// Em DataTable render de status
-render: (status) => {
-  const variantMap = {
-    'ATIVO': 'ativo',
-    'EM_MANUTENCAO': 'manutencao',
-    'AGUARDANDO_APROVACAO': 'manutencao',
-    'BAIXADO': 'baixa',
-    'CANCELADO': 'neutral'
-  };
-  return createBadge({ variant: variantMap[status] || 'neutral', label: status, dot: true }).element.outerHTML;
-}
-```
-
----
-
-### 4.9 Tooltip
-
-* **Propósito:** Texto contextual em hover/focus — ícones de ação, headers de tabela truncados, badges. **Usa `@popperjs/core`** para posicionamento.
-* **Anatomia:** `div[role="tooltip"]` + `div.arrow` + `div.content`.
-
-#### Props/API
-
-| Prop | Tipo | Default | Descrição |
-| :--- | :--- | :--- | :--- |
-| `content` | `string \| HTMLElement` | **obrigatório** | Conteúdo do tooltip |
-| `placement` | `'top' \| 'bottom' \| 'left' \| 'right'` | `'top'` | Posição relativa ao trigger |
-| `trigger` | `'hover' \| 'focus' \| 'click'` | `'hover'` | Evento que abre |
-| `delay` | `number` | `200` | ms para mostrar/esconder |
-| `interactive` | `boolean` | `false` | Permite hover no próprio tooltip |
-| `offset` | `number` | `8` | Distância do trigger (px) |
-
-#### Estados visuais
-
-| Estado | Comportamento Visual |
+| Regra | Descrição |
 | :--- | :--- |
-| **Default** | `background: var(--color-text-primary)`, `color: var(--color-text-inverse)`, `padding: var(--space-1) var(--space-2)`, `border-radius: var(--radius-sm)`, `font-size: var(--text-xs)`, `white-space: nowrap`, `box-shadow: var(--shadow-md)`, `z-index: var(--z-tooltip)` |
-| **Arrow** | `::before` com `border-color: var(--color-text-primary) transparent` |
-| **Animation** | `opacity: 0 → 1`, `transform: translateY(-4px) → 0`, `transition: var(--duration-fast)` |
-
-#### Tokens consumidos
-
-`--color-text-primary`, `--color-text-inverse`, `--space-1`, `--space-2`, `--radius-sm`, `--text-xs`, `--shadow-md`, `--z-tooltip`, `--duration-fast`
-
-#### Exemplo de uso
-
-```js
-import { createTooltip } from './components/tooltip.js';
-
-// Em IconButton da tabela
-const btnEditar = createIconButton({ ariaLabel: 'Editar ativo', icon: editIcon });
-const tooltipEditar = createTooltip({
-  trigger: btnEditar.element,
-  content: 'Editar ativo',
-  placement: 'top',
-  delay: 150
-});
-
-// Cleanup
-btnEditar.element.addEventListener('remove', () => tooltipEditar.destroy());
-```
+| **Versionamento** | Componentes UI base seguem semver independente (`@aegis/ui@1.x.x`); componentes de domínio versionados com app |
+| **Breaking Changes** | Props removidas/renomeadas → major; novas props opcionais → minor; bugfix → patch |
+| **Depreciação** | 2 versões minor de aviso + migration guide no CHANGELOG |
+| **Design Tokens** | Mudança em token primitivo → major em `@aegis/ui` + comunicação 30 dias antes |
+| **Code Owners** | `ui/` → Frontend Lead + Design; `forms/`, `data-display/` → Domain Team + Frontend; `layout/` → Frontend Lead |
 
 ---
 
-### 4.10 Sidebar
+## 11. Métricas de Qualidade
 
-* **Propósito:** Navegação principal lateral — **componente de layout** presente em todas as telas autenticadas (Flow 1–7). Responsivo: fixa em `≥ --bp-lg`, drawer em `< --bp-lg`.
-* **Anatomia:** `aside[role="navigation"]` + `nav` + `ul` + `li` + `a`/`button` + `div.user-menu` (bottom).
-
-#### Props/API
-
-| Prop | Tipo | Default | Descrição |
-| :--- | :--- | :--- | :--- |
-| `items` | `NavItem[]` | `[]` | Itens de navegação (ver abaixo) |
-| `collapsible` | `boolean` | `true` | Permite colapsar para ícones apenas |
-| `collapsed` | `boolean` | `false` | Estado inicial |
-| `activeItem` | `string` | `undefined` | Key do item ativo |
-| `logo` | `{ src: string, alt: string, href: string }` | `undefined` | Logo no topo |
-| `userMenu` | `UserMenuConfig` | `undefined` | Menu do usuário no rodapé |
-| `onNavigate` | `(href: string) => void` | `undefined` | Handler de navegação (SPA router) |
-| `onToggleCollapse` | `(collapsed: boolean) => void` | `undefined` | Persiste em localStorage |
-
-#### NavItem
-
-```ts
-interface NavItem {
-  key: string;           // ex: 'ativos', 'manutencoes'
-  label: string;         // ex: 'Ativos'
-  icon: HTMLElement;     // SVG icon
-  href?: string;         // rota (se não tiver children)
-  children?: NavItem[];  // submenu (accordion)
-  badge?: string | number; // contador (ex: alertas não lidos)
-  roles?: ('ADMIN' | 'USER')[]; // controle de visibilidade por role
-}
-```
-
-#### Estados visuais
-
-| Estado | Comportamento Visual |
-| :--- | :--- |
-| **Sidebar expandida** | `width: 260px`, `transition: width var(--duration-base)` |
-| **Sidebar colapsada** | `width: 72px`, labels ocultos (`opacity: 0`, `pointer-events: none`), tooltips nos ícones |
-| **Item ativo** | `background: var(--color-accent-light)`, `color: var(--color-accent-primary)`, `border-right: 3px solid var(--color-accent-primary)` |
-| **Item hover** | `background: var(--color-bg-tertiary)` |
-| **Submenu aberto** | `max-height: 0 → auto`, `transition: max-height var(--duration-base)` |
-| **Mobile (drawer)** | `position: fixed`, `left: 0`, `top: 0`, `height: 100vh`, `z-index: var(--z-sidebar)`, `transform: translateX(-100%) → 0`, backdrop `var(--z-modal-backdrop)` |
-
-#### Tokens consumidos
-
-`--color-bg-secondary`, `--color-bg-tertiary`, `--color-accent-light`, `--color-accent-primary`, `--color-text-primary`, `--color-text-secondary`, `--color-text-muted`, `--space-3`, `--space-4`, `--space-6`, `--radius-md`, `--shadow-md`, `--z-sidebar`, `--z-modal-backdrop`, `--duration-base`, `--bp-lg`
-
-#### Exemplo de uso
-
-```js
-import { createSidebar } from './components/sidebar.js';
-
-const navItems = [
-  { key: 'dashboard', label: 'Dashboard', icon: homeIcon, href: '/dashboard', roles: ['ADMIN', 'USER'] },
-  { key: 'ativos', label: 'Ativos', icon: boxIcon, href: '/ativos', roles: ['ADMIN', 'USER'] },
-  { key: 'manutencoes', label: 'Manutenções', icon: toolIcon, href: '/manutencoes', badge: 3, roles: ['ADMIN', 'USER'] },
-  { key: 'alertas', label: 'Alertas', icon: bellIcon, href: '/alertas', badge: 7, roles: ['ADMIN', 'USER'] },
-  { key: 'cadastros', label: 'Cadastros', icon: databaseIcon, children: [
-    { key: 'filiais', label: 'Filiais', href: '/cadastros/filiais', roles: ['ADMIN'] },
-    { key: 'departamentos', label: 'Departamentos', href: '/cadastros/departamentos', roles: ['ADMIN'] },
-    { key: 'tipos-ativo', label: 'Tipos de Ativo', href: '/cadastros/tipos-ativo', roles: ['ADMIN'] },
-    { key: 'fornecedores', label: 'Fornecedores', href: '/cadastros/fornecedores', roles: ['ADMIN'] },
-    { key: 'localizacoes', label: 'Localizações', href: '/cadastros/localizacoes', roles: ['ADMIN'] }
-  ], roles: ['ADMIN'] },
-  { key: 'relatorios', label: 'Relatórios', icon: chartIcon, href: '/relatorios', roles: ['ADMIN'] },
-  { key: 'auditoria', label: 'Auditoria', icon: shieldIcon, href: '/auditoria', roles: ['ADMIN'] },
-  { key: 'usuarios', label: 'Usuários', icon: usersIcon, href: '/usuarios', roles: ['ADMIN'] }
-];
-
-const sidebar = createSidebar({
-  items: navItems,
-  collapsible: true,
-  collapsed: localStorage.getItem('sidebarCollapsed') === 'true',
-  logo: { src: '/logo.svg', alt: 'Aegis Patrimonio', href: '/dashboard' },
-  userMenu: {
-    name: currentUser.nome,
-    email: currentUser.email,
-    avatar: currentUser.avatarUrl,
-    items: [
-      { label: 'Meu Perfil', icon: userIcon, onClick: () => router.navigate('/perfil') },
-      { label: 'Preferências', icon: settingsIcon, onClick: () => router.navigate('/preferencias') },
-      { type: 'divider' },
-      { label: 'Sair', icon: logoutIcon, variant: 'danger', onClick: () => auth.logout() }
-    ]
-  },
-  onNavigate: (href) => router.navigate(href),
-  onToggleCollapse: (collapsed) => localStorage.setItem('sidebarCollapsed', collapsed)
-});
-
-// Render
-document.querySelector('#app-layout').prepend(sidebar.element);
-```
+| Métrica | Target | Ferramenta |
+| :--- | :--- | :--- |
+| **Bundle size (UI base)** | < 50 kB gzipped | `vite-bundle-analyzer` |
+| **Tree-shaking** | 100% (apenas componentes importados no bundle) | Rollup/Vite |
+| **Acessibilidade** | 0 violações axe-core | Cypress + axe |
+| **TypeScript strict** | `strict: true`, zero `any` | `tsc --noEmit` |
+| **Test coverage** | ≥ 80% | Vitest + c8 |
+| **Storybook coverage** | 100% componentes UI base | Chromatic |
 
 ---
 
-### 4.11 FormLayout
+## 12. Referências
 
-* **Propósito:** Layout de formulário responsivo (grid 1/2/3 colunas) com labels alinhados — usado em **todos os modais de criação/edição** (Flow 2, 3, 4, 7).
-* **Anatomia:** `form` + `div.form-grid` + `div.form-field` (label + input + helper/error) + `div.form-actions` (footer).
-
-#### Props/API
-
-| Prop | Tipo | Default | Descrição |
-| :--- | :--- | :--- | :--- |
-| `fields` | `FormField[]` | `[]` | Array de campos (ver abaixo) |
-| `colCount` | `1 \| 2 \| 3` | `2` | Colunas no desktop (≥ `--bp-lg`) |
-| `labelPosition` | `'top' \| 'left'` | `'top'` | Label acima ou à esquerda do input |
-| `onSubmit` | `(data: Record<string, any>) => Promise<void>` | `undefined` | Handler de submit |
-| `submitButton` | `ButtonConfig` | `undefined` | Config do botão submit |
-| `cancelButton` | `ButtonConfig` | `undefined` | Config do botão cancelar |
-
-#### FormField
-
-```ts
-interface FormField {
-  key: string;                    // nome do campo no objeto de dados
-  component: HTMLElement;         // Input.element, Select.element, etc.
-  span?: number;                  // col-span (1 a colCount)
-  required?: boolean;             // asterisco no label
-  validator?: (value: any) => string | null; // validação síncrona
-  asyncValidator?: (value: any) => Promise<string | null>; // validação assíncrona
-}
-```
-
-#### Estados visuais
-
-| Estado | Comportamento Visual |
-| :--- | :--- |
-| **Grid** | `display: grid`, `grid-template-columns: repeat(var(--col-count), 1fr)`, `gap: var(--space-4) var(--space-6)` |
-| **Responsive** | `@media (max-width: 768px) { grid-template-columns: 1fr }` |
-| **Field** | `display: flex`, `flex-direction: column`, `gap: var(--label-gap)` |
-| **Label** | `font-size: var(--label-font-size)`, `font-weight: var(--label-font-weight)` |
-| **Error state** | Input com `aria-invalid="true"`, error text com `role="alert"` |
-| **Actions** | `display: flex`, `justify-content: flex-end`, `gap: var(--space-3)`, `padding-top: var(--space-4)`, `border-top: 1px solid var(--color-border-light)`, `margin-top: var(--space-6)` |
-
-#### Tokens consumidos
-
-`--space-3`, `--space-4`, `--space-6`, `--label-font-size`, `--label-font-weight`, `--label-gap`, `--color-border-light`, `--color-text-primary`, `--color-text-secondary`, `--color-text-muted`, `--duration-base`
-
-#### Exemplo de uso (Flow 3 - Formulário de Ativo)
-
-```js
-import { createFormLayout } from './components/form-layout.js';
-import { createInput } from './components/input.js';
-import { createSelect } from './components/select.js';
-import { createDatePicker } from './components/date-picker.js';
-import { createTextarea } from './components/textarea.js';
-
-const fields = [
-  { key: 'tag', component: createInput({ label: 'Tag *', required: true, maxLength: 50 }).element, span: 1, required: true },
-  { key: 'nome', component: createInput({ label: 'Nome *', required: true, maxLength: 200 }).element, span: 2, required: true },
-  { key: 'descricao', component: createTextarea({ label: 'Descrição', rows: 3 }).element, span: 3 },
-  { key: 'tipoId', component: createSelect({ label: 'Tipo de Ativo *', required: true, loadOptions: loadTiposAtivo }).element, span: 1, required: true },
-  { key: 'filialId', component: createSelect({ label: 'Filial *', required: true, loadOptions: loadFiliais }).element, span: 1, required: true },
-  { key: 'departamentoId', component: createSelect({ label: 'Departamento *', required: true, loadOptions: loadDepartamentos }).element, span: 1, required: true },
-  { key: 'localizacaoId', component: createSelect({ label: 'Localização', loadOptions: loadLocalizacoes }).element, span: 1 },
-  { key: 'fornecedorId', component: createSelect({ label: 'Fornecedor', loadOptions: loadFornecedores }).element, span: 1 },
-  { key: 'dataAquisicao', component: createDatePicker({ label: 'Data de Aquisição *', required: true, maxDate: new Date() }).element, span: 1, required: true },
-  { key: 'valorAquisicao', component: createInput({ label: 'Valor de Aquisição (R$)', type: 'number', step: '0.01', min: 0 }).element, span: 1 },
-  { key: 'vidaUtilAnos', component: createInput({ label: 'Vida Útil (anos)', type: 'number', min: 1, max: 50 }).element, span: 1 },
-  { key: 'status', component: createSelect({ label: 'Status *', required: true, options: [
-    { value: 'ATIVO', label: 'Ativo' },
-    { value: 'EM_MANUTENCAO', label: 'Em Manutenção' },
-    { value: 'AGUARDANDO_APROVACAO', label: 'Aguardando Aprovação' },
-    { value: 'BAIXADO', label: 'Baixado' }
-  ]}).element, span: 1, required: true }
-];
-
-const formLayout = createFormLayout({
-  fields,
-  colCount: 3,
-  labelPosition: 'top',
-  submitButton: { variant: 'primary', label: 'Salvar', loading: false },
-  cancelButton: { variant: 'secondary', label: 'Cancelar' },
-  onSubmit: async (data) => {
-    if (editingId) {
-      await api.put(`/ativos/${editingId}`, data);
-      toast.success('Ativo atualizado');
-    } else {
-      await api.post('/ativos', data);
-      toast.success('Ativo criado');
-    }
-    modalCriarAtivo.hide();
-    table.refresh();
-  }
-});
-```
+- `design-tokens.md` — Tokens consumidos por todos componentes
+- `ui-style-guide.md` — Diretrizes visuais e de uso
+- `accessibility-guidelines.md` — Requisitos WCAG 2.1 AA
+- `user-flows.md` — Fluxos que definem necessidades de componentes
+- `system-architecture.md` — Stack frontend (Vue 3, Bootstrap 5, Pinia, Vite)
+- `api-specification.md` — Contratos de API consumidos pelos forms/data-display
 
 ---
 
-## 5. Componentes em Depreciação
-
-| Componente | Motivo | Substituído por | Prazo de Remoção |
-| :--- | :--- | :--- | :--- |
-| *Nenhum* | Primeira versão do design system — não há componentes legados | — | — |
-
----
-
-## 6. Gaps Conhecidos
-
-| Componente Necessário | Contexto / Fluxo | Prioridade | Observações |
-| :--- | :--- | :--- | :--- |
-| **Wizard / Stepper** | Flow 3 (Criação de Ativo com hardware em abas), Flow 4 (Fluxo de manutenção multi-etapas) | Alta | Necessário para formulários complexos em etapas |
-| **TreeSelect** | Flow 2 (Hierarquia de filiais/departamentos/localizações) | Média | Seleção em árvore com busca |
-| **DataGrid (virtualizado)** | Flow 3 (Lista de ativos > 10k registros) | Média | DataTable atual não virtualiza — performance em listas grandes |
-| **Chart / Sparkline** | Flow 5 (Histórico de saúde de disco), Flow 6 (Dashboards TCO) | Média | Gráficos simples (linha, barra, área) — considerar `uPlot` ou `Chart.js` leve |
-| **RichTextEditor** | Flow 4 (Descrição detalhada de manutenção com formatação) | Baixa | Apenas se requisito de negócio exigir |
-| **Calendar / DateRangePicker** | Flow 6 (Filtros de período em relatórios) | Média | Atualmente só `DatePicker` single |
-| **Command Palette (Cmd+K)** | Transversal — navegação rápida, ações globais | Baixa | Melhoria de UX para power users (ADMIN) |
-| **Tour / Onboarding** | Flow 1 (Primeiro acesso) | Baixa | Guias interativos para novos usuários |
-
----
-
-## 7. Referências
-
-* **Design Tokens:** `design-tokens.md` (este repositório) — fonte única de verdade para cores, espaçamento, tipografia, motion, z-index, breakpoints, tokens semânticos de componente
-* **User Flows:** `user-flows.md` (este repositório) — define quais componentes são necessários em cada fluxo e seus estados
-* **Glossário Ubíquo:** `docs/glossario.md` <!-- source: glossario#L1-L75 --> — nomenclatura de domínio (Ativo, Manutenção, Filial, etc.)
-* **Business Requirements Document:** `docs/brd.md` (seções 3, 4, 6) — regras de negócio (BR-01 a BR-10), KPIs, personas
-* **Diagnóstico Determinístico:** `docs/diagnostico.md` — confirma stack vanilla JS + Popper.js only, 0 componentes UI existentes
-* **Popper.js Docs:** https://popper.js.org/docs/v2/ — posicionamento de Tooltip, Dropdown, Select, DatePicker
-* **WCAG 2.1 AA:** https://www.w3.org/WAI/WCAG21/quickref/ — checklist de acessibilidade aplicado a todos os componentes
-
----
-
-> **Próximos passos (action items):**
-> 1. [ ] Criar diretório `frontend/src/components/` e `index.js` barrel export
-> 2. [ ] Implementar `Button`, `Input`, `Select`, `Modal`, `Toast` (core para formulários)
-> 3. [ ] Implementar `DataTable` (componente mais complexo — prioridade alta)
-> 4. [ ] Implementar `Sidebar`, `Header`, `FormLayout` (layout base da aplicação)
-> 5. [ ] Implementar `Badge`, `Tooltip`, `IconButton`, `Alert`, `EmptyState`, `Skeleton`
-> 6. [ ] Configurar CSS Custom Properties globais (`tokens.css`) importado no entry point
-> 7. [ ] Adicionar testes de acessibilidade (axe-core) e visuais (Playwright) por componente
-> 8. [ ] Documentar cada componente com exemplos em `frontend/docs/components/` (ou Storybook se adotado futuramente)
+**Total de componentes:** 43 (21 UI base + 6 Data Display + 11 Forms + 5 Layout)
+**Status:** 43/43 implementados (baseado no build `frontend/dist/` existente)
+**Próximos passos:** Adicionar testes de regressão visual (Chromatic), documentar props no Storybook, migrar para biblioteca pública `@aegis/ui` se houver múltiplos frontends.

@@ -1,229 +1,143 @@
-# Business Requirements Document (BRD)
-## Sistema de Gestão de Patrimônio (A4)
+# Business Requirements Document (BRD) — a6 · AegisPatrimônio
+
+> **Versão:** 1.0 · **Status:** Draft · **Owner:** A designar (a ser atribuído pelo sponsor) · **Última atualização:** (data da geração)
+> **Stakeholders:** Sponsor (Diretoria Administrativa/Financeira), Product, Engenharia (backend e frontend), Gestores de Patrimônio das filiais, TI/Infraestrutura, Auditoria/Compliance
 
 ---
 
-### 1. Visão Geral do Negócio
+## 1. Executive Summary & Vision
 
-#### 1.1 Propósito
-Este documento descreve os requisitos de negócio para o **Sistema de Gestão de Patrimônio (A4)**, uma aplicação web para gestão completa de ativos organizacionais, incluindo cadastro de entidades organizacionais, controle de ativos, gestão de manutenção e fluxos de aprovação.
+A gestão patrimonial da empresa está fragmentada: ativos distribuídos por filiais, departamentos e localizações físicas, manutenções conduzidas de forma reativa e custo por bem invisível para quem decide. O **a6 (AegisPatrimônio)** é o sistema que centraliza o cadastro patrimonial, o fluxo de manutenção com aprovação, os alertas de uso de recursos e o monitoramento de saúde dos equipamentos — com acesso controlado por perfil de usuário e por filial. O projeto já possui implementação substancial verificada em código: 353 arquivos e ~27,9 mil linhas, cobrindo cadastros, manutenção, alertas, saúde de ativos e relatório de custo total por ativo. A visão é ser a **fonte única de verdade do patrimônio**, permitindo decisões de reparo, substituição e desativação apoiadas em dados, e antecipar falhas a partir do histórico de saúde registrado por ativo.
 
-#### 1.2 Escopo
-O sistema atende às necessidades de:
-- **Gestão Organizacional**: Departamentos, Filiais, Fornecedores, Funcionários
-- **Gestão de Ativos**: Cadastro, classificação (tipos), localização, depreciação
-- **Gestão de Manutenção**: Solicitações, ordens de serviço, fluxo de aprovação
-- **Segurança e Acesso**: Autenticação JWT, autorização baseada em roles (Admin/User)
+## 2. Problem Statement
 
-#### 1.3 Contexto do Domínio (Ubiquitous Language)
-Os termos de domínio são definidos no [Glossário & Ubiquitous Language](./glossario.md). Termos-chave:
-- **Ativo**: Bem patrimonial rastreável (hardware, mobiliário, equipamentos)
-- **Filial/Departamento**: Unidades organizacionais hierárquicas
-- **Fornecedor**: Entidade externa provedora de bens/serviços
-- **Funcionário**: Colaborador interno, pode ser usuário do sistema
-- **Solicitação de Manutenção**: Demanda de reparo/manutenção com fluxo de aprovação
-- **Perfil Admin**: Acesso total (CRUD em todas as entidades)
-- **Perfil User**: Acesso restrito (leitura, solicitação de manutenção)
+* **Problema central:** não existe uma fonte única de verdade para o patrimônio da empresa — os bens estão espalhados por filiais, departamentos e localizações físicas; as manutenções não têm fluxo de aprovação rastreável; o custo acumulado por ativo não é visível; e a condição operacional dos equipamentos não possui histórico que permita antecipar falhas.
+* **Evidências:** as funcionalidades já implementadas no código evidenciam as dores de negócio que atendem: (a) cadastro estruturado de ativos com filial, departamento, localização e tipo (`createAtivo`, `createLocalizacao`, `createTipoAtivo`); (b) fluxo de manutenção com aprovação (`iniciar`, `aprovar`, `concluir`, `cancelar`) e consultas com filtros combinados (`ManutencaoSpecification`); (c) alertas de uso de recursos com baixa formal (`checkResourceUsageAlerts`, `getRecentAlerts`, `markAsRead`); (d) histórico de saúde com dados de hardware e disco registrados "para viabilizar análise preditiva de falhas" (`updateHealthCheck`, `getHealthHistory`); (e) indicador de custo total por ativo "para apoiar decisões sobre substituição, reparo ou desativação" (`custoTotalPorAtivo`); (f) trilha de auditoria com registro automático de data/hora de modificação (`onUpdate`/`preUpdate`). A existência de um seeder de dados realistas (`RealisticDataSeeder`) indica a necessidade de homologação com dados próximos da operação real.
+* **Custo de não agir (Cost of Inaction):** manutenção reativa consistentemente mais cara que a preditiva; decisões de substituição tomadas sem o custo acumulado por ativo; risco de perda e desvio de bens sem rastreabilidade por filial/localização; auditorias sem trilha confiável de quem alterou o quê e quando.
 
----
+## 3. Target Audience & Personas
 
-### 2. Stakeholders
+> `[ENTRADA HUMANA NECESSÁRIA — não gerado a partir do código]` — **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
+> *Premissas adotadas:* os perfis técnicos ADMIN/USER e o modelo de permissão contextual (por filial/departamento) foram verificados nos cenários de teste extraídos no Glossário; os cargos/ personas abaixo são inferência do domínio patrimonial — não há pesquisa de usuário no repositório.
 
-| Stakeholder | Papel | Interesse Principal |
-|-------------|-------|---------------------|
-| **Gestor de Patrimônio** | Product Owner | Visibilidade total do acervo, relatórios, auditoria |
-| **Administrador do Sistema** | Admin (Role) | Gestão de usuários, permissões, cadastros mestres |
-| **Funcionário/Colaborador** | User (Role) | Solicitar manutenção, consultar ativos alocados |
-| **Equipe de Manutenção** | Operador | Receber, executar e concluir ordens de serviço |
-| **Aprovação/Compliance** | Aprovador | Validar solicitações, garantir conformidade |
-| **TI/Infraestrutura** | Tech Lead | Disponibilidade, segurança, integrações |
+| Persona | Perfil | Necessidade Principal | Ganho Esperado |
+| :--- | :--- | :--- | :--- |
+| Administrador de Patrimônio | Perfil ADMIN — responsável pelo cadastro central | Criar, atualizar e excluir cadastros de ativos, filiais, departamentos, localizações, tipos de ativo, fornecedores, funcionários e usuários | Cadastro íntegro e centralizado, com validação de dados recusando entradas inválidas e trilha de auditoria automática |
+| Gestor de Filial | Perfil USER — opera uma unidade | Consultar listagens autorizadas à sua filial, acompanhar alertas e conduzir solicitações de manutenção (iniciar, acompanhar aprovação, concluir) | Visibilidade do patrimônio da sua unidade e fluxo de manutenção com aprovação formal |
+| Técnico de TI / Monitoramento | Responsável pela saúde dos equipamentos | Registrar health checks (dados de hardware e disco), manter métricas atualizadas e acompanhar histórico e alertas de uso de recursos | Antecipação de falhas e priorização de manutenção baseada em evidência |
+| Auditor / Compliance | Auditoria interna | Consultar eventos de auditoria e histórico de modificações dos registros | Trilha de rastreabilidade por registro, com data/hora de última alteração garantida |
 
----
+## 4. Core Objectives & Success Metrics
 
-### 3. Requisitos Funcionais
+| Objetivo | KPI (Métrica) | Baseline Atual | Meta | Prazo |
+| :--- | :--- | :--- | :--- | :--- |
+| Centralizar e completar o cadastro patrimonial | % de ativos com cadastro completo (filial, departamento, localização, tipo de ativo) | Não medido (sem telemetria no repositório) | ≥ 95% *[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]* | 1º trimestre pós-go-live |
+| Restringir escrita a administradores com acesso contextual | % de operações de escrita cobertas por `hasPermission`; nº de incidentes de acesso indevido | Cobertura já verificada em cenários de teste (criar/atualizar/deletar com USER → Forbidden) | 0 incidentes em produção | Contínuo |
+| Gerir manutenção com fluxo de aprovação auditável | `custoTotalPorAtivo` disponível por ativo; tempo médio do ciclo `iniciar` → `concluir` | Não medido | 100% dos ativos com custo acumulado visível | 2º trimestre pós-go-live |
+| Antecipar falhas com monitoramento de saúde | % de ativos com `updateHealthCheck` atualizado; % de alertas de uso de recursos reconhecidos (`markAsRead`) dentro do SLA | Não medido | ≥ 90% dos ativos monitorados | 2º trimestre pós-go-live |
+| Garantir rastreabilidade e auditoria | % de registros com data/hora de última modificação (`onUpdate`/`preUpdate`) | Mecanismo implementado no código | 100% | Go-live |
 
-#### 3.1 Gestão de Entidades Organizacionais (CRUD Admin)
+* **North Star Metric:** nº de **ativos sob gestão completa** — ativos com cadastro completo + manutenção rastreada no fluxo de aprovação + saúde monitorada via health check.
+* **Guardrail Metrics:** latência das consultas de listagem (área sensível — ver TODO de performance em `AtivoService`), taxa de erros de API tratados ao usuário (`handleApiError`), incidentes de acesso indevido, custo de infraestrutura por usuário.
 
-| ID | Requisito | Descrição | Regra de Negócio (Glossário) |
-|----|-----------|-----------|------------------------------|
-| RF-01 | **Criar Departamento** | Cadastrar novo departamento na estrutura organizacional | `criar_comAdmin_deveRetornarCreated` |
-| RF-02 | **Atualizar Departamento** | Modificar dados cadastrais de departamento existente | `atualizar_comAdmin_deveRetornarOk` |
-| RF-03 | **Excluir Departamento** | Remover permanentemente departamento | `deletar_comAdmin_deveRetornarNoContent` |
-| RF-04 | **Buscar Departamento por ID** | Consultar detalhes de um departamento específico | `buscarPorId` |
-| RF-05 | **Listar Departamentos** | Listar todos os departamentos com paginação | - |
-| RF-06 | **Criar Filial** | Cadastrar nova unidade organizacional (filial) | `createFilial` |
-| RF-07 | **Criar Fornecedor** | Cadastrar novo fornecedor para aquisição/manutenção | `createFornecedor` |
-| RF-08 | **Criar Funcionário** | Registrar colaborador, opcionalmente vinculado a usuário | `createFuncionario`, `createFuncionarioAndUsuario` |
-| RF-09 | **Criar Localização** | Cadastrar local físico/lógico para alocação de ativos | `createLocalizacao` |
-| RF-10 | **Criar Tipo de Ativo** | Classificar ativos em categorias (ex.: Notebook, Impressora) | `createTipoAtivo` |
+> *Nota de transparência: os baselines não existem no repositório (não há telemetria instrumentada); devem ser medidos na primeira onda de operação. As metas são propostas derivadas do escopo funcional real e requerem validação do sponsor.*
 
-> **Restrição de Acesso**: Todas as operações de escrita (Criar, Atualizar, Excluir) **exigem perfil Admin**. Usuários com perfil User recebem **403 Forbidden** (`criar_comUser_deveRetornarForbidden`, `atualizar_comUser_deveRetornarForbidden`, `deletar_comUser_deveRetornarForbidden`).
+## 5. Scope Boundaries
 
-#### 3.2 Gestão de Ativos
+### In-Scope
+* **Cadastros base:** ativos patrimoniais (`createAtivo`), tipos de ativo (`createTipoAtivo`), filiais (`createFilial`), departamentos (`createDepartamento`), localizações físicas — prédio, andar, sala (`createLocalizacao`), fornecedores (`createFornecedor`), funcionários (`createFuncionario`) e vínculo funcionário↔credenciais (`createFuncionarioAndUsuario`).
+* **Usuários e controle de acesso:** usuários (`createUsuario`), emissão de credenciais (`createUserAndToken`), papéis (`createRole`), permissões (`createPermission`), verificação contextual perfil + filial/departamento (`hasPermission`), filtro de controle de acesso por requisição (`doFilterInternal`) e interceptador de credenciais no frontend (`authInterceptor`).
+* **Fluxo de manutenção:** solicitação/início (`iniciar`), aprovação (`aprovar`), conclusão (`concluir`), cancelamento (`cancelar`); consultas com filtros combinados (`ManutencaoSpecification`).
+* **Monitoramento de saúde dos ativos:** registro de health check com dados de hardware e disco (`updateHealthCheck`), atualização de métricas (`updateScalars`), histórico de saúde com permissão de leitura por filial (`getHealthHistory`), inventário de hardware — adaptadores de rede, discos e memórias (`findByAtivoDetalheHardwareId` / `deleteByAtivoDetalheHardwareId`).
+* **Alertas:** verificação de uso de recursos (`checkResourceUsageAlerts`), listagem geral e recentes (`listarAlertas`, `getRecentAlerts`), baixa de alerta (`markAsRead`).
+* **Relatórios gerenciais:** custo total de manutenção por ativo (`custoTotalPorAtivo`).
+* **Auditoria e rastreabilidade:** eventos de auditoria, registro automático de data/hora de modificação (`onUpdate`/`preUpdate`).
+* **Sessão:** login (incl. `mockLogin` para validação), logout com invalidação imediata do token, encerramento de sessão (`clearSession`).
+* **Carga de dados realista para homologação** (`RealisticDataSeeder`).
 
-| ID | Requisito | Descrição |
-|----|-----------|-----------|
-| RF-11 | **Cadastrar Ativo** | Registrar novo ativo com: tipo, filial, departamento, localização, fornecedor, valor, data aquisição |
-| RF-12 | **Atualizar Ativo** | Alterar dados do ativo (transferência, reavaliação, mudança de status) |
-| RF-13 | **Baixar/Excluir Ativo** | Dar baixa patrimonial ou excluir registro (Admin only) |
-| RF-14 | **Consultar Ativo por ID** | Obter detalhes completos incluindo histórico (`buscarPorId`) |
-| RF-15 | **Listar/Filtrar Ativos** | Busca por tipo, filial, departamento, status, localização |
-| RF-16 | **Cálculo de Depreciação** | Calcular valor residual baseado em método/tempo de vida útil |
-| RF-17 | **Custo Total por Ativo** | Somatório de custos de manutenção por ativo/período (`custoTotalPorAtivo`) |
+### Out-of-Scope
+* **Empacotamento desktop via Tauri** — o repositório não possui `src-tauri/Cargo.toml`.
+* **Integrações com sistemas de terceiros** (ERP, financeiro, gateways) — nenhuma dependência de produção além de `@popperjs/core` está declarada.
+* **Canais de notificação externos** (e-mail, SMS, push) — não evidenciados no código analisado.
+* **Aplicativo mobile nativo.**
 
-#### 3.3 Gestão de Manutenção (Fluxo de Aprovação)
+### Future Considerations (Not Now)
+* **Análise preditiva de falhas** sobre o histórico de saúde — os dados de hardware e disco já são registrados para viabilizar esse fim, mas a análise avançada é adiada.
+* **Otimização do caminho de ranking de ativos** — TODO em `AtivoService` (linha 119): o caminho carrega até 1000 candidatos (id+nome) e faz ranking em memória.
+* **Empacotamento desktop/mobile** e distribuição instalável.
+* **Integrações externas** (ERP/financeiro), cogitadas mas conscientemente adiadas.
 
-| ID | Requisito | Descrição | Estados/Transições |
-|----|-----------|-----------|-------------------|
-| RF-18 | **Criar Solicitação** | Funcionário abre solicitação de manutenção para ativo | `criar` → **Pendente** |
-| RF-19 | **Aprovar Solicitação** | Aprovador autoriza execução | **Pendente** → `aprovar` → **Aprovada** |
-| RF-20 | **Cancelar Solicitação** | Anular solicitação/fluxo em andamento | Qualquer → `cancelar` → **Cancelada** |
-| RF-21 | **Concluir Manutenção** | Finalizar ordem após execução | **Aprovada/Em Andamento** → `concluir` → **Concluída** |
-| RF-22 | **Histórico de Manutenção** | Rastrear todas as intervenções por ativo | - |
+## 6. Business Rules & Constraints
 
-#### 3.4 Autenticação e Autorização
+* **BR-01:** Criação, alteração e exclusão de cadastros (ativos, filiais, departamentos, fornecedores, funcionários, tipos de ativo) são **restritas a administradores** — usuários com perfil comum (USER) recebem acesso negado. Evidência: `criar_comUser_deveRetornarForbidden`, `atualizar_comUser_deveRetornarForbidden`, `deletar_comUser_deveRetornarForbidden`.
+* **BR-02:** Usuários autenticados **podem consultar** listagens completas de registros. Evidência: `listarTodos_comUser_deveRetornarOk`.
+* **BR-03:** O acesso ao **histórico de saúde de um ativo** exige permissão de leitura **na filial à qual o ativo pertence**. Evidência: `getHealthHistory`.
+* **BR-04:** A autorização (`hasPermission`) considera sempre o **perfil de acesso e o contexto** (filial/departamento) — RBAC com contexto; é a regra central que protege as operações sobre o patrimônio.
+* **BR-05:** Cadastros com **dados inválidos ou incompletos são recusados**; consultas por identificador inexistente retornam "não encontrado", nunca dados incorretos. Evidência: `criar_comDadosInvalidos_deveRetornarBadRequest`, `buscarPorId_comIdInexistente_deveRetornarNotFound`.
+* **BR-06:** Operações bem-sucedidas de criação e exclusão por administrador retornam **Created** e **NoContent**, respectivamente. Evidência: `criar_comAdmin_deveRetornarCreated`, `deletar_comAdmin_deveRetornarNoContent`.
+* **BR-07:** O **logout invalida imediatamente o token de acesso**; sessão encerrada (`clearSession`) exige nova autenticação.
+* **BR-08:** Todo registro alterado mantém **data/hora da última modificação** registrada automaticamente — rastreabilidade obrigatória. Evidência: `onUpdate`, `preUpdate`.
+* **BR-09:** A conversão DTO→entidade só ocorre com dados válidos; **DTO nulo não gera registro**. Evidência: `toEntity_deveRetornarNullParaDTONulo`, `toEntity_deveMapearDTOparaEntidade`.
+* **BR-10:** A atualização do **inventário de hardware** de um ativo limpa os componentes antigos (adaptadores de rede, discos, memórias) antes de registrar os novos. Evidência: `deleteByAtivoDetalheHardwareId` + `findByAtivoDetalheHardwareId`.
 
-| ID | Requisito | Descrição |
-|----|-----------|-----------|
-| RF-23 | **Login/Autenticação** | Autenticação via credenciais, retorno de JWT |
-| RF-24 | **Interceptador de Auth** | Injeção automática de token em requisições (`authInterceptor`) |
-| RF-25 | **Controle de Sessão** | Logout/limpeza de credenciais (`clearSession`) |
-| RF-26 | **RBAC (Role-Based Access Control)** | Duas roles: **Admin** (escrita total) e **User** (leitura + solicitações) |
-| RF-27 | **Gestão de Permissões/Roles** | CRUD de roles e permissões granulares (`createRole`, `createPermission`) |
-| RF-28 | **Validação de Dados** | Rejeitar payloads inválidos com **400 Bad Request** (`criar_comDadosInvalidos_deveRetornarBadRequest`) |
-| RF-29 | **Tratamento de Não Encontrado** | Retornar **404 Not Found** para IDs inexistentes (`buscarPorId_comIdInexistente_deveRetornarNotFound`) |
+**Constraints (restrições técnicas e de processo):**
+* **C-01:** Stack declarada verificada: única dependência de produção é `@popperjs/core ^2.11.8`; **nenhum motor de banco ou ORM/query builder está declarado nas dependências** — o mecanismo real de persistência precisa ser confirmado pela engenharia antes de qualquer decisão de infraestrutura.
+* **C-02:** Código composto por 338 arquivos `.java` (em `src/`) e 15 arquivos `.js` (em `frontend/`); nomenclatura em inglês no código, comentários e documentação em português (regra do Glossário).
+* **C-03:** Termos canônicos do Glossário devem ser usados em código e documentação (ex.: usar "aprovar", nunca "homologar/deferir/ratificar").
+* **C-04:** O método `Usuario.setUsername` está com **corpo vazio (stub)** — potencial comportamento incompleto na atualização de nome de usuário até sua resolução.
 
----
+## 7. Assumptions & Dependencies
 
-### 4. Requisitos Não-Funcionais
+* **Premissas:**
+  * O produto é o sistema **AegisPatrimônio** (namespace `br.com.aegispatrimonio` nos fontes; codinome "a6" no pipeline de documentação).
+  * Backend e frontend se comunicam pela camada de serviços do frontend (`request`/`handleResponse`/`handleApiError` em `frontend/src/services/api.js`), com credenciais anexadas automaticamente a cada chamada (`authInterceptor`).
+  * Os perfis ADMIN/USER e o modelo de permissão contextual descritos neste BRD refletem o comportamento verificado nos cenários de teste extraídos do Glossário.
+  * Existe persistência de dados em algum mecanismo **não declarado** nas dependências do `package.json` — premissa a ser esclarecida pela engenharia antes da fase de infraestrutura.
+* **Dependências externas:**
+  * **Nenhuma** dependência de produção declarada além de `@popperjs/core ^2.11.8`; **nenhuma** API de terceiros identificada nos fontes.
+  * Nenhum fornecedor externo ou exigência regulatória específica identificada no código — verificar com Compliance quais normas de gestão patrimonial aplicáveis ao setor devem ser atendidas.
 
-| ID | Categoria | Requisito | Critério/Métrica |
-|----|-----------|-----------|------------------|
-| RNF-01 | **Segurança** | Autenticação JWT com expiração e refresh | Token expira em 1h; refresh token 7 dias |
-| RNF-02 | **Segurança** | Senhas hasheadas (bcrypt/argon2) | Nunca armazenar plain text |
-| RNF-03 | **Segurança** | HTTPS obrigatório em produção | TLS 1.2+ |
-| RNF-04 | **Desempenho** | Tempo de resposta API < 200ms (p95) | Excluindo operações de relatório pesado |
-| RNF-05 | **Disponibilidade** | Uptime 99.5% (excluindo manutenção programada) | SLA mensal |
-| RNF-06 | **Escalabilidade** | Suportar 10k+ ativos, 1k+ usuários simultâneos | Horizontal scaling ready |
-| RNF-07 | **Auditoria** | Log de todas as operações de escrita (criar/atualizar/deletar) | Immutable audit trail |
-| RNF-08 | **Usabilidade** | Interface responsiva (desktop/tablet) | Mobile-first para solicitações |
-| RNF-09 | **Integração** | API RESTful com OpenAPI/Swagger | Documentação automática |
-| RNF-10 | **Testabilidade** | Cobertura de testes > 80% (unit + integration) | Pipeline CI/CD bloqueia se < 80% |
+## 8. Risks & Mitigations (Business-Level)
 
----
+| Risco | Probabilidade | Impacto | Mitigação |
+| :--- | :--- | :--- | :--- |
+| Complexidade ciclomática alta em pontos críticos: `checkResourceUsageAlerts` (17), `RealisticDataSeeder.run` (15), `AtivoMapper.toDTO` (14), `ManutencaoSpecification.build` (14), `request` no frontend (13) | Média | Alto | Refatorar em funções/métodos menores antes de evoluir essas áreas; manter testes de regressão (os cenários de permissão já extraídos servem de base) |
+| TODO de performance em `AtivoService` (carrega até 1000 candidatos e faz ranking em memória) | Média | Médio | Empurrar ranking/filtragem para a camada de consulta e paginar; monitorar latência das listagens como guardrail |
+| `console.error`/`console.debug` residuais em `frontend/src/services/api.js` (linhas 44 e 107) | Alta | Baixo | Remover antes de produção e adicionar verificação automatizada no pipeline |
+| Stub `Usuario.setUsername` com corpo vazio | Média | Médio | Implementar o comportamento ou remover o campo do fluxo de atualização; cobrir com teste de atualização de usuário |
+| Persistência não declarada nas dependências (sem motor de banco/ORM conhecido) | Média | Alto | Levantamento técnico urgente da stack real de dados; documentar antes de decisões de infraestrutura ou escalabilidade |
+| `package.json` sem nome e sem scripts | Alta | Médio | Nomear o pacote e automatizar scripts de build/verificação |
+| Configuração incorreta de permissões por filial bloqueando consultas legítimas (`findByFilialIdIn` restringe por filiais autorizadas) | Baixa | Médio | Manter matriz de permissões por filial e testes dedicados de acesso por filial |
 
-### 5. Regras de Negócio (Business Rules)
+## 9. Financial Considerations
 
-| Regra | Descrição | Origem (Glossário) |
-|-------|-----------|-------------------|
-| **RN-01** | Apenas usuários com role **Admin** podem criar, atualizar ou excluir entidades mestres (Departamento, Filial, Fornecedor, TipoAtivo, Localização, Role, Permission) | `criar_comAdmin_deveRetornarCreated`, `atualizar_comAdmin_deveRetornarOk`, `deletar_comAdmin_deveRetornarNoContent` |
-| **RN-02** | Usuários com role **User** recebem **403 Forbidden** ao tentar operações de escrita em entidades mestres | `criar_comUser_deveRetornarForbidden`, `atualizar_comUser_deveRetornarForbidden`, `deletar_comUser_deveRetornarForbidden` |
-| **RN-03** | Dados de entrada inválidos (campos obrigatórios, formatos, tipos) devem retornar **400 Bad Request** | `criar_comDadosInvalidos_deveRetornarBadRequest` |
-| **RN-04** | Busca por ID inexistente retorna **404 Not Found** | `buscarPorId_comIdInexistente_deveRetornarNotFound` |
-| **RN-05** | Solicitação de manutenção segue fluxo: **Pendente → Aprovada → Em Andamento → Concluída** (pode ser **Cancelada** a qualquer momento) | `aprovar`, `concluir`, `cancelar` |
-| **RN-06** | Funcionário pode ser vinculado a usuário do sistema para autenticação | `createFuncionarioAndUsuario` |
-| **RN-07** | Cada ativo pertence a **um** Tipo de Ativo, **uma** Filial, **um** Departamento, **uma** Localização | Modelo relacional |
-| **RN-08** | Custo total de manutenção por ativo é calculado somando todas as ordens concluídas no período | `custoTotalPorAtivo` |
+> `[ENTRADA HUMANA NECESSÁRIA — não gerado a partir do código]` — **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
+> *Premissas adotadas:* não há nenhum dado de orçamento, custo ou headcount no repositório; a estimativa abaixo usa apenas o porte verificado do codebase (353 arquivos, ~27.912 LOC, 1.287 funções, 347 classes) como proxy de esforço.
 
----
+* **Investimento estimado:** evolução e sustentação contínua de um sistema deste porte por um time pequeno (cenário de referência: 3–5 pessoas entre backend, frontend e QA). Número a validar pelo sponsor.
+* **ROI esperado / Payback:** redução do custo reativo de manutenção via monitoramento de saúde e alertas de uso de recursos; decisões de substituição/desativação apoiadas pelo custo acumulado por ativo (`custoTotalPorAtivo`). Payback a estimar com dados reais de perda de bens e tempo de parada — não estimável a partir do repositório.
+* **Modelo de custo recorrente:** hospedagem da aplicação (backend + frontend); **sem licenças de terceiros identificadas** — a única dependência de produção declarada (`@popperjs/core`) não implica custo de licenciamento. Headcount de sustentação conforme cenário acima.
 
-### 6. Casos de Uso Principais
+## 10. Go-to-Market Considerations
 
-#### UC-01: Administrador Cadastra Nova Filial
-**Ator**: Admin  
-**Pré-condição**: Usuário autenticado com role Admin  
-**Fluxo Principal**:
-1. Admin acessa "Cadastro de Filiais"
-2. Preenche dados: nome, código, endereço, responsável
-3. Submete formulário
-4. Sistema valida dados (RN-03)
-5. Sistema persiste filial e retorna **201 Created** (RN-01)
-**Pós-condição**: Filial disponível para associação a ativos/departamentos
+> `[ENTRADA HUMANA NECESSÁRIA — não gerado a partir do código]` — **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
+> *Premissas adotadas:* produto de uso interno corporativo (gestão patrimonial multi-filial); a existência do `RealisticDataSeeder` sugere homologação com dados realistas antes da operação.
 
-#### UC-02: Funcionário Solicita Manutenção de Ativo
-**Ator**: User (Funcionário)  
-**Pré-condição**: Usuário autenticado; ativo existe e está ativo  
-**Fluxo Principal**:
-1. Funcionário acessa "Nova Solicitação"
-2. Seleciona ativo (busca por filial/departamento/localização)
-3. Descreve problema, prioridade, anexa fotos (opcional)
-4. Submete solicitação
-5. Sistema cria solicitação com status **Pendente** (RF-18)
-**Pós-condição**: Solicitação visível para aprovadores
+* **Estratégia de lançamento:** **rollout gradual por filial** — piloto em uma filial com carga de dados realista, validação do fluxo de aprovação e das permissões por filial, seguida de expansão para as demais unidades. Big bang não recomendado dado o modelo de permissão contextual (risco de bloquear consultas legítimas em escala).
+* **Comunicação & Enablement:** treinamento de administradores de patrimônio (perfil ADMIN) nos cadastros e no fluxo de manutenção; material de consulta canônico baseado no Glossário (Ubiquitous Language) para uniformizar termos entre áreas; orientação aos usuários comuns (perfil USER) sobre o que podem consultar (listagens, alertas, histórico de saúde da própria filial) e solicitar (manutenções).
 
-#### UC-03: Aprovador Autoriza Manutenção
-**Ator**: Aprovador (Admin ou role específica)  
-**Pré-condição**: Solicitação em status **Pendente**  
-**Fluxo Principal**:
-1. Aprovador visualiza fila de pendentes
-2. Analisa detalhes, histórico do ativo (`custoTotalPorAtivo`)
-3. Clica "Aprovar"
-4. Sistema atualiza status para **Aprovada** (RN-05)
-**Pós-condição**: Equipe de manutenção notificada
+## 11. Approval & Sign-off
 
-#### UC-04: Técnico Conclui Ordem de Serviço
-**Ator**: Equipe de Manutenção  
-**Pré-condição**: Solicitação **Aprovada**; técnico designado  
-**Fluxo Principal**:
-1. Técnico executa serviço
-2. Registra: data, descrição, peças usadas, custo, tempo
-3. Clica "Concluir"
-4. Sistema atualiza para **Concluída** (RN-05)
-5. Atualiza `custoTotalPorAtivo` do ativo
-**Pós-condição**: Histórico atualizado; ativo disponível
+> Nomes dos aprovadores a preencher pelos stakeholders responsáveis — não há sign-off definido nos fontes analisados.
 
----
+| Papel | Nome | Status | Data |
+| :--- | :--- | :--- | :--- |
+| Sponsor | | Pendente | |
+| Product Lead | | Pendente | |
+| Engineering Lead | | Pendente | |
 
-### 7. Critérios de Aceitação (Definition of Done)
+## 12. Revision History
 
-| Critério | Descrição |
-|----------|-----------|
-| **CA-01** | Todas as APIs de CRUD (entidades mestres) retornam 201/200/204 para Admin e 403 para User |
-| **CA-02** | Validação de entrada rejeita payloads inválidos com 400 e mensagens claras |
-| **CA-03** | Busca por ID inexistente retorna 404 com mensagem padronizada |
-| **CA-04** | Fluxo de manutenção (Pendente→Aprovada→Concluída) funciona end-to-end |
-| **CA-05** | Cancelamento funciona em qualquer estado, liberando recursos |
-| **CA-06** | Autenticação JWT: login retorna token; endpoints protegidos rejeitam sem token (401) |
-| **CA-07** | Interceptador injeta token automaticamente no frontend |
-| **CA-08** | Logout limpa sessão local e invalida token server-side (blocklist) |
-| **CA-09** | Relatórios de custo total por ativo batem com soma das ordens concluídas |
-| **CA-10** | Testes de integração cobrem todos os cenários de permissão (Admin vs User) |
-
----
-
-### 8. Métricas de Sucesso (KPIs)
-
-| KPI | Meta | Frequência |
-|-----|------|------------|
-| **Tempo médio de aprovação** | < 4 horas úteis | Semanal |
-| **Taxa de solicitações canceladas** | < 10% | Mensal |
-| **Custo médio de manutenção por ativo/ano** | Redução 15% YoY | Anual |
-| **Disponibilidade do sistema** | 99.5% | Mensal |
-| **Tempo de resposta API (p95)** | < 200ms | Contínuo |
-| **Cobertura de testes** | > 80% | Por deploy |
-
----
-
-### 9. Riscos e Dependências
-
-| Risco | Impacto | Mitigação |
-|-------|---------|-----------|
-| **R-01**: Complexidade de permissões granulares | Atraso na entrega de RBAC | Começar com 2 roles (Admin/User); evoluir para permissões finas |
-| **R-02**: Migração de dados legados | Inconsistência no go-live | Scripts de validação + execução em staging |
-| **R-03**: Performance em relatórios de custo total | Timeout em consultas pesadas | Materialized views / cache Redis / paginação |
-| **R-04**: Adoção pelos usuários (User) | Baixa utilização do módulo de solicitação | UX mobile-first; treinamento; notificações push |
-
----
-
-### 10. Aprovação
-
-| Papel | Nome | Assinatura | Data |
-|-------|------|------------|------|
-| Product Owner | | | |
-| Tech Lead | | | |
-| Security Officer | | | |
-| Compliance | | | |
-
----
-
-> **Nota**: Este BRD é um documento vivo. Alterações nos requisitos funcionais devem passar por mudança controlada (change request) e refletidas no Glossário, ADRs e casos de teste.
+| Versão | Data | Autor | Mudanças |
+| :--- | :--- | :--- | :--- |
+| 1.0 | (data da geração) | Pipeline de documentação a6 | Criação inicial com base no diagnóstico determinístico do codebase (varredura + AST de 353 arquivos) e no Glossário (Ubiquitous Language) |

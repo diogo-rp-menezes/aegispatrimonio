@@ -9,6 +9,7 @@ import br.com.aegispatrimonio.repository.AtivoRepository;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,17 +41,41 @@ public class DepreciacaoService {
 
     @Transactional
     @Scheduled(cron = "0 0 2 1 * ?") // Executa no primeiro dia de cada mês às 02:00
+    @SchedulerLock(name = "depreciacaoMensal", lockAtMostFor = "PT30M", lockAtLeastFor = "PT5M")
     public void calcularDepreciacaoMensalAgendada() {
         log.info("Iniciando job de cálculo de depreciação mensal...");
-        try (Stream<Ativo> ativos = ativoRepository.findAllByStatus(StatusAtivo.ATIVO)) {
-            List<Ativo> ativosParaAtualizar = ativos
-                    .filter(this::isAtivoElegivelParaDepreciacao)
-                    .peek(this::aplicarDepreciacaoMensal)
-                    .collect(Collectors.toList());
+        int batchSize = 100;
+        int count = 0;
+        int totalProcessed = 0;
+        List<Ativo> buffer = new ArrayList<>();
 
-            if (!ativosParaAtualizar.isEmpty()) {
-                ativoRepository.saveAll(ativosParaAtualizar);
-                log.info("{} ativos foram depreciados com sucesso.", ativosParaAtualizar.size());
+        try (Stream<Ativo> ativos = ativoRepository.findAllByStatus(StatusAtivo.ATIVO)) {
+            Iterator<Ativo> iterator = ativos.iterator();
+            while (iterator.hasNext()) {
+                Ativo ativo = iterator.next();
+                if (isAtivoElegivelParaDepreciacao(ativo)) {
+                    aplicarDepreciacaoMensal(ativo);
+                    buffer.add(ativo);
+                    count++;
+                }
+
+                if (count % batchSize == 0 && !buffer.isEmpty()) {
+                    ativoRepository.saveAll(buffer);
+                    entityManager.flush();
+                    entityManager.clear();
+                    totalProcessed += buffer.size();
+                    buffer.clear();
+                }
+            }
+            if (!buffer.isEmpty()) {
+                ativoRepository.saveAll(buffer);
+                entityManager.flush();
+                entityManager.clear();
+                totalProcessed += buffer.size();
+                buffer.clear();
+            }
+            if (totalProcessed > 0) {
+                log.info("{} ativos foram depreciados com sucesso.", totalProcessed);
             } else {
                 log.info("Nenhum ativo elegível para depreciação encontrado.");
             }

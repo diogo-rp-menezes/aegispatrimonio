@@ -1,24 +1,36 @@
 package br.com.aegispatrimonio.security;
 
+import br.com.aegispatrimonio.model.RevokedToken;
+import br.com.aegispatrimonio.repository.RevokedTokenRepository;
 import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.MalformedJwtException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.ArrayList;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class JwtServiceTest {
 
     private JwtService jwtService;
+    private TokenDenylistService denylist;
+
+    @Mock
+    private RevokedTokenRepository revokedTokenRepository;
 
     // Segredo de teste em Base64. Deve ter pelo menos 256 bits.
     private final String testSecret = "c2VjcmV0b3NlY3JldG9zZWNyZXRvc2VjcmV0b3NlY3JldG9zZWNyZXRvMTIzNDU2Nzg=";
@@ -26,7 +38,8 @@ class JwtServiceTest {
 
     @BeforeEach
     void setUp() {
-        jwtService = new JwtService(new TokenDenylistService());
+        denylist = new TokenDenylistService(revokedTokenRepository);
+        jwtService = new JwtService(denylist);
         // Injeta os valores que seriam preenchidos pelo @Value do Spring
         ReflectionTestUtils.setField(jwtService, "jwtSecret", testSecret);
         ReflectionTestUtils.setField(jwtService, "jwtExpiration", oneHour);
@@ -49,6 +62,37 @@ class JwtServiceTest {
         // Assert
         assertNotNull(token);
         assertEquals(userDetails.getUsername(), extractedUsername);
+    }
+
+    @Test
+    @DisplayName("C2: token gerado deve conter jti único e extraível")
+    void generateToken_deveConterJtiUnico() {
+        UserDetails userDetails = createTestUser("testuser@aegis.com");
+
+        String token1 = jwtService.generateToken(userDetails);
+        String token2 = jwtService.generateToken(userDetails);
+
+        String jti1 = jwtService.extractJti(token1);
+        String jti2 = jwtService.extractJti(token2);
+
+        assertNotNull(jti1);
+        assertNotNull(jti2);
+        assertNotEquals(jti1, jti2, "Cada token deve ter um jti único");
+    }
+
+    @Test
+    @DisplayName("C2: token gerado para CustomUserDetails deve conter o uid do usuário")
+    void generateToken_deveConterUid() {
+        br.com.aegispatrimonio.model.Usuario usuario = new br.com.aegispatrimonio.model.Usuario();
+        usuario.setId(77L);
+        usuario.setEmail("uiduser@aegis.com");
+        usuario.setPassword("password");
+        usuario.setStatus(br.com.aegispatrimonio.model.Status.ATIVO);
+        CustomUserDetails userDetails = new CustomUserDetails(usuario);
+
+        String token = jwtService.generateToken(userDetails);
+
+        assertEquals(77L, jwtService.extractUid(token));
     }
 
     @Test
@@ -109,15 +153,15 @@ class JwtServiceTest {
     }
 
     @Test
-    @DisplayName("Logout: token revogado deve ser rejeitado em isTokenValid")
+    @DisplayName("Logout: token revogado (por jti) deve ser rejeitado em isTokenValid")
     void isTokenValid_deveRetornarFalseParaTokenRevogado() {
         // Arrange
         UserDetails userDetails = createTestUser("testuser@aegis.com");
         String token = jwtService.generateToken(userDetails);
-        TokenDenylistService denylist = new TokenDenylistService();
-        ReflectionTestUtils.setField(jwtService, "tokenDenylistService", denylist);
+        String jti = jwtService.extractJti(token);
 
-        denylist.revoke(token, jwtService.extractExpirationEpochMillis(token));
+        when(revokedTokenRepository.findById(jti))
+                .thenReturn(Optional.of(new RevokedToken(jti, null, jwtService.extractExpirationEpochMillis(token))));
 
         // Act + Assert
         assertFalse(jwtService.isTokenValid(token, userDetails));
@@ -129,14 +173,31 @@ class JwtServiceTest {
         // Arrange
         UserDetails userDetails = createTestUser("testuser@aegis.com");
         String token = jwtService.generateToken(userDetails);
-        TokenDenylistService denylist = new TokenDenylistService();
-        ReflectionTestUtils.setField(jwtService, "tokenDenylistService", denylist);
+        String jti = jwtService.extractJti(token);
 
         // Outro token revogado; o atual não
         String outroToken = jwtService.generateToken(createTestUser("outro@aegis.com"));
-        denylist.revoke(outroToken, jwtService.extractExpirationEpochMillis(outroToken));
+        String outroJti = jwtService.extractJti(outroToken);
+        denylist.revoke(outroJti, jwtService.extractExpirationEpochMillis(outroToken), null);
+
+        when(revokedTokenRepository.findById(jti)).thenReturn(Optional.empty());
 
         // Act + Assert
         assertTrue(jwtService.isTokenValid(token, userDetails));
+    }
+
+    @Test
+    @DisplayName("C2: revokeAllTokensForUser estende as revogações ativas do usuário")
+    void revokeAllTokensForUser_deveRepasarParaDenylist() {
+        // Arrange
+        when(revokedTokenRepository.findByUsuarioId(42L)).thenReturn(java.util.List.of(
+                new RevokedToken("jti-1", 42L, System.currentTimeMillis() + 1_000)));
+
+        // Act
+        jwtService.revokeAllTokensForUser(42L);
+
+        // Assert
+        verify(revokedTokenRepository).findByUsuarioId(42L);
+        verify(revokedTokenRepository).save(any(RevokedToken.class));
     }
 }

@@ -30,13 +30,18 @@ public class DevConfig {
             transactionTemplate.execute(status -> {
                 // CORREÇÃO: Busca o usuário na nova tabela de usuarios
                 usuarioRepository.findByEmail("admin@aegis.com").ifPresent(adminUser -> {
-                    // Gera um token para ele
-                    String token = jwtService.generateToken(new CustomUserDetails(adminUser));
+                    // M2 (audit): nunca logar o token completo em INFO. Em INFO fica
+                    // apenas a instrução de como obtê-lo; o token em si só em DEBUG.
+                    logger.info("\n\n--- DEV: token de admin@aegis.com disponível ---");
+                    logger.info("Para obter o token, faça POST /api/v1/auth/login com as "
+                            + "credenciais de desenvolvimento, ou habilite o nível DEBUG "
+                            + "para br.com.aegispatrimonio.config.DevConfig.");
+                    logger.info("--------------------------------------------------\n\n");
 
-                    // Imprime o token no console de forma bem visível
-                    logger.info("\n\n--- TOKEN DE DESENVOLVIMENTO (admin@aegis.com) ---");
-                    logger.info("Authorization: Bearer {}", token);
-                    logger.info("--- COPIE O TOKEN ACIMA PARA USAR NO POSTMAN ---\n\n");
+                    if (logger.isDebugEnabled()) {
+                        String token = jwtService.generateToken(new CustomUserDetails(adminUser));
+                        logger.debug("Authorization: Bearer {}", token);
+                    }
                 });
                 return null;
             });

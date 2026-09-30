@@ -145,6 +145,63 @@ public interface AtivoRepository extends JpaRepository<Ativo, Long> {
                                                       @Param("hasPrediction") Boolean hasPrediction,
                                                       Pageable pageable);
 
+   /**
+    * M4 (audit): busca por nome via índice FULLTEXT (MySQL). Em H2 (dev/e2e/testes)
+    * MATCH...AGAINST não é suportado — o serviço faz fallback para o caminho LIKE.
+    */
+   @Query(value = "SELECT a.* FROM ativos a WHERE MATCH(a.nome) AGAINST(:nome IN NATURAL LANGUAGE MODE) " +
+          "AND (:filialId IS NULL OR a.filial_id = :filialId) " +
+          "AND (:tipoAtivoId IS NULL OR a.tipo_ativo_id = :tipoAtivoId) " +
+          "AND (:status IS NULL OR a.status = :status) " +
+          "AND (:minDate IS NULL OR a.previsao_esgotamento_disco >= :minDate) " +
+          "AND (:maxDate IS NULL OR a.previsao_esgotamento_disco < :maxDate) " +
+          "AND (:hasPrediction IS NULL OR (:hasPrediction = true AND a.previsao_esgotamento_disco IS NOT NULL) OR (:hasPrediction = false AND a.previsao_esgotamento_disco IS NULL)) " +
+          "ORDER BY MATCH(a.nome) AGAINST(:nome IN NATURAL LANGUAGE MODE) DESC",
+          countQuery = "SELECT COUNT(*) FROM ativos a WHERE MATCH(a.nome) AGAINST(:nome IN NATURAL LANGUAGE MODE) " +
+          "AND (:filialId IS NULL OR a.filial_id = :filialId) " +
+          "AND (:tipoAtivoId IS NULL OR a.tipo_ativo_id = :tipoAtivoId) " +
+          "AND (:status IS NULL OR a.status = :status) " +
+          "AND (:minDate IS NULL OR a.previsao_esgotamento_disco >= :minDate) " +
+          "AND (:maxDate IS NULL OR a.previsao_esgotamento_disco < :maxDate) " +
+          "AND (:hasPrediction IS NULL OR (:hasPrediction = true AND a.previsao_esgotamento_disco IS NOT NULL) OR (:hasPrediction = false AND a.previsao_esgotamento_disco IS NULL))",
+          nativeQuery = true)
+   Page<Ativo> searchByNomeFullText(@Param("nome") String nome,
+                                    @Param("filialId") Long filialId,
+                                    @Param("tipoAtivoId") Long tipoAtivoId,
+                                    @Param("status") String status,
+                                    @Param("minDate") java.time.LocalDate minDate,
+                                    @Param("maxDate") java.time.LocalDate maxDate,
+                                    @Param("hasPrediction") Boolean hasPrediction,
+                                    Pageable pageable);
+
+   @Query(value = "SELECT a.* FROM ativos a WHERE MATCH(a.nome) AGAINST(:nome IN NATURAL LANGUAGE MODE) " +
+          "AND a.filial_id IN :filialIds " +
+          "AND (:filialId IS NULL OR a.filial_id = :filialId) " +
+          "AND (:tipoAtivoId IS NULL OR a.tipo_ativo_id = :tipoAtivoId) " +
+          "AND (:status IS NULL OR a.status = :status) " +
+          "AND (:minDate IS NULL OR a.previsao_esgotamento_disco >= :minDate) " +
+          "AND (:maxDate IS NULL OR a.previsao_esgotamento_disco < :maxDate) " +
+          "AND (:hasPrediction IS NULL OR (:hasPrediction = true AND a.previsao_esgotamento_disco IS NOT NULL) OR (:hasPrediction = false AND a.previsao_esgotamento_disco IS NULL)) " +
+          "ORDER BY MATCH(a.nome) AGAINST(:nome IN NATURAL LANGUAGE MODE) DESC",
+          countQuery = "SELECT COUNT(*) FROM ativos a WHERE MATCH(a.nome) AGAINST(:nome IN NATURAL LANGUAGE MODE) " +
+          "AND a.filial_id IN :filialIds " +
+          "AND (:filialId IS NULL OR a.filial_id = :filialId) " +
+          "AND (:tipoAtivoId IS NULL OR a.tipo_ativo_id = :tipoAtivoId) " +
+          "AND (:status IS NULL OR a.status = :status) " +
+          "AND (:minDate IS NULL OR a.previsao_esgotamento_disco >= :minDate) " +
+          "AND (:maxDate IS NULL OR a.previsao_esgotamento_disco < :maxDate) " +
+          "AND (:hasPrediction IS NULL OR (:hasPrediction = true AND a.previsao_esgotamento_disco IS NOT NULL) OR (:hasPrediction = false AND a.previsao_esgotamento_disco IS NULL))",
+          nativeQuery = true)
+   Page<Ativo> searchByNomeFullTextByFilialIds(@Param("nome") String nome,
+                                               @Param("filialIds") Set<Long> filialIds,
+                                               @Param("filialId") Long filialId,
+                                               @Param("tipoAtivoId") Long tipoAtivoId,
+                                               @Param("status") String status,
+                                               @Param("minDate") java.time.LocalDate minDate,
+                                               @Param("maxDate") java.time.LocalDate maxDate,
+                                               @Param("hasPrediction") Boolean hasPrediction,
+                                               Pageable pageable);
+
     @Query("SELECT a FROM Ativo a " +
            "LEFT JOIN FETCH a.filial " +
            "LEFT JOIN FETCH a.localizacao " +

@@ -2922,6 +2922,19 @@ indexes:
     tradeoffs:
       write_amplification: "low"
     evidence: "design"
+
+  - id: "INDEX-040"
+    table: "ativos"
+    columns: [{ name: "nome" }]
+    type: "fulltext"
+    unique: false
+    purpose:
+      query_pattern: "Busca por nome de ativo via MATCH ... AGAINST (IN NATURAL LANGUAGE MODE), com ranking por relevância (M4 do audit 2026-09-30; substitui o caminho in-memory de 1000 candidatos + Levenshtein)"
+      workload: "read"
+    tradeoffs:
+      write_amplification: "medium (índice FULLTEXT atualizado em INSERT/UPDATE/DELETE de ativos)"
+    evidence: "audit-2026-09-30-M4"
+    notes: "Criado pela migration Flyway V20 (Java, idempotente via JDBC DatabaseMetaData). MySQL 8 apenas; em H2 (dev/e2e/testes) a migration é no-op e o AtivoService usa fallback LIKE."
 ```
 
 ---

@@ -1,13 +1,13 @@
 # Design Tokens — Aegis Patrimônio
 
-> **Versão:** 1.0 · **Owner:** Design/Frontend Lead · **Status:** Draft  
+> **Versão:** 1.0 · **Owner:** Design/Frontend Lead · **Status:** Draft
 > **Fonte de implementação:** **Nenhuma detectada no codebase atual** — o projeto não possui arquivo de tokens (tailwind.config.ts, tokens.json, styled-system theme, CSS custom properties centralizado). Este documento define a **estrutura obrigatória** a ser implementada antes de qualquer componente de UI.
 
 ---
 
 ## 1. Overview
 
-Este documento estabelece a **fonte única da verdade** para todos os valores visuais primitivos usados na interface do Aegis Patrimônio. Atualmente, o frontend (Vanilla JS + ESModules + `@popperjs/core`) **não possui sistema de design tokens** — estilos estão espalhados em arquivos CSS/JS não inventariados na varredura determinística.
+Este documento estabelece a **fonte única da verdade** para todos os valores visuais primitivos usados na interface do Aegis Patrimônio. Atualmente, o frontend (Vue.js 3 + Bootstrap 5 + Pinia + Vite) **não possui sistema de design tokens** — estilos estão espalhados em arquivos CSS/JS não inventariados na varredura determinística.
 
 **Regra obrigatória:** Nenhum componente deve usar valores "hardcoded" (hex, px, rem, ms) fora destes tokens. Toda adição/alteração passa por PR com aprovação de Design + Engenharia.
 
@@ -121,180 +121,467 @@ Este documento estabelece a **fonte única da verdade** para todos os valores vi
 | `--space-12` | `3rem` | `48px` | ⬜ Pendente |
 | `--space-16` | `4rem` | `64px` | ⬜ Pendente |
 
-* **Grid base:** Múltiplos de **4px (0.25rem)** — todos os paddings, margins, gaps devem usar estes tokens.
-
 ### 4.2 Border Radius
 
 | Token | Valor | Uso | Status |
 | :--- | :--- | :--- | :--- |
-| `--radius-none` | `0` | Tabelas, divisores | ⬜ Pendente |
-| `--radius-sm` | `0.25rem` (4px) | Inputs, selects, badges, tags de status | ⬜ Pendente |
-| `--radius-md` | `0.375rem` (6px) | Botões, cards, tabelas com hover | ⬜ Pendente |
-| `--radius-lg` | `0.5rem` (8px) | Modais, painéis laterais, dropdowns Popper | ⬜ Pendente |
-| `--radius-xl` | `0.75rem` (12px) | Containers principais, wizard steps | ⬜ Pendente |
-| `--radius-full` | `9999px` | Avatares, pills de status (concluído/pendente), botões circulares | ⬜ Pendente |
+| `--radius-none` | `0` | Elementos quadrados (badges, tags) | ⬜ Pendente |
+| `--radius-sm` | `0.25rem` (4px) | Inputs, botões, badges | ⬜ Pendente |
+| `--radius-md` | `0.375rem` (6px) | Cards, modais, dropdowns | ⬜ Pendente |
+| `--radius-lg` | `0.5rem` (8px) | Modais grandes, painéis | ⬜ Pendente |
+| `--radius-xl` | `0.75rem` (12px) | Containers principais | ⬜ Pendente |
+| `--radius-full` | `9999px` | Pills, avatares, badges circulares | ⬜ Pendente |
 
-### 4.3 Shadows / Elevation
+### 4.3 Breakpoints (Responsivo — Mobile-first)
 
-| Token | Valor (box-shadow) | Uso | Status |
+| Token | Valor | Uso | Status |
 | :--- | :--- | :--- | :--- |
-| `--shadow-none` | `none` | Reset em componentes flatten | ⬜ Pendente |
-| `--shadow-sm` | `0 1px 2px 0 rgb(0 0 0 / 0.05)` | Hover de linha de tabela, cards compactos | ⬜ Pendente |
-| `--shadow-md` | `0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)` | Cards de ativo, painéis laterais | ⬜ Pendente |
-| `--shadow-lg` | `0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)` | Modais, dropdowns Popper, sidebars | ⬜ Pendente |
-| `--shadow-xl` | `0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)` | Drawers, wizards multi-step | ⬜ Pendente |
-| `--shadow-focus` | `0 0 0 3px var(--color-brand-primary) / 0.4` | **Foco visível obrigatório** (acessibilidade) — inputs, botões, links | ⬜ Pendente |
+| `--bp-sm` | `640px` | Tablet portrait / mobile landscape | ⬜ Pendente |
+| `--bp-md` | `768px` | Tablet landscape | ⬜ Pendente |
+| `--bp-lg` | `1024px` | Desktop pequeno | ⬜ Pendente |
+| `--bp-xl` | `1280px` | Desktop padrão | ⬜ Pendente |
+| `--bp-2xl` | `1536px` | Desktop grande / wide | ⬜ Pendente |
+
+> **Requisito BRD (NFR-08):** Interface responsiva desktop/tablet, **mobile-first para solicitações** de manutenção.
 
 ---
 
-## 5. Breakpoints
+## 5. Shadows & Elevation
 
-> **Frontend alvo:** Web responsivo (desktop-first per BRD — uso em backoffice/filiais). Mobile apenas para visualização/aprovação rápida.
-
-| Token | Largura Mínima | Dispositivo Alvo | Status |
+| Token | Valor (CSS box-shadow) | Uso | Status |
 | :--- | :--- | :--- | :--- |
-| `--bp-sm` | `640px` | Mobile grande / side-by-side em tablet | ⬜ Pendente |
-| `--bp-md` | `768px` | Tablet portrait | ⬜ Pendente |
-| `--bp-lg` | `1024px` | **Desktop padrão** (breakpoint principal) | ⬜ Pendente |
-| `--bp-xl` | `1280px` | Desktop grande / duas colunas confortáveis | ⬜ Pendente |
-| `--bp-2xl` | `1536px` | Ultra-wide / dashboard multi-painel | ⬜ Pendente |
-
-* **Container max-width:** `--container-max: 1280px` (alinhado a `bp-xl`) — **TO BE DEFINED**
-
----
-
-## 6. Motion Tokens
-
-| Token | Duração | Easing | Uso | Status |
-| :--- | :--- | :--- | :--- | :--- |
-| `--duration-instant` | `0ms` | — | Transições desabilitadas (prefers-reduced-motion) | ⬜ Pendente |
-| `--duration-fast` | `150ms` | `cubic-bezier(0.4, 0, 0.2, 1)` | Micro-interações: hover botão, toggle switch, tooltip Popper show/hide | ⬜ Pendente |
-| `--duration-base` | `200ms` | `cubic-bezier(0.4, 0, 0.2, 1)` | **Padrão**: expansão de linha, accordion, tab switch, input focus | ⬜ Pendente |
-| `--duration-slow` | `300ms` | `cubic-bezier(0.4, 0, 0.2, 1)` | Modais, sidebars, page transitions, wizard steps | ⬜ Pendente |
-| `--duration-slower` | `500ms` | `cubic-bezier(0.4, 0, 0.2, 1)` | Animações de entrada de dashboard, skeleton → content | ⬜ Pendente |
-
-* **Respeitar `prefers-reduced-motion: reduce`** — todas as animações devem ser desativadas/instantâneas quando ativo.
+| `--shadow-none` | `none` | Reset | ⬜ Pendente |
+| `--shadow-sm` | `0 1px 2px 0 rgb(0 0 0 / 0.05)` | Cards sutis, inputs focus | ⬜ Pendente |
+| `--shadow-md` | `0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)` | Cards padrão, dropdowns | ⬜ Pendente |
+| `--shadow-lg` | `0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)` | Modais, sidebars | ⬜ Pendente |
+| `--shadow-xl` | `0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)` | Modais full-screen, drawers | ⬜ Pendente |
+| `--shadow-focus` | `0 0 0 3px var(--color-brand-primary) / 0.4` | Focus ring acessível (WCAG) | ⬜ Pendente |
 
 ---
 
-## 7. Z-Index Scale (Camadas Popper/Modais)
+## 6. Motion & Transitions
 
-> **Crítico:** O projeto usa `@popperjs/core` para tooltips/modais. Escala abaixo evita conflitos.
+| Token | Valor | Uso | Status |
+| :--- | :--- | :--- | :--- |
+| `--duration-fast` | `100ms` | Hover, focus, micro-interações | ⬜ Pendente |
+| `--duration-normal` | `200ms` | Transições padrão (modais, dropdowns, tabs) | ⬜ Pendente |
+| `--duration-slow` | `300ms` | Animações complexas (sidebars, drawers) | ⬜ Pendente |
+| `--ease-standard` | `cubic-bezier(0.4, 0, 0.2, 1)` | Padrão Material/Google | ⬜ Pendente |
+| `--ease-emphasized` | `cubic-bezier(0.2, 0, 0, 1)` | Entrada de modais, toasts | ⬜ Pendente |
+| `--ease-decelerate` | `cubic-bezier(0, 0, 0.2, 1)` | Saída de modais, toasts | ⬜ Pendente |
 
-| Token | Valor | Camada | Status |
+> **Requisito:** Respeitar `prefers-reduced-motion: reduce` — desabilitar animações não essenciais.
+
+---
+
+## 7. Z-Index Scale
+
+| Token | Valor | Uso | Status |
 | :--- | :--- | :--- | :--- |
 | `--z-base` | `0` | Conteúdo normal | ⬜ Pendente |
-| `--z-dropdown` | `100` | Dropdowns, menus de ação (ações de linha) | ⬜ Pendente |
+| `--z-dropdown` | `100` | Dropdowns, selects | ⬜ Pendente |
 | `--z-sticky` | `200` | Headers fixos, sidebars | ⬜ Pendente |
-| `--z-tooltip` | `300` | **Popper tooltips** (acima de sticky) | ⬜ Pendente |
-| `--z-modal-backdrop` | `400` | Overlay de modal | ⬜ Pendente |
-| `--z-modal` | `500` | Modal content | ⬜ Pendente |
-| `--z-toast` | `600` | Toasts/notificações (acima de modal) | ⬜ Pendente |
-| `--z-max` | `9999` | Apenas para debug/emergência | ⬜ Pendente |
+| `--z-modal-backdrop` | `400` | Overlay de modais | ⬜ Pendente |
+| `--z-modal` | `500` | Modais, drawers | ⬜ Pendente |
+| `--z-popover` | `600` | Popovers, tooltips (Popper.js) | ⬜ Pendente |
+| `--z-toast` | `700` | Toasts, notificações | ⬜ Pendente |
+| `--z-tooltip` | `800` | Tooltips nativos | ⬜ Pendente |
 
 ---
 
-## 8. Component-Specific Tokens (Derivados)
+## 8. Component-Specific Tokens (Exemplos)
 
-> Estes tokens **compõem primitivas acima** para garantir consistência em componentes recorrentes do Aegis.
+> **Nota:** Tokens específicos de componente derivam dos primitivos acima. Exemplos para componentes críticos do Aegis:
 
-### 8.1 Tabela de Ativos / Manutenções
+### 8.1 Tabela de Ativos (Lista principal)
 
-| Token | Composição | Status |
+| Token | Derivação | Status |
 | :--- | :--- | :--- |
 | `--table-header-bg` | `var(--color-bg-secondary)` | ⬜ Pendente |
 | `--table-row-hover-bg` | `var(--color-bg-tertiary)` | ⬜ Pendente |
-| `--table-row-selected-bg` | `var(--color-brand-primary) / 0.1` | ⬜ Pendente |
+| `--table-row-striped-bg` | `var(--color-bg-secondary) / 0.5` | ⬜ Pendente |
 | `--table-border-color` | `var(--color-border-subtle)` | ⬜ Pendente |
 | `--table-cell-padding` | `var(--space-3) var(--space-4)` | ⬜ Pendente |
+| `--table-font-size` | `var(--text-sm)` | ⬜ Pendente |
 
-### 8.2 Formulários (Criar/Editar Ativo, Solicitar Manutenção)
+### 8.2 Formulários (Cadastro Ativo, Manutenção, Entidades)
 
-| Token | Composição | Status |
+| Token | Derivação | Status |
 | :--- | :--- | :--- |
-| `--input-bg` | `var(--color-bg-primary)` | ⬜ Pendente |
-| `--input-border` | `var(--color-border-subtle)` | ⬜ Pendente |
+| `--input-height` | `2.5rem` (40px) | ⬜ Pendente |
+| `--input-padding` | `0 var(--space-3)` | ⬜ Pendente |
+| `--input-border-color` | `var(--color-border-subtle)` | ⬜ Pendente |
 | `--input-border-focus` | `var(--color-brand-primary)` | ⬜ Pendente |
-| `--input-border-error` | `var(--color-danger)` | ⬜ Pendente |
-| `--input-placeholder-color` | `var(--color-text-secondary)` | ⬜ Pendente |
-| `--label-color` | `var(--color-text-primary)` | ⬜ Pendente |
-| `--help-text-color` | `var(--color-text-secondary)` | ⬜ Pendente |
-| `--input-padding` | `var(--space-2) var(--space-3)` | ⬜ Pendente |
-| `--input-radius` | `var(--radius-sm)` | ⬜ Pendente |
+| `--input-error-border` | `var(--color-danger)` | ⬜ Pendente |
+| `--input-bg` | `var(--color-bg-primary)` | ⬜ Pendente |
+| `--label-font-size` | `var(--text-sm)` | ⬜ Pendente |
+| `--label-font-weight` | `500` | ⬜ Pendente |
+| `--help-text-font-size` | `var(--text-xs)` | ⬜ Pendente |
 
-### 8.3 Botões
+### 8.3 Botões (Primário, Secundário, Perigo, Ghost)
 
-| Token | Composição | Status |
+| Token | Derivação | Status |
 | :--- | :--- | :--- |
+| `--btn-height` | `2.5rem` (40px) | ⬜ Pendente |
+| `--btn-padding-x` | `var(--space-4)` | ⬜ Pendente |
+| `--btn-font-size` | `var(--text-sm)` | ⬜ Pendente |
+| `--btn-font-weight` | `500` | ⬜ Pendente |
 | `--btn-primary-bg` | `var(--color-brand-primary)` | ⬜ Pendente |
 | `--btn-primary-hover` | `var(--color-brand-hover)` | ⬜ Pendente |
 | `--btn-primary-text` | `var(--color-text-inverse)` | ⬜ Pendente |
-| `--btn-secondary-bg` | `var(--color-bg-secondary)` | ⬜ Pendente |
-| `--btn-secondary-border` | `var(--color-border-strong)` | ⬜ Pendente |
-| `--btn-secondary-hover` | `var(--color-bg-tertiary)` | ⬜ Pendente |
 | `--btn-danger-bg` | `var(--color-danger)` | ⬜ Pendente |
-| `--btn-danger-hover` | `color-mix(in srgb, var(--color-danger) 85%, black)` | ⬜ Pendente |
-| `--btn-padding` | `var(--space-2) var(--space-4)` | ⬜ Pendente |
-| `--btn-radius` | `var(--radius-md)` | ⬜ Pendente |
-| `--btn-font-size` | `var(--text-sm)` | ⬜ Pendente |
-| `--btn-font-weight` | `500` | ⬜ Pendente |
+| `--btn-danger-hover` | `var(--color-danger) / 0.9` | ⬜ Pendente |
+| `--btn-ghost-bg` | `transparent` | ⬜ Pendente |
+| `--btn-ghost-hover` | `var(--color-bg-secondary)` | ⬜ Pendente |
 
-### 8.4 Badges / Status (Manutenção: Pendente/Aprovada/Em Execução/Concluída/Cancelada)
+### 8.4 Badges de Status (Ativo, Manutenção, Alerta)
 
-| Token | Composição | Status |
+| Token | Derivação | Status |
 | :--- | :--- | :--- |
 | `--badge-padding` | `var(--space-1) var(--space-2)` | ⬜ Pendente |
-| `--badge-radius` | `var(--radius-full)` | ⬜ Pendente |
 | `--badge-font-size` | `var(--text-xs)` | ⬜ Pendente |
 | `--badge-font-weight` | `600` | ⬜ Pendente |
-| `--badge-pending-bg` | `var(--color-warning-bg)` | ⬜ Pendente |
-| `--badge-pending-text` | `var(--color-warning)` | ⬜ Pendente |
-| `--badge-approved-bg` | `var(--color-info-bg)` | ⬜ Pendente |
-| `--badge-approved-text` | `var(--color-info)` | ⬜ Pendente |
-| `--badge-executing-bg` | `var(--color-brand-primary) / 0.15` | ⬜ Pendente |
-| `--badge-executing-text` | `var(--color-brand-primary)` | ⬜ Pendente |
-| `--badge-completed-bg` | `var(--color-success-bg)` | ⬜ Pendente |
-| `--badge-completed-text` | `var(--color-success)` | ⬜ Pendente |
-| `--badge-cancelled-bg` | `var(--color-danger-bg)` | ⬜ Pendente |
-| `--badge-cancelled-text` | `var(--color-danger)` | ⬜ Pendente |
+| `--badge-radius` | `var(--radius-full)` | ⬜ Pendente |
+| `--badge-ativo-bg` | `var(--color-success-bg)` | ⬜ Pendente |
+| `--badge-ativo-text` | `var(--color-success)` | ⬜ Pendente |
+| `--badge-manutencao-bg` | `var(--color-warning-bg)` | ⬜ Pendente |
+| `--badge-manutencao-text` | `var(--color-warning)` | ⬜ Pendente |
+| `--badge-alerta-bg` | `var(--color-danger-bg)` | ⬜ Pendente |
+| `--badge-alerta-text` | `var(--color-danger)` | ⬜ Pendente |
 
----
+### 8.5 QR Code / Etiquetas (Geração de PDF)
 
-## 9. Governança dos Tokens
-
-| Aspecto | Definição | Status |
+| Token | Derivação | Status |
 | :--- | :--- | :--- |
-| **Processo de adição/alteração** | 1. Issue no GitHub com label `design-tokens`<br>2. PR com: novo token + justificativa + screenshot de uso<br>3. Aprovação: **Design Lead + Frontend Lead**<br>4. Merge → CI publica pacote/atualiza CSS vars | ⬜ Pendente |
-| **Ferramenta de sincronização** | **Style Dictionary** (npm) → gera: `tokens.css` (CSS custom properties), `tokens.js` (ESM para JS), `tokens.json` (source of truth). **Figma Tokens plugin** para sync bidirecional Design ↔ Code. | ⬜ Pendente |
-| **Como evitar drift** | - `tokens.json` é **single source of truth** (versionado)<br>- CI job `tokens:validate` compara `tokens.json` vs Figma (via API) vs `tokens.css` gerado<br>- Storybook com `design-tokens` addon para visual regression<br>- Lint: `stylelint` + `postcss-custom-properties` valida uso apenas de tokens | ⬜ Pendente |
-| **Versionamento** | SemVer no `tokens.json` (`version: "1.0.0"`). Breaking change = major (ex: renomear token). | ⬜ Pendente |
-| **Documentação viva** | Storybook `/design-tokens` page auto-gerada do `tokens.json` | ⬜ Pendente |
+| `--qrcode-size` | `2rem` (32px) | ⬜ Pendente |
+| `--qrcode-quiet-zone` | `var(--space-2)` | ⬜ Pendente |
+| `--label-font-family` | `var(--font-mono)` | ⬜ Pendente |
+| `--label-font-size` | `var(--text-xs)` | ⬜ Pendente |
 
 ---
 
-## 10. Referências
+## 9. Implementation Guide
 
-* **Arquivo de implementação alvo (a criar):** `frontend/src/styles/tokens.css` (CSS Custom Properties) + `frontend/src/styles/tokens.json` (Style Dictionary source)
-* **Configuração Style Dictionary (a criar):** `style-dictionary.config.js`
-* **Figma file:** **[INSERIR LINK DO FIGMA — REQUER ENTRADA HUMANA]**
-* **BRD (fonte de requisitos):** `Business Requirements Document` — seções 3 (Personas), 5 (Scope), 6 (Business Rules BR-01 a BR-10)
-* **Diagnóstico de código:** `frontend/src/services/api.js` (Popper.js usage), `src/main/java/.../service/AlertNotificationService.java` (alertas de saúde)
+### 9.1 Estrutura de Arquivos Recomendada
+
+```
+frontend/
+├── src/
+│   ├── styles/
+│   │   ├── tokens.css          # CSS Custom Properties (esta definição)
+│   │   ├── tokens.json         # Export JSON para consumo JS/TS (Style Dictionary)
+│   │   ├── global.css          # Reset + import tokens.css
+│   │   └── themes/
+│   │       ├── light.css       # Overrides light mode
+│   │       └── dark.css        # Overrides dark mode
+│   ├── utils/
+│   │   └── tokens.ts           # Type-safe accessors (ex: tokens.color.brand.primary)
+│   └── components/
+│       └── ...                 # Componentes usam var(--token) ou tokens.color.xxx
+```
+
+### 9.2 CSS Custom Properties (tokens.css)
+
+```css
+/* frontend/src/styles/tokens.css */
+:root {
+  /* Color - Primitive */
+  --color-bg-primary: #FFFFFF;
+  --color-bg-secondary: #F8F9FA;
+  --color-bg-tertiary: #FFFFFF;
+  --color-border-subtle: #DEE2E6;
+  --color-border-strong: #ADB5BD;
+  --color-text-primary: #212529;
+  --color-text-secondary: #6C757D;
+  --color-text-inverse: #FFFFFF;
+  --color-brand-primary: #0D6EFD;
+  --color-brand-hover: #0B5ED7;
+  --color-brand-active: #0A58CA;
+
+  /* Color - Semantic */
+  --color-success: #198754;
+  --color-success-bg: #D1E7DD;
+  --color-warning: #FFC107;
+  --color-warning-bg: #FFF3CD;
+  --color-danger: #DC3545;
+  --color-danger-bg: #F8D7DA;
+  --color-info: #0DCAF0;
+  --color-info-bg: #CFEFFE;
+
+  /* Color - Role-based */
+  --color-role-admin: #6F42C1;
+  --color-role-user: #0D6EFD;
+  --color-permission-allowed: #198754;
+  --color-permission-denied: #DC3545;
+
+  /* Typography */
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+
+  /* Spacing */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* Border Radius */
+  --radius-none: 0;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-focus: 0 0 0 3px var(--color-brand-primary) / 0.4;
+
+  /* Motion */
+  --duration-fast: 100ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+
+  /* Z-Index */
+  --z-base: 0;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-modal-backdrop: 400;
+  --z-modal: 500;
+  --z-popover: 600;
+  --z-toast: 700;
+  --z-tooltip: 800;
+}
+
+/* Dark mode overrides */
+.theme-dark {
+  --color-bg-primary: #1A1A2E;
+  --color-bg-secondary: #16213E;
+  --color-bg-tertiary: #0F3460;
+  --color-border-subtle: #2D3A4F;
+  --color-border-strong: #4A5A7A;
+  --color-text-primary: #E9ECEF;
+  --color-text-secondary: #ADB5BD;
+  --color-brand-primary: #6EA8FE;
+  --color-brand-hover: #8BB4FE;
+  --color-brand-active: #4D94FE;
+  --color-success: #75B798;
+  --color-warning: #FFD64D;
+  --color-danger: #EA868F;
+  --color-info: #6EDFF6;
+}
+```
+
+### 9.3 TypeScript Accessors (tokens.ts)
+
+```typescript
+// frontend/src/utils/tokens.ts
+export const tokens = {
+  color: {
+    bg: {
+      primary: 'var(--color-bg-primary)',
+      secondary: 'var(--color-bg-secondary)',
+      tertiary: 'var(--color-bg-tertiary)',
+    },
+    border: {
+      subtle: 'var(--color-border-subtle)',
+      strong: 'var(--color-border-strong)',
+    },
+    text: {
+      primary: 'var(--color-text-primary)',
+      secondary: 'var(--color-text-secondary)',
+      inverse: 'var(--color-text-inverse)',
+    },
+    brand: {
+      primary: 'var(--color-brand-primary)',
+      hover: 'var(--color-brand-hover)',
+      active: 'var(--color-brand-active)',
+    },
+    semantic: {
+      success: 'var(--color-success)',
+      successBg: 'var(--color-success-bg)',
+      warning: 'var(--color-warning)',
+      warningBg: 'var(--color-warning-bg)',
+      danger: 'var(--color-danger)',
+      dangerBg: 'var(--color-danger-bg)',
+      info: 'var(--color-info)',
+      infoBg: 'var(--color-info-bg)',
+    },
+    role: {
+      admin: 'var(--color-role-admin)',
+      user: 'var(--color-role-user)',
+      permissionAllowed: 'var(--color-permission-allowed)',
+      permissionDenied: 'var(--color-permission-denied)',
+    },
+  },
+  font: {
+    sans: 'var(--font-sans)',
+    mono: 'var(--font-mono)',
+  },
+  text: {
+    xs: 'var(--text-xs)',
+    sm: 'var(--text-sm)',
+    base: 'var(--text-base)',
+    lg: 'var(--text-lg)',
+    xl: 'var(--text-xl)',
+    '2xl': 'var(--text-2xl)',
+    '3xl': 'var(--text-3xl)',
+  },
+  space: {
+    1: 'var(--space-1)',
+    2: 'var(--space-2)',
+    3: 'var(--space-3)',
+    4: 'var(--space-4)',
+    5: 'var(--space-5)',
+    6: 'var(--space-6)',
+    8: 'var(--space-8)',
+    10: 'var(--space-10)',
+    12: 'var(--space-12)',
+    16: 'var(--space-16)',
+  },
+  radius: {
+    none: 'var(--radius-none)',
+    sm: 'var(--radius-sm)',
+    md: 'var(--radius-md)',
+    lg: 'var(--radius-lg)',
+    xl: 'var(--radius-xl)',
+    full: 'var(--radius-full)',
+  },
+  shadow: {
+    sm: 'var(--shadow-sm)',
+    md: 'var(--shadow-md)',
+    lg: 'var(--shadow-lg)',
+    xl: 'var(--shadow-xl)',
+    focus: 'var(--shadow-focus)',
+  },
+  duration: {
+    fast: 'var(--duration-fast)',
+    normal: 'var(--duration-normal)',
+    slow: 'var(--duration-slow)',
+  },
+  ease: {
+    standard: 'var(--ease-standard)',
+    emphasized: 'var(--ease-emphasized)',
+    decelerate: 'var(--ease-decelerate)',
+  },
+  zIndex: {
+    base: 'var(--z-base)',
+    dropdown: 'var(--z-dropdown)',
+    sticky: 'var(--z-sticky)',
+    modalBackdrop: 'var(--z-modal-backdrop)',
+    modal: 'var(--z-modal)',
+    popover: 'var(--z-popover)',
+    toast: 'var(--z-toast)',
+    tooltip: 'var(--z-tooltip)',
+  },
+} as const;
+
+export type Tokens = typeof tokens;
+```
+
+### 9.4 Uso em Componentes Vue
+
+```vue
+<!-- Exemplo: AtivoCard.vue -->
+<script setup lang="ts">
+import { tokens } from '@/utils/tokens';
+defineProps<{ ativo: Ativo }>();
+</script>
+
+<template>
+  <div class="ativo-card" :style="cardStyle">
+    <span class="badge" :style="badgeStyle">{{ ativo.status }}</span>
+    <code class="serial" :style="serialStyle">{{ ativo.numeroSerie }}</code>
+  </div>
+</template>
+
+<style scoped>
+.ativo-card {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--duration-fast) var(--ease-standard);
+}
+.ativo-card:hover {
+  box-shadow: var(--shadow-md);
+}
+.badge {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.serial {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+</style>
+```
 
 ---
 
-## 11. Próximos Passos (Action Items)
+## 10. Governance & Change Process
 
-| # | Ação | Responsável | Prazo | Status |
-| :--- | :--- | :--- | :--- | :--- |
-| 1 | Definir paleta de cores (primitivas + semânticas) com testes de contraste WCAG 2.1 AA | Design Lead | Sprint 1 | ⬜ Pendente |
-| 2 | Escolher tipografia (sans + mono) — licença web, performance, suporte PT-BR | Design Lead | Sprint 1 | ⬜ Pendente |
-| 3 | Criar `tokens.json` + `style-dictionary.config.js` + pipeline CI | Frontend Lead | Sprint 1 | ⬜ Pendente |
-| 4 | Gerar `tokens.css` e importar no `index.html` / entry point | Frontend Lead | Sprint 1 | ⬜ Pendente |
-| 5 | Substituir valores hardcoded existentes por tokens (varredura + refatoração) | Frontend Team | Sprint 2 | ⬜ Pendente |
-| 6 | Implementar toggle Light/Dark + persistência + `prefers-color-scheme` | Frontend Team | Sprint 2 | ⬜ Pendente |
-| 7 | Configurar Figma Tokens plugin + sync bidirecional | Design Lead | Sprint 2 | ⬜ Pendente |
-| 8 | Adicionar Storybook `design-tokens` page + visual regression (Chromatic) | Frontend Lead | Sprint 3 | ⬜ Pendente |
+| Etapa | Descrição | Responsável |
+| :--- | :--- | :--- |
+| **Proposta** | Novo token ou alteração via PR com justificativa (acessibilidade, novo componente, feedback usuário) | Qualquer dev/designer |
+| **Revisão Design** | Validação visual, contraste WCAG 2.1 AA, consistência com sistema | Design Lead |
+| **Revisão Engenharia** | Impacto em componentes existentes, breaking changes, migração | Frontend Lead |
+| **Aprovação** | Ambos aprovam → merge para `main` | Design + Eng Lead |
+| **Distribuição** | Atualização de `tokens.json` + `tokens.css` + `tokens.ts` em release patch | CI/CD automatizado |
+| **Documentação** | Changelog em `CHANGELOG.md` + atualização deste documento | Autor do PR |
+
+> **Regra:** Tokens **primitivos** (cores base, espaçamento, tipografia) são **imutáveis após v1.0** — apenas adição. Tokens **semânticos/componentes** podem evoluir com versionamento semântico.
 
 ---
 
-> **Fim do documento.** Todas as seções marcadas com **⬜ Pendente** requerem decisão humana (Design/Product/Eng) antes da implementação. Nenhum valor foi inventado — apenas a **estrutura** foi derivada dos requisitos do BRD e da stack real (Vanilla JS + Popper.js).
+## 11. Accessibility Checklist (Tokens)
+
+- [ ] Todos pares de cor texto/fundo ≥ **4.5:1** (WCAG AA) — texto normal
+- [ ] Todos pares de cor texto/fundo ≥ **3:1** (WCAG AA) — texto grande (≥ 18px ou 14px bold)
+- [ ] Focus ring visível (`--shadow-focus`) em **todos** elementos interativos
+- [ ] Estados hover/active/focus/disabled distintos para botões, inputs, links
+- [ ] Modo escuro testado com `prefers-color-scheme: dark` + toggle manual
+- [ ] `prefers-reduced-motion: reduce` desabilita `--duration-*` não essenciais
+- [ ] Fonte monoespaçada (`--font-mono`) para dados técnicos (IP, MAC, serial, JSON)
+- [ ] Tamanho mínimo de toque **44×44px** (mobile) — `--btn-height` ≥ 44px
+
+---
+
+## 12. Referências
+
+- `ui-style-guide.md` — Diretrizes de uso dos tokens em componentes
+- `component-library.md` — Inventário de componentes que consomem tokens
+- `accessibility-guidelines.md` — Requisitos WCAG 2.1 AA detalhados
+- `system-architecture.md` §3 — Frontend stack (Vue 3, Bootstrap 5, Vite)
+- `BRD` NFR-08 — Usabilidade responsiva, mobile-first para solicitações
+- `ADR-001` — Monolito único: frontend servido estaticamente pelo Spring Boot
+
+---
+
+**Próximos passos:**
+1. **Design Team** define valores reais para todos tokens "TO BE DEFINED"
+2. **Frontend Lead** implementa `tokens.css` + `tokens.ts` + integração no Vite
+3. **Engenharia** refatora componentes existentes para usar tokens (eliminar hardcoded values)
+4. **CI Gate** adiciona verificação: `grep -r "#[0-9A-Fa-f]\{3,8\}" frontend/src --include="*.vue" --include="*.css" --include="*.ts"` deve retornar vazio (exceto tokens.css)

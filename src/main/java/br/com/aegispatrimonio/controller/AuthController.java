@@ -124,7 +124,9 @@ public class AuthController {
         try {
             final long expiresAt = jwtService.extractExpirationEpochMillis(token);
             final String username = jwtService.extractUsername(token);
-            tokenDenylistService.revoke(token, expiresAt);
+            final String jti = jwtService.extractJti(token);
+            final Long uid = jwtService.extractUid(token);
+            tokenDenylistService.revoke(jti, expiresAt, uid);
             securityAuditService.logAuthorization(username, "auth", "LOGOUT", "logout", true,
                     "Token revogado via logout server-side");
         } catch (Exception e) {
@@ -148,8 +150,11 @@ public class AuthController {
                     }
                 }
             } catch (Exception e) {
-                log.error("Resiliência no login: Falha ao carregar filiais para usuário {}. Motivo: {}",
-                        userDetails.getUsername(), e.getMessage());
+                // M5 (audit): antes o catch engolia a exceção em silêncio; agora
+                // registra WARN com contexto (usuário + causa) para permitir
+                // diagnóstico em produção. Login segue resiliente: filiais vazias.
+                log.warn("Resiliência no login: falha ao carregar filiais do usuário {}. Motivo: {}",
+                        userDetails.getUsername(), e.getMessage(), e);
                 // filiais permanece Collections.emptyList()
             }
         }

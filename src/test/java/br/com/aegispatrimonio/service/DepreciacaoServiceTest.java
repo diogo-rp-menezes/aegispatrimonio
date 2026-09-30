@@ -6,6 +6,8 @@ import br.com.aegispatrimonio.model.MetodoDepreciacao;
 import br.com.aegispatrimonio.model.StatusAtivo;
 import br.com.aegispatrimonio.model.Usuario;
 import br.com.aegispatrimonio.repository.AtivoRepository;
+import jakarta.persistence.EntityManager;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,6 +35,8 @@ class DepreciacaoServiceTest {
     private AtivoRepository ativoRepository;
     @Mock
     private CurrentUserProvider currentUserProvider; // Adicionado mock para CurrentUserProvider
+    @Mock
+    private EntityManager entityManager;
 
     @InjectMocks
     private DepreciacaoService depreciacaoService;
@@ -68,6 +72,17 @@ class DepreciacaoServiceTest {
         verify(ativoRepository).saveAll(anyList());
         BigDecimal depreciacaoMensalEsperada = new BigDecimal("100.00");
         assertEquals(0, depreciacaoMensalEsperada.compareTo(ativo.getDepreciacaoAcumulada().setScale(2, RoundingMode.HALF_UP)));
+    }
+
+    @Test
+    @DisplayName("Job mensal deve estar protegido por lock distribuído (ShedLock)")
+    void calcularDepreciacaoMensalAgendada_deveTerSchedulerLock() throws Exception {
+        var method = DepreciacaoService.class.getMethod("calcularDepreciacaoMensalAgendada");
+        var lock = method.getAnnotation(SchedulerLock.class);
+
+        assertNotNull(lock, "O job mensal deve ter @SchedulerLock para rodar em apenas uma réplica");
+        assertEquals("depreciacaoMensal", lock.name());
+        assertFalse(lock.lockAtMostFor().isEmpty());
     }
 
     @Test

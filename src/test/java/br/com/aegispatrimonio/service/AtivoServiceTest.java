@@ -48,8 +48,6 @@ class AtivoServiceTest {
     @Mock
     private DepreciacaoService depreciacaoService;
     @Mock
-    private SearchOptimizationService searchOptimizationService;
-    @Mock
     private UserContextService userContextService;
     @Mock
     private AtivoHealthHistoryRepository healthHistoryRepository;
@@ -231,45 +229,30 @@ class AtivoServiceTest {
     }
 
     @Test
-    @DisplayName("ListarTodos: Deve usar busca fuzzy quando nome é fornecido")
-    void listarTodos_comBuscaFuzzy_deveRankearResultados() {
+    @DisplayName("ListarTodos: Deve usar busca FULLTEXT quando nome tem 3+ caracteres")
+    void listarTodos_comBuscaPorNome_deveUsarFullText() {
         // Arrange
-        String query = "laptp";
+        String query = "laptop";
 
-        br.com.aegispatrimonio.dto.AtivoNameDTO n1 = new br.com.aegispatrimonio.dto.AtivoNameDTO(1L, "Desktop");
-        br.com.aegispatrimonio.dto.AtivoNameDTO n2 = new br.com.aegispatrimonio.dto.AtivoNameDTO(2L, "Laptop");
-        br.com.aegispatrimonio.dto.AtivoNameDTO n3 = new br.com.aegispatrimonio.dto.AtivoNameDTO(3L, "Lap Top");
-
-        // Mock candidates returned by Repository
-        List<br.com.aegispatrimonio.dto.AtivoNameDTO> candidates = List.of(n1, n2, n3);
-        // Mock ranked result returned by Service
-        List<br.com.aegispatrimonio.dto.AtivoNameDTO> ranked = List.of(n2, n3);
-
-        mockUserContext(true, null); // Admin
-
-        // When finding candidates (name is null)
-        when(ativoRepository.findSimpleByFilters(any(), any(), any(), any(), any(), any(),
-                any(org.springframework.data.domain.Pageable.class)))
-                .thenReturn(candidates);
-
-        // When ranking
-        when(searchOptimizationService.<br.com.aegispatrimonio.dto.AtivoNameDTO>rankResults(eq(query), anyList(),
-                any())).thenReturn(ranked);
-
-        // When fetching details for the page content
         Ativo a2 = new Ativo();
         a2.setId(2L);
         a2.setNome("Laptop");
         Ativo a3 = new Ativo();
         a3.setId(3L);
-        a3.setNome("Lap Top");
-        when(ativoRepository.findAllByIdInWithDetails(anyList())).thenReturn(List.of(a2, a3));
+        a3.setNome("Laptop Dell");
+
+        mockUserContext(true, null); // Admin
+
+        org.springframework.data.domain.Page<Ativo> fullTextPage = new org.springframework.data.domain.PageImpl<>(
+                List.of(a2, a3), org.springframework.data.domain.Pageable.ofSize(10), 2);
+        when(ativoRepository.searchByNomeFullText(eq(query), isNull(), isNull(), isNull(), isNull(), isNull(),
+                isNull(), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(fullTextPage);
 
         br.com.aegispatrimonio.dto.AtivoDTO dto2 = new br.com.aegispatrimonio.dto.AtivoDTO(2L, "Laptop", null, null,
                 null, null, null, null, null, null, null, null, null, null, null, null, null, null);
-        br.com.aegispatrimonio.dto.AtivoDTO dto3 = new br.com.aegispatrimonio.dto.AtivoDTO(3L, "Lap Top", null, null,
-                null, null, null, null, null, null, null, null, null, null, null, null, null, null);
-
+        br.com.aegispatrimonio.dto.AtivoDTO dto3 = new br.com.aegispatrimonio.dto.AtivoDTO(3L, "Laptop Dell", null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
         when(ativoMapper.toDTO(a2)).thenReturn(dto2);
         when(ativoMapper.toDTO(a3)).thenReturn(dto3);
 
@@ -280,10 +263,33 @@ class AtivoServiceTest {
                 params);
 
         // Assert
-        verify(searchOptimizationService).rankResults(eq(query), anyList(), any());
-        verify(ativoRepository).findAllByIdInWithDetails(anyList());
+        verify(ativoRepository).searchByNomeFullText(eq(query), isNull(), isNull(), isNull(), isNull(), isNull(),
+                isNull(), any(org.springframework.data.domain.Pageable.class));
+        verify(ativoRepository, never()).findByFilters(any(), any(), any(), any(), any(), any(), any(), any());
         org.junit.jupiter.api.Assertions.assertEquals(2, result.getContent().size());
         org.junit.jupiter.api.Assertions.assertEquals("Laptop", result.getContent().get(0).nome());
+        org.junit.jupiter.api.Assertions.assertEquals("Laptop Dell", result.getContent().get(1).nome());
+    }
+
+    @Test
+    @DisplayName("ListarTodos: Termo curto (< 3 chars) deve usar caminho LIKE, não FULLTEXT")
+    void listarTodos_comTermoCurto_deveUsarLike() {
+        // Arrange
+        String query = "la";
+        mockUserContext(true, null); // Admin
+
+        when(ativoRepository.findByFilters(isNull(), isNull(), isNull(), eq(query), isNull(), isNull(), isNull(),
+                any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(org.springframework.data.domain.Page.empty());
+
+        // Act
+        AtivoQueryParams params = new AtivoQueryParams(null, null, null, query, null);
+        ativoService.listarTodos(org.springframework.data.domain.Pageable.ofSize(10), params);
+
+        // Assert
+        verify(ativoRepository).findByFilters(isNull(), isNull(), isNull(), eq(query), isNull(), isNull(), isNull(),
+                any(org.springframework.data.domain.Pageable.class));
+        verify(ativoRepository, never()).searchByNomeFullText(any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test

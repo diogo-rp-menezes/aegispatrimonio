@@ -1,181 +1,111 @@
-# Product Roadmap & Sprint History — Sistema de Gestão de Patrimônio (AegisPatrimonio)
+# Product Roadmap & Sprint History — AegisPatrimônio (a6)
 
-> **Horizonte de planejamento:** Trimestral · **Última atualização:** baseline inicial gerado por IA — data de calendário real a registrar na consolidação [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
-
-> **Fonte primária:** Story Map & Slicing Strategy (A4) do Sistema de Gestão de Patrimônio — codebase `AegisPatrimonio` (pacote `br.com.aegispatrimonio`). Todos os itens de backlog são referenciados pelos identificadores do BRD (RF-XX, RNF-XX, UC-XX, CA-XX, RN-XX, R-XX) para rastreabilidade direta.
-
-### Premissas de Planejamento [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
-
-O Story Map (A4) define slices, stories e riscos de slicing, mas **não define sprints, datas, capacidade em pontos nem velocity**. Todo o sequenciamento deste roadmap deriva dos slices MoSCoW do Story Map (Slice 1/MVP → Slice 2/Should → Slice 3/Could) e das stories RF-XX/RNF-XX neles listadas. Premissas adotadas:
-
-1. **Sprints de 2 semanas**, iniciadas após a validação do fatiamento MoSCoW com o Product Owner (premissa do próprio Story Map).
-2. **Squad único dedicado**, com capacidade inicial de referência de **24 pontos/sprint** (escala Fibonacci), a ser calibrada com velocity real a partir da Sprint 1.
-3. **Pontos por story são estimativas relativas de complexidade** — não declaradas no Story Map — e devem ser refinados em cerimônia de planning.
-4. **Datas de milestone são relativas ao kick-off** (em semanas), não de calendário — o BRD não define prazos.
-5. **Partes das stories RF-XX podem já estar implementadas** no codebase existente (350 arquivos de código, 27.537 linhas de código (LOC), conforme diagnóstico determinístico do workspace) — a verificação story-a-story é pré-requisito da Sprint 1 (ver seção 6).
-
----
+> **Horizonte de planejamento:** Trimestral · sprints de 2 semanas · **Última atualização:** 28/04/2025 [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
+>
+> **Fontes:** Story Map & Slicing Strategy do AegisPatrimônio (fonte primária — backbone E1–E8, tarefas associadas e regras de negócio BR-01 a BR-10) + diagnóstico determinístico do codebase (353 arquivos, 1.287 funções, 347 classes, ~27.912 LOC, varredura + AST).
+>
+> **Nota de transparência sobre estimativas:** nenhuma data, capacidade em pontos, velocity ou milestone está declarada no Story Map ou no diagnóstico do codebase. Todos os valores desse tipo neste documento são [INFERIDOS POR IA — REQUER VALIDAÇÃO HUMANA], com as premissas declaradas na Seção 2 e nas seções correspondentes.
+>
+> **Nota sobre códigos de stories:** o Story Map organiza a jornada em atividades (E1–E8) e tarefas associadas (nomes de funções/casos de uso), mas não define numeração explícita de User Stories; o BRD v1.0 também não define (conforme nota de transparência do próprio Story Map). Os códigos US-001…US-021 abaixo são numeração proposta, derivada diretamente das atividades e tarefas do Story Map — [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — e devem ser substituídos pela numeração oficial (REQ-xxx) quando existir.
 
 ## 1. Strategic Themes (Now / Next / Later)
 
+> Priorização Now/Next/Later derivada do fatiamento do Story Map, que declara que as atividades 1–4 formam o núcleo obrigatório da jornada e as atividades 5–8 agregam valor de antecipação de falhas, decisão apoiada em custo e rastreabilidade auditável — [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA].
+
 ### Now (Sprint Atual / Trimestre Atual)
-* **MVP — Jornada Ponta-a-Ponta de Gestão de Manutenção (Release 1 · Sprints 1–5)** — entregar o fluxo de manutenção **Pendente → Aprovada → Concluída** (CA-04), precedido de autenticação JWT com RBAC Admin/User (CA-06..CA-08) e dos cadastros mestres mínimos para registrar e consultar ativos; portão de saída CA-01 (escopo fatiado), CA-02, CA-03, CA-05, CA-10 e gates de qualidade RNF-04/RNF-05/RNF-10. *(Story Map: Slice 1 — Must Have)*
+* **Núcleo operacional do patrimônio (E1–E3)** — objetivo de negócio: estabelecer a fonte única de verdade do patrimônio, com autenticação por credenciais próprias e encerramento seguro de sessão (BR-07), cadastros base completos do domínio (filiais, departamentos, localizações, tipos de ativo, usuários, credenciais, papéis, permissões, fornecedores, funcionários) e ativos cadastrados de forma íntegra e consultável (BR-02, BR-05). É pré-requisito de todo o restante da jornada: sem cadastros base não há ativo cadastrável, e sem fluxo de aprovação não há manutenção rastreável.
 
 ### Next (Próximo Trimestre)
-* **Integridade Cadastral e Inteligência de Custo (Release 2 · Sprints 6–8)** — fechar o CRUD integral das entidades mestres (CA-01 completo), completar o ciclo de vida do ativo (baixa RF-13 e depreciação RF-16), agregar custo total por ativo (RF-17/CA-09), evoluir o RBAC para permissões granulares (RF-27 — mitigação R-01 do BRD) e implantar a trilha de auditoria imutável (RNF-07). *(Story Map: Slice 2 — Should Have)*
+* **Manutenção com aprovação, saúde dos equipamentos e alertas (E4–E6)** — objetivo de negócio: conduzir manutenções solicitáveis, aprováveis, concluíveis e canceláveis com rastreabilidade ponta-a-ponta; registrar health checks e acompanhar o histórico para antecipação de falhas (BR-03, BR-10); reconhecer alertas de uso de recursos e registrar a baixa formal.
 
 ### Later (Explorando / Backlog Estratégico)
-* **Experiência, Adoção e Visibilidade Gerencial (Backlog Could — sem compromisso de prazo)** — interface responsiva (desktop/tablet) com experiência **mobile-first para solicitações** (RNF-08); notificação à Equipe de Manutenção após aprovação (derivada da pós-condição de UC-03 — meio de entrega não definido no BRD) **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**; relatórios gerenciais de custo médio por ativo/ano (KPI do BRD: redução de 15% YoY — escopo detalhado do relatório não definido no BRD) **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**; reavaliação da estratégia de escalabilidade (RNF-06) após a definição da arquitetura de deploy.
-
-> **Fora de escopo neste ciclo (Won't Have, conforme Story Map):** permissões granulares finas além do escopo de RF-27; migração de dados legados (R-02 — tratada como trabalho de implantação separado); notificações push (mitigação R-04); escalabilidade horizontal dedicada (RNF-06 — adiada até a definição da arquitetura de deploy).
-
----
+* **Decisão apoiada em custo e compliance auditável (E7–E8)** — objetivo de negócio: apoiar decisões de reparo, substituição ou desativação com o custo acumulado por bem (`custoTotalPorAtivo`) e garantir trilha de auditoria confiável por registro ("quem alterou o quê e quando"). Ainda sem compromisso de prazo: depende da validação das personas Sponsor/Diretoria e Auditor/Compliance (inferidas no BRD §3) e da maturidade das entregas de Now/Next.
+* *Stories candidatas, sem sprint agendada:* US-021 — Trilha de auditoria de modificações (E8); desdobramentos adicionais de E7 (visões de apoio à decisão) a definir com as personas — [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]. US-020 (custo por ativo) aparece antecipadamente na Sprint 3 como puxamento do tema Later, sujeito a confirmação.
 
 ## 2. Upcoming Sprints
 
-> Sequenciamento derivado dos slices do Story Map: as **35 stories RF/RNF dos Slices 1 e 2** estão integralmente alocadas às Sprints 1–8; os itens do Slice 3 permanecem no Later (seção 1). Datas em semanas relativas ao kick-off — ver Premissas de Planejamento.
+> **Premissas de capacidade e velocity [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]:** sprints de 2 semanas; estimativas em pontos na escala Fibonacci; velocity inicial de 30 pontos/sprint assumida de forma conservadora por inexistência de histórico (composição e capacidade real do time não declaradas nos artefatos — validar no planning).
+>
+> **Nota de consistência com o codebase:** a varredura determinística mostra que funções associadas a diversas stories abaixo já existem no código (ex.: `createAtivo`, `iniciar`/`aprovar`/`concluir`/`cancelar`, `checkResourceUsageAlerts`, `getHealthHistory`). No planning de cada sprint, validar se a story corresponde a construção nova ou a completura/hardening do que já existe.
 
-### Sprint 1 — Fundações: Autenticação, RBAC e Contratos de Erro
-* **Período:** semanas 1–2 do plano [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
-* **Meta Central (Sprint Goal):** Usuários autenticam via JWT com sessão segura e atuam conforme o RBAC Admin/User, e a API responde com erros 400/404 padronizados — base transversal de todas as jornadas do Story Map (Etapa 1 do backbone; BRD: CA-06, CA-07, CA-08, RN-03, RN-04).
-* **Capacidade do time:** 24 pontos [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
+### Sprint 1 — 05/05/2025 a 16/05/2025 [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
+* **Meta Central (Sprint Goal):** habilitar o núcleo obrigatório da jornada do Story Map (E1–E3): autenticação com credenciais próprias e encerramento seguro de sessão (BR-07), cadastros base completos do domínio patrimonial e cadastro/consulta íntegros de ativos (BR-02, BR-05) — condição prévia para qualquer manutenção rastreável. Conecta ao objetivo do BRD/Story Map de manter a fonte única de verdade do patrimônio.
+* **Capacidade do time:** 30 pontos [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] · total planejado: 30 pontos
 * **Stories planejadas:**
-  - [ ] RF-23 — Login/Autenticação com retorno de JWT (5 pts)
-  - [ ] RF-24 — Interceptador de Auth com injeção automática de token no frontend (3 pts)
-  - [ ] RF-25 — Controle de Sessão (logout / `clearSession`) (2 pts)
-  - [ ] RF-26 — RBAC com roles **Admin** e **User** — 403 para User em operações de escrita (5 pts)
-  - [ ] RF-28 — Validação de dados: 400 Bad Request com mensagens claras (2 pts)
-  - [ ] RF-29 — Tratamento de ID inexistente: 404 Not Found padronizado (2 pts)
-  - [ ] RNF-01 — JWT com expiração (1h) e refresh (7 dias) (3 pts)
-  - [ ] RNF-02 — Senhas hasheadas, nunca armazenadas em plain text (2 pts)
-* **Riscos conhecidos:** MVP sem gestão de Funcionários (RF-08 fatiado para a Release 2) — usuários precisarão existir para login; mitigação via carga/ajuste manual dos cadastros, apoiada pelo seeder existente no código (`RealisticDataSeeder`). Risco residual de retrabalho nas regras de 403 quando roles adicionais forem introduzidas (R-01).
+  - [ ] US-001 — Login (incl. `mockLogin` para validação), logout com invalidação imediata do token, encerramento de sessão (`clearSession`) e anexação automática de credenciais às chamadas (`authInterceptor`) (E1; BR-07) (5)
+  - [ ] US-002 — Cadastro de filiais, departamentos e localizações prédio/andar/sala (E2) (3)
+  - [ ] US-003 — Cadastro de tipos de ativo, fornecedores e funcionários (E2) (3)
+  - [ ] US-004 — Gestão de usuários, credenciais, papéis e permissões, incl. vínculo funcionário↔credenciais (`createFuncionarioAndUsuario`) (E2) (5)
+  - [ ] US-005 — Cadastro e consulta de ativos com filial, departamento, localização e tipo; listagens completas (BR-02) e busca por identificador com recusa de dados inválidos e "não encontrado" para ID inexistente (BR-05) (E3) (8)
+  - [ ] US-006 — Carga de dados realistas (`RealisticDataSeeder`) e refatoração do método `run` (complexidade ciclomática 15 — 2º maior valor do codebase) em métodos menores (E2) (3)
+  - [ ] US-007 — Corrigir stub `setUsername` com corpo vazio em `Usuario.java:86` (1)
+  - [ ] US-008 — Remover logs residuais do frontend (`console.error` em `api.js:44`, `console.debug` em `api.js:107`) e quebrar a função `request` (complexidade 13) em funções menores (2)
+* **Riscos conhecidos:** decisão de persistência pendente — nenhum motor de banco de dados e nenhum ORM/query builder declarados nas dependências do projeto (ver Seção 6); velocity inicial estimada sem histórico; numeração oficial de stories ainda não definida no BRD.
 
-### Sprint 2 — Cadastros Mestres Mínimos
-* **Período:** semanas 3–4 do plano [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
-* **Meta Central (Sprint Goal):** Admin cadastra a estrutura organizacional mínima (departamentos, filiais, fornecedores, localizações e tipos de ativo) que sustenta o cadastro e a alocação de ativos — Etapa 2 do backbone; escrita exclusiva Admin com 403 para User (RN-01/RN-02).
-* **Capacidade do time:** 24 pontos [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
+### Sprint 2 — 19/05/2025 a 30/05/2025 [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
+* **Meta Central (Sprint Goal):** entregar o fluxo de manutenção com aprovação (E4) — iniciar/solicitar, aprovar, concluir e cancelar, com consultas filtráveis — e o ciclo de monitoramento de saúde (E5) com histórico legível por filial (BR-03) e inventário de hardware (BR-10), completando o núcleo obrigatório da jornada e iniciando o valor de antecipação de falhas.
+* **Capacidade do time:** 30 pontos [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] · total planejado: 29 pontos
 * **Stories planejadas:**
-  - [ ] RF-01 — Criar Departamento (3 pts)
-  - [ ] RF-04 — Buscar Departamento por ID (2 pts)
-  - [ ] RF-05 — Listar Departamentos com paginação (3 pts)
-  - [ ] RF-06 — Criar Filial (3 pts)
-  - [ ] RF-07 — Criar Fornecedor (3 pts) — Must por ser exigido pelo cadastro de ativo (RF-11)
-  - [ ] RF-09 — Criar Localização (3 pts)
-  - [ ] RF-10 — Criar Tipo de Ativo (3 pts)
-* **Riscos conhecidos:** RN-01/RN-02 devem ser aplicadas consistentemente em todos os endpoints de escrita (dependência direta do RBAC entregue na Sprint 1); folga de capacidade (20 de 24 pts) reservada para correções carry-over da Sprint 1.
+  - [ ] US-009 — Ciclo de manutenção rastreável e auditável: iniciar, aprovar, concluir e cancelar (E4) (8)
+  - [ ] US-010 — Consultas de manutenção com filtros combinados (`ManutencaoSpecification`) e refatoração do método `build` (complexidade 14) em métodos menores (5)
+  - [ ] US-011 — Health check com dados de hardware e disco e atualização de métricas (`updateHealthCheck`, `updateScalars`) (E5) (5)
+  - [ ] US-012 — Histórico de saúde com permissão de leitura por filial (`getHealthHistory`; BR-03) (3)
+  - [ ] US-013 — Inventário de hardware: adaptadores de rede, discos e memórias (BR-10) (5)
+  - [ ] US-014 — Otimizar caminho de ranking de ativos — TODO de performance em `AtivoService.java:119` (carrega até 1000 candidatos id+nome e faz ranking) (3)
+* **Riscos conhecidos:** acoplamento do fluxo de aprovação entre papéis (Gestor de Filial solicita/conduz, Administrador aprova); performance do ranking com alto volume de candidatos; complexidade da validação de permissão de leitura por filial.
 
-### Sprint 3 — Acervo de Ativos
-* **Período:** semanas 5–6 do plano [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
-* **Meta Central (Sprint Goal):** Acervo patrimonial operacional — registrar, corrigir/transferir e consultar ativos com filtros por tipo, filial, departamento, status e localização — Etapa 3 do backbone; pré-requisito do passo 2 de UC-02 (seleção de ativo na solicitação de manutenção).
-* **Capacidade do time:** 24 pontos [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
+### Sprint 3 — 02/06/2025 a 13/06/2025 [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
+* **Meta Central (Sprint Goal):** fechar o ciclo operacional com alertas de uso de recursos reconhecíveis e baixa formal (E6) e preparar a Release 1 (Beta Interno) com hardening dos achados da varredura AST — condição de qualidade para expor o sistema às personas mapeadas.
+* **Capacidade do time:** 30 pontos [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] · total planejado: 21 pontos (folga intencional de ~9 pontos para estabilização da release)
 * **Stories planejadas:**
-  - [ ] RF-11 — Cadastrar Ativo (tipo, filial, departamento, localização, fornecedor, valor, data de aquisição) (5 pts)
-  - [ ] RF-12 — Atualizar Ativo (correção cadastral, transferência, status) (5 pts)
-  - [ ] RF-14 — Consultar Ativo por ID com histórico (3 pts)
-  - [ ] RF-15 — Listar/Filtrar Ativos (5 pts)
-* **Riscos conhecidos:** TODO de performance no caminho de listagem/ranking de ativos (`AtivoService.java:119` — carrega até 1000 candidatos id+nome) — monitorar o p95 (RNF-04) durante o MVP e otimizar paginação/filtragem antes da Release 2.
-
-### Sprint 4 — Ciclo de Manutenção Ponta-a-Ponta
-* **Período:** semanas 7–8 do plano [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
-* **Meta Central (Sprint Goal):** Fluxo **Pendente → Aprovada → Concluída** funcional com histórico de manutenção visível — fecha a jornada ponta-a-ponta mínima do MVP (CA-04); etapas 4–7 do backbone (UC-02, UC-03, UC-04).
-* **Capacidade do time:** 24 pontos [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
-* **Stories planejadas:**
-  - [ ] RF-18 — Criar Solicitação de Manutenção (→ **Pendente**) (5 pts)
-  - [ ] RF-19 — Aprovar Solicitação (**Pendente** → **Aprovada**) (3 pts)
-  - [ ] RF-20 — Cancelar Solicitação em qualquer estado (CA-05) (2 pts)
-  - [ ] RF-21 — Concluir Manutenção (**Aprovada/Em Andamento** → **Concluída**) (3 pts)
-  - [ ] RF-22 — Histórico de Manutenção por ativo (3 pts)
-* **Riscos conhecidos:** Experiência degradada para o Funcionário (R-04 do BRD) — o MVP entrega a solicitação sem a experiência mobile-first (RNF-08 no Could); mitigação: validar o fluxo de solicitação com usuários reais já nesta sprint e antecipar RNF-08 para a Release 2 caso a adoção fique abaixo do esperado.
-
-### Sprint 5 — Hardening e Portão de Saída do MVP
-* **Período:** semanas 9–10 do plano [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
-* **Meta Central (Sprint Goal):** MVP pronto para lançar — portão de saída do Story Map atendido (CA-01 no escopo fatiado, CA-02, CA-03, CA-04, CA-05, CA-10) e gates de qualidade RNF-04/RNF-05/RNF-10 verificados; dívida técnica estática crítica resolvida antes de produção.
-* **Capacidade do time:** 24 pontos [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
-* **Stories planejadas:**
-  - [ ] RNF-03 — HTTPS obrigatório em produção (TLS 1.2+) (2 pts)
-  - [ ] RNF-10 — Cobertura de testes > 80%, bloqueando o pipeline de CI/CD (5 pts)
-  - [ ] CA-10 — Testes de integração cobrindo os cenários de permissão Admin vs User (3 pts)
-  - [ ] Verificação de RNF-04 (tempo de resposta p95 < 200ms) e RNF-05 (uptime 99,5%) em staging/produção (2 pts)
-  - [ ] Dívida técnica estática do diagnóstico do workspace (5 pts) **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA — derivado do diagnóstico do workspace, não do Story Map]**: refatorar as funções com complexidade ciclomática alta (`frontend/src/services/api.js:54` — `request`, 13; `RealisticDataSeeder.java:34` — `run`, 15; `AtivoMapper.java:15` — `toDTO`, 14; `ManutencaoSpecification.java:26` — `build`, 14; `AlertNotificationService.java:96` — `checkResourceUsageAlerts`, 17); remover as chamadas `console.error`/`console.debug` residuais (`api.js:44`, `api.js:107`); implementar o stub `Usuario.setUsername` (`Usuario.java:86`).
-* **Riscos conhecidos:** Adiamento da escalabilidade (RNF-06) — a reavaliação da arquitetura de deploy pressupõe decisão pós-MVP; risco de retrabalho se os requisitos de escala (10k+ ativos, 1k+ usuários simultâneos) se tornarem prioritários antes da Release 2. **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
-
-### Sprint 6 — CRUD Integral das Entidades Mestres (Release 2)
-* **Período:** semanas 11–12 do plano [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
-* **Meta Central (Sprint Goal):** Fechar o CA-01 integral (CRUD completo das entidades mestres) e documentar automaticamente a API — objetivo declarado do Slice 2 do Story Map.
-* **Capacidade do time:** 24 pontos [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
-* **Stories planejadas:**
-  - [ ] RF-02 — Atualizar Departamento (2 pts)
-  - [ ] RF-03 — Excluir Departamento (retorna 204 NoContent) (2 pts)
-  - [ ] RF-08 — Criar Funcionário, com vinculação opcional a usuário (`createFuncionarioAndUsuario`, RN-06) (5 pts)
-  - [ ] RNF-09 — Documentação automática da API REST (3 pts)
-* **Riscos conhecidos:** Folga de capacidade (12 de 24 pts) reservada para antecipar RNF-08 (mobile-first) caso a adoção do MVP fique abaixo do esperado (risco R-04 do BRD).
-
-### Sprint 7 — Ciclo de Vida do Ativo e Inteligência de Custo (Release 2)
-* **Período:** semanas 13–14 do plano [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
-* **Meta Central (Sprint Goal):** Completar o ciclo de vida do ativo (baixa e depreciação) e entregar o custo total por ativo batendo com a soma das ordens concluídas (CA-09).
-* **Capacidade do time:** 24 pontos [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
-* **Stories planejadas:**
-  - [ ] RF-13 — Baixar/Excluir Ativo (Admin only) (3 pts)
-  - [ ] RF-16 — Cálculo de Depreciação (valor residual por método/vida útil) (5 pts)
-  - [ ] RF-17 — Custo Total por Ativo (`custoTotalPorAtivo`) (5 pts)
-* **Riscos conhecidos:** Performance em consultas pesadas (R-03 do BRD) — RF-17 pode sofrer timeout; mitigação via paginação e avaliação de performance conforme previsto no próprio BRD.
-
-### Sprint 8 — RBAC Granular e Auditoria (Release 2)
-* **Período:** semanas 15–16 do plano [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
-* **Meta Central (Sprint Goal):** Evoluir o RBAC para permissões granulares (mitigação R-01 do BRD) e implantar a trilha de auditoria imutável de todas as operações de escrita (RNF-07) — fecha o Slice 2.
-* **Capacidade do time:** 24 pontos [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
-* **Stories planejadas:**
-  - [ ] RF-27 — Gestão de Permissões/Roles (`createRole`, `createPermission`) (5 pts)
-  - [ ] RNF-07 — Trilha de auditoria imutável de todas as operações de escrita (5 pts)
-* **Riscos conhecidos:** Risco residual de retrabalho nas regras de 403 ao introduzir roles adicionais (R-01); folga (10 de 24 pts) reservada para estabilização da Release 2.
-
----
+  - [ ] US-015 — Verificação de uso de recursos e listagem de alertas gerais e recentes (`checkResourceUsageAlerts`, `listarAlertas`, `getRecentAlerts`) (E6) (5)
+  - [ ] US-016 — Baixa formal de alerta (`markAsRead`) com rastreabilidade (E6) (2)
+  - [ ] US-017 — Refatorar `AlertNotificationService.checkResourceUsageAlerts` (complexidade 17 — maior do codebase) em métodos menores (3)
+  - [ ] US-018 — Refatorar `AtivoMapper.toDTO` (complexidade 14) em métodos menores (3)
+  - [ ] US-019 — Hardening de Release 1: revisão dos achados da varredura AST (12 funções com complexidade alta sinalizadas, stubs e logs residuais) e verificação dos critérios de aceite do BRD (3)
+  - [ ] US-020 — Custo total de manutenção por ativo (`custoTotalPorAtivo`) (E7) (5) — puxamento antecipado do tema Later, sujeito a confirmação no planning
+* **Riscos conhecidos:** `checkResourceUsageAlerts` é a função mais complexa do codebase (17) — a refatoração exige testes de caracterização para não desestabilizar os alertas; o puxamento de US-020 pode não caber se os alertas exigirem retrabalho.
 
 ## 3. Closed Sprints
 
-> **Nenhum registro de sprints concluídas foi encontrado** no workspace (varredura determinística) nem nos artefatos-fonte (Story Map A4 / BRD). O codebase já contém 350 arquivos de código (27.537 LOC), o que indica esforço de desenvolvimento prévio, mas **sem histórico de sprints, velocity ou retrospectivas documentado** — este histórico precisa ser verificado com o time (ferramenta de gestão de projetos, board e atas de retrospectiva) e consolidado nesta seção.
+### Sem registros de sprints concluídas
+Nenhuma sprint concluída, ata de retrospectiva ou registro de velocity foi encontrado no workspace (varredura determinística de 353 arquivos) nem nos artefatos-fonte (Story Map, BRD). O histórico de execução não é reconstrutível com confiabilidade a partir do código: a existência de implementações (cadastros, fluxo de manutenção, health checks, alertas) indica desenvolvimento em curso, mas não permite atribuir entregas a sprints específicas nem medir velocity passada.
 
-* **Ação requerida:** popular esta seção a partir dos registros reais da ferramenta de gestão ou, na ausência deles, a partir da primeira retrospectiva realizada sob este roadmap. Enquanto isso, a **Sprint 1** (seção 2) é tratada como a primeira sprint rastreável deste plano.
-* **Status do baseline:** este documento estabelece o primeiro baseline de planejamento do projeto; não existem dados de "planejado vs. entregue" anteriores a ele.
+**O que falta verificar:**
+* Ferramenta de gestão de projetos utilizada pelo time e seus registros de sprint/velocity;
+* Atas de retrospectiva de ciclos anteriores;
+* Se o time opera cerimônias de sprint ou outro ciclo de entrega.
 
----
+Esta seção deve ser preenchida a partir da Sprint 1 deste roadmap (primeira sprint com datas planejadas).
 
 ## 4. Milestones & Releases
 
 | Milestone | Data Alvo | Escopo | Status |
 | :--- | :--- | :--- | :--- |
-| **MVP funcional (Release 1)** | ~10 semanas após o kick-off (5 sprints de 2 semanas) [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] | Slice 1 (Must): RF-23..RF-26, RF-01/04/05/06/07/09/10, RF-11/12/14/15, RF-18..RF-22, RF-28/29, RNF-01/02/03 — ~94 pontos [INFERIDO POR IA] | Planejado |
-| **Portão de Saída do MVP (Release Gate)** | Imediatamente após a Sprint 5 [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] | CA-01 (escopo fatiado), CA-02, CA-03, CA-04, CA-05, CA-10; RNF-04 (p95 < 200ms), RNF-05 (uptime 99,5%), RNF-10 (cobertura > 80%) | Planejado |
-| **Release 2 — Integridade Cadastral e Inteligência de Custo** | ~16 semanas após o kick-off (3 sprints adicionais) [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] | Slice 2 (Should): RF-02/03/08, RF-13/16/17, RF-27, RNF-07, RNF-09 — 35 pontos [INFERIDO POR IA] | Planejado |
-| **Backlog Could (Release 3 exploratória)** | Sem data comprometida | RNF-08 (mobile-first), notificação pós-aprovação, relatórios de custo médio por ativo/ano; reavaliação de RNF-06 | Exploratório |
-
----
+| Checkpoint — Núcleo de cadastros e ativos (E1–E3) | 16/05/2025 [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] | Autenticação (BR-07), cadastros base, ativos com consulta (BR-02, BR-05) e hardening inicial (seeder, stub, logs do frontend) | Planejado |
+| Checkpoint — Manutenção e saúde (E4–E5) | 30/05/2025 [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] | Ciclo de manutenção com aprovação, health checks com histórico por filial (BR-03), inventário de hardware (BR-10) | Planejado |
+| Beta Interno — Release 1 (E1–E6 + E7 parcial) | 13/06/2025 [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] | Jornada operacional completa (autenticação → cadastros → ativos → manutenção → saúde → alertas), custo por ativo (se US-020 confirmada) e hardening AST | Planejado |
+| Release 1 — Produção (GA operacional) | A definir após feedback do Beta Interno [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] | Ajustes de feedback do Beta, estabilização e critérios de aceite do BRD | Planejado |
+| Release 2 — Decisão & Compliance (E7–E8) | Sem data (tema Later) | Custo acumulado por ativo para decisão de reparo/substituição/desativação + trilha de auditoria de modificações | Planejado (sem compromisso de prazo) |
 
 ## 5. Velocity Trend
 
-> Não há histórico de velocity anterior a este baseline — nenhum registro de sprints concluídas foi encontrado no workspace ou nos artefatos-fonte. Os valores de "Entregue" serão preenchidos ao fechamento de cada sprint; os valores "Planejado" são estimativas [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA].
+> Sem histórico de sprints concluídas no workspace ou nos artefatos-fonte (ver Seção 3). A coluna "Planejado" reflete as estimativas [INFERIDAS POR IA — REQUER VALIDAÇÃO HUMANA] das sprints futuras; a tendência real só existirá a partir da Sprint 1.
 
 | Sprint | Planejado | Entregue | Observação |
 | :--- | :--- | :--- | :--- |
-| 1 | 24 pts | — | Fundações de acesso; velocity de referência a calibrar |
-| 2 | 20 pts | — | Cadastros mestres mínimos |
-| 3 | 18 pts | — | Acervo de ativos |
-| 4 | 16 pts | — | Ciclo de manutenção ponta-a-ponta |
-| 5 | 17 pts | — | Hardening e portão de saída do MVP |
-| 6 | 12 pts | — | CRUD integral (Release 2) |
-| 7 | 13 pts | — | Ciclo de vida do ativo e custo (Release 2) |
-| 8 | 10 pts | — | RBAC granular e auditoria (Release 2) |
-
----
+| Sprint 1 | 30 | — | Não iniciada; velocity estimada sem histórico |
+| Sprint 2 | 29 | — | Não iniciada |
+| Sprint 3 | 21 | — | Não iniciada; folga intencional para estabilização da Release 1 |
 
 ## 6. Dependencies & Blockers Ativos
 
+> Donos e previsões de resolução são propostas — [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]; nenhum dono está declarado nos artefatos-fonte.
+
 | Item | Bloqueado por | Dono | Previsão de resolução |
 | :--- | :--- | :--- | :--- |
-| Verificação story-a-story das stories RF-XX contra o codebase existente (350 arquivos — 335 `.java` em `src/`, 15 `.js` em `frontend/`, 27.537 LOC) | Ausência de rastreabilidade story↔código; o diagnóstico determinístico do workspace é o único ponto de partida disponível | Product Owner + squad de desenvolvimento [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] | Antes da Sprint 1 [INFERIDO POR IA] |
-| Validação do fatiamento MoSCoW e da necessidade de custo acumulado (RF-17) na aprovação do MVP | Decisão pendente do Product Owner (premissa 6 do Story Map) | Product Owner | Antes da Sprint 2 [INFERIDO POR IA] |
-| Definição da arquitetura de deploy e persistência — pré-requisito para RNF-03 (HTTPS), RNF-05 (uptime 99,5%) e reavaliação de RNF-06 (escalabilidade) | Infraestrutura não definida: o diagnóstico não identificou motor de banco nem ORM nas dependências declaradas do projeto | Responsável por infraestrutura/deploy [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] | Antes do portão de saída do MVP (Sprint 5) [INFERIDO POR IA] |
-| Carga de cadastros de usuários no MVP (RN-06 não coberta — RF-08 na Release 2) | Fatiamento do Story Map (RF-08 no Slice 2) | Administrador do Sistema | Durante a implantação do MVP [INFERIDO POR IA] |
-| Performance da listagem de ativos (TODO `AtivoService.java:119` — até 1000 candidatos por requisição) | Otimização de paginação/filtragem ainda não realizada | Squad de desenvolvimento [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] | Monitorar p95 (RNF-04) durante o MVP; otimizar antes da Release 2 [INFERIDO POR IA] |
-| Meio de entrega da notificação pós-aprovação (pós-condição de UC-03) | Meio não definido no BRD (e-mail, in-app ou push) | Product Owner | Backlog Could — sem prazo comprometido |
-| Antecipação de RNF-08 (mobile-first) para a Release 2 | Decisão condicionada à adoção do MVP pelos usuários (risco R-04 do BRD) | Product Owner | Avaliar ao fechamento do MVP (Sprint 5) [INFERIDO POR IA] |
+| Decisão de persistência: nenhum motor de banco de dados e nenhum ORM/query builder declarados nas dependências do projeto (diagnóstico de stack) — impacta US-002 em diante | Decisão técnica/arquitetural de persistência não registrada nos artefatos | Tech Lead (a designar) | Antes do planning da Sprint 1 |
+| Numeração oficial de User Stories (US-xxx/REQ-xxx) e priorização MoSCoW — o BRD v1.0 não define (nota de transparência do Story Map) | Revisão do BRD com stakeholders | Product Owner | Antes da Sprint 1 |
+| US-014 — Ranking de ativos: critérios de ranking e limite de candidatos indefinidos (TODO em `AtivoService.java:119`) | Definição de produto (critérios) + investigação de performance | Gestor de Produto + dev responsável | Sprint 2 |
+| Validação das personas (Administrador de Patrimônio, Gestor de Filial, Técnico de TI/Monitoramento, Auditor/Compliance — inferidas no BRD §3) | Confirmação com stakeholders reais | Product Owner | Antes da priorização do tema Later (E7–E8) |
+| Datas de sprint, capacidade (30 pontos) e velocity — sem histórico no workspace | Confirmação de disponibilidade e capacidade real do time | Scrum Master / PO | Planning da Sprint 1 |

@@ -1,650 +1,1045 @@
-# User Stories (BDD) — Sistema de Gestão de Patrimônio (A3)
+# User Stories Specification (BDD) — a6 · AegisPatrimônio
 
-> **Épico relacionado:** Gestão de Patrimônio — Gestão Organizacional (entidades mestres), Gestão de Manutenção (ciclo de solicitações) e Compliance/Auditoria · **Sprint:** não definida nas fontes — a definir em planning **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** · **Status geral:** Backlog
+> **Épico relacionado:** Múltiplos épicos — ver Mapa de Épicos abaixo · **Sprint:** A definir (backlog inicial — nenhum planejamento de sprint detectado no workspace) · **Status geral:** Backlog
 
-## Notas de Derivação e Verificação
+**Fontes e método:** este documento deriva do **Catálogo de Casos de Uso (Use Cases) v1.0** (artefato-fonte prioritário, que por sua vez deriva do BRD v1.0) e do **diagnóstico determinístico do codebase** (353 arquivos, ~27.912 LOC, 1.287 funções, 347 classes). Cada story cobre os fluxos de caminho feliz, borda e erro do caso de uso correspondente, em formato BDD/Gherkin.
 
-- **Origem:** as stories abaixo foram derivadas dos casos de uso **UC-01..UC-04** (artefato *Use Cases*/A4, baseado no BRD — RF-01..RF-29, RN-01..RN-08, CA-01..CA-10, RNF-01..RNF-10) e da varredura determinística do codebase (**A5** — 350 arquivos, 27.537 LOC, 1268 funções, 344 classes). O BRD **não define User Stories** — os requisitos estão cobertos pelos RFs; portanto, todo o backlog abaixo é derivação rastreável, não escopo inventado.
-- **Rotas/tabelas:** a varredura **não identificou nenhuma rota/endpoint explícito nem tabelas de banco de dados** no código. Por isso, os critérios de aceite são ancorados aos **contratos comportamentais definidos no BRD** (nomes dos testes de integração, ex.: `criar_comAdmin_deveRetornarCreated`) e aos **códigos de regra de negócio (RN-XX)**, em vez de caminhos de endpoint. Caminhos concretos de API devem ser confirmados no `api-specification.md` quando este for gerado.
-- **Stack real (varredura de dependências):** as dependências reais capturadas limitam-se a `@popperjs/core` (produção); não foram encontrados motor de banco, ORM/query builder ou empacotamento Tauri. O codebase é composto por 335 arquivos `.java` em `src/` e 15 arquivos `.js` em `frontend/`. Requisitos do BRD que pressupõem capacidades além disso — ex.: RNF-01 (token JWT), RNF-06 (scaling horizontal) — são tratados como **metas do BRD pendentes de verificação no codebase**; nenhum mecanismo de infraestrutura não detectado é afirmado como existente.
-- **Rótulos:** trechos marcados com **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** são hipóteses plausíveis derivadas do contexto (BRD + varredura), não fatos verificados; as premissas adotadas estão declaradas junto a cada trecho.
-- **Códigos de regra:** os códigos **RN-XX** correspondem às Business Rules da seção 5 do BRD.
+**Nota de rastreabilidade (rotas/tabelas):** a varredura do workspace **não detectou rotas/IPC/handlers explícitos e nenhum schema de banco de dados**. Por isso, a ancoragem técnica das stories é feita nos **métodos de serviço e componentes verificados no código** (ex.: `createAtivo`, `iniciar`, `aprovar`, `concluir`, `cancelar`, `updateHealthCheck`, `updateScalars`, `getHealthHistory`, `checkResourceUsageAlerts`, `listarAlertas`, `getRecentAlerts`, `markAsRead`, `custoTotalPorAtivo`, `hasPermission`, `doFilterInternal`, `ManutencaoSpecification`, `AtivoMapper`, `RealisticDataSeeder`) e na **camada de serviços do frontend** (`request`/`handleResponse`/`handleApiError` em `frontend/src/services/api.js`, com `authInterceptor` anexando credenciais a cada chamada). Quando a especificação de API for produzida, cada cenário deve ser vinculado à rota correspondente.
 
-### Achados da varredura (A5) que afetam diretamente estas stories
+**Nota sobre UC-11, UC-12 e UC-13:** os três casos de uso constam do índice do catálogo-fonte; o conteúdo detalhado de UC-11 está **truncado** no material disponível e as seções completas de UC-12/UC-13 **não foram incluídas**. As stories correspondentes (US-011 a US-013) foram derivadas do índice, dos achados AST e das regras de negócio citadas, com todas as inferências explicitamente marcadas.
 
-- `src/main/java/br/com/aegispatrimonio/service/AtivoService.java:119` — TODO de performance: busca carrega até 1000 candidatos (id+nome) e faz ranking → **US-002** (passo 2), **US-005**.
-- `src/main/java/br/com/aegispatrimonio/mapper/AtivoMapper.java:15` — método `toDTO` com complexidade ciclomática 14 (detalhes do ativo — RF-14) → **US-002**, **US-005**.
-- `src/main/java/br/com/aegispatrimonio/repository/ManutencaoSpecification.java:26` — método `build` com complexidade 14 (filtros dinâmicos da fila de manutenção) → **US-003**.
-- `src/main/java/br/com/aegispatrimonio/service/AlertNotificationService.java:96` — `checkResourceUsageAlerts` com complexidade 17 (único serviço de alerta detectado; ligação com a aprovação não estabelecida) → **US-003**.
-- `src/main/java/br/com/aegispatrimonio/model/Usuario.java:86` — `setUsername` com corpo vazio (stub) → **US-002** (RN-06), **US-007**.
-- `frontend/src/services/api.js:44` e `:107` — chamadas residuais `console.error`/`console.debug` no cliente API usado por todos os fluxos → **US-001..US-004**, **US-007**.
-- `src/main/java/br/com/aegispatrimonio/config/seeder/RealisticDataSeeder.java:34` — seeder de dados realistas, método `run` com complexidade 15 → dados de teste dos fluxos (**US-001**, DoD).
+**Legenda de NFRs:** os artefatos-fonte não trazem um registro de NFRs com IDs explícitos; as categorias abaixo são as efetivamente usadas nas seções 6 dos casos de uso. Os IDs foram atribuídos apenas para viabilizar a rastreabilidade. **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
 
-## Visão Geral do Backlog
+| ID | Categoria | Escopo (conforme os casos de uso) |
+| :--- | :--- | :--- |
+| NFR-01 | Performance | Latência de consultas/listagens (guardrail do BRD) e de operações interativas; TODO de performance em `AtivoService` (ranking de até 1000 candidatos em memória) |
+| NFR-02 | Segurança | RBAC contextual (`hasPermission` + `doFilterInternal`) cobrindo 100% das escritas; invalidação imediata de token no logout (BR-07); KPI do BRD: 0 incidentes de acesso indevido em produção |
+| NFR-03 | Manutenibilidade | Refatorar pontos de alta complexidade ciclomática (achados AST): `checkResourceUsageAlerts` (17), `RealisticDataSeeder.run` (15), `AtivoMapper.toDTO` (14), `ManutencaoSpecification.build` (14), `request` (13) |
+| NFR-04 | Disponibilidade | Sem SLO, clustering ou redundância evidenciados no código — requisitos a definir pela engenharia |
+| NFR-05 | Auditoria e Integridade | Data/hora de modificação registrada automaticamente (`onUpdate`/`preUpdate` — BR-08); custo reflete o histórico real; fluxo de aprovação auditável |
+| NFR-06 | Evolutividade | Dados de hardware/disco preservados para análise preditiva de falhas; paginação/filtragem na camada de consulta (Future Considerations do BRD) |
 
-| ID | Story | UC | Prioridade (MoSCoW) | Pontos | Labels |
-|----|-------|----|---------------------|--------|--------|
-| US-001 | Administrador cadastra nova filial | UC-01 | Must | 3 | backend, frontend, ux |
-| US-002 | Funcionário solicita manutenção de ativo | UC-02 | Must | 5 | backend, frontend, ux |
-| US-003 | Aprovador autoriza manutenção | UC-03 | Must | 5 | backend, frontend, ux |
-| US-004 | Técnico conclui ordem de serviço | UC-04 | Must | 5 | backend, frontend, ux |
-| US-005 | Otimização da busca e filtragem de ativos | UC-02 | Should | 3 | backend, tech-debt, performance |
-| US-006 | Audit trail de operações de escrita (RNF-07) | UC-01..UC-04 | Should | 5 | backend, infra, compliance, tech-debt |
-| US-007 | Higiene de código: stub `setUsername` e logs residuais | UC-02 | Could | 1 | backend, frontend, tech-debt |
+**Mapa de Épicos:** o agrupamento deriva dos itens In-Scope do BRD citados no Catálogo de Casos de Uso. **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** (agrupamento organizacional; os itens In-Scope citados são reais)
 
-> Pontos de história em sequência Fibonacci, estimados por IA — **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**; premissas adotadas declaradas na seção de complexidade de cada story.
+| Épico | Nome (item In-Scope do BRD) | Stories |
+| :--- | :--- | :--- |
+| EP-01 | Sessão | US-001 |
+| EP-02 | Cadastros base | US-002 |
+| EP-03 | Usuários e controle de acesso | US-003 |
+| EP-04 | Consultas e listagens | US-004 |
+| EP-05 | Fluxo de manutenção | US-005, US-006, US-007 |
+| EP-06 | Monitoramento de saúde dos ativos | US-008, US-011 |
+| EP-07 | Alertas | US-009 |
+| EP-08 | Relatórios gerenciais | US-010 |
+| EP-09 | Operação técnica de homologação (carga de dados) | US-012 |
+| EP-10 | Auditoria e compliance | US-013 |
 
----
+**Premissas globais de estimativa:** todas as prioridades MoSCoW e story points deste documento são **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**. Premissas adotadas: (a) prioridade derivada do objetivo/KPI do BRD citado no UC correspondente e da dependência entre stories; (b) complexidade derivada do número de fluxos do UC (feliz/alternativos/exceções), da quantidade de componentes tocados e dos achados AST de complexidade ciclomática; (c) não há telemetria no repositório, portanto não existem dados históricos de esforço.
 
-## US-001 — Administrador cadastra nova filial
+### Visão Geral das Stories
 
-* **Priority:** Must — filial é entidade mestre (RN-01) e pré-requisito para o rastreamento de ativos (RN-07) e para a busca por filial da UC-02 (RF-15).
-* **Complexity:** 3 pontos **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — premissa: CRUD de entidade mestre com validação de campos obrigatórios (RN-03) e RBAC (RN-01/RN-02), sem dependência de outros cadastros (precondição do UC-01); fluxo de 5 passos.
-* **Épico:** Gestão Organizacional (entidades mestres)
-* **Labels:** backend, frontend, ux
-
-### 1. Description (INVEST)
-* **As a** Administrador do Sistema (role **Admin**)
-* **I want to** cadastrar novas filiais informando nome, código, endereço e responsável
-* **So that** ativos e departamentos possam ser vinculados e rastreados por unidade organizacional (RN-07)
-
-*Checklist INVEST:* **Independent** — não depende de outros cadastros (precondição do UC-01); **Negotiable** — campos do formulário negociáveis com PO; **Valuable** — habilita o rastreamento por filial; **Estimable** — fluxo simples e contratos de teste definidos; **Small** — um formulário, uma escrita; **Testable** — contratos `criar_comAdmin_deveRetornarCreated`, `criar_comUser_deveRetornarForbidden`, `criar_comDadosInvalidos_deveRetornarBadRequest`.
-
-### 2. Business Context
-Filial é a unidade organizacional básica do sistema: cada ativo pertence a **uma** filial (RN-07) e, sem filiais cadastradas, a busca de ativos por filial da UC-02 (RF-15) não tem base operacional. A story atende diretamente RF-06 (Criar Filial) e os critérios CA-01/CA-02 do BRD. É também pré-requisito da carga inicial de dados (risco R-02 do BRD — migração de legados), hoje exercitada em ambiente de teste pelo seeder `RealisticDataSeeder` (detectado na varredura A5).
-
-### 3. Acceptance Criteria (BDD/Gherkin)
-
-#### Scenario 1: Criação bem-sucedida de filial por Admin (caminho feliz)
-* **Given** um usuário autenticado com role **Admin** e sessão válida (RN-01)
-* **When** ele submete o formulário de criação com nome, código, endereço e responsável preenchidos (RN-03)
-* **Then** o sistema persiste a filial e retorna **201 Created** (contrato `criar_comAdmin_deveRetornarCreated`; CA-01)
-* **And** a filial fica disponível para associação a ativos e departamentos (RN-07)
-
-#### Scenario 2: Cadastro de filial com código duplicado (caso de borda)
-* **Given** uma filial com código "FIL-001" já persistida
-* **When** o Admin submete uma nova filial com o mesmo código
-* **Then** o sistema aceita a criação e retorna **201 Created**
-* **And** nenhuma mensagem de duplicidade é exibida — **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** premissa: RN-01..RN-08 não definem regra de unicidade para código/nome de filial (ver Open Issues do UC-01); caso o PO defina unicidade, este cenário deve ser revisado.
-
-#### Scenario 3: Usuário sem role Admin tenta criar filial (erro)
-* **Given** um usuário autenticado com role **User** e token válido
-* **When** ele tenta submeter a criação de uma filial
-* **Then** o sistema retorna **403 Forbidden** (contrato `criar_comUser_deveRetornarForbidden`; RN-02; CA-01)
-* **And** nenhum dado é persistido
-
-#### Scenario 4: Dados obrigatórios ausentes (erro)
-* **Given** um usuário autenticado com role **Admin**
-* **When** ele submete o formulário sem um ou mais campos obrigatórios (nome, código, endereço, responsável)
-* **Then** o sistema retorna **400 Bad Request** com mensagem clara (contrato `criar_comDadosInvalidos_deveRetornarBadRequest`; RN-03; CA-02)
-* **And** a escrita não é executada
-
-#### Scenario 5: Sessão expirada durante o cadastro (erro)
-* **Given** um usuário autenticado cujo token expirou (expiração de 1h — RNF-01 do BRD, meta pendente de verificação no codebase)
-* **When** ele submete o formulário de criação
-* **Then** o sistema retorna **401 Unauthorized** (CA-06)
-* **And** o frontend limpa a sessão (`clearSession` — RF-25; CA-08) **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA: redirecionamento para login não especificado no BRD nem detectado na varredura]**
-
-### 4. UI/UX Notes
-* **Wireframe/Mockup:** não disponível nas fontes — design a criar/validar com PO. **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
-* **Estados da interface:** loading (envio via `services/api.js`), success (confirmação de criação), error (mensagens de 400/401/403), empty (formulário iniciado com campos vazios — estado inicial de preenchimento).
-
-### 5. Technical Implementation Notes
-* **Componentes/serviços afetados:** cliente API do frontend `frontend/src/services/api.js` (função `request`, complexidade ciclomática 13 — responsável por injetar o token de autenticação, RF-24/CA-07); persistência de filiais no backend (nenhuma classe específica de filial foi destacada na varredura A5 — confirmar no codebase).
-* **Dependências técnicas:** nenhuma rota/endpoint explícito detectado na varredura — caminho concreto da API a confirmar no `api-specification.md` (pendente); nenhum motor de banco ou ORM encontrado nas dependências varridas (apenas `@popperjs/core` em produção) — o mecanismo de persistência real não é discoverable a partir das fontes; dados de teste via `RealisticDataSeeder` (`src/main/java/br/com/aegispatrimonio/config/seeder/RealisticDataSeeder.java` — método `run` com complexidade 15).
-* **Considerações de performance/segurança:** RNF-04 — resposta < 200ms (p95) na criação (meta do BRD; nenhuma instrumentação de métricas detectada na varredura); RNF-01 — token JWT com expiração de 1h (meta do BRD); RNF-07 — escrita deve gerar registro em audit trail imutável (meta do BRD; implementação não detectada — ver US-006); chamadas residuais `console.error` (`api.js:44`) e `console.debug` (`api.js:107`) devem ser removidas antes de produção (ver US-007).
-
-### 6. Out of Scope
-* Cadastro/edição de departamentos (encadeia para fluxo próprio — AS-2 do UC-01; RF-01).
-* Edição e exclusão de filial (RF-06 cobre apenas criação).
-* Regra de unicidade de código/nome de filial (não definida no BRD — ver Open Issues).
-* Carga massiva de filiais legadas (risco R-02 do BRD — tratada à parte).
-
-### 7. Definition of Ready
-- [ ] Critérios de aceite definidos (neste documento) e validados com PO — **pendente de validação**
-- [ ] Dependências identificadas e desbloqueadas — rota/endpoint a confirmar no `api-specification.md` (pendente)
-- [ ] Design/UX aprovado (se aplicável) — wireframe inexistente nas fontes
-- [ ] Estimativa de esforço realizada — 3 pontos **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**, a validar em planning
-
-### 8. Definition of Done
-- [ ] Código implementado e revisado (PR aprovado)
-- [ ] Testes unitários cobrindo os cenários BDD (incl. permissão Admin vs User — CA-10)
-- [ ] Testes de integração cobrindo os contratos `criar_comAdmin_deveRetornarCreated`, `criar_comUser_deveRetornarForbidden`, `criar_comDadosInvalidos_deveRetornarBadRequest`
-- [ ] Tipagem estrita (backend Java; frontend JavaScript — não há TypeScript nas dependências detectadas; validar contratos de payload)
-- [ ] Lint/format ok (nenhuma configuração de linter detectada nas dev-dependencies — configurar/validar se aplicável)
-- [ ] Sem regressões de acessibilidade
-- [ ] Documentação/API docs atualizadas (`api-specification.md`)
-- [ ] Feature testada em staging (com dados do `RealisticDataSeeder`)
-- [ ] Métricas/observabilidade instrumentadas (se aplicável) — nenhuma instrumentação detectada na varredura
-
-### 9. Traceability
-* **Use Cases relacionados:** UC-01
-* **Requisitos funcionais:** RF-06 (Criar Filial); RF-24 (interceptador de auth); RF-25 (`clearSession`)
-* **Regras de negócio (RN-XX = Business Rules do BRD):** RN-01, RN-02, RN-03, RN-07
-* **Critérios de aceitação (BRD):** CA-01, CA-02, CA-06, CA-08
-* **NFRs relacionadas:** RNF-01, RNF-04, RNF-07, RNF-08
-* **Riscos relacionados:** R-02 (migração de dados legados)
+| ID | Título | Épico | Priority | Complexity | UC de origem |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| US-001 | Autenticar e Gerir Sessão (Login e Logout) | EP-01 | Must | 5 | UC-01 |
+| US-002 | Gerir Cadastros Base do Patrimônio | EP-02 | Must | 8 | UC-02 |
+| US-003 | Gerir Usuários, Papéis e Permissões | EP-03 | Must | 8 | UC-03 |
+| US-004 | Consultar Listagens e Registros com Filtros | EP-04 | Must | 5 | UC-04 |
+| US-005 | Iniciar Solicitação de Manutenção | EP-05 | Must | 3 | UC-05 |
+| US-006 | Aprovar Manutenção | EP-05 | Must | 3 | UC-06 |
+| US-007 | Concluir ou Cancelar Manutenção | EP-05 | Must | 5 | UC-07 |
+| US-008 | Registrar Health Check e Consultar Histórico de Saúde | EP-06 | Should | 5 | UC-08 |
+| US-009 | Gerir Alertas de Uso de Recursos | EP-07 | Should | 8 | UC-09 |
+| US-010 | Consultar Custo Total por Ativo | EP-08 | Should | 3 | UC-10 |
+| US-011 | Atualizar Inventário de Hardware do Ativo | EP-06 | Should | 5 | UC-11 (parcial) |
+| US-012 | Executar Carga de Dados Realista para Homologação | EP-09 | Could | 3 | UC-12 (índice) |
+| US-013 | Consultar Eventos de Auditoria e Histórico de Modificações | EP-10 | Should | 5 | UC-13 (índice) |
 
 ---
 
-## US-002 — Funcionário solicita manutenção de ativo
+## US-001 — Autenticar e Gerir Sessão (Login e Logout)
 
-* **Priority:** Must — núcleo do módulo de manutenção (RF-18); sem ela, UC-03 e UC-04 não existem (fila de pendentes vazia).
-* **Complexity:** 5 pontos **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — premissa: envolve busca/filtragem de ativos (RF-15) + criação de solicitação + anexos opcionais; TODO de performance conhecido em `AtivoService.java:119` e complexidade de `AtivoMapper.toDTO` (14) no caminho exato deste fluxo.
-* **Épico:** Gestão de Manutenção (ciclo Pendente → Aprovada → Em Andamento → Concluída — RN-05)
-* **Labels:** backend, frontend, ux
+* **Priority:** Must (MoSCoW) [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — gateway de todos os demais casos de uso; meta do BRD: 0 incidentes em produção
+* **Complexity:** 5 story points [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — premissa: 2 fluxos principais (login/logout) + 2 exceções; componentes de backend e frontend
+* **Épico:** EP-01 — Acesso e Sessão
+* **Labels:** backend, frontend, segurança
 
 ### 1. Description (INVEST)
-* **As a** Funcionário/Colaborador (role **User**)
-* **I want to** buscar um ativo por filial, departamento ou localização e registrar uma solicitação de manutenção com descrição, prioridade e fotos opcionais
-* **So that** a equipe de manutenção e os aprovadores possam qualificar e autorizar o reparo, e o histórico do ativo seja registrado (RF-22)
+* **As a** usuário do sistema (perfil ADMIN ou USER) com credenciais emitidas
+* **I want to** autenticar-me com minhas credenciais e encerrar a sessão quando desejar
+* **So that** eu acesse o AegisPatrimônio com as credenciais anexadas automaticamente a cada chamada e o token seja invalidado imediatamente ao encerrar a sessão
 
-*Checklist INVEST:* **Independent** — executável mesmo sem filiais cadastradas (filtros retornam vazio), porém a filtragem por filial (RN-07) beneficia-se de US-001; **Negotiable** — valores permitidos para "prioridade" a negociar com PO (não definidos no BRD); **Valuable** — inicia o fluxo de manutenção; **Estimable** — fluxo de 6 passos com contratos definidos; **Small** — uma busca + uma escrita; **Testable** — contratos `criar_comDadosInvalidos_deveRetornarBadRequest`, `buscarPorId_comIdInexistente_deveRetornarNotFound`.
+*Checklist INVEST:* Independent (não depende de outras stories para existir; apenas do vínculo funcionário↔usuário de US-003 para credenciais reais); Negotiable (mecanismo de token negociável); Valuable (habilita 100% dos demais casos de uso); Estimable (fluxos claros no UC-01); Small (escopo restrito a sessão); Testable (cenários BDD abaixo).
 
 ### 2. Business Context
-A story materializa o risco R-04 do BRD: a adoção do módulo de manutenção depende de UX mobile-first (RNF-08). O status **Pendente** (RF-18; RN-05) alimenta diretamente a fila de aprovação (UC-03). O passo de busca é exatamente o caminho apontado pelo TODO de performance detectado na varredura (`AtivoService.java:119` — "carrega até 1000 candidatos (id+nome) e faz ranking"), o que ameaça a meta RNF-04 com o crescimento do parque (RNF-06: 10k+ ativos).
+Todo acesso ao sistema passa por esta story — sem sessão válida, nenhum outro caso de uso opera. A meta do BRD de **0 incidentes de acesso indevido em produção** começa aqui: a credencial é validada a cada requisição (`doFilterInternal`) e o logout invalida o token imediatamente (BR-07). A auditoria/compliance depende da rastreabilidade de sessão; os gestores de filial dependem do acesso para operar o patrimônio da unidade.
 
 ### 3. Acceptance Criteria (BDD/Gherkin)
 
-#### Scenario 1: Criação de solicitação com ativo selecionado (caminho feliz)
-* **Given** um funcionário autenticado (token injetado automaticamente pelo interceptador — RF-24/CA-07) e um ativo existente e ativo, vinculado a filial/departamento/localização (RN-07)
-* **When** ele busca e seleciona o ativo (RF-15), descreve o problema, define a prioridade e submete a solicitação
-* **Then** o sistema valida os dados (RN-03) e cria a solicitação com status **Pendente** (RF-18; RN-05)
-* **And** a solicitação fica visível na fila de pendentes dos aprovadores (pós-condição do UC-02)
+#### Scenario 1: Login com credenciais válidas — caminho feliz
+* **Given** um funcionário com credenciais emitidas e vínculo funcionário↔usuário estabelecido (US-003 / `createFuncionarioAndUsuario`)
+* **When** o usuário informa as credenciais na tela de login e o frontend envia a solicitação pela camada de serviços (`request` em `frontend/src/services/api.js`)
+* **Then** o sistema valida as credenciais, emite o token de acesso (`createUserAndToken`) e estabelece a sessão; a partir de então `authInterceptor` anexa automaticamente as credenciais a cada chamada e `doFilterInternal` valida a credencial a cada requisição (BR-04)
 
-#### Scenario 2: Busca sem resultados e ajuste de filtros (caso de borda)
-* **Given** um funcionário autenticado na tela "Nova Solicitação"
-* **When** ele aplica filtros (filial/departamento/localização) que não retornam nenhum ativo
-* **Then** o sistema exibe lista vazia e o funcionário ajusta os filtros
-* **And** ao ajustar os filtros para critérios com resultados, o fluxo retoma na seleção do ativo — **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA: comportamento de "lista vazia" não especificado no BRD; a busca com ranking de até 1000 candidatos está implementada em `AtivoService` — TODO de performance em `AtivoService.java:119`]**
+#### Scenario 2: Logout com invalidação imediata — caso de borda
+* **Given** um usuário autenticado com sessão válida e chamadas em curso
+* **When** o usuário aciona o logout
+* **Then** o sistema invalida **imediatamente** o token de acesso (BR-07) e encerra a sessão (`clearSession`); qualquer chamada subsequente com o token antigo é recusada e nova autenticação é exigida
 
-#### Scenario 3: Falha no upload de fotos — anexo opcional (caso de borda) **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
-* **Given** um funcionário autenticado com um ativo selecionado e fotos anexadas ao formulário
-* **When** o serviço de anexo falha (indisponibilidade ou arquivo rejeitado por tamanho/formato) e ele submete a solicitação
-* **Then** o sistema permite a submissão sem as fotos e cria a solicitação com status **Pendente**
-* **And** a falha do anexo é registrada/exibida — premissa: o anexo é opcional no fluxo do BRD e não bloqueia a criação; nenhum endpoint de upload foi detectado na varredura — mecanismo real a confirmar.
+#### Scenario 3: Credenciais inválidas — caminho de erro
+* **Given** um usuário na tela de login sem sessão válida
+* **When** o usuário informa credenciais que não correspondem a um usuário válido
+* **Then** o sistema recusa o login com mensagem de erro tratada pela camada `handleApiError` e nenhuma sessão é estabelecida **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** texto exato da mensagem não evidenciado na varredura
 
-#### Scenario 4: Ativo inexistente (erro)
-* **Given** um funcionário autenticado
-* **When** ele submete uma solicitação referenciando um ID de ativo inexistente ou ativo baixado
-* **Then** o sistema retorna **404 Not Found** com mensagem padronizada (contrato `buscarPorId_comIdInexistente_deveRetornarNotFound`; RN-04; CA-03)
-* **And** a solicitação não é criada
-
-#### Scenario 5: Descrição/prioridade ausentes (erro)
-* **Given** um funcionário autenticado com um ativo selecionado
-* **When** ele submete a solicitação sem descrição ou prioridade (ou com payload malformado)
-* **Then** o sistema retorna **400 Bad Request** com mensagem clara (RN-03; CA-02)
-* **And** a solicitação não é criada
-
-#### Scenario 6: Sessão expirada na submissão (erro)
-* **Given** um funcionário autenticado cujo token expirou (1h — RNF-01 do BRD)
-* **When** ele submete a solicitação
-* **Then** o sistema retorna **401 Unauthorized** (CA-06)
-* **And** o frontend limpa a sessão (`clearSession` — RF-25; CA-08) e redireciona para login **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA: redirecionamento não especificado no BRD]**
+#### Scenario 4: Falha de conexão com o backend — caminho de erro
+* **Given** um usuário na tela de login
+* **When** o backend está indisponível ou ocorre falha de rede durante a chamada `request`
+* **Then** `handleApiError` captura a falha e apresenta o erro ao usuário (guardrail do BRD: taxa de erros de API tratados ao usuário); o `console.error` residual em `frontend/src/services/api.js:44` deve ser removido antes de produção **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** nenhuma política de retry automático evidenciada no código
 
 ### 4. UI/UX Notes
-* **Wireframe/Mockup:** não disponível nas fontes — design mobile-first a criar/validar com PO (RNF-08; risco R-04). **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
-* **Estados da interface:** loading (busca de ativos e envio), empty (busca sem resultados), error (400/401/404 e falha de conexão), success (solicitação criada com status Pendente).
+* **Wireframe/Mockup:** nenhum artefato de design encontrado no workspace (varredura determinística) — a criar; telas de login e indicador de sessão.
+* **Estados da interface:** loading (durante `request` de login), success (sessão estabelecida), error (credenciais inválidas / falha de conexão via `handleApiError`), empty (não aplicável). **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
+* A variante de validação `mockLogin` (AS-1 do UC-01) deve estar claramente sinalizada como ambiente de homologação — nunca disponível em produção.
 
 ### 5. Technical Implementation Notes
-* **Componentes/serviços afetados:** `frontend/src/services/api.js` (função `request`, complexidade 13; `console.error` residual em `api.js:44`); `src/main/java/br/com/aegispatrimonio/service/AtivoService.java` (busca com ranking — TODO de performance na linha 119); `src/main/java/br/com/aegispatrimonio/mapper/AtivoMapper.java` (método `toDTO`, complexidade 14 — detalhes do ativo, RF-14); serviço de solicitações de manutenção (classe específica não destacada na varredura A5 — confirmar no codebase).
-* **Dependências técnicas:** nenhuma rota detectada — endpoints de busca de ativos e de criação de solicitação a confirmar no `api-specification.md`; sem motor de banco/ORM nas dependências (persistência não discoverable); mecanismo de upload de anexos não detectado na varredura; vínculo Funcionário↔Usuário (RN-06; RF-08: `createFuncionario` / `createFuncionarioAndUsuario`).
-* **Considerações de performance/segurança:** RNF-04 — < 200ms (p95) na criação e na busca; **atenção** ao TODO de `AtivoService.java:119` e à complexidade de `AtivoMapper.toDTO` (14) — otimização tratada em US-005; RNF-01 — token JWT (meta do BRD); RNF-10 — cobertura > 80% incluindo permissões Admin vs User (CA-10); RNF-06 — meta de 10k+ ativos / 1k+ usuários simultâneos, pendente de verificação (aplicação backend única, sem mecanismos de scaling detectados).
+* **Componentes/serviços afetados:** `createUserAndToken`, `clearSession`, `authInterceptor`, `doFilterInternal`, `request`/`handleResponse`/`handleApiError` (`frontend/src/services/api.js`).
+* **Dependências técnicas:** nenhuma rota/handler detectado na varredura — vincular às rotas quando `api-specification.md` for produzida; mecanismo de persistência de sessão não declarado nas dependências (Constraint C-01 do BRD).
+* **Considerações de performance/segurança:** invalidação imediata de token (BR-07) é requisito de segurança obrigatório (NFR-02); `request` tem complexidade ciclomática 13 (achado AST em `frontend/src/services/api.js:54`) — refatorar em funções menores antes de evoluir a camada de serviços (NFR-03); latência do login compatível com uso interativo (NFR-01, meta numérica a definir).
 
 ### 6. Out of Scope
-* Aprovação da solicitação (US-03) e conclusão da ordem (US-04).
-* Transição para "Em Andamento" (não coberta por RF-18..RF-22 — ver US-04/Open Issues do UC-04).
-* Implementação do mecanismo de upload de anexos (não detectado — escopo a definir com PO).
-* Gestão do cadastro de funcionários (RF-08).
+* Emissão de credenciais e gestão de papéis/permissões (US-003).
+* Recuperação de senha / self-service de credenciais — não evidenciado no código.
+* Integrações com sistemas de terceiros (Out-of-Scope do BRD — única dependência de produção declarada: `@popperjs/core ^2.11.8`).
 
 ### 7. Definition of Ready
-- [ ] Critérios de aceite definidos (neste documento) e validados com PO — **pendente de validação**
-- [ ] Dependências identificadas e desbloqueadas — endpoints a confirmar no `api-specification.md`; valores de "prioridade" a definir com PO
-- [ ] Design/UX aprovado (se aplicável) — wireframe mobile-first inexistente nas fontes
-- [ ] Estimativa de esforço realizada — 5 pontos **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**, a validar em planning
+- [ ] Critérios de aceite definidos e validados com PO
+- [ ] Dependências identificadas e desbloqueadas (vínculo funcionário↔usuário — US-003)
+- [ ] Design/UX aprovado (se aplicável — tela de login)
+- [ ] Estimativa de esforço realizada
+- [ ] Mecanismo de emissão/validação/invalidação de token e política de expiração levantados com a engenharia (open issues do UC-01)
 
 ### 8. Definition of Done
 - [ ] Código implementado e revisado (PR aprovado)
-- [ ] Testes unitários cobrindo os cenários BDD (incl. permissões — CA-10)
-- [ ] Testes de integração cobrindo os contratos `criar_comDadosInvalidos_deveRetornarBadRequest` e `buscarPorId_comIdInexistente_deveRetornarNotFound`
-- [ ] Tipagem estrita (backend Java; frontend JavaScript — não há TypeScript nas dependências detectadas; validar contratos de payload)
-- [ ] Lint/format ok (nenhuma configuração de linter detectada nas dev-dependencies — configurar/validar se aplicável)
+- [ ] Testes unitários cobrindo cenários BDD (login válido, logout, credenciais inválidas, falha de conexão)
+- [ ] Testes de integração/E2E quando aplicável
+- [ ] Tipagem estrita aplicável ao stack (código Java compilado sem erros; frontend em JavaScript — não há TypeScript no workspace)
+- [ ] Lint/format ok
 - [ ] Sem regressões de acessibilidade
-- [ ] Documentação/API docs atualizadas (`api-specification.md`)
-- [ ] Feature testada em staging (com dados do `RealisticDataSeeder`)
-- [ ] Métricas/observabilidade instrumentadas (se aplicável) — nenhuma instrumentação detectada na varredura
-
-### 9. Traceability
-* **Use Cases relacionados:** UC-02
-* **Requisitos funcionais:** RF-15, RF-18, RF-22; RF-24, RF-25; RF-08 (contexto RN-06)
-* **Regras de negócio (RN-XX = Business Rules do BRD):** RN-03, RN-04, RN-05, RN-06, RN-07
-* **Critérios de aceitação (BRD):** CA-02, CA-03, CA-04, CA-06, CA-07, CA-08, CA-10
-* **NFRs relacionadas:** RNF-01, RNF-04, RNF-06, RNF-08, RNF-10
-* **Riscos relacionados:** R-04 (adoção do módulo — UX mobile-first)
-
----
-
-## US-003 — Aprovador autoriza manutenção
-
-* **Priority:** Must — a transição **Pendente → Aprovada** (RN-05) é obrigatória no fluxo; sem ela, nenhuma ordem chega à conclusão (UC-04) e o controle de custo (RN-08) não opera.
-* **Complexity:** 5 pontos **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — premissa: fila com filtros dinâmicos (`ManutencaoSpecification.build`, complexidade 14), consulta de custo por ativo (RF-17/RN-08) com risco de timeout (R-03 do BRD) e transição de estado sujeita a condição de corrida.
-* **Épico:** Gestão de Manutenção
-* **Labels:** backend, frontend, ux
-
-### 1. Description (INVEST)
-* **As a** Aprovador
-* **I want to** visualizar a fila de solicitações pendentes, analisar o histórico de custos do ativo e autorizar (ou cancelar) cada solicitação
-* **So that** apenas demandas conformes sigam para a equipe de manutenção e o custo total por ativo permaneça sob controle (RN-08)
-
-*Checklist INVEST:* **Independent** — depende da existência de solicitações Pendentes (US-002), dependência de fluxo e não de implementação; **Negotiable** — role de aprovação não fixada no BRD (RF-26/RF-27); **Valuable** — gate de conformidade e custo; **Estimable** — contratos `aprovar`, `cancelar`, `custoTotalPorAtivo` definidos; **Small** — uma fila + uma transição; **Testable** — cenários de permissão e transição cobertos por CA-03/CA-04/CA-05/CA-09/CA-10.
-
-### 2. Business Context
-O KPI do BRD ("tempo médio de aprovação < 4 horas úteis") depende diretamente desta story. O risco R-03 do BRD ("Performance em relatórios de custo total — Timeout em consultas pesadas") afeta o passo de análise (`custoTotalPorAtivo`), e o risco R-01 (começar com 2 roles e evoluir para permissões granulares — RF-26/RF-27) define o modelo de autorização. A notificação da equipe de manutenção (pós-condição do BRD) é lacuna a confirmar: o único serviço de alerta detectado na varredura (`AlertNotificationService.checkResourceUsageAlerts`) trata alertas de uso de recursos, sem ligação estabelecida com a aprovação.
-
-### 3. Acceptance Criteria (BDD/Gherkin)
-
-#### Scenario 1: Aprovação de solicitação pendente (caminho feliz)
-* **Given** um aprovador autenticado com permissão de aprovação (RBAC — RF-26) e uma solicitação em status **Pendente** (RN-05)
-* **When** ele analisa os detalhes da solicitação e o `custoTotalPorAtivo` (RF-17; RN-08 — somatório das ordens concluídas no período) e clica "Aprovar"
-* **Then** o sistema valida a transição **Pendente → Aprovada** (RN-05) e persiste
-* **And** a equipe de manutenção é notificada (pós-condição do BRD — mecanismo de notificação não confirmado nas fontes **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**; o `AlertNotificationService` detectado trata alertas de uso de recursos, sem ligação estabelecida com a aprovação)
-
-#### Scenario 2: Cancelamento de solicitação (caso de borda — RF-20)
-* **Given** um aprovador autenticado com permissão de aprovação e uma solicitação em status **Pendente**
-* **When** ele clica "Cancelar"
-* **Then** o sistema atualiza o status para **Cancelada** (RN-05 — cancelamento permitido a qualquer momento; CA-05)
-* **And** os recursos alocados são liberados (CA-05) e a solicitação não compõe o custo total (RN-08 — apenas ordens concluídas somam)
-
-#### Scenario 3: Aprovador adia a decisão (caso de borda) **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
-* **Given** um aprovador autenticado analisando uma solicitação **Pendente**
-* **When** ele sai da análise sem decidir
-* **Then** a solicitação permanece em status **Pendente** e pode ser retomada a qualquer momento
-* **And** nenhum SLA técnico de expiração é aplicado — premissa: o KPI "tempo médio de aprovação < 4 horas úteis" é meta de gestão, não comportamento de sistema.
-
-#### Scenario 4: Transição de estado inválida / condição de corrida (erro)
-* **Given** dois aprovadores autenticados visualizando a mesma solicitação **Pendente**
-* **When** o primeiro aprova e o segundo tenta aprovar (ou cancelar) em seguida
-* **Then** o sistema rejeita a segunda transição e mantém o estado consistente com RN-05
-* **And** retorna **400 Bad Request** (RN-03) ou **409 Conflict** — **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA: o BRD não define o código HTTP para transição inválida; a confirmar no `api-specification.md`]**
-
-#### Scenario 5: Aprovador sem permissão (erro)
-* **Given** um usuário autenticado sem role/permissão de aprovação
-* **When** ele tenta aprovar ou cancelar uma solicitação
-* **Then** o sistema retorna **403 Forbidden** **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA: inferido do modelo RBAC (RF-26) e do critério de cobertura de permissões (CA-10); o BRD define 403 explicitamente apenas para escrita em entidades mestres (RN-02)]**
-* **And** o status da solicitação permanece inalterado
-
-#### Scenario 6: Solicitação inexistente (erro)
-* **Given** um aprovador autenticado
-* **When** ele tenta aprovar uma solicitação com ID inexistente
-* **Then** o sistema retorna **404 Not Found** com mensagem padronizada (RN-04; CA-03)
-* **And** nenhuma transição é executada
-
-### 4. UI/UX Notes
-* **Wireframe/Mockup:** não disponível nas fontes — design a criar/validar com PO. **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
-* **Estados da interface:** loading (fila e consulta de custo), empty (fila sem pendentes), error (403/404, transição inválida e timeout na consulta de custo — risco R-03), success (status atualizado para Aprovada/Cancelada).
-
-### 5. Technical Implementation Notes
-* **Componentes/serviços afetados:** `frontend/src/services/api.js`; `src/main/java/br/com/aegispatrimonio/repository/ManutencaoSpecification.java` (método `build`, complexidade 14 — filtros dinâmicos da fila de manutenção; presume-se suporte a filtragem de pendentes); `src/main/java/br/com/aegispatrimonio/service/AlertNotificationService.java` (método `checkResourceUsageAlerts`, complexidade 17 — único serviço de alerta detectado; ligação com a aprovação não estabelecida); consulta `custoTotalPorAtivo` (RF-17).
-* **Dependências técnicas:** nenhuma rota detectada — endpoints de listagem de pendentes e de aprovação a confirmar no `api-specification.md`; role de aprovação não fixada no BRD (RF-26/RF-27 — `createRole`, `createPermission`); sem motor de banco/ORM detectado nas dependências — o mecanismo de persistência e de consulta de custo não é discoverable a partir das fontes.
-* **Considerações de performance/segurança:** RNF-04 — < 200ms (p95), **excluindo operações de relatório pesado** — `custoTotalPorAtivo` está explicitamente fora dessa garantia (risco R-03; mitigações previstas no BRD — consultas otimizadas, paginação, cache — nenhuma detectada como implementada); RNF-07 — a transição de escrita (aprovar) deve gerar registro de auditoria imutável (meta do BRD; ver US-006); RNF-01 — token JWT válido durante a análise (meta do BRD).
-
-### 6. Out of Scope
-* Conclusão da ordem de serviço (US-04).
-* Transição para "Em Andamento" (sem requisito/UC que a dispare — ver US-04).
-* CRUD de roles/permissões (RF-26/RF-27 — story própria).
-* Implementação do mecanismo de notificação da equipe de manutenção (lacuna a confirmar nas fontes).
-
-### 7. Definition of Ready
-- [ ] Critérios de aceite definidos (neste documento) e validados com PO — **pendente de validação**
-- [ ] Dependências identificadas e desbloqueadas — endpoints a confirmar no `api-specification.md`; role de aprovação a definir com PO
-- [ ] Design/UX aprovado (se aplicável) — wireframe inexistente nas fontes
-- [ ] Estimativa de esforço realizada — 5 pontos **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**, a validar em planning
-
-### 8. Definition of Done
-- [ ] Código implementado e revisado (PR aprovado)
-- [ ] Testes unitários cobrindo os cenários BDD (incl. condição de corrida e permissões — CA-10)
-- [ ] Testes de integração cobrindo os contratos `aprovar`, `cancelar` e `custoTotalPorAtivo`
-- [ ] Tipagem estrita (backend Java; frontend JavaScript — não há TypeScript nas dependências detectadas; validar contratos de payload)
-- [ ] Lint/format ok (nenhuma configuração de linter detectada nas dev-dependencies — configurar/validar se aplicável)
-- [ ] Sem regressões de acessibilidade
-- [ ] Documentação/API docs atualizadas (`api-specification.md`)
-- [ ] Feature testada em staging (com dados do `RealisticDataSeeder`)
-- [ ] Métricas/observabilidade instrumentadas (se aplicável) — nenhuma instrumentação detectada na varredura
-
-### 9. Traceability
-* **Use Cases relacionados:** UC-03
-* **Requisitos funcionais:** RF-17, RF-19, RF-20; RF-26/RF-27 (contexto RBAC)
-* **Regras de negócio (RN-XX = Business Rules do BRD):** RN-04, RN-05, RN-08; RN-01/RN-02 (contexto RBAC)
-* **Critérios de aceitação (BRD):** CA-03, CA-04, CA-05, CA-09
-* **NFRs relacionadas:** RNF-01, RNF-04, RNF-07
-* **Riscos relacionados:** R-01 (evolução de roles), R-03 (performance em relatórios de custo)
-
----
-
-## US-004 — Técnico conclui ordem de serviço
-
-* **Priority:** Must — fecha o ciclo de manutenção (RN-05) e alimenta o `custoTotalPorAtivo` (RN-08; CA-09), indicador central de controle de custo do BRD.
-* **Complexity:** 5 pontos **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — premissa: registro de execução com múltiplos campos (data, descrição, peças, custo, tempo), transição de estado, atualização de custo com conciliação (CA-09); designação de técnico sem requisito funcional correspondente (RF-18..RF-22 não cobrem designação).
-* **Épico:** Gestão de Manutenção
-* **Labels:** backend, frontend, ux
-
-### 1. Description (INVEST)
-* **As a** técnico da Equipe de Manutenção
-* **I want to** registrar data, descrição, peças utilizadas, custo e tempo da execução e concluir a ordem de serviço
-* **So that** o histórico do ativo e o custo total por ativo fiquem atualizados e confiáveis (RF-22; RF-17; RN-08) e o ativo volte a ficar disponível
-
-*Checklist INVEST:* **Independent** — depende de ordem Aprovada (US-003), dependência de fluxo e não de implementação; **Negotiable** — campos de registro extraídos do fluxo do BRD, modelo completo não verificado; **Valuable** — fecha o ciclo e alimenta o KPI de custo; **Estimable** — contrato `concluir` definido; **Small** — um registro + uma transição; **Testable** — cenários de transição, validação e conciliação cobertos por CA-02/CA-03/CA-04/CA-05/CA-09.
-
-### 2. Business Context
-A conclusão é o ponto em que o custo total por ativo (RN-08) é alimentado — o critério CA-09 do BRD exige que os relatórios de custo batam com a soma das ordens concluídas. O KPI do BRD "taxa de solicitações canceladas < 10%" indica que a maioria das ordens aprovadas chega à conclusão. Lacunas do BRD afetam esta story: a transição para "Em Andamento" é prevista no fluxo (RN-05) mas não há requisito/UC que a dispare, e a designação de técnico não possui requisito funcional.
-
-### 3. Acceptance Criteria (BDD/Gherkin)
-
-#### Scenario 1: Conclusão de ordem aprovada/em andamento (caminho feliz)
-* **Given** um técnico autenticado com permissão de execução (RBAC — RF-26) **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA: o BRD não define a role do técnico; presume-se dentro do modelo Admin/User ou de role específica via RF-27]** designado para a ordem, e uma solicitação em status **Aprovada** ou **Em Andamento** (RN-05)
-* **When** ele registra data, descrição, peças utilizadas, custo e tempo e clica "Concluir"
-* **Then** o sistema valida os dados (RN-03) e a transição (**Aprovada/Em Andamento → Concluída**, RN-05) e persiste a ordem
-* **And** o `custoTotalPorAtivo` passa a refletir a nova ordem concluída (RF-17; RN-08) e o histórico do ativo é atualizado (RF-22)
-
-#### Scenario 2: Registro parcial e retomada posterior (caso de borda) **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
-* **Given** um técnico autenticado em campo com uma ordem em **Aprovada/Em Andamento**
-* **When** ele salva dados parciais da execução sem concluir
-* **Then** a ordem permanece em **Aprovada/Em Andamento** e o `custoTotalPorAtivo` não é alterado (RN-08 — apenas ordens concluídas somam)
-* **And** o técnico retoma o registro e conclui posteriormente — premissa: o estado "Em Andamento" (RN-05) suporta execução parcial; o mecanismo de salvamento parcial não está especificado no BRD.
-
-#### Scenario 3: Ordem cancelada antes da conclusão (caso de borda)
-* **Given** uma ordem em **Aprovada/Em Andamento** com registro parcial do técnico
-* **When** a solicitação é cancelada (RF-20) por aprovador ou solicitante
-* **Then** o status passa a **Cancelada** (RN-05; CA-05 — libera recursos) e a ordem não é concluída
-* **And** a ordem cancelada **não compõe** o `custoTotalPorAtivo` (RN-08 — apenas ordens concluídas somam)
-
-#### Scenario 4: Transição de estado inválida (erro)
-* **Given** um técnico autenticado
-* **When** ele tenta concluir uma ordem que não está em **Aprovada** nem **Em Andamento** (ex.: **Pendente** ou **Cancelada**)
-* **Then** o sistema rejeita a transição e mantém a consistência com RN-05
-* **And** retorna **400 Bad Request** (RN-03) ou **409 Conflict** — **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA: código HTTP para transição inválida não definido no BRD; a confirmar no `api-specification.md`]**
-* **And** o `custoTotalPorAtivo` não é alterado
-
-#### Scenario 5: Dados de execução inválidos (erro)
-* **Given** um técnico autenticado com uma ordem em **Aprovada/Em Andamento**
-* **When** ele submete custo/tempo com formato inválido ou sem campos obrigatórios (data, descrição, peças)
-* **Then** o sistema retorna **400 Bad Request** com mensagem clara (RN-03; CA-02)
-* **And** a ordem não é concluída e o `custoTotalPorAtivo` não é alterado
-
-#### Scenario 6: Ordem/solicitação inexistente (erro)
-* **Given** um técnico autenticado
-* **When** ele tenta concluir uma ordem com ID inexistente
-* **Then** o sistema retorna **404 Not Found** com mensagem padronizada (RN-04; CA-03)
-* **And** nenhuma transição é executada
-
-#### Scenario 7: Token expirado durante registro em campo (erro) **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
-* **Given** um técnico autenticado cujo token expirou (1h — RNF-01 do BRD) após execução prolongada em campo
-* **When** ele clica "Concluir"
-* **Then** o sistema retorna **401 Unauthorized** (CA-06)
-* **And** o técnico refaz o login e re-submete os dados — premissa: não há draft automático nas fontes disponíveis; dados não submetidos podem ser perdidos.
-
-### 4. UI/UX Notes
-* **Wireframe/Mockup:** não disponível nas fontes — design para uso em campo a criar/validar com PO. **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
-* **Estados da interface:** loading (envio da conclusão), empty (n/a — o fluxo parte de uma ordem existente), error (400/401/404 e transição inválida), success (ordem concluída com custo total atualizado).
-
-### 5. Technical Implementation Notes
-* **Componentes/serviços afetados:** `frontend/src/services/api.js` (função `request` — injeção de token, RF-24); serviço de ordens de manutenção (classe específica não destacada na varredura A5 — confirmar no codebase); consulta `custoTotalPorAtivo` (RF-17).
-* **Dependências técnicas:** nenhuma rota detectada — endpoint de conclusão a confirmar no `api-specification.md`; transição para "Em Andamento" não coberta por RF-18..RF-22 (lacuna do BRD); designação de técnico sem requisito funcional — presume-se designação manual/externa; sem motor de banco/ORM detectado nas dependências (persistência não discoverable).
-* **Considerações de performance/segurança:** RNF-04 — < 200ms (p95) na conclusão (meta do BRD); RNF-07 — escrita (concluir) deve gerar registro de auditoria imutável (meta do BRD; ver US-006); RNF-01 — token JWT com expiração de 1h, relevante para execução em campo (Scenario 7); RNF-10 — cobertura > 80% incluindo o cenário de conciliação de custos (CA-09).
-
-### 6. Out of Scope
-* Aprovação/cancelamento da solicitação (US-03).
-* Transição que dispara o estado "Em Andamento" (lacuna do BRD — story própria a definir).
-* Fluxo de designação de técnico (não definido no BRD).
-* Reconciliação automática de custos (CA-09 — presume-se verificação em testes de integração e correção manual; mecanismo a definir).
-
-### 7. Definition of Ready
-- [ ] Critérios de aceite definidos (neste documento) e validados com PO — **pendente de validação**
-- [ ] Dependências identificadas e desbloqueadas — endpoint a confirmar no `api-specification.md`; lacunas (Em Andamento, designação de técnico) a decidir com PO
-- [ ] Design/UX aprovado (se aplicável) — wireframe inexistente nas fontes
-- [ ] Estimativa de esforço realizada — 5 pontos **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**, a validar em planning
-
-### 8. Definition of Done
-- [ ] Código implementado e revisado (PR aprovado)
-- [ ] Testes unitários cobrindo os cenários BDD (incl. transições inválidas e conciliação — CA-09)
-- [ ] Testes de integração cobrindo o contrato `concluir` e a conciliação do `custoTotalPorAtivo` (CA-09)
-- [ ] Tipagem estrita (backend Java; frontend JavaScript — não há TypeScript nas dependências detectadas; validar contratos de payload)
-- [ ] Lint/format ok (nenhuma configuração de linter detectada nas dev-dependencies — configurar/validar se aplicável)
-- [ ] Sem regressões de acessibilidade
-- [ ] Documentação/API docs atualizadas (`api-specification.md`)
-- [ ] Feature testada em staging (com dados do `RealisticDataSeeder`)
-- [ ] Métricas/observabilidade instrumentadas (se aplicável) — nenhuma instrumentação detectada na varredura
-
-### 9. Traceability
-* **Use Cases relacionados:** UC-04
-* **Requisitos funcionais:** RF-17, RF-21, RF-22; RF-24
-* **Regras de negócio (RN-XX = Business Rules do BRD):** RN-03, RN-04, RN-05, RN-07, RN-08
-* **Critérios de aceitação (BRD):** CA-02, CA-03, CA-04, CA-05, CA-09
-* **NFRs relacionadas:** RNF-01, RNF-04, RNF-07, RNF-08, RNF-10
-* **Riscos relacionados:** R-03 (conciliação/performance de custos — indireto)
-
----
-
-## US-005 — Otimização da busca e filtragem de ativos
-
-* **Priority:** Should — a busca funciona hoje, mas o TODO de performance (`AtivoService.java:119`) e a complexidade do `AtivoMapper.toDTO` (14) ameaçam a meta RNF-04 (< 200ms p95) com o crescimento do parque (RNF-06: 10k+ ativos).
-* **Complexity:** 3 pontos **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — premissa: refatoração do caminho de busca (reduzir candidatos carregados/ranking) e quebra do método `toDTO` em métodos menores, sem mudança do contrato comportamental (RF-15).
-* **Épico:** Gestão de Manutenção / Tech-Debt (performance)
-* **Labels:** backend, tech-debt, performance
-
-### 1. Description (INVEST)
-* **As a** desenvolvedor do Sistema de Gestão de Patrimônio
-* **I want to** otimizar o caminho de busca/listagem de ativos — hoje carrega até 1000 candidatos (id+nome) e faz ranking — e reduzir a complexidade do mapeamento para DTO
-* **So that** a listagem/filtragem de ativos (RF-15) atenda à meta de resposta < 200ms (p95) mesmo com o crescimento do parque de ativos
-
-*Checklist INVEST:* **Independent** — não altera contratos de outros fluxos; **Negotiable** — estratégia de otimização a negociar em design técnico; **Valuable** — protege a meta RNF-04 e a UX da UC-02 (risco R-04); **Estimable** — escopo delimitado aos arquivos apontados pela varredura; **Small** — dois pontos de refatoração; **Testable** — regressão dos contratos existentes + medição de tempo de resposta.
-
-### 2. Business Context
-O TODO de performance em `AtivoService.java:119` está exatamente no passo 2 da UC-02 (busca de ativos por filial/departamento/localização — RF-15), fluxo de maior frequência do sistema. Com a meta RNF-06 do BRD (10k+ ativos / 1k+ usuários simultâneos), o carregamento e ranking de até 1000 candidatos por busca tende a degradar a resposta e a adoção do módulo (risco R-04). A varredura também registrou `AtivoMapper.toDTO` com complexidade ciclomática 14, impactando a consulta de detalhes do ativo (RF-14).
-
-### 3. Acceptance Criteria (BDD/Gherkin)
-
-#### Scenario 1: Busca otimizada dentro da meta de performance (caminho feliz)
-* **Given** um parque de ativos com volume compatível com a meta do BRD (RNF-06 — 10k+ ativos) e um funcionário autenticado
-* **When** ele aplica filtros de filial, departamento ou localização (RF-15)
-* **Then** a resposta é retornada em menos de 200ms (p95) (RNF-04)
-* **And** o resultado contém os ativos compatíveis com os filtros, sem alteração do contrato comportamental
-
-#### Scenario 2: Busca com grande volume de candidatos (caso de borda)
-* **Given** critérios de busca que, no caminho atual, carregariam até 1000 candidatos (id+nome) para ranking (TODO em `AtivoService.java:119`)
-* **When** a busca é executada no caminho otimizado
-* **Then** o resultado não depende do carregamento/ranking completo dos candidatos
-* **And** a resposta permanece dentro da meta RNF-04 — **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA: a estratégia de otimização (ex.: delegar filtragem à consulta, paginação) não está definida nas fontes; sem motor de banco/ORM detectado nas dependências, a estratégia não pode presumir recursos de consulta específicos — a confirmar em design técnico]**
-
-#### Scenario 3: Falha na busca após refatoração (erro)
-* **Given** a refatoração aplicada ao caminho de busca e ao mapper
-* **When** a busca falha (erro interno ou critérios malformados)
-* **Then** o sistema retorna erro com mensagem clara, sem expor detalhes internos
-* **And** os testes de regressão dos contratos existentes (ex.: `buscarPorId_comIdInexistente_deveRetornarNotFound`) continuam passando
-
-### 4. UI/UX Notes
-* **Wireframe/Mockup:** não aplicável — refatoração sem mudança de interface. **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
-* **Estados da interface:** inalterados em relação à UC-02 (loading na busca, empty sem resultados, error em falhas, success na listagem).
-
-### 5. Technical Implementation Notes
-* **Componentes/serviços afetados:** `src/main/java/br/com/aegispatrimonio/service/AtivoService.java` (linha 119 — TODO de performance); `src/main/java/br/com/aegispatrimonio/mapper/AtivoMapper.java` (método `toDTO`, complexidade ciclomática 14); `frontend/src/services/api.js` (consumidor do caminho de busca).
-* **Dependências técnicas:** sem motor de banco/ORM detectado nas dependências varridas (apenas `@popperjs/core` em produção) — a estratégia de otimização não pode presumir recursos de consulta específicos; contrato RF-15 inalterado; nenhuma rota detectada na varredura.
-* **Considerações de performance/segurança:** RNF-04 (< 200ms p95) é o critério central; RNF-06 (10k+ ativos / 1k+ usuários) é meta pendente de verificação — aplicação backend única, sem mecanismos de scaling horizontal detectados no codebase, logo a otimização deve ser feita dentro do caminho de aplicação existente.
-
-### 6. Out of Scope
-* Mudança no contrato comportamental da busca (RF-15).
-* Infraestrutura de scaling horizontal (não detectada no codebase — fora do escopo até que exista).
-* Implementação de cache/paginação como produto (as mitigações do risco R-03 referem-se a relatórios de custo — UC-03).
-
-### 7. Definition of Ready
-- [ ] Critérios de aceite definidos (neste documento) e validados com PO — **pendente de validação**
-- [ ] Dependências identificadas e desbloqueadas — estratégia de otimização a definir em design técnico
-- [ ] Design/UX aprovado (se aplicável) — não aplicável (sem mudança de interface)
-- [ ] Estimativa de esforço realizada — 3 pontos **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**, a validar em planning
-
-### 8. Definition of Done
-- [ ] Código implementado e revisado (PR aprovado)
-- [ ] Testes unitários cobrindo os cenários BDD
-- [ ] Testes de regressão dos contratos existentes da busca passando
-- [ ] Tipagem estrita (backend Java)
-- [ ] Lint/format ok (nenhuma configuração de linter detectada nas dev-dependencies — configurar/validar se aplicável)
-- [ ] Sem regressões de acessibilidade
-- [ ] Documentação atualizada (notas de design técnico da otimização)
-- [ ] Feature testada em staging (medição de tempo de resposta com dados do `RealisticDataSeeder`)
-- [ ] Métricas/observabilidade instrumentadas (se aplicável) — nenhuma instrumentação de métricas detectada na varredura; medição do p95 requer instrumentação nova
-
-### 9. Traceability
-* **Use Cases relacionados:** UC-02 (passo 2); UC-03 (indireto — padrão de filtros em `ManutencaoSpecification`)
-* **Requisitos funcionais:** RF-15 (listagem/filtragem de ativos); RF-14 (detalhes do ativo via `toDTO`)
-* **Regras de negócio (RN-XX = Business Rules do BRD):** RN-07 (base de filtragem)
-* **NFRs relacionadas:** RNF-04, RNF-06
-* **Riscos relacionados:** R-04 (adoção do módulo — UX/performance)
-
----
-
-## US-006 — Audit trail de operações de escrita (RNF-07)
-
-* **Priority:** Should — meta do BRD (RNF-07) referenciada por todos os casos de uso de escrita (UC-01..UC-04); sem ela, a rastreabilidade de compliance exigida pelo BRD não é atendida. Derivada dos Open Issues dos UCs ("implementação do audit trail não detectada na varredura").
-* **Complexity:** 5 pontos **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — premissa: mecanismo transversal de registro imutável para todas as escritas (criar filial, criar solicitação, aprovar/cancelar, concluir ordem); nenhum mecanismo de persistência detectado nas dependências — o design depende de decisão técnica a confirmar.
-* **Épico:** Compliance/Auditoria (transversal)
-* **Labels:** backend, infra, compliance, tech-debt
-
-### 1. Description (INVEST)
-* **As a** gestor de compliance/auditoria
-* **I want to** que toda operação de escrita (criar filial, criar solicitação, aprovar/cancelar, concluir ordem) gere um registro imutável em audit trail, incluindo tentativas rejeitadas
-* **So that** as operações sejam rastreáveis e auditáveis conforme RNF-07 e os critérios de compliance do BRD
-
-*Checklist INVEST:* **Independent** — mecanismo transversal, não acoplado a um fluxo específico; **Negotiable** — escopo do registro (payload, IP) a negociar; **Valuable** — atende RNF-07 e stakeholders de compliance; **Estimable** — escopo delimitado às escritas dos UC-01..UC-04; **Small** — um mecanismo transversal; **Testable** — cenários de registro em sucesso, rejeição e falha.
-
-### 2. Business Context
-O RNF-07 do BRD exige que operações de escrita gerem registro em audit trail imutável — requisito citado nos UC-01 (criar filial), UC-02 (criar solicitação), UC-03 (aprovar) e UC-04 (concluir). A varredura A5 **não detectou nenhuma implementação de audit trail** no codebase, e o UC-01 (EX-1) afirma que tentativas rejeitadas também devem ser registradas. Esta story fecha essa lacuna de forma transversal, evitando implementação ad hoc em cada fluxo.
-
-### 3. Acceptance Criteria (BDD/Gherkin)
-
-#### Scenario 1: Escrita bem-sucedida gera registro de auditoria (caminho feliz)
-* **Given** um usuário autenticado com permissão para uma operação de escrita (ex.: Admin criando filial — RN-01)
-* **When** a operação é concluída com sucesso (ex.: **201 Created**)
-* **Then** um registro imutável de auditoria é gerado com usuário, operação, data/hora e resultado (RNF-07)
-* **And** o registro não pode ser alterado por operações subsequentes
-
-#### Scenario 2: Tentativa rejeitada também é registrada (caso de borda)
-* **Given** um usuário autenticado que submete uma operação de escrita com dados inválidos (RN-03) ou sem permissão (RN-02)
-* **When** o sistema rejeita a operação (**400 Bad Request** / **403 Forbidden**)
-* **Then** a tentativa é registrada no audit trail conforme RNF-07 — **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA: o UC-01 (EX-1) afirma que tentativas devem ser registradas; o escopo exato do registro (payload, IP) não está definido no BRD]**
-
-#### Scenario 3: Falha na gravação do audit trail (erro)
-* **Given** uma operação de escrita válida e autorizada
-* **When** a gravação do registro de auditoria falha
-* **Then** o comportamento esperado (bloquear a escrita ou registrar a falha e sinalizar) deve ser definido — **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA: o BRD não define o comportamento de falha do audit trail; premissa adotada: a falha de auditoria não deve corromper a operação de negócio, mas deve ser sinalizada]**
-
-### 4. UI/UX Notes
-* **Wireframe/Mockup:** não aplicável — mecanismo de backend, sem interface (a interface de consulta do audit trail não é especificada no BRD). **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
-* **Estados da interface:** inalterados nos fluxos existentes (o registro é responsabilidade do backend e transparente ao usuário).
-
-### 5. Technical Implementation Notes
-* **Componentes/serviços afetados:** mecanismo transversal a todos os fluxos de escrita (UC-01..UC-04); o cliente `frontend/src/services/api.js` não é afetado (registro é responsabilidade do backend).
-* **Dependências técnicas:** nenhum mecanismo de persistência detectado nas dependências varridas (apenas `@popperjs/core` em produção; sem motor de banco/ORM) — o design do audit trail depende de decisão técnica a confirmar; nenhuma rota detectada na varredura; `api-specification.md` pendente.
-* **Considerações de performance/segurança:** RNF-04 — o registro não deve comprometer a meta de < 200ms (p95) (premissa: gravação de baixo custo ou assíncrona — a confirmar); RNF-01 — registro associado ao usuário autenticado; imutabilidade garantida (RNF-07).
-
-### 6. Out of Scope
-* Interface de consulta/visualização do audit trail (não especificada no BRD).
-* Política de retenção/backup dos registros (não especificada no BRD).
-
-### 7. Definition of Ready
-- [ ] Critérios de aceite definidos (neste documento) e validados com PO — **pendente de validação**
-- [ ] Dependências identificadas e desbloqueadas — mecanismo de persistência e comportamento de falha a definir em design técnico
-- [ ] Design/UX aprovado (se aplicável) — não aplicável (sem interface)
-- [ ] Estimativa de esforço realizada — 5 pontos **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**, a validar em planning
-
-### 8. Definition of Done
-- [ ] Código implementado e revisado (PR aprovado)
-- [ ] Testes unitários cobrindo os cenários BDD (sucesso, rejeição, falha)
-- [ ] Testes de integração verificando o registro nas escritas dos UC-01..UC-04
-- [ ] Tipagem estrita (backend Java)
-- [ ] Lint/format ok (nenhuma configuração de linter detectada nas dev-dependencies — configurar/validar se aplicável)
-- [ ] Sem regressões de acessibilidade
-- [ ] Documentação atualizada
+- [ ] Documentação/API docs atualizadas
 - [ ] Feature testada em staging
-- [ ] Métricas/observabilidade instrumentadas (se aplicável) — nenhuma instrumentação detectada na varredura
+- [ ] Métricas/observabilidade instrumentadas (se aplicável — não há telemetria no repositório hoje)
 
 ### 9. Traceability
-* **Use Cases relacionados:** UC-01, UC-02, UC-03, UC-04 (todas as operações de escrita)
-* **Requisitos funcionais:** RF-06 (criar filial), RF-18 (criar solicitação), RF-19/RF-20 (aprovar/cancelar), RF-21 (concluir)
-* **Regras de negócio (RN-XX = Business Rules do BRD):** RN-01, RN-02, RN-03 (tentativas rejeitadas)
-* **NFRs relacionadas:** RNF-07 (primária), RNF-01, RNF-04
-* **Riscos relacionados:** nenhum risco específico mapeado nas fontes para auditoria
+* **NFRs relacionadas:** NFR-01, NFR-02, NFR-03, NFR-04
+* **Use Cases relacionados:** UC-01 (origem), UC-03 (emissão de credenciais)
+* **Regras de Negócio:** BR-02, BR-04, BR-07
+* **Riscos relacionados:** complexidade ciclomática 13 em `request` (achado AST — mitigação registrada no BRD); `console.error` residual em `api.js:44` (remover antes de produção); mecanismo de token não documentado (open issue do UC-01)
 
 ---
 
-## US-007 — Higiene de código: stub `setUsername` e logs residuais no cliente API
+## US-002 — Gerir Cadastros Base do Patrimônio
 
-* **Priority:** Could — impacto funcional limitado (RN-06 — vínculo Funcionário↔Usuário) e higiene de produção; não bloqueia os fluxos principais. Derivada dos achados da varredura A5 (`Usuario.java:86`, `api.js:44`, `api.js:107`).
-* **Complexity:** 1 ponto **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** — premissa: implementação do corpo vazio de `setUsername` e remoção de duas chamadas de log no cliente API.
-* **Épico:** Tech-Debt (qualidade de código)
-* **Labels:** backend, frontend, tech-debt
+* **Priority:** Must (MoSCoW) [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — fonte única de verdade do patrimônio (visão do BRD); pré-requisito de US-005, US-008 e US-010
+* **Complexity:** 8 story points [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — premissa: 7 tipos de cadastro (ativo, filial, departamento, localização física, tipo de ativo, fornecedor, funcionário) × criar/atualizar/excluir; `AtivoMapper.toDTO` com complexidade 14
+* **Épico:** EP-02 — Cadastros Base do Patrimônio
+* **Labels:** backend, frontend, dados
 
 ### 1. Description (INVEST)
-* **As a** desenvolvedor do Sistema de Gestão de Patrimônio
-* **I want to** implementar o corpo vazio do método `setUsername` de `Usuario` e remover as chamadas residuais `console.error`/`console.debug` do cliente API
-* **So that** a atualização de username tenha efeito (RN-06) e o cliente API não produza logs residuais em produção
+* **As a** administrador de patrimônio (perfil ADMIN)
+* **I want to** criar, atualizar e excluir ativos patrimoniais e cadastros de apoio (filiais, departamentos, localizações físicas — prédio/andar/sala, tipos de ativo, fornecedores, funcionários)
+* **So that** o patrimônio tenha uma fonte única de verdade íntegra e centralizada, com data/hora de modificação registrada automaticamente
 
-*Checklist INVEST:* **Independent** — não depende de outros itens do backlog; **Negotiable** — comportamento esperado do `setUsername` a confirmar com o modelo de dados; **Valuable** — corrige stub funcional e higiene de produção; **Estimable** — escopo de dois pontos de código apontados pela varredura; **Small** — alterações mínimas; **Testable** — regressão dos fluxos existentes.
+*Checklist INVEST:* Independent (o fluxo é idêntico por tipo de cadastro; ordem de implantação depende dos cadastros de apoio); Negotiable; Valuable (base de todos os fluxos de consulta, manutenção e monitoramento); Estimable (evidências de teste já existentes no código); Small (um padrão CRUD repetido); Testable (cenários BDD abaixo).
 
 ### 2. Business Context
-A varredura A5 registrou `Usuario.setUsername` com corpo vazio (stub) em `Usuario.java:86` — o UC-02 presume que a atualização de username não tem efeito até implementação, impactando o cadastro/vínculo de funcionário (RN-06; RF-08: `createFuncionario` / `createFuncionarioAndUsuario`). No frontend, o cliente API usado por **todos** os fluxos (UC-01..UC-04) contém chamadas residuais `console.error` (`api.js:44`) e `console.debug` (`api.js:107`), que devem ser removidas antes de produção.
+O cadastro íntegro é a condição para que gestores de filial consultem dados corretos e para que o fluxo de manutenção e o monitoramento de saúde operem sobre ativos reais. A diretoria depende da fonte única de verdade (visão do BRD); a auditoria depende da trilha de quem alterou o quê e quando (BR-08). O KPI do BRD de 0 incidentes de acesso indevido exige que 100% das escritas sejam cobertas por `hasPermission` (BR-01).
 
 ### 3. Acceptance Criteria (BDD/Gherkin)
 
-#### Scenario 1: Atualização de username com efeito (caminho feliz)
-* **Given** um usuário do sistema com vínculo a funcionário (RN-06; RF-08)
-* **When** o método `setUsername` é invocado com um novo valor e a entidade é persistida
-* **Then** o username é atualizado com efeito (não mais um stub vazio — varredura: `Usuario.java:86`)
+#### Scenario 1: Criação de ativo com dados válidos — caminho feliz
+* **Given** um administrador autenticado (BR-01) e os cadastros de apoio existentes (filial, departamento, localização, tipo de ativo)
+* **When** o administrador submete o formulário de cadastro de ativo com dados válidos
+* **Then** o sistema valida os dados (BR-05), converte DTO→entidade apenas com dados válidos (BR-09), persiste o registro (`createAtivo`), registra data/hora automaticamente (`onUpdate`/`preUpdate` — BR-08) e retorna confirmação de criação (Created — BR-06)
 
-#### Scenario 2: Cliente API sem logs residuais (caso de borda)
-* **Given** o cliente API `frontend/src/services/api.js` em execução
-* **When** uma requisição falha ou é depurada
-* **Then** nenhuma chamada `console.error` (`api.js:44`) ou `console.debug` (`api.js:107`) é emitida em produção
-* **And** o tratamento de erros da função `request` permanece inalterado (complexidade ciclomática 13)
+#### Scenario 2: Exclusão de cadastro — caso de borda
+* **Given** um administrador autenticado e um registro existente localizado via consulta (US-004)
+* **When** o administrador solicita a exclusão do registro
+* **Then** o sistema valida permissão (BR-01/BR-04), remove o registro (`deletar`) e retorna NoContent (BR-06)
+* Nota: comportamento para exclusão de cadastros com vínculos (ex.: filial com ativos vinculados) não evidenciado na varredura — verificar integridade referencial real (open issue do UC-02).
 
-#### Scenario 3: Regressão nos fluxos existentes (erro)
-* **Given** as alterações de higiene aplicadas
-* **When** os fluxos UC-01..UC-04 são executados (incl. cadastro/vínculo de funcionário — RN-06)
-* **Then** nenhum comportamento dos contratos existentes é alterado
-* **And** os testes de integração referenciados pelo BRD continuam passando
+#### Scenario 3: Dados inválidos ou incompletos — caminho de erro
+* **Given** um administrador autenticado no formulário de cadastro
+* **When** o administrador submete dados inválidos ou incompletos
+* **Then** o sistema retorna BadRequest (evidência de teste: `criar_comDadosInvalidos_deveRetornarBadRequest`), o erro é tratado ao usuário via `handleApiError` e nenhum registro é criado (BR-05; DTO nulo não gera registro — BR-09)
+
+#### Scenario 4: Escrita por usuário comum (USER) — caminho de erro
+* **Given** um usuário autenticado com perfil USER
+* **When** o usuário tenta criar, atualizar ou excluir um cadastro
+* **Then** o sistema nega o acesso com Forbidden (evidências: `criar_comUser_deveRetornarForbidden`, `atualizar_comUser_deveRetornarForbidden`, `deletar_comUser_deveRetornarForbidden`) e nenhuma alteração ocorre (BR-01)
 
 ### 4. UI/UX Notes
-* **Wireframe/Mockup:** não aplicável — alterações de código sem mudança de interface. **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
-* **Estados da interface:** inalterados em relação aos fluxos UC-01..UC-04.
+* **Wireframe/Mockup:** nenhum artefato de design encontrado no workspace — a criar; formulários por tipo de cadastro com campos de contexto (filial/departamento/localização).
+* **Estados da interface:** loading (durante persistência), success (Created/NoContent), error (BadRequest/Forbidden via `handleApiError`), empty (listagem sem registros — ver US-004). **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
 
 ### 5. Technical Implementation Notes
-* **Componentes/serviços afetados:** `src/main/java/br/com/aegispatrimonio/model/Usuario.java` (método `setUsername`, linha 86 — corpo vazio); `frontend/src/services/api.js` (linhas 44 e 107 — `console.error`/`console.debug`).
-* **Dependências técnicas:** nenhuma rota detectada na varredura; comportamento esperado do `setUsername` (persistência do username) a confirmar com o modelo de dados — o modelo completo não foi verificado na varredura.
-* **Considerações de performance/segurança:** remoção de logs reduz exposição potencial de dados em console (boa prática de produção); sem impacto de performance esperado.
+* **Componentes/serviços afetados:** `createAtivo`, `createFilial`, `createDepartamento`, `createLocalizacao`, `createTipoAtivo`, `createFornecedor`, `createFuncionario`, `deletar`, `AtivoMapper` (conversão DTO↔entidade), `onUpdate`/`preUpdate` (auditoria automática).
+* **Dependências técnicas:** nenhuma rota/tabela detectada na varredura — vincular quando `api-specification.md` for produzida; mecanismo de persistência não declarado nas dependências (C-01 do BRD); regras de unicidade (ex.: código patrimonial duplicado) não evidenciadas — confirmar com a engenharia.
+* **Considerações de performance/segurança:** validação síncrona antes da persistência (NFR-01); 100% das operações de escrita cobertas por `hasPermission` (NFR-02); `AtivoMapper.toDTO` com complexidade ciclomática 14 (achado AST em `mapper/AtivoMapper.java`) — refatorar antes de evoluir o mapeamento (NFR-03).
 
 ### 6. Out of Scope
-* Cadastro/edição de funcionários (RF-08 — story própria).
-* Refatoração da função `request` do `api.js` (complexidade ciclomática 13 — apenas as chamadas de log residuais estão em escopo).
+* Emissão de credenciais ao funcionário (US-003 — o cadastro de funcionário criado aqui é pré-requisito).
+* Importação/exportação em massa de cadastros — não evidenciada no código.
+* Carga de dados realista para homologação (US-012).
 
 ### 7. Definition of Ready
-- [ ] Critérios de aceite definidos (neste documento) e validados com PO — **pendente de validação**
-- [ ] Dependências identificadas e desbloqueadas — comportamento esperado do `setUsername` a confirmar
-- [ ] Design/UX aprovado (se aplicável) — não aplicável (sem mudança de interface)
-- [ ] Estimativa de esforço realizada — 1 ponto **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**, a validar em planning
+- [ ] Critérios de aceite definidos e validados com PO
+- [ ] Dependências identificadas e desbloqueadas (cadastros de apoio precedem o ativo)
+- [ ] Design/UX aprovado (se aplicável — formulários)
+- [ ] Estimativa de esforço realizada
+- [ ] Comportamento de exclusão com vínculos e regras de unicidade confirmados com a engenharia
 
 ### 8. Definition of Done
 - [ ] Código implementado e revisado (PR aprovado)
-- [ ] Testes unitários cobrindo os cenários BDD
-- [ ] Testes de regressão dos fluxos UC-01..UC-04 passando
-- [ ] Tipagem estrita (backend Java; frontend JavaScript — não há TypeScript nas dependências detectadas)
-- [ ] Lint/format ok (nenhuma configuração de linter detectada nas dev-dependencies — configurar/validar se aplicável)
+- [ ] Testes unitários cobrindo cenários BDD (criação válida, exclusão, dados inválidos, escrita por USER)
+- [ ] Testes de integração/E2E quando aplicável
+- [ ] Tipagem estrita aplicável ao stack (Java compilado sem erros; frontend em JavaScript)
+- [ ] Lint/format ok
 - [ ] Sem regressões de acessibilidade
-- [ ] Documentação atualizada
+- [ ] Documentação/API docs atualizadas
 - [ ] Feature testada em staging
-- [ ] Métricas/observabilidade instrumentadas (se aplicável) — não aplicável
+- [ ] Métricas/observabilidade instrumentadas (se aplicável)
 
 ### 9. Traceability
-* **Use Cases relacionados:** UC-02 (vínculo Funcionário↔Usuário — RN-06); UC-01, UC-03, UC-04 (cliente API comum a todos os fluxos)
-* **Requisitos funcionais:** RF-08 (`createFuncionario` / `createFuncionarioAndUsuario`)
-* **Regras de negócio (RN-XX = Business Rules do BRD):** RN-06
-* **NFRs relacionadas:** RNF-10 (testabilidade — regressão)
-* **Riscos relacionados:** nenhum risco específico mapeado nas fontes
+* **NFRs relacionadas:** NFR-01, NFR-02, NFR-03, NFR-05
+* **Use Cases relacionados:** UC-02 (origem), UC-03 (funcionário → credenciais), UC-04 (consulta), UC-12 (carga de homologação)
+* **Regras de Negócio:** BR-01, BR-04, BR-05, BR-06, BR-08, BR-09
+* **Riscos relacionados:** `AtivoMapper.toDTO` complexidade 14 (achado AST — mitigação registrada no BRD); exclusão de cadastros com vínculos (open issue); regras de unicidade não evidenciadas (open issue)
+
+---
+
+## US-003 — Gerir Usuários, Papéis e Permissões
+
+* **Priority:** Must (MoSCoW) [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — o modelo RBAC contextual é a regra central de proteção (BR-04); KPI do BRD: 0 incidentes de acesso indevido
+* **Complexity:** 8 story points [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — premissa: emissão de credenciais + papéis + permissões + ajuste contextual por filial; stub `Usuario.setUsername` a resolver
+* **Épico:** EP-03 — Usuários e Controle de Acesso
+* **Labels:** backend, segurança, tech-debt
+
+### 1. Description (INVEST)
+* **As a** administrador (perfil ADMIN)
+* **I want to** emitir credenciais a funcionários, criar usuários, papéis e permissões e ajustar o acesso contextual por filial/departamento
+* **So that** cada usuário opere apenas conforme o contexto concedido, protegendo o patrimônio contra acesso indevido
+
+*Checklist INVEST:* Independent (depende apenas do funcionário cadastrado em US-002); Negotiable (matriz de permissões negociável); Valuable (proteção central do sistema); Estimable (fluxos claros no UC-03); Small (escopo restrito a acesso); Testable (cenários BDD abaixo).
+
+### 2. Business Context
+O modelo RBAC contextual (`hasPermission` + `doFilterInternal`) é a regra que protege todas as operações de escrita e delimita as consultas por filial. Sem ele, os KPIs de segurança do BRD (0 incidentes) e a restrição de consultas às filiais autorizadas (`findByFilialIdIn`) não se sustentam. A emissão de credenciais em admissões de funcionários é o gatilho operacional mais comum.
+
+### 3. Acceptance Criteria (BDD/Gherkin)
+
+#### Scenario 1: Emissão de credenciais a funcionário — caminho feliz
+* **Given** um administrador autenticado (BR-01) e um funcionário cadastrado (US-002)
+* **When** o administrador seleciona o funcionário e confirma a emissão de credenciais
+* **Then** o sistema cria o usuário e o vínculo funcionário↔credenciais (`createFuncionarioAndUsuario`), emite o token (`createUserAndToken`), registra data/hora (BR-08) e o funcionário fica apto a autenticar (US-001) e a operar conforme o contexto concedido (BR-04)
+
+#### Scenario 2: Ajuste de acesso contextual por filial/departamento — caso de borda
+* **Given** um administrador autenticado e um usuário com contexto (filial/departamento) definido
+* **When** o administrador atualiza as permissões contextuais do usuário
+* **Then** o sistema aplica o novo contexto nas requisições seguintes via `doFilterInternal`/`hasPermission` (BR-04) e as consultas por filial passam a respeitar as filiais autorizadas (restrição `findByFilialIdIn` citada no BRD)
+
+#### Scenario 3: Dados inválidos na criação — caminho de erro
+* **Given** um administrador autenticado na gestão de usuários/papéis/permissões
+* **When** o administrador submete dados inválidos ou incompletos
+* **Then** o sistema retorna BadRequest (BR-05), o erro é tratado via `handleApiError` e nenhum registro é criado
+
+#### Scenario 4: Escrita por usuário comum (USER) — caminho de erro
+* **Given** um usuário autenticado com perfil USER
+* **When** o usuário tenta criar usuário, papel ou permissão
+* **Then** o sistema nega com Forbidden (BR-01) e nenhuma alteração ocorre
+
+### 4. UI/UX Notes
+* **Wireframe/Mockup:** nenhum artefato de design encontrado no workspace — a criar; telas de gestão de usuários, papéis, permissões e matriz de contexto por filial.
+* **Estados da interface:** loading, success (credenciais emitidas / permissões atualizadas), error (BadRequest/Forbidden via `handleApiError`), empty (nenhum usuário/papel cadastrado). **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
+
+### 5. Technical Implementation Notes
+* **Componentes/serviços afetados:** `createUsuario`, `createFuncionarioAndUsuario`, `createUserAndToken`, `createRole`, `createPermission`, `hasPermission`, `doFilterInternal`.
+* **Dependências técnicas:** nenhuma rota/tabela detectada na varredura — vincular quando `api-specification.md` for produzida; matriz de permissões por filial não documentada — criar e manter (mitigação de risco registrada no BRD).
+* **Considerações de performance/segurança:** a verificação de permissão é executada a cada requisição (via `doFilterInternal`) — sua latência impacta todos os casos de uso (NFR-01/NFR-02); **Constraint C-04 do BRD:** `Usuario.setUsername` está com **corpo vazio (stub)** (achado AST em `src\main\java\br\com\aegispatrimonio\model\Usuario.java:86`) — implementar o comportamento ou remover o campo do fluxo de atualização, com teste de atualização de usuário cobrindo o caso (NFR-03).
+
+### 6. Out of Scope
+* Login/logout e gestão de sessão (US-001).
+* Revogação de credenciais por desligamento de funcionário — processo não evidenciado no código (open issue do UC-03).
+* Integração com provedores de identidade externos (Out-of-Scope do BRD).
+
+### 7. Definition of Ready
+- [ ] Critérios de aceite definidos e validados com PO
+- [ ] Dependências identificadas e desbloqueadas (funcionário cadastrado — US-002)
+- [ ] Design/UX aprovado (se aplicável)
+- [ ] Estimativa de esforço realizada
+- [ ] Matriz de permissões por filial documentada e destino do stub `setUsername` decidido com a engenharia
+
+### 8. Definition of Done
+- [ ] Código implementado e revisado (PR aprovado)
+- [ ] Testes unitários cobrindo cenários BDD (emissão de credenciais, ajuste contextual, dados inválidos, escrita por USER)
+- [ ] Testes de integração/E2E quando aplicável
+- [ ] Tipagem estrita aplicável ao stack (Java compilado sem erros; frontend em JavaScript)
+- [ ] Lint/format ok
+- [ ] Sem regressões de acessibilidade
+- [ ] Documentação/API docs atualizadas
+- [ ] Feature testada em staging
+- [ ] Métricas/observabilidade instrumentadas (se aplicável)
+
+### 9. Traceability
+* **NFRs relacionadas:** NFR-01, NFR-02, NFR-03, NFR-05
+* **Use Cases relacionados:** UC-03 (origem), UC-01 (consumo da credencial), UC-02 (cadastro de funcionário), UC-04 (restrição de consultas por filial)
+* **Regras de Negócio:** BR-01, BR-04, BR-05, BR-06, BR-08
+* **Riscos relacionados:** `Usuario.setUsername` com corpo vazio/stub (Constraint C-04, achado AST); matriz de permissões por filial não mantida (mitigação registrada no BRD); processo de revogação não evidenciado (open issue)
+
+---
+
+## US-004 — Consultar Listagens e Registros com Filtros
+
+* **Priority:** Must (MoSCoW) [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — esperadamente o caso de uso mais frequente do sistema; latência de listagens é guardrail do BRD
+* **Complexity:** 5 story points [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — premissa: listagens + consulta por ID + filtros combinados (`ManutencaoSpecification`)
+* **Épico:** EP-04 — Consultas e Listagens
+* **Labels:** backend, frontend, performance
+
+### 1. Description (INVEST)
+* **As a** usuário autenticado (ADMIN ou USER)
+* **I want to** consultar listagens e registros específicos com filtros combinados
+* **So that** eu visualize o patrimônio da minha unidade e localize registros rapidamente, sem expor dados fora do meu contexto
+
+*Checklist INVEST:* Independent; Negotiable (filtros suportados negociáveis); Valuable (caso de uso mais frequente — BR-02); Estimable; Small; Testable (evidência de teste `listarTodos_comUser_deveRetornarOk` já existente).
+
+### 2. Business Context
+Consultas são a operação diária de gestores de filial (visibilidade do patrimônio da unidade — BR-02), de técnicos de TI (histórico de saúde — BR-03) e da auditoria (consultas rastreáveis). A latência das listagens é **guardrail do BRD** (área sensível): o TODO de performance em `AtivoService` (linha 119) indica carregamento de até 1000 candidatos (id+nome) com ranking em memória — monitorar é obrigatório.
+
+### 3. Acceptance Criteria (BDD/Gherkin)
+
+#### Scenario 1: Consulta de listagem com filtros combinados — caminho feliz
+* **Given** um usuário autenticado (BR-02)
+* **When** o usuário acessa uma listagem (ex.: manutenções) e combina filtros de consulta
+* **Then** o sistema aplica o filtro de controle de acesso (`doFilterInternal` — BR-04), monta a consulta combinada (`ManutencaoSpecification.build`) e retorna a listagem (Ok — evidência de teste: `listarTodos_comUser_deveRetornarOk`)
+
+#### Scenario 2: Consulta de histórico de saúde por filial — caso de borda
+* **Given** um usuário autenticado e um ativo pertencente a uma filial
+* **When** o usuário solicita o histórico de saúde do ativo (`getHealthHistory`)
+* **Then** o sistema verifica a permissão de leitura **na filial à qual o ativo pertence** (BR-03) e retorna o histórico somente se autorizado
+
+#### Scenario 3: Identificador inexistente — caminho de erro
+* **Given** um usuário autenticado
+* **When** o usuário consulta um registro por ID inexistente (`buscarPorId`)
+* **Then** o sistema retorna NotFound (BR-05), nunca dados incorretos, e o erro é tratado via `handleApiError`
+
+### 4. UI/UX Notes
+* **Wireframe/Mockup:** nenhum artefato de design encontrado no workspace — a criar; telas de listagem com barra de filtros combinados.
+* **Estados da interface:** loading (durante consulta), success (listagem/registro retornado), error (falha de API via `handleApiError`), empty (listagem sem resultados para os filtros). **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
+
+### 5. Technical Implementation Notes
+* **Componentes/serviços afetados:** `listarTodos`, `buscarPorId`, `ManutencaoSpecification` (montagem de filtros combinados), `getHealthHistory`, `doFilterInternal`.
+* **Dependências técnicas:** nenhuma rota/tabela detectada na varredura — vincular quando `api-specification.md` for produzida; os filtros exatos suportados por `ManutencaoSpecification` não estão detalhados na varredura; paginação das listagens não evidenciada — confirmar comportamento com grandes volumes.
+* **Considerações de performance/segurança:** TODO de performance em `AtivoService` (linha 119): o caminho carrega até 1000 candidatos (id+nome) e faz ranking em memória — monitorar latência (NFR-01) e, no futuro, empurrar ranking/filtragem para a camada de consulta com paginação (NFR-06); restrição de consultas por filiais autorizadas (`findByFilialIdIn`) deve ser coberta por testes dedicados de acesso por filial (NFR-02); `ManutencaoSpecification.build` com complexidade ciclomática 14 (achado AST) — refatorar antes de evoluir (NFR-03); `console.debug` residual em `frontend/src/services/api.js:107` — remover antes de produção.
+
+### 6. Out of Scope
+* Criação/alteração/exclusão de registros (US-002).
+* Exportação de relatórios — não evidenciada no código.
+* Análise preditiva de falhas (Future Considerations do BRD).
+
+### 7. Definition of Ready
+- [ ] Critérios de aceite definidos e validados com PO
+- [ ] Dependências identificadas e desbloqueadas (cadastros e registros consultáveis — US-002)
+- [ ] Design/UX aprovado (se aplicável)
+- [ ] Estimativa de esforço realizada
+- [ ] Filtros suportados por `ManutencaoSpecification` e comportamento de paginação confirmados com a engenharia
+
+### 8. Definition of Done
+- [ ] Código implementado e revisado (PR aprovado)
+- [ ] Testes unitários cobrindo cenários BDD (listagem com filtros, histórico por filial, ID inexistente)
+- [ ] Testes de integração/E2E quando aplicável (incl. testes dedicados de acesso por filial)
+- [ ] Tipagem estrita aplicável ao stack (Java compilado sem erros; frontend em JavaScript)
+- [ ] Lint/format ok
+- [ ] Sem regressões de acessibilidade
+- [ ] Documentação/API docs atualizadas
+- [ ] Feature testada em staging
+- [ ] Métricas/observabilidade instrumentadas (se aplicável — latência das listagens é guardrail do BRD)
+
+### 9. Traceability
+* **NFRs relacionadas:** NFR-01, NFR-02, NFR-03, NFR-06
+* **Use Cases relacionados:** UC-04 (origem), UC-05/UC-06 (acompanhamento de manutenções), UC-08 (histórico de saúde)
+* **Regras de Negócio:** BR-02, BR-03, BR-04, BR-05
+* **Riscos relacionados:** TODO de performance em `AtivoService` — ranking em memória de até 1000 candidatos (mitigação/Future Considerations do BRD); `ManutencaoSpecification.build` complexidade 14 (achado AST); `console.debug` residual em `api.js:107`
+
+---
+
+## US-005 — Iniciar Solicitação de Manutenção
+
+* **Priority:** Must (MoSCoW) [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — fluxo de manutenção formal e rastreável é objetivo central do BRD
+* **Complexity:** 3 story points [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — premissa: fluxo único de registro no estado inicial do ciclo
+* **Épico:** EP-05 — Fluxo de Manutenção
+* **Labels:** backend, frontend
+
+### 1. Description (INVEST)
+* **As a** gestor de filial (perfil USER)
+* **I want to** registrar uma solicitação de manutenção para um ativo da minha unidade
+* **So that** o equipamento entre no fluxo formal de manutenção, rastreável até a aprovação
+
+*Checklist INVEST:* Independent (depende do ativo cadastrado — US-002); Negotiable (campos da solicitação negociáveis); Valuable (início do ciclo que formaliza o gasto de manutenção); Estimable; Small; Testable (cenários BDD abaixo).
+
+### 2. Business Context
+O fluxo de manutenção com aprovação auditável é objetivo declarado do BRD: a solicitação registrada no estado inicial (`iniciar`) é o ponto de partida do ciclo `iniciar` → `aprovar` → `concluir`/`cancelar` e alimenta o custo acumulado por ativo (KPI da diretoria). Sem o registro formal, o custo de manutenção permanece invisível e a manutenção reativa prevalece (custo de inação do BRD).
+
+### 3. Acceptance Criteria (BDD/Gherkin)
+
+#### Scenario 1: Registro de solicitação de manutenção — caminho feliz
+* **Given** um usuário autenticado com permissão no contexto do ativo (BR-04) e o ativo cadastrado (US-002)
+* **When** o gestor de filial acessa o ativo e solicita a manutenção
+* **Then** o sistema valida autenticação, permissão (BR-01/BR-04) e dados da solicitação (BR-05), registra a manutenção no estado inicial do fluxo (`iniciar`), registra data/hora (BR-08) e a manutenção fica aguardando aprovação (US-006)
+
+#### Scenario 2: Acompanhamento da solicitação — caso de borda
+* **Given** uma manutenção registrada no estado inicial
+* **When** o gestor acompanha o status via consultas com filtros (`ManutencaoSpecification` — US-004)
+* **Then** o sistema retorna o status atual da manutenção sem alterar seu estado
+
+#### Scenario 3: Usuário sem permissão no contexto do ativo — caminho de erro
+* **Given** um usuário autenticado sem permissão sobre o ativo (filial/departamento fora do contexto autorizado)
+* **When** o usuário tenta registrar a manutenção
+* **Then** o sistema nega com Forbidden (BR-01/BR-04) e nenhuma manutenção é registrada
+* Erros adicionais cobertos pelos mesmos pontos de extensão: BadRequest para dados inválidos (BR-05) e NotFound para ativo inexistente (BR-05).
+
+### 4. UI/UX Notes
+* **Wireframe/Mockup:** nenhum artefato de design encontrado no workspace — a criar; formulário de solicitação de manutenção a partir do ativo.
+* **Estados da interface:** loading, success (manutenção registrada no estado inicial), error (BadRequest/Forbidden/NotFound via `handleApiError`), empty (ativo sem manutenções). **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
+
+### 5. Technical Implementation Notes
+* **Componentes/serviços afetados:** `iniciar` (serviço de manutenção), `ManutencaoSpecification` (acompanhamento), `onUpdate`/`preUpdate` (auditoria).
+* **Dependências técnicas:** nenhuma rota/tabela detectada na varredura — vincular quando `api-specification.md` for produzida; campos obrigatórios da solicitação (ex.: descrição do problema, prioridade) não evidenciados na varredura; transições de estado permitidas não detalhadas — verificar a implementação real de `iniciar`.
+* **Considerações de performance/segurança:** registro compatível com uso interativo (NFR-01); o registro deve ser rastreável no fluxo de aprovação (NFR-05); **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** confirmar se `iniciar` exige ADMIN ou aceita USER — as personas do BRD atribuem ao Gestor de Filial (USER) a condução de solicitações, mas BR-01 restringe escrita a administradores.
+
+### 6. Out of Scope
+* Aprovação da manutenção (US-006).
+* Conclusão/cancelamento (US-007).
+* Gatilhos automáticos de manutenção (ex.: a partir de alertas) — não evidenciados no código.
+
+### 7. Definition of Ready
+- [ ] Critérios de aceite definidos e validados com PO
+- [ ] Dependências identificadas e desbloqueadas (ativo cadastrado — US-002)
+- [ ] Design/UX aprovado (se aplicável)
+- [ ] Estimativa de esforço realizada
+- [ ] Executor de `iniciar` (ADMIN vs USER) e campos obrigatórios da solicitação confirmados com a engenharia
+
+### 8. Definition of Done
+- [ ] Código implementado e revisado (PR aprovado)
+- [ ] Testes unitários cobrindo cenários BDD (registro válido, acompanhamento, sem permissão, dados inválidos, ativo inexistente)
+- [ ] Testes de integração/E2E quando aplicável
+- [ ] Tipagem estrita aplicável ao stack (Java compilado sem erros; frontend em JavaScript)
+- [ ] Lint/format ok
+- [ ] Sem regressões de acessibilidade
+- [ ] Documentação/API docs atualizadas
+- [ ] Feature testada em staging
+- [ ] Métricas/observabilidade instrumentadas (se aplicável)
+
+### 9. Traceability
+* **NFRs relacionadas:** NFR-01, NFR-05
+* **Use Cases relacionados:** UC-05 (origem), UC-02 (ativo), UC-04 (acompanhamento), UC-06 (aprovação)
+* **Regras de Negócio:** BR-01, BR-04, BR-05, BR-08
+* **Riscos relacionados:** transições de estado e executor de `iniciar` não detalhados (open issue do UC-05); ambiguidade BR-01 vs personas para `iniciar` [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]
+
+---
+
+## US-006 — Aprovar Manutenção
+
+* **Priority:** Must (MoSCoW) [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — a aprovação formaliza o gasto e o fluxo de aprovação auditável é objetivo do BRD
+* **Complexity:** 3 story points [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — premissa: fluxo único de aprovação com validação de estado
+* **Épico:** EP-05 — Fluxo de Manutenção
+* **Labels:** backend, frontend, auditoria
+
+### 1. Description (INVEST)
+* **As a** administrador (perfil ADMIN) **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** executor da aprovação não explícito no BRD/código; inferido do objetivo de restringir escrita a administradores e de a persona Gestor de Filial apenas acompanhar a aprovação
+* **I want to** aprovar as manutenções aguardando decisão
+* **So that** o gasto de manutenção seja formalizado e o fluxo permaneça auditável (quem aprovou e quando)
+
+*Checklist INVEST:* Independent (depende da solicitação registrada — US-005); Negotiable (fluxo de rejeição negociável); Valuable (formaliza o gasto — diretoria Administrativa/Financeira); Estimable; Small; Testable.
+
+### 2. Business Context
+A aprovação é o ato que formaliza o gasto de manutenção perante a diretoria e habilita a execução (US-007). O objetivo do BRD de "fluxo de manutenção com aprovação auditável" exige rastreabilidade da decisão (data/hora garantida por `onUpdate`/`preUpdate` — BR-08). O tempo médio do ciclo `iniciar` → `concluir` é KPI do BRD — a aprovação não deve ser gargalo.
+
+### 3. Acceptance Criteria (BDD/Gherkin)
+
+#### Scenario 1: Aprovação de manutenção no estado inicial — caminho feliz
+* **Given** um administrador autenticado (BR-01) e uma manutenção registrada no estado inicial (`iniciar` — US-005)
+* **When** o administrador acessa a fila de manutenções aguardando aprovação (consulta com filtros via `ManutencaoSpecification` — US-004) e registra a aprovação
+* **Then** o sistema valida permissão (BR-01/BR-04), registra a aprovação (`aprovar`), registra data/hora (BR-08) e a manutenção fica apta a ser concluída (US-007)
+
+#### Scenario 2: Encaminhamento para cancelamento em vez de aprovação — caso de borda
+* **Given** um administrador autenticado e uma manutenção aguardando aprovação
+* **When** o administrador avalia a solicitação e decide não aprová-la
+* **Then** o fluxo segue para o cancelamento da manutenção (`cancelar` — US-007) **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** não há método de "rejeição" distinto na varredura; o cancelamento é o único encaminhamento alternativo evidenciado
+
+#### Scenario 3: Manutenção em estado não aprovável — caminho de erro
+* **Given** um administrador autenticado e uma manutenção já aprovada ou cancelada
+* **When** o administrador tenta aprovar a manutenção
+* **Then** o sistema recusa a transição com erro tratado ao usuário e o estado permanece inalterado **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** comportamento exato para transição inválida não evidenciado — verificar implementação de `aprovar`
+* Erros adicionais: NotFound para manutenção inexistente (BR-05); Forbidden para tentativa de aprovação por USER (BR-01) **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** depende da confirmação de quem pode aprovar.
+
+### 4. UI/UX Notes
+* **Wireframe/Mockup:** nenhum artefato de design encontrado no workspace — a criar; fila de aprovações com filtros por estado.
+* **Estados da interface:** loading, success (aprovação registrada), error (transição inválida / NotFound / Forbidden via `handleApiError`), empty (fila sem manutenções aguardando aprovação). **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
+
+### 5. Technical Implementation Notes
+* **Componentes/serviços afetados:** `aprovar` (serviço de manutenção), `ManutencaoSpecification` (fila com filtros), `onUpdate`/`preUpdate` (auditoria).
+* **Dependências técnicas:** nenhuma rota/tabela detectada na varredura — vincular quando `api-specification.md` for produzida; estado prévio exigido (`iniciar` → `aprovar`) inferido da sequência de métodos verificados **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**.
+* **Considerações de performance/segurança:** rastreabilidade da aprovação (quem aprovou e quando) é requisito de auditoria (NFR-05); a aprovação não deve ser gargalo do ciclo `iniciar` → `concluir` (KPI do BRD — NFR-01).
+
+### 6. Out of Scope
+* Registro da solicitação (US-005).
+* Execução/conclusão da manutenção (US-007).
+* Fluxo de rejeição com justificativa — não evidenciado na varredura (open issue do UC-06).
+
+### 7. Definition of Ready
+- [ ] Critérios de aceite definidos e validados com PO
+- [ ] Dependências identificadas e desbloqueadas (solicitações registradas — US-005)
+- [ ] Design/UX aprovado (se aplicável)
+- [ ] Estimativa de esforço realizada
+- [ ] Perfil aprovador formalmente definido e comportamento para transição inválida verificado com a engenharia
+
+### 8. Definition of Done
+- [ ] Código implementado e revisado (PR aprovado)
+- [ ] Testes unitários cobrindo cenários BDD (aprovação válida, encaminhamento para cancelamento, transição inválida, USER sem permissão)
+- [ ] Testes de integração/E2E quando aplicável
+- [ ] Tipagem estrita aplicável ao stack (Java compilado sem erros; frontend em JavaScript)
+- [ ] Lint/format ok
+- [ ] Sem regressões de acessibilidade
+- [ ] Documentação/API docs atualizadas
+- [ ] Feature testada em staging
+- [ ] Métricas/observabilidade instrumentadas (se aplicável — tempo do ciclo é KPI do BRD)
+
+### 9. Traceability
+* **NFRs relacionadas:** NFR-01, NFR-05
+* **Use Cases relacionados:** UC-06 (origem), UC-05 (solicitação), UC-07 (cancelamento alternativo), UC-04 (fila com filtros)
+* **Regras de Negócio:** BR-01, BR-04, BR-05, BR-08
+* **Riscos relacionados:** executor da aprovação não definido [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]; comportamento para transição inválida não evidenciado (open issue)
+
+---
+
+## US-007 — Concluir ou Cancelar Manutenção
+
+* **Priority:** Must (MoSCoW) [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — alimenta o custo acumulado por ativo (KPI do BRD: 100% dos ativos com custo visível até o 2º trimestre pós-go-live)
+* **Complexity:** 5 story points [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — premissa: duas transições (concluir/cancelar) + validação de estado
+* **Épico:** EP-05 — Fluxo de Manutenção
+* **Labels:** backend, frontend, dados
+
+### 1. Description (INVEST)
+* **As a** gestor de filial (perfil USER) para conclusão / responsável do fluxo para cancelamento **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** executor do cancelamento não explícito
+* **I want to** concluir manutenções aprovadas ou cancelar solicitações em aberto
+* **So that** o fluxo de manutenção seja encerrado formalmente e o custo acumulado do ativo reflita a realidade para decisões de substituição, reparo ou desativação
+
+*Checklist INVEST:* Independent (depende da manutenção aprovada/em aberto — US-006); Negotiable (campos da conclusão negociáveis); Valuable (base da decisão de substituição/reparo/desativação — diretoria); Estimable; Small; Testable.
+
+### 2. Business Context
+O encerramento formal do fluxo é o que torna o custo acumulado por ativo confiável (`custoTotalPorAtivo` — UC-10), habilitando o KPI do BRD de 100% dos ativos com custo visível. Sem a conclusão registrada, a diretoria decide sem evidência e o tempo médio do ciclo `iniciar` → `concluir` (KPI do BRD) não pode ser medido.
+
+### 3. Acceptance Criteria (BDD/Gherkin)
+
+#### Scenario 1: Conclusão de manutenção aprovada — caminho feliz
+* **Given** um usuário autenticado e uma manutenção aprovada (US-006)
+* **When** o responsável acessa a manutenção e registra a conclusão
+* **Then** o sistema valida autenticação, permissão (BR-01/BR-04) e estado da manutenção, registra a conclusão (`concluir`), registra data/hora (BR-08) e o custo acumulado do ativo passa a refletir a conclusão no relatório `custoTotalPorAtivo` (US-010) **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** relação entre conclusão e custo inferida da finalidade declarada do indicador no BRD
+
+#### Scenario 2: Cancelamento de manutenção em aberto — caso de borda
+* **Given** um usuário autenticado e uma manutenção em aberto (aguardando aprovação ou aprovada não executada)
+* **When** o responsável solicita o cancelamento
+* **Then** o sistema valida permissão e estado, registra o cancelamento (`cancelar`) e a data/hora (BR-08), encerrando o fluxo daquela manutenção sem execução
+
+#### Scenario 3: Estado incompatível com a transição — caminho de erro
+* **Given** um usuário autenticado e uma manutenção em estado incompatível (ex.: não aprovada para conclusão, ou já concluída para cancelamento)
+* **When** o responsável tenta executar a transição
+* **Then** o sistema recusa a transição com erro tratado ao usuário e o estado permanece inalterado **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** comportamento exato não evidenciado — verificar implementação de `concluir`/`cancelar`
+* Erro adicional: NotFound para manutenção inexistente (BR-05).
+
+### 4. UI/UX Notes
+* **Wireframe/Mockup:** nenhum artefato de design encontrado no workspace — a criar; tela da manutenção com ações de concluir/cancelar conforme o estado.
+* **Estados da interface:** loading, success (conclusão/cancelamento registrados), error (transição inválida / NotFound via `handleApiError`), empty (não aplicável). **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
+
+### 5. Technical Implementation Notes
+* **Componentes/serviços afetados:** `concluir`, `cancelar` (serviço de manutenção), `custoTotalPorAtivo` (relatório de custo), `onUpdate`/`preUpdate` (auditoria).
+* **Dependências técnicas:** nenhuma rota/tabela detectada na varredura — vincular quando `api-specification.md` for produzida; campos registrados na conclusão (ex.: custo real, observações, peças substituídas) não evidenciados na varredura — levantar com a engenharia.
+* **Considerações de performance/segurança:** o tempo médio do ciclo `iniciar` → `concluir` é KPI do BRD (NFR-01); encerramento rastreável com data/hora garantida (NFR-05); executor de cada transição a confirmar (BR-01) **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**.
+
+### 6. Out of Scope
+* Aprovação (US-006).
+* Composição detalhada do custo (mão de obra, peças, indiretos) — open issue do UC-10, a levantar.
+* Gatilhos automáticos de conclusão — não evidenciados no código.
+
+### 7. Definition of Ready
+- [ ] Critérios de aceite definidos e validados com PO
+- [ ] Dependências identificadas e desbloqueadas (manutenções aprovadas — US-006)
+- [ ] Design/UX aprovado (se aplicável)
+- [ ] Estimativa de esforço realizada
+- [ ] Campos da conclusão e comportamento para transição inválida confirmados com a engenharia
+
+### 8. Definition of Done
+- [ ] Código implementado e revisado (PR aprovado)
+- [ ] Testes unitários cobrindo cenários BDD (conclusão válida, cancelamento, estado incompatível, manutenção inexistente)
+- [ ] Testes de integração/E2E quando aplicável
+- [ ] Tipagem estrita aplicável ao stack (Java compilado sem erros; frontend em JavaScript)
+- [ ] Lint/format ok
+- [ ] Sem regressões de acessibilidade
+- [ ] Documentação/API docs atualizadas
+- [ ] Feature testada em staging
+- [ ] Métricas/observabilidade instrumentadas (se aplicável — tempo do ciclo é KPI do BRD)
+
+### 9. Traceability
+* **NFRs relacionadas:** NFR-01, NFR-05
+* **Use Cases relacionados:** UC-07 (origem), UC-05 (solicitação), UC-06 (aprovação), UC-10 (custo acumulado)
+* **Regras de Negócio:** BR-01, BR-04, BR-05, BR-08
+* **Riscos relacionados:** relação conclusão→custo não explícita na varredura [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]; campos da conclusão não evidenciados (open issue)
+
+---
+
+## US-008 — Registrar Health Check e Consultar Histórico de Saúde
+
+* **Priority:** Should (MoSCoW) [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — KPI do BRD: ≥ 90% dos ativos monitorados (com `updateHealthCheck` atualizado) até o 2º trimestre pós-go-live
+* **Complexity:** 5 story points [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — premissa: registro (`updateHealthCheck` + `updateScalars`) + consulta (`getHealthHistory`) com permissão por filial
+* **Épico:** EP-06 — Monitoramento de Saúde dos Ativos
+* **Labels:** backend, frontend, monitoramento
+
+### 1. Description (INVEST)
+* **As a** técnico de TI / monitoramento
+* **I want to** registrar health checks com dados de hardware e disco e consultar o histórico de saúde dos ativos
+* **So that** a manutenção seja priorizada com base em evidência e a análise preditiva de falhas seja viabilizada no futuro
+
+*Checklist INVEST:* Independent (depende do ativo cadastrado — US-002); Negotiable (formato/periodicidade do health check negociáveis); Valuable (antecipação de falhas — objetivo do BRD); Estimable; Small; Testable.
+
+### 2. Business Context
+Os dados de hardware e disco são registrados "para viabilizar análise preditiva de falhas" (finalidade declarada no BRD) e sustentam a priorização de manutenção baseada em evidência. O KPI do BRD de ≥ 90% dos ativos monitorados até o 2º trimestre pós-go-live depende deste fluxo; a leitura do histórico é restrita por filial (BR-03), protegendo dados sensíveis por unidade.
+
+### 3. Acceptance Criteria (BDD/Gherkin)
+
+#### Scenario 1: Registro de health check com dados de hardware e disco — caminho feliz
+* **Given** um usuário autenticado com permissão no contexto do ativo (BR-04) e o ativo cadastrado (US-002)
+* **When** o técnico acessa o ativo e registra o health check com dados de hardware e disco
+* **Then** o sistema valida os dados coletados (BR-05), registra o health check (`updateHealthCheck`), atualiza as métricas escalares do ativo (`updateScalars`), registra data/hora (BR-08) e o histórico de saúde fica atualizado e consultável (`getHealthHistory`)
+
+#### Scenario 2: Consulta do histórico de saúde restrita por filial — caso de borda
+* **Given** um usuário autenticado e um ativo com histórico de saúde registrado
+* **When** o usuário solicita o histórico de saúde do ativo (`getHealthHistory`)
+* **Then** o sistema verifica a permissão de leitura **na filial à qual o ativo pertence** (BR-03) e retorna o histórico somente se autorizado
+
+#### Scenario 3: Dados de health check inválidos — caminho de erro
+* **Given** um técnico autenticado no registro de health check
+* **When** o técnico submete dados de hardware/disco inválidos ou incompletos
+* **Then** o sistema retorna BadRequest (BR-05), o erro é tratado via `handleApiError` e nenhum health check é registrado
+* Erro adicional: NotFound para ativo inexistente (BR-05).
+
+### 4. UI/UX Notes
+* **Wireframe/Mockup:** nenhum artefato de design encontrado no workspace — a criar; formulário de health check e visão de histórico de saúde do ativo.
+* **Estados da interface:** loading, success (health check registrado / histórico retornado), error (BadRequest/NotFound via `handleApiError`), empty (ativo ainda sem histórico de saúde). **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
+
+### 5. Technical Implementation Notes
+* **Componentes/serviços afetados:** `updateHealthCheck`, `updateScalars`, `getHealthHistory`, `doFilterInternal`.
+* **Dependências técnicas:** nenhuma rota/tabela detectada na varredura — vincular quando `api-specification.md` for produzida; periodicidade e formato exato do health check não evidenciados na varredura; critérios que conectam o histórico aos alertas de uso de recursos (US-009) não evidenciados.
+* **Considerações de performance/segurança:** KPI do BRD — ≥ 90% dos ativos monitorados até o 2º trimestre pós-go-live; a coleta deve ser compatível com o ciclo de monitoramento definido (NFR-01); leitura do histórico restrita por filial (BR-03) — cobrir com testes dedicados de acesso por filial (NFR-02); o formato de registro deve preservar a finalidade de análise preditiva (NFR-06).
+
+### 6. Out of Scope
+* Análise preditiva de falhas (Future Considerations do BRD — adiada).
+* Geração e gestão de alertas de uso de recursos (US-009).
+* Atualização do inventário de hardware (US-011 — fluxo distinto, regido por BR-10).
+
+### 7. Definition of Ready
+- [ ] Critérios de aceite definidos e validados com PO
+- [ ] Dependências identificadas e desbloqueadas (ativo cadastrado — US-002)
+- [ ] Design/UX aprovado (se aplicável)
+- [ ] Estimativa de esforço realizada
+- [ ] Periodicidade e formato exato do health check levantados com a engenharia
+
+### 8. Definition of Done
+- [ ] Código implementado e revisado (PR aprovado)
+- [ ] Testes unitários cobrindo cenários BDD (registro válido, consulta por filial, dados inválidos, ativo inexistente)
+- [ ] Testes de integração/E2E quando aplicável (incl. testes dedicados de acesso por filial)
+- [ ] Tipagem estrita aplicável ao stack (Java compilado sem erros; frontend em JavaScript)
+- [ ] Lint/format ok
+- [ ] Sem regressões de acessibilidade
+- [ ] Documentação/API docs atualizadas
+- [ ] Feature testada em staging
+- [ ] Métricas/observabilidade instrumentadas (se aplicável — % de ativos monitorados é KPI do BRD)
+
+### 9. Traceability
+* **NFRs relacionadas:** NFR-01, NFR-02, NFR-06
+* **Use Cases relacionados:** UC-08 (origem), UC-02 (ativo), UC-09 (alertas), UC-11 (inventário de hardware)
+* **Regras de Negócio:** BR-03, BR-04, BR-05, BR-08, BR-10 (indireta, via US-011)
+* **Riscos relacionados:** periodicidade não definida no código [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]; conexão histórico↔alertas não evidenciada (open issue)
+
+---
+
+## US-009 — Gerir Alertas de Uso de Recursos
+
+* **Priority:** Should (MoSCoW) [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — KPI do BRD: % de alertas reconhecidos dentro do SLA (valor numérico a definir)
+* **Complexity:** 8 story points [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — premissa: `checkResourceUsageAlerts` tem a maior complexidade ciclomática do codebase (17 — achado AST); fluxos de verificação, consulta e baixa
+* **Épico:** EP-07 — Alertas de Uso de Recursos
+* **Labels:** backend, frontend, monitoramento, tech-debt
+
+### 1. Description (INVEST)
+* **As a** técnico de TI / monitoramento (e gestor de filial para consulta e baixa) **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** distribuição de responsabilidades entre perfis inferida das personas do BRD
+* **I want** que os alertas de uso de recursos sejam gerados, consultáveis e formalmente reconhecidos (baixa via `markAsRead`)
+* **So that** a manutenção reativa seja reduzida (custo de inação do BRD) e nenhum alerta fique sem tratamento
+
+*Checklist INVEST:* Independent (consome métricas de US-008); Negotiable (limiares e SLA negociáveis); Valuable (redução do custo reativo — diretoria); Estimable; Small; Testable.
+
+### 2. Business Context
+Os alertas de uso de recursos materializam a priorização de manutenção baseada em evidência: a verificação (`checkResourceUsageAlerts`) avalia os ativos monitorados e gera alertas para os casos que excedem os critérios. O KPI do BRD de % de alertas reconhecidos dentro do SLA depende da baixa formal (`markAsRead`); sem reconhecimento, o custo reativo de manutenção prevalece (custo de inação do BRD).
+
+### 3. Acceptance Criteria (BDD/Gherkin)
+
+#### Scenario 1: Verificação gera alertas e responsável dá baixa — caminho feliz
+* **Given** ativos com métricas de uso de recursos disponíveis (US-008) e um usuário autenticado
+* **When** a verificação de uso de recursos é executada (`checkResourceUsageAlerts`) e o responsável consulta os alertas (`listarAlertas`, `getRecentAlerts`) e dá baixa formal (`markAsRead`)
+* **Then** o sistema gera alertas para os casos que excedem os critérios, registra a baixa com data/hora (BR-08) e o alerta fica reconhecido (KPI do BRD: % de alertas reconhecidos dentro do SLA)
+
+#### Scenario 2: Verificação sem alertas a gerar — caso de borda
+* **Given** ativos com métricas de uso de recursos disponíveis
+* **When** a verificação avalia os ativos e nenhum excede os critérios
+* **Then** nenhum alerta é gerado e o fluxo encerra sem registro **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** critérios de geração de alerta (limiares de uso de recursos) não evidenciados na varredura
+
+#### Scenario 3: Baixa de alerta sem permissão — caminho de erro
+* **Given** um usuário autenticado sem permissão para a baixa formal
+* **When** o usuário tenta dar baixa no alerta (`markAsRead`)
+* **Then** o sistema nega com Forbidden (BR-01/BR-04) e o alerta permanece sem baixa **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** a varredura não explicita se `markAsRead` exige ADMIN; inferido do padrão de restrição de escrita a administradores (BR-01)
+* Erro adicional: falha na verificação de uso de recursos — erro tratado ao usuário; refatorar `checkResourceUsageAlerts` (complexidade 17) antes de evoluir a área, mantendo testes de regressão.
+
+### 4. UI/UX Notes
+* **Wireframe/Mockup:** nenhum artefato de design encontrado no workspace — a criar; listagens de alertas gerais e recentes com ação de baixa.
+* **Estados da interface:** loading, success (alertas listados / baixa registrada), error (falha na verificação / Forbidden via `handleApiError`), empty (nenhum alerta gerado). **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
+
+### 5. Technical Implementation Notes
+* **Componentes/serviços afetados:** `checkResourceUsageAlerts` (`service/AlertNotificationService.java` — maior complexidade ciclomática do codebase: 17), `listarAlertas`, `getRecentAlerts`, `markAsRead`, `onUpdate`/`preUpdate` (auditoria).
+* **Dependências técnicas:** nenhuma rota/tabela detectada na varredura — vincular quando `api-specification.md` for produzida; disparo da verificação (manual, agendado ou por evento) não evidenciado no código — confirmar; SLA numérico de reconhecimento a definir (KPI do BRD sem valor).
+* **Considerações de performance/segurança:** KPI do BRD — % de alertas reconhecidos dentro do SLA até o 2º trimestre pós-go-live (NFR-01); baixa formal é operação de escrita coberta por `hasPermission` (NFR-02); refatorar `checkResourceUsageAlerts` em funções menores antes de evoluir, com testes de regressão (NFR-03).
+
+### 6. Out of Scope
+* Registro de health checks e métricas (US-008).
+* Notificações externas (e-mail/push) — não evidenciadas no código; única dependência de produção declarada é `@popperjs/core ^2.11.8`.
+* Definição automática de manutenção a partir de alertas — não evidenciada.
+
+### 7. Definition of Ready
+- [ ] Critérios de aceite definidos e validados com PO
+- [ ] Dependências identificadas e desbloqueadas (métricas de uso de recursos — US-008)
+- [ ] Design/UX aprovado (se aplicável)
+- [ ] Estimativa de esforço realizada
+- [ ] Limiares de alerta, disparo da verificação e SLA de reconhecimento definidos com a engenharia
+
+### 8. Definition of Done
+- [ ] Código implementado e revisado (PR aprovado)
+- [ ] Testes unitários cobrindo cenários BDD (verificação com alertas, verificação sem alertas, baixa sem permissão)
+- [ ] Testes de integração/E2E quando aplicável
+- [ ] Tipagem estrita aplicável ao stack (Java compilado sem erros; frontend em JavaScript)
+- [ ] Lint/format ok
+- [ ] Sem regressões de acessibilidade
+- [ ] Documentação/API docs atualizadas
+- [ ] Feature testada em staging
+- [ ] Métricas/observabilidade instrumentadas (se aplicável — % de alertas reconhecidos é KPI do BRD)
+
+### 9. Traceability
+* **NFRs relacionadas:** NFR-01, NFR-02, NFR-03
+* **Use Cases relacionados:** UC-09 (origem), UC-08 (métricas de uso), UC-04 (consulta de listagens)
+* **Regras de Negócio:** BR-01, BR-02, BR-04, BR-05, BR-08
+* **Riscos relacionados:** `checkResourceUsageAlerts` complexidade 17 — maior do codebase (achado AST — mitigação registrada no BRD); disparo da verificação não evidenciado (open issue); SLA de reconhecimento sem valor numérico (open issue)
+
+---
+
+## US-010 — Consultar Custo Total por Ativo
+
+* **Priority:** Should (MoSCoW) [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — KPI do BRD: 100% dos ativos com custo acumulado visível até o 2º trimestre pós-go-live
+* **Complexity:** 3 story points [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — premissa: consulta única via `custoTotalPorAtivo`
+* **Épico:** EP-08 — Relatórios Gerenciais
+* **Labels:** backend, frontend
+
+### 1. Description (INVEST)
+* **As a** gestor de filial / administrador (e, indiretamente, a Diretoria Administrativa/Financeira)
+* **I want to** consultar o custo total de manutenção acumulado por ativo
+* **So that** decisões de substituição, reparo ou desativação sejam apoiadas em dados (finalidade declarada do indicador no BRD)
+
+*Checklist INVEST:* Independent (consome o histórico de manutenções — US-005/006/007); Negotiable; Valuable (decisão gerencial apoiada em dados — visão do BRD); Estimable; Small; Testable.
+
+### 2. Business Context
+O indicador `custoTotalPorAtivo` existe "para apoiar decisões sobre substituição, reparo ou desativação" (finalidade declarada no BRD). O KPI de 100% dos ativos com custo acumulado visível até o 2º trimestre pós-go-live depende deste fluxo e da integridade do histórico de manutenções (fonte única de verdade — visão do BRD).
+
+### 3. Acceptance Criteria (BDD/Gherkin)
+
+#### Scenario 1: Consulta do custo total por ativo — caminho feliz
+* **Given** um usuário autenticado (BR-02) e um ativo com histórico de manutenção (US-005/006/007)
+* **When** o usuário acessa o relatório de custo total por ativo
+* **Then** o sistema valida permissão contextual (BR-04), calcula/apresenta o custo total de manutenção acumulado do ativo (`custoTotalPorAtivo`) e retorna o resultado
+
+#### Scenario 2: Ativo sem histórico de manutenção — caso de borda
+* **Given** um usuário autenticado e um ativo sem manutenções registradas
+* **When** o usuário consulta o custo total do ativo
+* **Then** o sistema apresenta custo zero ou indicação "sem dados", nunca dados incorretos **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** comportamento exato não evidenciado na varredura
+
+#### Scenario 3: Ativo inexistente — caminho de erro
+* **Given** um usuário autenticado
+* **When** o usuário consulta o custo de um ativo inexistente
+* **Then** o sistema retorna NotFound (BR-05) e o erro é tratado via `handleApiError`
+
+### 4. UI/UX Notes
+* **Wireframe/Mockup:** nenhum artefato de design encontrado no workspace — a criar; visão de custo acumulado por ativo (e comparação entre ativos candidatos a desativação — cenário AS-1 do UC-10).
+* **Estados da interface:** loading, success (custo apresentado), error (NotFound via `handleApiError`), empty (ativo sem histórico de manutenção — custo zero/"sem dados"). **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
+
+### 5. Technical Implementation Notes
+* **Componentes/serviços afetados:** `custoTotalPorAtivo` (relatório de custo por ativo).
+* **Dependências técnicas:** nenhuma rota/tabela detectada na varredura — vincular quando `api-specification.md` for produzida; composição do custo (mão de obra, peças, custos indiretos) não evidenciada na varredura — levantar; consolidação por filial/departamento não evidenciada.
+* **Considerações de performance/segurança:** KPI do BRD — 100% dos ativos com custo acumulado visível até o 2º trimestre pós-go-live; latência compatível com uso interativo (NFR-01); o custo apresentado deve refletir o histórico real de manutenções (NFR-05).
+
+### 6. Out of Scope
+* Registro de custos na conclusão de manutenções (US-007).
+* Consolidação gerencial por filial/departamento — não evidenciada (open issue do UC-10).
+* Exportação de relatórios — não evidenciada no código.
+
+### 7. Definition of Ready
+- [ ] Critérios de aceite definidos e validados com PO
+- [ ] Dependências identificadas e desbloqueadas (histórico de manutenções — US-005/006/007)
+- [ ] Design/UX aprovado (se aplicável)
+- [ ] Estimativa de esforço realizada
+- [ ] Composição do custo e comportamento para ativo sem manutenções confirmados com a engenharia
+
+### 8. Definition of Done
+- [ ] Código implementado e revisado (PR aprovado)
+- [ ] Testes unitários cobrindo cenários BDD (consulta válida, ativo sem manutenções, ativo inexistente)
+- [ ] Testes de integração/E2E quando aplicável
+- [ ] Tipagem estrita aplicável ao stack (Java compilado sem erros; frontend em JavaScript)
+- [ ] Lint/format ok
+- [ ] Sem regressões de acessibilidade
+- [ ] Documentação/API docs atualizadas
+- [ ] Feature testada em staging
+- [ ] Métricas/observabilidade instrumentadas (se aplicável — % de ativos com custo visível é KPI do BRD)
+
+### 9. Traceability
+* **NFRs relacionadas:** NFR-01, NFR-05
+* **Use Cases relacionados:** UC-10 (origem), UC-05/UC-06/UC-07 (fonte dos custos), UC-02 (ativo)
+* **Regras de Negócio:** BR-02, BR-04, BR-05
+* **Riscos relacionados:** origem dos custos não explícita na varredura [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]; composição do custo não evidenciada (open issue)
+
+---
+
+## US-011 — Atualizar Inventário de Hardware do Ativo
+
+* **Priority:** Should (MoSCoW) [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — inventário fiel compõe os dados de hardware que sustentam o monitoramento (US-008) e a futura análise preditiva
+* **Complexity:** 5 story points [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — premissa: limpeza dos componentes antigos + registro dos novos (BR-10)
+* **Épico:** EP-06 — Monitoramento de Saúde dos Ativos
+* **Labels:** backend, frontend, monitoramento
+
+> **Atenção:** o conteúdo do UC-11 no artefato-fonte está **truncado** (interrompido nas precondições). Os cenários abaixo derivam do trecho disponível, da regra BR-10 e das regras gerais BR-05; pontos não cobertos estão marcados como verificação pendente.
+
+### 1. Description (INVEST)
+* **As a** técnico de TI / monitoramento
+* **I want to** atualizar o inventário de hardware do ativo (adaptadores de rede, discos, memórias) quando há substituição de componentes
+* **So that** o inventário permaneça fiel ao equipamento e os dados de saúde preservem a finalidade de análise preditiva de falhas
+
+*Checklist INVEST:* Independent (depende do ativo com detalhe de hardware — US-002/US-008); Negotiable; Valuable (base da futura análise preditiva — Future Considerations do BRD); Estimable (parcialmente — contrato truncado no artefato-fonte); Small; Testable.
+
+### 2. Business Context
+O inventário de hardware compõe os dados de hardware do ativo registrados pelo monitoramento de saúde (US-008). Sem atualização fiel após substituições, o histórico de saúde e a futura análise preditiva de falhas (Future Considerations do BRD) perdem a base de evidência. A regra BR-10 garante que componentes antigos sejam limpos antes do registro dos novos, evitando inventário duplicado/inconsistente.
+
+### 3. Acceptance Criteria (BDD/Gherkin)
+
+#### Scenario 1: Atualização completa do inventário de hardware — caminho feliz
+* **Given** um usuário autenticado e um ativo com detalhe de hardware (precondição do UC-11)
+* **When** o técnico registra o novo inventário de hardware (adaptadores de rede, discos, memórias)
+* **Then** o sistema limpa os componentes antigos antes de registrar os novos (BR-10) e o inventário do ativo reflete a configuração atual
+
+#### Scenario 2: Substituição parcial de componentes — caso de borda
+* **Given** um usuário autenticado e um ativo com inventário de hardware existente
+* **When** o técnico substitui apenas um componente (ex.: disco)
+* **Then** o sistema remove apenas o componente substituído e mantém os demais, preservando a integridade do inventário **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** cenário inferido da regra BR-10 e da natureza dos componentes; o trecho do UC-11 está truncado no artefato-fonte
+
+#### Scenario 3: Dados inválidos ou ativo sem detalhe de hardware — caminho de erro
+* **Given** um técnico autenticado e um ativo sem detalhe de hardware ou com dados de inventário inválidos
+* **When** o técnico tenta registrar o inventário
+* **Then** o sistema recusa a entrada (BR-05) com erro tratado ao usuário e o inventário permanece inalterado **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** comportamento exato não evidenciado (trecho do UC-11 truncado no artefato-fonte)
+
+### 4. UI/UX Notes
+* **Wireframe/Mockup:** nenhum artefato de design encontrado no workspace — a criar; tela de inventário de hardware do ativo com lista de componentes (adaptadores de rede, discos, memórias).
+* **Estados da interface:** loading, success (inventário atualizado), error (dados inválidos via `handleApiError`), empty (ativo sem inventário de hardware registrado). **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
+
+### 5. Technical Implementation Notes
+* **Componentes/serviços afetados:** métodos de atualização do inventário de hardware do ativo — **nomes exatos não evidenciados no trecho disponível do UC-11** — levantar com a engenharia; relação com `updateHealthCheck` (US-008), cujos dados de hardware compõem o inventário.
+* **Dependências técnicas:** nenhuma rota/tabela detectada na varredura — vincular quando `api-specification.md` for produzida; contrato de limpeza/registro de componentes (BR-10) a confirmar na implementação real.
+* **Considerações de performance/segurança:** escrita coberta por `hasPermission` (NFR-02); o formato do inventário deve preservar a finalidade de análise preditiva (NFR-06).
+
+### 6. Out of Scope
+* Registro do health check em si (US-008).
+* Análise preditiva de falhas (Future Considerations do BRD — adiada).
+* Gestão de componentes como cadastro independente — não evidenciada no código.
+
+### 7. Definition of Ready
+- [ ] Critérios de aceite definidos e validados com PO
+- [ ] Dependências identificadas e desbloqueadas (ativo com detalhe de hardware — US-002/US-008)
+- [ ] Design/UX aprovado (se aplicável)
+- [ ] Estimativa de esforço realizada
+- [ ] Métodos/contrato de atualização do inventário levantados com a engenharia (trecho do UC-11 truncado no artefato-fonte)
+
+### 8. Definition of Done
+- [ ] Código implementado e revisado (PR aprovado)
+- [ ] Testes unitários cobrindo cenários BDD (atualização completa, substituição parcial, dados inválidos)
+- [ ] Testes de integração/E2E quando aplicável
+- [ ] Tipagem estrita aplicável ao stack (Java compilado sem erros; frontend em JavaScript)
+- [ ] Lint/format ok
+- [ ] Sem regressões de acessibilidade
+- [ ] Documentação/API docs atualizadas
+- [ ] Feature testada em staging
+- [ ] Métricas/observabilidade instrumentadas (se aplicável)
+
+### 9. Traceability
+* **NFRs relacionadas:** NFR-02, NFR-06
+* **Use Cases relacionados:** UC-11 (origem — parcial/truncado), UC-08 (monitoramento de saúde)
+* **Regras de Negócio:** BR-05, BR-10
+* **Riscos relacionados:** artefato-fonte truncado — contrato real de atualização do inventário pendente de levantamento; inventário duplicado/inconsistente se BR-10 não for respeitado
+
+---
+
+## US-012 — Executar Carga de Dados Realista para Homologação
+
+* **Priority:** Could (MoSCoW) [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — operação técnica de suporte à homologação (nível Subfunction no catálogo de UCs)
+* **Complexity:** 3 story points [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — premissa: execução do seeder; `RealisticDataSeeder.run` com complexidade ciclomática 15 (achado AST)
+* **Épico:** EP-09 — Operação Técnica de Homologação (Carga de Dados)
+* **Labels:** backend, dados, tech-debt
+
+> **Atenção:** a seção completa do UC-12 **não foi incluída** no material disponível (apenas o índice do catálogo). Os cenários abaixo derivam do índice, do achado AST (`config/seeder/RealisticDataSeeder.java`) e do contexto de validação citado no catálogo; todos os pontos não cobertos estão marcados como verificação pendente.
+
+### 1. Description (INVEST)
+* **As a** engenheiro/TI (operação técnica)
+* **I want to** executar uma carga de dados realista para homologação
+* **So that** os demais casos de uso possam ser validados com dados próximos da realidade operacional
+
+*Checklist INVEST:* Independent (não depende de outras stories — é suporte à validação); Negotiable (volume/composição dos dados negociáveis); Valuable (habilita validação realista dos fluxos); Estimable (parcialmente — seção do UC-12 ausente); Small; Testable.
+
+### 2. Business Context
+A validação realista dos fluxos (login, cadastros, manutenção, monitoramento) depende de dados próximos da produção. O catálogo de UCs cita o `mockLogin` para validação (UC-01, AS-1) e a carga de dados realista como operação técnica de homologação (UC-12) — juntas, compõem o kit de validação do ambiente.
+
+### 3. Acceptance Criteria (BDD/Gherkin)
+
+#### Scenario 1: Execução da carga de dados realista — caminho feliz
+* **Given** um ambiente de homologação com o mecanismo de persistência disponível
+* **When** a carga de dados realista é executada (`RealisticDataSeeder.run`)
+* **Then** o ambiente é populado com dados realistas (ativos, cadastros de apoio e vínculos) aptos a exercitar os demais casos de uso **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** cenário derivado do índice do catálogo e do achado AST; composição exata dos dados não evidenciada
+
+#### Scenario 2: Execução em ambiente já populado — caso de borda
+* **Given** um ambiente de homologação já populado por execução anterior
+* **When** a carga é executada novamente
+* **Then** o comportamento (idempotência, duplicação ou limpeza prévia) deve ser o definido e verificado, sem corromper o ambiente **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** comportamento não evidenciado — levantar com a engenharia
+
+#### Scenario 3: Falha durante a carga — caminho de erro
+* **Given** um ambiente de homologação
+* **When** ocorre erro durante a execução da carga (`RealisticDataSeeder.run`)
+* **Then** o erro é tratado e o ambiente não fica em estado inconsistente; refatorar `run` (complexidade ciclomática 15 — achado AST em `config/seeder/RealisticDataSeeder.java:34`) em métodos menores antes de evoluir a carga (NFR-03) **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
+
+### 4. UI/UX Notes
+* **Wireframe/Mockup:** não aplicável — operação técnica (sem interface de usuário evidenciada; execução por engenharia/TI).
+* **Estados da interface:** não aplicável; estados da operação: execução em curso, sucesso (ambiente populado), erro (falha tratada). **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
+
+### 5. Technical Implementation Notes
+* **Componentes/serviços afetados:** `RealisticDataSeeder.run` (`src\main\java\br\com\aegispatrimonio\config\seeder\RealisticDataSeeder.java:34`, complexidade ciclomática 15 — achado AST).
+* **Dependências técnicas:** nenhuma rota/tabela detectada na varredura — vincular quando `api-specification.md` for produzida; volume/composição dos dados, política de idempotência e ambiente de execução não evidenciados.
+* **Considerações de performance/segurança:** a carga destina-se exclusivamente à homologação — nunca a produção; refatorar `run` (complexidade 15) antes de evoluir (NFR-03).
+
+### 6. Out of Scope
+* Uso da carga em produção.
+* Cadastros manuais via interface (US-002).
+* Geração de dados sintéticos parametrizáveis — não evidenciada no código.
+
+### 7. Definition of Ready
+- [ ] Critérios de aceite definidos e validados com PO
+- [ ] Dependências identificadas e desbloqueadas (mecanismo de persistência disponível em homologação)
+- [ ] Design/UX aprovado (não aplicável — operação técnica)
+- [ ] Estimativa de esforço realizada
+- [ ] Política de idempotência e composição dos dados definidas com a engenharia
+
+### 8. Definition of Done
+- [ ] Código implementado e revisado (PR aprovado)
+- [ ] Testes unitários cobrindo cenários BDD (execução válida, reexecução, falha)
+- [ ] Testes de integração/E2E quando aplicável
+- [ ] Tipagem estrita aplicável ao stack (Java compilado sem erros)
+- [ ] Lint/format ok
+- [ ] Sem regressões de acessibilidade (não aplicável — operação técnica)
+- [ ] Documentação/API docs atualizadas
+- [ ] Feature testada em staging
+- [ ] Métricas/observabilidade instrumentadas (se aplicável)
+
+### 9. Traceability
+* **NFRs relacionadas:** NFR-03
+* **Use Cases relacionados:** UC-12 (origem — índice), UC-01 (mockLogin — validação), UC-02 (cadastros populados)
+* **Regras de Negócio:** nenhuma regra BR-XX diretamente vinculada no material disponível — a carga é operação técnica de suporte
+* **Riscos relacionados:** `RealisticDataSeeder.run` complexidade 15 (achado AST — refatorar antes de evoluir); ambiente inconsistente em falha sem política de idempotência definida
+
+---
+
+## US-013 — Consultar Eventos de Auditoria e Histórico de Modificações
+
+* **Priority:** Should (MoSCoW) [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — rastreabilidade para auditoria/compliance; a auditoria automática (BR-08) é a base já existente
+* **Complexity:** 5 story points [INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA] — premissa: consulta de eventos/histórico por registro sobre o mecanismo `onUpdate`/`preUpdate`
+* **Épico:** EP-10 — Auditoria e Compliance
+* **Labels:** backend, frontend, auditoria
+
+> **Atenção:** a seção completa do UC-13 **não foi incluída** no material disponível (apenas o índice do catálogo). Os cenários abaixo derivam do índice, do mecanismo de auditoria automática verificado (`onUpdate`/`preUpdate` — BR-08) e das regras gerais; todos os pontos não cobertos estão marcados como verificação pendente.
+
+### 1. Description (INVEST)
+* **As a** auditor / compliance
+* **I want to** consultar os eventos de auditoria e o histórico de modificações dos registros
+* **So that** eu verifique quem alterou o quê e quando, com trilha completa e rastreável
+
+*Checklist INVEST:* Independent (consome a trilha gerada automaticamente pelas demais stories); Negotiable (escopo do que é auditado negociável); Valuable (rastreabilidade exigida por auditoria/compliance); Estimable (parcialmente — seção do UC-13 ausente); Small; Testable.
+
+### 2. Business Context
+A auditoria/compliance depende da trilha de quem alterou o quê e quando — trilha que já é gerada automaticamente por `onUpdate`/`preUpdate` (BR-08) em todas as modificações (cadastros, manutenções, health checks, alertas). A consulta estruturada desses eventos é o que transforma a trilha em evidência utilizável para auditoria.
+
+### 3. Acceptance Criteria (BDD/Gherkin)
+
+#### Scenario 1: Consulta do histórico de modificações de um registro — caminho feliz
+* **Given** um auditor autenticado (BR-02) e um registro com modificações registradas (BR-08 — `onUpdate`/`preUpdate`)
+* **When** o auditor consulta os eventos de auditoria/histórico de modificações do registro
+* **Then** o sistema retorna a trilha de modificações com data/hora de cada alteração
+
+#### Scenario 2: Registro sem modificações registradas — caso de borda
+* **Given** um auditor autenticado e um registro recém-criado sem modificações posteriores
+* **When** o auditor consulta o histórico do registro
+* **Then** o sistema retorna lista vazia ou apenas o evento de criação, nunca dados incorretos **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** comportamento não evidenciado (seção do UC-13 não incluída no material disponível)
+
+#### Scenario 3: Registro inexistente — caminho de erro
+* **Given** um auditor autenticado
+* **When** o auditor consulta o histórico de um registro inexistente
+* **Then** o sistema retorna NotFound (BR-05) e o erro é tratado via `handleApiError` **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]** comportamento inferido da regra geral BR-05
+
+### 4. UI/UX Notes
+* **Wireframe/Mockup:** nenhum artefato de design encontrado no workspace — a criar; visão de histórico de modificações por registro (timeline de eventos).
+* **Estados da interface:** loading, success (trilha retornada), error (NotFound via `handleApiError`), empty (registro sem modificações registradas). **[INFERIDO POR IA — REQUER VALIDAÇÃO HUMANA]**
+
+### 5. Technical Implementation Notes
+* **Componentes/serviços afetados:** mecanismo de auditoria automática (`onUpdate`/`preUpdate` — BR-08); métodos de consulta de eventos de auditoria — **nomes exatos não evidenciados no material disponível** — levantar com a engenharia.
+* **Dependências técnicas:** nenhuma rota/tabela detectada na varredura — vincular quando `api-specification.md` for produzida; escopo do que é auditado (usuário responsável, campos alterados) não evidenciado na varredura.
+* **Considerações de performance/segurança:** consulta restrita a perfis autorizados (BR-04 — NFR-02); a trilha deve permanecer completa e imutável (NFR-05); latência compatível com uso interativo (NFR-01).
+
+### 6. Out of Scope
+* Alteração de registros (US-002) e transições do fluxo de manutenção (US-005/006/007) — a auditoria apenas consulta a trilha gerada.
+* Exportação de relatórios de auditoria — não evidenciada no código.
+* Retenção/arquivamento de eventos — política não evidenciada (open issue).
+
+### 7. Definition of Ready
+- [ ] Critérios de aceite definidos e validados com PO
+- [ ] Dependências identificadas e desbloqueadas (trilha gerada por `onUpdate`/`preUpdate` — BR-08)
+- [ ] Design/UX aprovado (se aplicável)
+- [ ] Estimativa de esforço realizada
+- [ ] Escopo do registro de auditoria (usuário/campos) e métodos de consulta levantados com a engenharia
+
+### 8. Definition of Done
+- [ ] Código implementado e revisado (PR aprovado)
+- [ ] Testes unitários cobrindo cenários BDD (consulta válida, registro sem modificações, registro inexistente)
+- [ ] Testes de integração/E2E quando aplicável
+- [ ] Tipagem estrita aplicável ao stack (Java compilado sem erros; frontend em JavaScript)
+- [ ] Lint/format ok
+- [ ] Sem regressões de acessibilidade
+- [ ] Documentação/API docs atualizadas
+- [ ] Feature testada em staging
+- [ ] Métricas/observabilidade instrumentadas (se aplicável)
+
+### 9. Traceability
+* **NFRs relacionadas:** NFR-01, NFR-02, NFR-05
+* **Use Cases relacionados:** UC-13 (origem — índice), UC-02 (cadastros), UC-05/UC-06/UC-07 (trilhas do fluxo de manutenção), UC-08 (health checks)
+* **Regras de Negócio:** BR-02, BR-04, BR-05, BR-08
+* **Riscos relacionados:** mecanismo de consulta de eventos de auditoria não evidenciado no material disponível; escopo do que é auditado (usuário/campos) não documentado — levantar

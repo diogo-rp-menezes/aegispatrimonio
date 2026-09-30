@@ -252,6 +252,36 @@ EXPLAIN ANALYZE SELECT * FROM health_check_disco WHERE disco_id = '...' ORDER BY
 
 ---
 
+## 6. Migrations Flyway aplicadas (registro incremental)
+
+### V20 — FULLTEXT index em `ativos(nome)` (M4, audit 2026-09-30)
+
+```yaml
+migration:
+  id: "V20__create_ativos_fulltext_index"
+  type: "Java (BaseJavaMigration, padrão V17)"
+  motivation: >
+    M4 do audit: a busca por nome carregava até 1000 candidatos (id+nome) e fazia
+    ranking Levenshtein em memória. Migrada para FULLTEXT (MATCH ... AGAINST em
+    NATURAL LANGUAGE MODE) com ranking por relevância no banco.
+  changes:
+    - type: "CREATE"
+      object: "FULLTEXT INDEX ft_ativos_nome ON ativos(nome)"
+      description: "MySQL 8 apenas; idempotente via JDBC DatabaseMetaData"
+  portability:
+    h2: "no-op (H2 não suporta FULLTEXT); AtivoService usa fallback LIKE"
+    mysql: "CREATE FULLTEXT INDEX, guardado por verificação de metadados"
+  rollback:
+    manual: "DROP INDEX ft_ativos_nome ON ativos;"
+    note: "Sem perda de dados; aplicação continua funcional via fallback LIKE do AtivoService"
+  downtime: "Nenhum — CREATE INDEX online no MySQL 8 (InnoDB); código novo é retrocompatível (fallback LIKE)"
+  verification: >
+    MySQL: EXPLAIN SELECT ... WHERE MATCH(nome) AGAINST('desktop' IN NATURAL LANGUAGE MODE)
+    deve usar ft_ativos_nome (fulltext scan), não Seq Scan.
+```
+
+---
+
 <!-- source: db-schema-spec#1.1 -->
 <!-- source: db-schema-spec#1.2 -->
 <!-- source: db-schema-spec#1.3 -->

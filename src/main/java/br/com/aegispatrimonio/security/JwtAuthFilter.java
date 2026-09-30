@@ -63,9 +63,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 }
             }
         } catch (Exception e) {
-            // Logar erro de token inválido se necessário, mas não interromper o filtro
-            // O usuário permanecerá não autenticado
-            log.error("Erro ao processar token JWT: {}", e.getMessage());
+            // H1 (audit): token inválido/expirado é evento comum e esperado —
+            // WARN curto com a causa, sem stacktrace. Detalhes completos em DEBUG.
+            log.warn("Token JWT inválido ou não processado: {}", e.getMessage());
+            log.debug("Detalhes da falha ao processar token JWT", e);
         }
         filterChain.doFilter(request, response);
     }
