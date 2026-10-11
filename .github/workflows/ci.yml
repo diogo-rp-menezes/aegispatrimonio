@@ -31,7 +31,7 @@ jobs:
       - name: Upload build artifact (jar)
         if: always()
         # v4.6.2
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: aegis-artifact
           path: target/*.jar
@@ -39,7 +39,7 @@ jobs:
       - name: Upload JaCoCo exec
         if: always()
         # v4.6.2
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: jacoco-exec
           path: target/jacoco.exec
@@ -47,7 +47,7 @@ jobs:
       - name: Upload JaCoCo HTML report
         if: always()
         # v4.6.2
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: jacoco-report-html
           path: target/site/jacoco/**
